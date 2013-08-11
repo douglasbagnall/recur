@@ -1,0 +1,21 @@
+#ignore these in git listings
+*.pyc
+*~
+*.[oadi]
+*.so
+.emacs*
+/junk/
+test_*
+!test_*.[ch]
+/test-images/generated
+/test-images/output
+/test-video
+/test-audio
+*.p[bgp]m
+*.log
+/images/
+/*.net
+/*.S
+/debug/
+/gtk-recur
+/nets
