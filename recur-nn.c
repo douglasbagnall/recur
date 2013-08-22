@@ -641,10 +641,12 @@ apply_sgd_with_bptt_batch(RecurNN *net, float momentum, float momentum_weight,
 void bptt_consolidate_many_nets(RecurNN **nets, int n){
   RecurNN *net = nets[0];
   RecurNNBPTT *bptt = net->bptt;
-  /*XXX could just use first net's delta as gradient */
-  float *ho_gradient = calloc(net->ih_size, sizeof(float));
-  float *ih_gradient = calloc(net->ih_size, sizeof(float));
-  for (int i = 0; i < n; i++){
+  /*Use first net's delta as gradient accumulator.*/
+  float *ho_gradient = bptt->ho_delta;
+  float *ih_gradient = bptt->ih_delta;
+  scale_aligned_array(ho_gradient, net->ho_size, bptt->ho_scale);
+  scale_aligned_array(ih_gradient, net->ih_size, bptt->ih_scale);
+  for (int i = 1; i < n; i++){
     net = nets[i];
     bptt = net->bptt;
     /*saxpy -> scale and add */
@@ -659,8 +661,9 @@ void bptt_consolidate_many_nets(RecurNN **nets, int n){
 
   apply_learning_with_momentum(net->ih_weights, ih_gradient, bptt->ih_momentum,
       net->ih_size, bptt->learn_rate, bptt->momentum, bptt->momentum_weight);
-  free(ho_gradient);
-  free(ih_gradient);
+
+  memset(ho_gradient, 0, net->ho_size * sizeof(float));
+  memset(ih_gradient, 0, net->ih_size * sizeof(float));
 }
 
 
