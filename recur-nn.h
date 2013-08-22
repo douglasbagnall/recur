@@ -19,10 +19,6 @@ typedef float v4ss __attribute__ ((vector_size (16))) __attribute__ ((aligned (1
 #define RECUR_RNG_SUBSEED -2ULL
 #define RECUR_RNG_NOSEED -3ULL
 
-#define LEAKY_INTEGRATION 0
-#define LEAKY_INTEGRATION_FRACTION 0.1
-#define LEAKY_INTEGRATION_MAX 0.2
-
 #define RANDOM_DAMAGE 1
 #define RANDOM_DAMAGE_MAGNITUDE 0.03
 

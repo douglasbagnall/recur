@@ -301,15 +301,6 @@ maybe_scale_inputs(RecurNN *net){
 /*raw opinion does the core calculation */
 static void
 rnn_raw_opinion(RecurNN *net){
-#if LEAKY_INTEGRATION
-  int leaky_n = LEAKY_INTEGRATION_FRACTION * net->h_size;
-  float leaks[leaky_n + 1];
-  memcpy(leaks, net->hidden_layer, (leaky_n + 1) * sizeof(float));
-  //for (int i = 0; i < leaky_n; i++){
-  //  printf("%d.%d: %f\n", net->generation, i, net->hidden_layer[i]);
-  //}
-#endif
-
   if (net->bias)
     net->input_layer[0] = 1.0f;
 
@@ -324,18 +315,6 @@ rnn_raw_opinion(RecurNN *net){
     net->hidden_layer[i] = MAX(net->hidden_layer[i], 0.0);
   }
   maybe_scale_hiddens(net);
-
-#if LEAKY_INTEGRATION
-  float leak_rate = LEAKY_INTEGRATION_MAX;
-  float leak_decay = LEAKY_INTEGRATION_MAX / (leaky_n - 1);
-  for (int i = 1; i <= leaky_n; i++){
-    MAYBE_DEBUG("leak rate %f, hidden[%d] %f leak %f",
-        leak_rate, i, net->hidden_layer[i], leaks[i]);
-    net->hidden_layer[i] *= (1.0f - leak_rate);
-    net->hidden_layer[i] += leaks[i] * leak_rate;
-    leak_rate -= leak_decay;
-  }
-#endif
 
   if (net->bias)
     net->hidden_layer[0] = 1.0f;
