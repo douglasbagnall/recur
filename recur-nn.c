@@ -366,8 +366,15 @@ backprop_top_layer(RecurNN *net)
   return error_sum;
 }
 
+/*apply_sgd_top_layer backpropagates error, calculates updates via gradient
+  descent, and alters the weights accordingly.
+
+It is more efficient than calc_sgd_top_layer (with subsequent weight
+adjustment) when the top layer synchronic batch size is one.
+*/
+
 static float
-sgd_top_layer(RecurNN *net){
+apply_sgd_top_layer(RecurNN *net){
   //cblas_ger
   RecurNNBPTT *bptt = net->bptt;
   float *restrict o_error = bptt->o_error;
@@ -418,6 +425,10 @@ sgd_top_layer(RecurNN *net){
   return error_sum;
 }
 
+/*calc_sgd_top_layer backpropagates error, and calculates weight updates via
+  gradient descent, which get put in the net->bptt->ho_delta array.
+*/
+
 static float
 calc_sgd_top_layer(RecurNN *net){
   //cblas_ger
@@ -437,12 +448,12 @@ calc_sgd_top_layer(RecurNN *net){
   }
 
   error_sum = backprop_top_layer(net);
-
   for (y = 0; y < net->h_size; y++){
-    float *restrict drow = delta + y * net->o_size;
-    ASSUME_ALIGNED(drow);
     if (hiddens[y]){
+      float *restrict drow = delta + y * net->o_size;
+      ASSUME_ALIGNED(drow);
       for (x = 0; x < net->o_size; x++){
+        /*XXX using += would allow diachronic batching*/
         drow[x] = o_error[x] * hiddens[y];
       }
     }
@@ -630,6 +641,7 @@ apply_sgd_with_bptt_batch(RecurNN *net, float momentum, float momentum_weight,
 void bptt_consolidate_many_nets(RecurNN **nets, int n){
   RecurNN *net = nets[0];
   RecurNNBPTT *bptt = net->bptt;
+  /*XXX could just use first net's delta as gradient */
   float *ho_gradient = calloc(net->ih_size, sizeof(float));
   float *ih_gradient = calloc(net->ih_size, sizeof(float));
   for (int i = 0; i < n; i++){
@@ -675,7 +687,7 @@ bptt_calc_deltas(RecurNN *net){
 void
 bptt_calculate(RecurNN *net){
   float bptt_error_sum;
-  float top_error_sum = sgd_top_layer(net);
+  float top_error_sum = apply_sgd_top_layer(net);
   float top_error_scaled = softclip_scale(top_error_sum,
       net->h_size * MAX_TOP_ERROR_FACTOR, net->bptt->h_error, net->h_size);
 
