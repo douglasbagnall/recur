@@ -336,35 +336,26 @@ rnn_opinion(RecurNN *net, const float *inputs){
 }
 
 
-static float
-sgd_top_layer(RecurNN *net){
-  //cblas_ger
-  RecurNNBPTT *bptt = net->bptt;
-  float *restrict h_error = bptt->h_error;
-  float *restrict o_error = bptt->o_error;
-  float *restrict inputs = net->hidden_layer;
+static inline float
+backprop_top_layer(RecurNN *net)
+{
+  int x, y;
+  float error_sum = 0.0f;
+
+  float *restrict hiddens = net->hidden_layer;
+  float *restrict h_error = net->bptt->h_error;
+  float *restrict o_error = net->bptt->o_error;
   float *restrict weights = net->ho_weights;
-  float *restrict momentums = bptt->ho_momentum;
-  float rate = bptt->learn_rate;
-  float momentum = bptt->momentum;
-  float momentum_weight = bptt->momentum_weight;
-  float error_sum = 0;
-  ASSUME_ALIGNED(inputs);
+  ASSUME_ALIGNED(hiddens);
   ASSUME_ALIGNED(h_error);
   ASSUME_ALIGNED(o_error);
   ASSUME_ALIGNED(weights);
-  ASSUME_ALIGNED(momentums);
 
-  int y, x;
-
-  if (net->bias){
-    inputs[0] = 1.0f;
-  }
   for (y = 0; y < net->h_size; y++){
     float e = 0.0;
     float *restrict row = weights + y * net->o_size;
     ASSUME_ALIGNED(row);
-    if (inputs[y]){
+    if (hiddens[y]){
       for (x = 0; x < net->o_size; x++){
         e += row[x] * o_error[x];
       }
@@ -372,14 +363,42 @@ sgd_top_layer(RecurNN *net){
     }
     h_error[y] = e;
   }
+  return error_sum;
+}
+
+static float
+sgd_top_layer(RecurNN *net){
+  //cblas_ger
+  RecurNNBPTT *bptt = net->bptt;
+  float *restrict o_error = bptt->o_error;
+  float *restrict hiddens = net->hidden_layer;
+  float *restrict weights = net->ho_weights;
+  float *restrict momentums = bptt->ho_momentum;
+  float rate = bptt->learn_rate;
+  float momentum = bptt->momentum;
+  float momentum_weight = bptt->momentum_weight;
+  float error_sum;
+  ASSUME_ALIGNED(hiddens);
+  ASSUME_ALIGNED(o_error);
+  ASSUME_ALIGNED(weights);
+  ASSUME_ALIGNED(momentums);
+
+  int y, x;
+
+  if (net->bias){
+    hiddens[0] = 1.0f;
+  }
+
+  error_sum = backprop_top_layer(net);
+
   for (y = 0; y < net->h_size; y++){
     float *restrict momentum_row = momentums + y * net->o_size;
     float *restrict row = weights + y * net->o_size;
     ASSUME_ALIGNED(row);
     ASSUME_ALIGNED(momentum_row);
 
-    if (inputs[y]){
-      float m = inputs[y] * rate;
+    if (hiddens[y]){
+      float m = hiddens[y] * rate;
       for (x = 0; x < net->o_size; x++){
         float d = o_error[x] * m;
         float mm = momentum_row[x];
@@ -403,16 +422,12 @@ static float
 calc_sgd_top_layer(RecurNN *net){
   //cblas_ger
   RecurNNBPTT *bptt = net->bptt;
-  float *restrict h_error = bptt->h_error;
   float *restrict o_error = bptt->o_error;
   float *restrict hiddens = net->hidden_layer;
-  float *restrict weights = net->ho_weights;
   float *restrict delta = bptt->ho_delta;
   float error_sum = 0;
   ASSUME_ALIGNED(hiddens);
-  ASSUME_ALIGNED(h_error);
   ASSUME_ALIGNED(o_error);
-  ASSUME_ALIGNED(weights);
   ASSUME_ALIGNED(delta);
 
   int y, x;
@@ -420,18 +435,9 @@ calc_sgd_top_layer(RecurNN *net){
   if (net->bias){
     hiddens[0] = 1.0f;
   }
-  for (y = 0; y < net->h_size; y++){
-    float e = 0.0;
-    float *restrict row = weights + y * net->o_size;
-    ASSUME_ALIGNED(row);
-    if (hiddens[y]){
-      for (x = 0; x < net->o_size; x++){
-        e += row[x] * o_error[x];
-      }
-      error_sum += fabsf(e);
-    }
-    h_error[y] = e;
-  }
+
+  error_sum = backprop_top_layer(net);
+
   for (y = 0; y < net->h_size; y++){
     float *restrict drow = delta + y * net->o_size;
     ASSUME_ALIGNED(drow);
