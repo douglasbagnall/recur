@@ -351,11 +351,11 @@ backprop_top_layer(RecurNN *net)
   ASSUME_ALIGNED(o_error);
   ASSUME_ALIGNED(weights);
 
-  for (y = 0; y < net->h_size; y++){
-    float e = 0.0;
-    float *restrict row = weights + y * net->o_size;
-    ASSUME_ALIGNED(row);
+  for (y = net->bias; y < net->h_size; y++){
+    float e = 0.0f;
     if (hiddens[y]){
+      float *restrict row = weights + y * net->o_size;
+      ASSUME_ALIGNED(row);
       for (x = 0; x < net->o_size; x++){
         e += row[x] * o_error[x];
       }
