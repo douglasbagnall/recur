@@ -318,24 +318,17 @@ epoch(RecurNN *net, const u8 *text, const int len){
 }
 
 void dump_parameters(void){
-  DEBUG("MAX_ERROR_GAIN %f\n"
-    "MIN_ERROR_FACTOR %f\n"
-    "HIDDEN_SIZE %d\n"
-    "LEARN_RATE %f\n"
-    "BIAS %d\n"
-    "MOMENTUM %f\n"
-    "MOMENTUM_WEIGHT %f\n"
-    "BPTT_DEPTH %d\n"
-    ,
-    MAX_ERROR_GAIN,
-    MIN_ERROR_FACTOR,
-    HIDDEN_SIZE,
-    LEARN_RATE,
-    BIAS,
-    MOMENTUM,
-    MOMENTUM_WEIGHT,
-    BPTT_DEPTH
-    );
+#define DEBUG_CONSTANT(x, f) DEBUG("%-25s: " #f, #x, x)
+  DEBUG_CONSTANT(MAX_ERROR_GAIN , %g);
+  DEBUG_CONSTANT(MIN_ERROR_FACTOR , %g);
+  DEBUG_CONSTANT(HIDDEN_SIZE , %d);
+  DEBUG_CONSTANT(LEARN_RATE , %g);
+  DEBUG_CONSTANT(BIAS , %d);
+  DEBUG_CONSTANT(MOMENTUM , %g);
+  DEBUG_CONSTANT(MOMENTUM_WEIGHT , %g);
+  DEBUG_CONSTANT(BPTT_DEPTH , %d);
+  DEBUG_CONSTANT(BPTT_BATCH_SIZE, %d);
+#undef DEBUG_CONSTANT
 }
 
 int
