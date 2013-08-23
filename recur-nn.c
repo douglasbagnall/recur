@@ -3,13 +3,15 @@
 
 static RecurNNBPTT *
 new_bptt(RecurNN *net, int depth, float learn_rate, float momentum,
-    float momentum_weight){
+         float momentum_weight, int batch_size){
   RecurNNBPTT *bptt = calloc(sizeof(RecurNNBPTT), 1);
   MAYBE_DEBUG("allocated bptt %p", bptt);
   bptt->depth = depth;
   bptt->learn_rate = learn_rate;
   bptt->momentum = momentum;
   bptt->momentum_weight = momentum_weight;
+  batch_size = MAX(1, batch_size);
+  bptt->batch_size = batch_size;
   size_t vlen = net->i_size * 2 + net->h_size * 0 + net->o_size * 1;
   vlen += 2 * (net->ih_size + net->ho_size);
   vlen += depth * net->i_size;
@@ -40,7 +42,7 @@ new_bptt(RecurNN *net, int depth, float learn_rate, float momentum,
 RecurNN *
 rnn_new(uint input_size, uint hidden_size, uint output_size, int flags,
     u64 rng_seed, const char *log_file, int bptt_depth, float learn_rate,
-    float momentum, float momentum_weight){
+    float momentum, float momentum_weight, int batch_size){
   RecurNN *net = calloc(1, sizeof(RecurNN));
   int bias = !! (flags & RNN_NET_FLAG_BIAS);
   float *fm;
@@ -88,7 +90,8 @@ rnn_new(uint input_size, uint hidden_size, uint output_size, int flags,
   MAYBE_DEBUG("flags is %d including bptt %d", flags, flags & RNN_NET_FLAG_OWN_BPTT);
   /* bptt */
   if (flags & RNN_NET_FLAG_OWN_BPTT){
-    net->bptt = new_bptt(net, bptt_depth, learn_rate, momentum, momentum_weight);
+    net->bptt = new_bptt(net, bptt_depth, learn_rate, momentum,
+        momentum_weight, batch_size);
     bptt_advance(net);
   }
   else {
@@ -169,20 +172,25 @@ rnn_clone(RecurNN *parent, int flags,
   int bptt_depth;
   float momentum;
   float momentum_weight;
+  int batch_size;
   if (parent->bptt && (flags & RNN_NET_FLAG_OWN_BPTT)){
     learn_rate = parent->bptt->learn_rate;
     bptt_depth = parent->bptt->depth;
     momentum = parent->bptt->momentum;
     momentum_weight = parent->bptt->momentum_weight;
+    batch_size = parent->bptt->batch_size;
   }
   else { /*doesn't matter what these are */
     learn_rate = 0;
     bptt_depth = 0;
     momentum = 0;
     momentum_weight = 0;
+    batch_size = 0;
   }
+
   net = rnn_new(parent->input_size, parent->hidden_size, parent->output_size,
-      flags, rng_seed, log_file, bptt_depth, learn_rate, momentum, momentum_weight);
+      flags, rng_seed, log_file, bptt_depth, learn_rate, momentum,
+      momentum_weight, batch_size);
 
   if (flags & RNN_NET_FLAG_OWN_WEIGHTS){
     memcpy(net->ih_weights, parent->ih_weights, net->ih_size * sizeof(float));
@@ -631,7 +639,7 @@ apply_sgd_with_bptt_batch(RecurNN *net, float top_error_sum){
 
   free(gradient);
 
-  if ((net->generation % BPTT_BATCH_SIZE) == 0){
+  if ((net->generation % bptt->batch_size) == 0){
     apply_learning_with_momentum(net->ih_weights, bptt->ih_delta, bptt->ih_momentum,
         net->ih_size, rate, bptt->momentum, bptt->momentum_weight);
   }
@@ -691,11 +699,10 @@ bptt_calculate(RecurNN *net){
   float top_error_scaled = softclip_scale(top_error_sum,
       net->h_size * MAX_TOP_ERROR_FACTOR, net->bptt->h_error, net->h_size);
 
-#if BPTT_BATCH_SIZE > 1
-  bptt_error_sum = apply_sgd_with_bptt_batch(net, top_error_scaled);
-#else
-  bptt_error_sum = apply_sgd_with_bptt(net, top_error_scaled);
-#endif
+  if (net->bptt->batch_size > 1)
+    bptt_error_sum = apply_sgd_with_bptt_batch(net, top_error_scaled);
+  else
+    bptt_error_sum = apply_sgd_with_bptt(net, top_error_scaled);
   net->generation++;
   if (net->log){
     bptt_log_float(net, "top_error_scaled", top_error_scaled);

@@ -34,8 +34,6 @@ typedef float v4ss __attribute__ ((vector_size (16))) __attribute__ ((aligned (1
 #define HIDDEN_MEAN_SOFT_TOP 2.0f
 #define INPUT_MEAN_SOFT_TOP 1.0f
 
-#define BPTT_BATCH_SIZE 1
-
 #define RNN_INITIAL_WEIGHT_VARIANCE_FACTOR 8.0f
 #define WEIGHT_SCALE (1.0f - 1e-6f)
 
@@ -114,6 +112,7 @@ struct _RecurNNBPTT {
   float ho_scale;
   float momentum;
   float momentum_weight;
+  int batch_size;
 };
 
 #define ALIGNED_SIZEOF(x)  ((sizeof(x) + 15UL) & ~15UL)
@@ -123,7 +122,7 @@ struct _RecurNNBPTT {
 
 RecurNN * rnn_new(uint input_size, uint hidden_size, uint output_size,
     int flags, u64 rng_seed, const char *log_file, int depth, float learn_rate,
-    float momentum, float momentum_weight);
+    float momentum, float momentum_weight, int batch_size);
 
 RecurNN * rnn_clone(RecurNN *parent, int flags,
     u64 rng_seed, const char *log_file);

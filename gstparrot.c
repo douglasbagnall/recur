@@ -98,7 +98,8 @@ gst_parrot_init (GstParrot * self)
   if (self->net == NULL){
     self->net = rnn_new(PARROT_N_FEATURES, PARROT_N_HIDDEN,
         PARROT_HALF_WINDOW, PARROT_RNN_FLAGS, PARROT_RNG_SEED,
-        NET_LOG_FILE, PARROT_BPTT_DEPTH, LEARN_RATE, MOMENTUM, MOMENTUM_WEIGHT);
+        NET_LOG_FILE, PARROT_BPTT_DEPTH, LEARN_RATE, MOMENTUM, MOMENTUM_WEIGHT,
+        PARROT_BATCH_SIZE);
   }
   else {
     self->net->bptt->learn_rate = LEARN_RATE;

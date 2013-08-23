@@ -22,6 +22,7 @@
 #define MOMENTUM_WEIGHT 0.5
 #define BIAS 1
 #define K_STOP 0
+#define BPTT_BATCH_SIZE 1
 
 #define SAFE_CONFAB 1
 
@@ -352,7 +353,8 @@ main(void){
   if (net == NULL)
     net = rnn_new(INPUT_SIZE, HIDDEN_SIZE,
         INPUT_SIZE, BIAS ? RNN_NET_FLAG_STANDARD : RNN_NET_FLAG_NO_BIAS, 1,
-        NET_LOG_FILE, BPTT_DEPTH, LEARN_RATE, MOMENTUM, MOMENTUM_WEIGHT);
+        NET_LOG_FILE, BPTT_DEPTH, LEARN_RATE, MOMENTUM, MOMENTUM_WEIGHT,
+        BPTT_BATCH_SIZE);
 
   create_char_lut(CHAR_TO_NET, NET_TO_CHAR);
   long len;

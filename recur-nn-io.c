@@ -56,6 +56,7 @@ rnn_save_net(RecurNN *net, const char *filename){
   SAVE_ARRAY(net, ho_weights, net->ho_size);
 
   SAVE_SCALAR(net->bptt, depth);
+  SAVE_SCALAR(net->bptt, batch_size);
   SAVE_SCALAR(net->bptt, index);
   SAVE_SCALAR(net->bptt, learn_rate);
   SAVE_SCALAR(net->bptt, momentum);
@@ -121,6 +122,7 @@ rnn_load_net(const char *filename){
   READ_SCALAR(tmpnet, generation);
   READ_SCALAR(tmpnet, flags);
   READ_SCALAR(tmpbptt, depth);
+  READ_SCALAR(tmpbptt, batch_size);
   READ_SCALAR(tmpbptt, learn_rate);
   READ_SCALAR(tmpbptt, index);
   READ_SCALAR(tmpbptt, momentum);
@@ -131,7 +133,7 @@ rnn_load_net(const char *filename){
   net = rnn_new(tmpnet.input_size, tmpnet.hidden_size,
       tmpnet.output_size, tmpnet.flags, 0, NULL,
       tmpbptt.depth, tmpbptt.learn_rate, tmpbptt.momentum,
-      tmpbptt.momentum_weight);
+      tmpbptt.momentum_weight, tmpbptt.batch_size);
   net->rng = tmpnet.rng;
   net->generation = tmpnet.generation;
   net->bptt->index = tmpbptt.index;
@@ -163,6 +165,7 @@ rnn_load_net(const char *filename){
   CHECK_SCALAR(net, tmpnet, generation);
   CHECK_SCALAR(net, tmpnet, flags);
   CHECK_SCALAR(net->bptt, tmpbptt, depth);
+  CHECK_SCALAR(net->bptt, tmpbptt, batch_size);
   CHECK_SCALAR(net->bptt, tmpbptt, index);
 #undef CHECK_SCALAR
 

@@ -37,6 +37,7 @@ typedef s16 audio_sample;
 #define RECUR_N_HIDDEN 199
 #define RECUR_BIAS 1
 #define RECUR_BPTT_DEPTH 20
+#define RECUR_BATCH_SIZE 1
 #define RECUR_RNG_SEED -1
 
 #define NET_FILENAME "gst-" QUOTE(RECUR_N_HIDDEN) "-" QUOTE(RECUR_BIAS) ".net"
