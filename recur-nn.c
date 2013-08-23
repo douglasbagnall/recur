@@ -562,10 +562,11 @@ bptt_and_accumulate_error(RecurNN *net, float *ih_delta, float top_error_sum)
   return error_sum;
 }
 
-
+/*apply_learning_with_momentum updates weights and momentum according to
+  delta and momentum, and zeros delta. */
 static void
 apply_learning_with_momentum(float *restrict weights,
-    const float *restrict delta, float *restrict momentums,
+    float *restrict delta, float *restrict momentums,
     int size, const float rate, const float momentum, const float momentum_weight){
 
   ASSUME_ALIGNED(weights);
@@ -577,6 +578,7 @@ apply_learning_with_momentum(float *restrict weights,
 
   size /= 4;
   v4ss rate_v = {rate, rate, rate, rate};
+  v4ss zero_v = {0.0f, 0.0f, 0.0f, 0.0f};
   v4ss momentum_v = {momentum, momentum, momentum, momentum};
   v4ss momentum_weight_v = {momentum_weight, momentum_weight,
                             momentum_weight, momentum_weight};
@@ -585,6 +587,7 @@ apply_learning_with_momentum(float *restrict weights,
   v4ss *vm = (v4ss*)momentums;
   for (int i = 0; i < size; i++){
     v4ss t = vtmp[i] * rate_v;
+    vtmp[i] = zero_v;
     v4ss m = vm[i];
     vw[i] += t + m * momentum_weight_v;
     vm[i] = (m + t) * momentum_v;
@@ -595,6 +598,7 @@ apply_learning_with_momentum(float *restrict weights,
   //#pragma omp parallel for
   for (int i = 0; i < size; i++){
     float t = delta[i] * rate;
+    delta[i] = 0;
     weights[i] += t + momentums[i] * momentum_weight;
     momentums[i] += t;
     momentums[i] *= momentum;
@@ -612,7 +616,6 @@ apply_sgd_with_bptt(RecurNN *net, float top_error_sum){
   apply_learning_with_momentum(net->ih_weights, bptt->ih_delta, bptt->ih_momentum,
       net->ih_size, rate, bptt->momentum, bptt->momentum_weight);
 
-  memset(bptt->ih_delta, 0, net->ih_size * sizeof(float));
   return error_sum;
 }
 
@@ -631,7 +634,6 @@ apply_sgd_with_bptt_batch(RecurNN *net, float top_error_sum){
   if ((net->generation % BPTT_BATCH_SIZE) == 0){
     apply_learning_with_momentum(net->ih_weights, bptt->ih_delta, bptt->ih_momentum,
         net->ih_size, rate, bptt->momentum, bptt->momentum_weight);
-    memset(bptt->ih_delta, 0, net->ih_size * sizeof(float));
   }
   return error_sum;
 }
@@ -659,9 +661,6 @@ void bptt_consolidate_many_nets(RecurNN **nets, int n){
 
   apply_learning_with_momentum(net->ih_weights, ih_gradient, bptt->ih_momentum,
       net->ih_size, bptt->learn_rate, bptt->momentum, bptt->momentum_weight);
-
-  memset(ho_gradient, 0, net->ho_size * sizeof(float));
-  memset(ih_gradient, 0, net->ih_size * sizeof(float));
 }
 
 

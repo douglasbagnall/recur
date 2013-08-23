@@ -10,7 +10,7 @@
 #include "pgm_dump.h"
 
 #define VECTOR 1
-#define VECTOR_ALL_THE_WAY (0 && VECTOR)
+#define VECTOR_ALL_THE_WAY (1 && VECTOR)
 
 #if VECTOR
 typedef float v4ss __attribute__ ((vector_size (16))) __attribute__ ((aligned (16)));
