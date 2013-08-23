@@ -17,9 +17,7 @@ typedef float v4ss __attribute__ ((vector_size (16))) __attribute__ ((aligned (1
 #endif
 
 #define RECUR_RNG_SUBSEED -2ULL
-#define RECUR_RNG_NOSEED -3ULL
 
-#define RANDOM_DAMAGE 1
 #define RANDOM_DAMAGE_MAGNITUDE 0.03
 
 #define MAX_TOP_ERROR_FACTOR 1.0f
@@ -37,10 +35,19 @@ typedef float v4ss __attribute__ ((vector_size (16))) __attribute__ ((aligned (1
 #define RNN_INITIAL_WEIGHT_VARIANCE_FACTOR 8.0f
 #define WEIGHT_SCALE (1.0f - 1e-6f)
 
-/*RESCALE_INTERVAL should be <= 32, ideally a power of 2 */
-#define RESCALE_INTERVAL 8
+/*RNN_CONDITIONING_INTERVAL should be <= 32, ideally a power of 2 */
+#define RNN_CONDITIONING_INTERVAL 8
 
 #define ASM_MARKER(x) asm("/**" QUOTE(x) "**/")
+
+/* Conditioning flags go in bits 16-23 of net->flags.
+
+   The RNN_COND_BIT_* numbers indicate the points in the conditioning cycle
+   that various kinds of work will be done. They are deliberately sparsely
+   spaced.
+
+   The RNN_COND_MASK_* flags turn off the respective conditioning task.
+ */
 
 #define RNN_COND_MASK_OFFSET 16
 

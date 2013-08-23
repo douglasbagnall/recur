@@ -725,7 +725,7 @@ void
 rnn_condition_net(RecurNN *net)
 {
   u32 mask = net->flags >> RNN_COND_MASK_OFFSET;
-  u32 m = net->generation % RESCALE_INTERVAL;
+  u32 m = net->generation % RNN_CONDITIONING_INTERVAL;
   if ((1 << m) & mask){
     return;
   }
