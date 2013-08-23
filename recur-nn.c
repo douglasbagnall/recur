@@ -617,8 +617,7 @@ apply_sgd_with_bptt(RecurNN *net, float top_error_sum){
 }
 
 static inline float
-apply_sgd_with_bptt_batch(RecurNN *net, float momentum, float momentum_weight,
-    float top_error_sum){
+apply_sgd_with_bptt_batch(RecurNN *net, float top_error_sum){
   RecurNNBPTT *bptt = net->bptt;
   float rate = bptt->learn_rate;
   float *gradient = malloc_aligned_or_die(net->ih_size * sizeof(float));
