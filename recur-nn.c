@@ -621,8 +621,7 @@ apply_sgd_with_bptt_batch(RecurNN *net, float momentum, float momentum_weight,
     float top_error_sum){
   RecurNNBPTT *bptt = net->bptt;
   float rate = bptt->learn_rate;
-  float *gradient = calloc(net->ih_size, sizeof(float));
-
+  float *gradient = malloc_aligned_or_die(net->ih_size * sizeof(float));
   float error_sum = bptt_and_accumulate_error(net, gradient, top_error_sum);
 
   /*saxpy -> scale and add */
