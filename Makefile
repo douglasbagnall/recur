@@ -88,8 +88,10 @@ pgm-clean:
 
 %.c: %.h
 
+NN_SPECIAL_FLAGS =  -fprefetch-loop-arrays
+
 recur-nn.o: recur-nn.c
-	$(CC)  -c -MMD $(ALL_CFLAGS) $(CPPFLAGS)   -fprefetch-loop-arrays -o $@ $<
+	$(CC)  -c -MMD $(ALL_CFLAGS) $(CPPFLAGS) $(NN_SPECIAL_FLAGS) -o $@ $<
 
 libgstrecur.so: $(OBJECTS)
 	$(CC) -shared -Wl,-O1 $+  $(INCLUDES) $(DEFINES)  $(LINKS) -Wl,-soname -Wl,$@ \
