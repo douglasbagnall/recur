@@ -23,7 +23,8 @@ G_BEGIN_DECLS
 #define MOMENTUM 0.95
 #define MOMENTUM_WEIGHT 0.5
 
-#define PARROT_CHANNELS 1
+#define PARROT_MAX_CHANNELS 20
+#define PARROT_MIN_CHANNELS 1
 #define PARROT_RATE 22050
 #define PARROT_BIAS 1
 #define PARROT_BATCH_SIZE 1
@@ -83,28 +84,34 @@ typedef s16 audio_sample;
 typedef struct _GstParrot GstParrot;
 typedef struct _GstParrotClass GstParrotClass;
 
-struct _GstParrot
+typedef struct _ParrotChannel
 {
-  GstAudioFilter audiofilter;
-  GstAudioInfo *info;
-  RecurNN *net;
+  RecurNN *train_net;
   RecurNN *dream_net;
-  s16 *incoming_queue;
-  int incoming_start;
-
-  int incoming_end;
-  s16 *outgoing_queue;
-  int outgoing_start;
-  int outgoing_end;
-  float *window;
-  mdct_lookup mdct_lut;
   float *features1;
   float *features2;
   float *pcm1;
   float *pcm2;
   float *mdct1;
   float *mdct2;
+} ParrotChannel;
+
+struct _GstParrot
+{
+  GstAudioFilter audiofilter;
+  GstAudioInfo *info;
+  RecurNN *net;
+  ParrotChannel *channels;
+  int n_channels;
+  s16 *incoming_queue;
+  int incoming_start;
+  int incoming_end;
+  s16 *outgoing_queue;
+  int outgoing_start;
+  int outgoing_end;
+  mdct_lookup mdct_lut;
   RecurAudioBinner *mfcc_factory;
+  float *window;
 };
 
 

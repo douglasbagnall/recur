@@ -209,6 +209,8 @@ AUD_URI_5 = file://$(MP3_DIR)/Kraftwerk/Kraftwerk\ -\ Autobahn.mp3
 AUD_URI_6 = file://$(MP3_DIR)/spoken/sat-20110813-0910-john_kendrick_bird_watching-00.ogg
 AUD_URI_CALE = file://$(MP3_DIR)/John_Cale/03\ Hedda\ Gabbler.mp3
 AUD_URI_REED = file://$(MP3_DIR)/misc/Lou\ Reed-10\ Sad\ Song.mp3
+AUD_URI_CALE_CAT = file://$(CURDIR)/test-audio/03\ Hedda\ Gabbler.mp3
+AUD_URI_REED_CAT = file://$(CURDIR)/test-audio/Lou\ Reed-10\ Sad\ Song.mp3
 
 TEST_PARROT_CORE = gst-launch-1.0  \
 	  --gst-plugin-path=$(CURDIR) \
@@ -235,6 +237,24 @@ test-parrot-torben: libgstparrot.so
 		uridecodebin uri=$(AUD_URI_REED)  ! $(AUD_LINE) ! parrot ! autoaudiosink
 	GST_DEBUG=recur:3 gst-launch-1.0 --gst-plugin-path=$(CURDIR) \
 		uridecodebin uri=$(AUD_URI_CALE)  ! $(AUD_LINE) ! parrot ! autoaudiosink
+
+PARROT_CAPS = "audio/x-raw,channels=1,rate=22050,format=S16LE"
+
+test-parrot-duo: libgstparrot.so
+	GST_DEBUG=2 gst-launch-1.0 --gst-plugin-path=$(CURDIR) \
+		uridecodebin uri=$(AUD_URI_REED)  ! audioconvert ! audioresample \
+		! $(PARROT_CAPS) ! interleave name=il \
+		! parrot ! autoaudiosink \
+		uridecodebin uri=$(AUD_URI_CALE) ! audioconvert ! audioresample \
+		! $(PARROT_CAPS) ! il.
+
+train-parrot-duo: libgstparrot.so
+	GST_DEBUG=parrot:5 gst-launch-1.0 --gst-plugin-path=$(CURDIR) \
+		uridecodebin uri=$(AUD_URI_REED_CAT)  ! audioconvert ! audioresample \
+		! $(PARROT_CAPS) ! interleave name=il \
+		! parrot ! fakesink \
+		uridecodebin uri=$(AUD_URI_CALE_CAT) ! audioconvert ! audioresample \
+		! $(PARROT_CAPS) ! il.
 
 
 include $(wildcard *.d)
