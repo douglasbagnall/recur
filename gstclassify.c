@@ -57,7 +57,7 @@ gst_classify_finalize (GObject * obj){
   if (self->channels){
     for (int i = 0; i < self->n_channels; i++){
       ClassifyChannel *c = &self->channels[i];
-      rnn_delete_net(c->train_net);
+      rnn_delete_net(c->net);
       free(c->pcm_next);
       free(c->pcm_now);
       free(c->features);
@@ -142,7 +142,7 @@ gst_classify_setup(GstAudioFilter *base, const GstAudioInfo *info){
   u32 train_flags = self->net->flags & ~RNN_NET_FLAG_OWN_WEIGHTS;
   for (int i = 0; i < self->n_channels; i++){
     ClassifyChannel *c = &self->channels[i];
-    c->train_net = rnn_clone(self->net, train_flags, RECUR_RNG_SUBSEED, NULL);
+    c->net = rnn_clone(self->net, train_flags, RECUR_RNG_SUBSEED, NULL);
     c->pcm_next = zalloc_aligned_or_die(CLASSIFY_WINDOW_SIZE * sizeof(float));
     c->pcm_now = zalloc_aligned_or_die(CLASSIFY_WINDOW_SIZE * sizeof(float));
     c->features = zalloc_aligned_or_die(CLASSIFY_N_FEATURES * sizeof(float));
@@ -294,24 +294,33 @@ possibly_save_net(RecurNN *net)
     rnn_multi_pgm_dump(net, "hhw ihw");
 }
 
-/*
+
 static GstMessage *
-prepare_message (GstClassify *self)
+prepare_message (GstClassify *self, float err_sum, int n_correct)
 {
-  char *name = "message"
+  char *name = "classification";
+  float scale = 1.0f / self->n_channels;
   GstStructure *s;
   s = gst_structure_new (name,
-      "type", G_TYPE_INT, 1,
-      "method", G_TYPE_INT, 1,
-      "start", G_TYPE_BOOLEAN, TRUE,
-      "number", G_TYPE_INT, event->payload->event,
-      "volume", G_TYPE_INT, event->payload->volume, NULL);
-
-  return gst_message_new_element (GST_OBJECT (dtmfsrc), s);
+      "error", G_TYPE_FLOAT, err_sum * scale,
+      "correct", G_TYPE_FLOAT, n_correct * scale,
+      NULL);
+  for (int i = 0; i < self->n_channels; i++){
+    char key[30];
+    RecurNN *net = self->channels[i].net;
+    for (int j = 0; j < net->output_size; j++){
+      snprintf(key, sizeof(key), "channel %d, input %d", i, j);
+      gst_structure_set(s, key, G_TYPE_FLOAT, net->output_layer[j], NULL);
+    }
+  }
+  return gst_message_new_element(GST_OBJECT(self), s);
 }
 
-*/
-
+static inline void
+send_message(GstClassify *self, float err_sum, int n_correct){
+  GstMessage *msg = prepare_message (self, err_sum, n_correct);
+  gst_element_post_message(GST_ELEMENT(self), msg);
+}
 
 
 static inline void
@@ -326,6 +335,18 @@ pcm_to_features(RecurAudioBinner *mf, float *features, float *pcm){
   }
 }
 
+
+static void
+consolidate_and_apply_learning(GstClassify *self)
+{
+  /*XXX nets doesn't change, can be set at start up */
+  RecurNN *nets[self->n_channels];
+  for (int j = 0; j < self->n_channels; j++){
+    nets[j] = self->channels[j].net;
+  }
+  bptt_consolidate_many_nets(nets, self->n_channels);
+}
+
 static inline void
 maybe_learn(GstClassify *self){
   int i, j, k;
@@ -336,18 +357,15 @@ maybe_learn(GstClassify *self){
   int chunk_size = CLASSIFY_HALF_WINDOW * self->n_channels;
 
   while (len >= chunk_size){
+    float err_sum = 0.0f;
+    int n_correct = 0;
     s16 *buffer_i = self->incoming_queue + self->incoming_start;
-
-    if (self->training){
-      float *error = self->net->bptt->o_error;
-      memset(error, 0, self->net->o_size * sizeof(float));
-    }
 
     for (j = 0; j < self->n_channels; j++){
       /*load first half of pcm_next, second part of pcm_now.*/
       /*second part of pcm_next retains previous data */
       ClassifyChannel *c = & self->channels[j];
-      RecurNN *net = c->train_net;
+      RecurNN *net = c->net;
       for(i = 0, k = j; i < CLASSIFY_HALF_WINDOW; i++, k += self->n_channels){
         float s = buffer_i[k] / 32768.0f;
         c->pcm_next[i] = s;
@@ -358,17 +376,22 @@ maybe_learn(GstClassify *self){
       pcm_to_features(self->mfcc_factory, c->features, c->pcm_now);
 
       float *answer;
+      int correct;
 
       if (self->training){
         bptt_advance(net);
-      }
-      answer = rnn_opinion(net, c->features);
-      int correct;
-      float err = softmax_best_guess(net->bptt->o_error, answer,
-          net->output_size, c->current_target, &correct);
-      if (self->training){
+        answer = rnn_opinion(net, c->features);
+        err_sum += softmax_best_guess(net->bptt->o_error, answer,
+            net->output_size, c->current_target, &correct);
         bptt_calc_deltas(net);
       }
+      else {
+        answer = rnn_opinion(net, c->features);
+        err_sum += softmax_best_guess(net->bptt->o_error, answer,
+            net->output_size, c->current_target, &correct);
+      }
+      n_correct += correct;
+
       float *tmp;
       tmp = c->pcm_next;
       c->pcm_next = c->pcm_now;
@@ -376,14 +399,11 @@ maybe_learn(GstClassify *self){
     }
 
     if (self->training){
-      //bptt_calculate(self->net);
-      RecurNN *nets[self->n_channels];
-      for (int j = 0; j < self->n_channels; j++){
-        nets[j] = self->channels[j].train_net;
-      }
-      bptt_consolidate_many_nets(nets, self->n_channels);
+      consolidate_and_apply_learning(self);
       possibly_save_net(self->net);
     }
+
+    send_message(self, err_sum, n_correct);
 
     self->incoming_start += chunk_size;
     self->incoming_start %= CLASSIFY_INCOMING_QUEUE_SIZE;

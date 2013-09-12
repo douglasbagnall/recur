@@ -142,6 +142,9 @@ recur_bin_slopes_new(const int n_bins, const int fft_len,
   return slopes;
 }
 
+
+/*XXX could also introduce window_scale, e.g. 1.0/32768, saving operations
+  elsewhere. */
 RecurAudioBinner *
 recur_audio_binner_new(int window_size, int window_type,
     int n_bins,

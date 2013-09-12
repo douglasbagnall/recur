@@ -124,6 +124,7 @@ fill_video_nodes(float *dest, RecurFrame *frame, int w, int h,
 
 static void
 consolidate_and_apply_learning(RecurContext *context){
+  /*XXX nets doesn't change, should be set at start up */
   RecurNN *nets[RECUR_N_TRAINERS];
   for (int j = 0; j < RECUR_N_TRAINERS; j++){
     nets[j] = context->trainers[j].net;

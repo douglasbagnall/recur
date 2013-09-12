@@ -83,7 +83,7 @@ typedef struct _GstClassifyClass GstClassifyClass;
 
 typedef struct _ClassifyChannel
 {
-  RecurNN *train_net;
+  RecurNN *net;
   float *features;
   float *pcm_now;
   float *pcm_next;
