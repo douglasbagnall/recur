@@ -101,6 +101,10 @@ libgstparrot.so: recur-nn.o recur-nn-io.o  mdct.o window.o gstparrot.o mfcc.o
 	$(CC) -shared -Wl,-O1 $+  $(INCLUDES) $(DEFINES)  $(LINKS) -Wl,-soname -Wl,$@ \
 	  -o $@
 
+libgstclassify.so: recur-nn.o recur-nn-io.o gstclassify.o mfcc.o
+	$(CC) -shared -Wl,-O1 $+  $(INCLUDES) $(DEFINES)  $(LINKS) -Wl,-soname -Wl,$@ \
+	  -o $@
+
 test_mfcc_table: %: recur-context.o recur-nn.o recur-nn-io.o rescale.o %.o
 	$(CC) -Wl,-O1 $^   $(INCLUDES) $(DEFINES)  $(LINKS)  -o $@
 
