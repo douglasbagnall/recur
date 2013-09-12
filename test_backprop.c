@@ -107,48 +107,12 @@ one_hot_opinion(RecurNN *net, const int hot){
   return answer;
 }
 
-
-static inline void
-softmax(float *restrict dest, const float *restrict src, int len){
-  int i;
-  float sum = 0.0;
-  for (i = 0; i < len; i++){
-    float f = src[i];
-    f = MIN(f, 60);
-    f = MAX(f, -60);
-    float x = fast_expf(f);
-    sum += x;
-    dest[i] = x;
-  }
-  for (i = 0; i < len; i++){
-    dest[i] /= sum;
-  }
-}
-
 static inline float
 net_error_bptt(RecurNN *net, float *restrict error, int c, int next, int *correct){
   ASSUME_ALIGNED(error);
   float *answer = one_hot_opinion(net, c);
-  softmax(error, answer, net->output_size);
-  /*softmax error is 0-1. all values should be 0, EXCEPT the hot one, which
-   should be 1. Error encodes the desired change, i.e., a negative number in
-   most cases, and 1 - softmax for the hot.
 
-   Sum of softmax is always one, so error sum is always twice next error.
-  */
-  int best_i = -1;
-  float best_e = -1;
-  for (int i = 0; i < net->output_size; i++){
-    if (error[i] > best_e){
-      best_e = error[i];
-      best_i = i;
-    }
-    error[i] = -error[i];
-  }
-  //DEBUG("best guess %d next %d", best_i, next);
-  *correct = (best_i == next);
-  error[next] += 1.0f;
-  return error[next];
+  return softmax_best_guess(error, answer, net->output_size, next, correct);
 }
 
 static void

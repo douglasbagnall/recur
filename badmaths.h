@@ -67,4 +67,51 @@ fast_tanhf(float x)
 }
 
 
+
+static inline void
+softmax(float *restrict dest, const float *restrict src, int len){
+  int i;
+  float sum = 0.0;
+  for (i = 0; i < len; i++){
+    float f = src[i];
+    f = MIN(f, 60);
+    f = MAX(f, -60);
+    float x = fast_expf(f);
+    sum += x;
+    dest[i] = x;
+  }
+  for (i = 0; i < len; i++){
+    dest[i] /= sum;
+  }
+}
+
+static inline float
+softmax_best_guess(float *restrict error, const float *restrict src,
+                   int len, int target, int *correct)
+{
+  softmax(error, src, len);
+  /*softmax error is 0-1. all values should be 0, EXCEPT the hot one, which
+   should be 1. Error encodes the desired change, i.e., a negative number in
+   most cases, and 1 - softmax for the hot.
+
+   Sum of softmax is always one, so error sum is always twice target error.
+  */
+  int best_i = -1;
+  float best_e = -1;
+  for (int i = 0; i < len; i++){
+    if (error[i] > best_e){
+      best_e = error[i];
+      best_i = i;
+    }
+    error[i] = -error[i];
+  }
+  //DEBUG("best guess %d next %d", best_i, next);
+  if (correct){
+    *correct = (best_i == target);
+  }
+  error[target] += 1.0f;
+  return error[target];
+}
+
+
 #endif
