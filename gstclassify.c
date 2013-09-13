@@ -41,6 +41,7 @@ static void gst_classify_set_property(GObject *object, guint prop_id, const GVal
 static void gst_classify_get_property(GObject *object, guint prop_id, GValue *value, GParamSpec *pspec);
 static GstFlowReturn gst_classify_transform_ip(GstBaseTransform *base, GstBuffer *buf);
 static gboolean gst_classify_setup(GstAudioFilter * filter, const GstAudioInfo * info);
+static void maybe_parse_target_string(GstClassify *self);
 
 #define gst_classify_parent_class parent_class
 G_DEFINE_TYPE (GstClassify, gst_classify, GST_TYPE_AUDIO_FILTER);
@@ -57,7 +58,7 @@ static void
 gst_classify_finalize (GObject * obj){
   GST_DEBUG("in gst_classify_finalize!\n");
   GstClassify *self = GST_CLASSIFY(obj);
-  rnn_save_net(self->net, NET_FILENAME);
+  rnn_save_net(self->net, self->net_filename);
   recur_audio_binner_delete(self->mfcc_factory);
   if (self->channels){
     for (int i = 0; i < self->n_channels; i++){
@@ -119,28 +120,38 @@ static void
 gst_classify_init (GstClassify * self)
 {
   self->channels = NULL;
+  self->target_string = NULL;
   self->n_channels = 0;
+  self->mfcc_factory = NULL;
+  self->incoming_queue = NULL;
+  self->net_filename = NULL;
   GST_INFO("gst classify init\n");
 }
 
-static gboolean
-gst_classify_setup(GstAudioFilter *base, const GstAudioInfo *info){
-  GST_INFO("gst_classify_setup\n");
-  GstClassify *self = GST_CLASSIFY(base);
-  //self->info = info;
 
-  self->incoming_queue = malloc_aligned_or_die(CLASSIFY_INCOMING_QUEUE_SIZE * sizeof(s16));
+static void
+reset_net_filename(GstClassify *self){
+  char s[200];
+  snprintf(s, sizeof(s), "classify-i%d-h%d-o%d-b%d-%dHz-w%d.net",
+      CLASSIFY_N_FEATURES, CLASSIFY_N_HIDDEN, self->n_classes,
+      CLASSIFY_BIAS, CLASSIFY_RATE, CLASSIFY_WINDOW_SIZE);
 
-  self->mfcc_factory = recur_audio_binner_new(CLASSIFY_WINDOW_SIZE,
-      RECUR_WINDOW_NONE,
-      CLASSIFY_N_FFT_BINS,
-      CLASSIFY_MFCC_MIN_FREQ,
-      CLASSIFY_MFCC_MAX_FREQ,
-      CLASSIFY_RATE,
-      1
-  );
+  if (self->net_filename){
+    if (! streq(s, self->net_filename)){
+      free(self->net_filename);
+      self->net_filename = strdup(s);
+    }
+  }
+  else {
+    self->net_filename = strdup(s);
+  }
+}
 
-  RecurNN *net = TRY_RELOAD ? rnn_load_net(NET_FILENAME) : NULL;
+
+static RecurNN *
+load_or_create_net(GstClassify *self){
+  reset_net_filename(self);
+  RecurNN *net = TRY_RELOAD ? rnn_load_net(self->net_filename) : NULL;
   if (net){
     if (net->output_size != self->n_classes){
       GST_WARNING("loaded net doesn't seem to match!");
@@ -158,23 +169,94 @@ gst_classify_setup(GstAudioFilter *base, const GstAudioInfo *info){
     net->bptt->learn_rate = LEARN_RATE;
     rnn_set_log_file(net, NET_LOG_FILE);
   }
+  return net;
+}
 
-  self->net = net;
 
+static gboolean
+gst_classify_setup(GstAudioFilter *base, const GstAudioInfo *info){
+  GST_INFO("gst_classify_setup\n");
+  GstClassify *self = GST_CLASSIFY(base);
+  //self->info = info;
   self->n_channels = info->channels;
-  self->channels = malloc_aligned_or_die(self->n_channels * sizeof(ClassifyChannel));
-  u32 train_flags = self->net->flags & ~RNN_NET_FLAG_OWN_WEIGHTS;
-  for (int i = 0; i < self->n_channels; i++){
-    ClassifyChannel *c = &self->channels[i];
-    c->net = rnn_clone(self->net, train_flags, RECUR_RNG_SUBSEED, NULL);
-    c->pcm_next = zalloc_aligned_or_die(CLASSIFY_WINDOW_SIZE * sizeof(float));
-    c->pcm_now = zalloc_aligned_or_die(CLASSIFY_WINDOW_SIZE * sizeof(float));
-    c->features = zalloc_aligned_or_die(CLASSIFY_N_FEATURES * sizeof(float));
+
+  if (self->incoming_queue == NULL){
+    self->incoming_queue = malloc_aligned_or_die(CLASSIFY_INCOMING_QUEUE_SIZE *
+        sizeof(s16));
   }
+
+  if (self->mfcc_factory == NULL){
+    self->mfcc_factory = recur_audio_binner_new(CLASSIFY_WINDOW_SIZE,
+        RECUR_WINDOW_NONE,
+        CLASSIFY_N_FFT_BINS,
+        CLASSIFY_MFCC_MIN_FREQ,
+        CLASSIFY_MFCC_MAX_FREQ,
+        CLASSIFY_RATE,
+        1
+    );
+  }
+  if (self->net == NULL){
+    self->net = load_or_create_net(self);
+  }
+  if (self->channels == NULL){
+    self->channels = malloc_aligned_or_die(self->n_channels * sizeof(ClassifyChannel));
+    u32 train_flags = self->net->flags & ~RNN_NET_FLAG_OWN_WEIGHTS;
+    for (int i = 0; i < self->n_channels; i++){
+      ClassifyChannel *c = &self->channels[i];
+      c->net = rnn_clone(self->net, train_flags, RECUR_RNG_SUBSEED, NULL);
+      c->pcm_next = zalloc_aligned_or_die(CLASSIFY_WINDOW_SIZE * sizeof(float));
+      c->pcm_now = zalloc_aligned_or_die(CLASSIFY_WINDOW_SIZE * sizeof(float));
+      c->features = zalloc_aligned_or_die(CLASSIFY_N_FEATURES * sizeof(float));
+    }
+  }
+  maybe_parse_target_string(self);
+
   GST_DEBUG_OBJECT (self,
       "info: %" GST_PTR_FORMAT, info);
   DEBUG("found %d channels", self->n_channels);
   return TRUE;
+}
+
+static inline void
+maybe_parse_target_string(GstClassify *self){
+  int i;
+  if (self->target_string == NULL || self->channels == NULL){
+    GST_DEBUG("not parsing NULL target string (%p) channels is %p",
+        self->target_string, self->channels);
+    return;
+  }
+  char *s = self->target_string;
+  if (*s == 0){
+    for (i = 0; i < self->n_channels; i++){
+      self->channels[i].current_target = -1;
+    }
+    self->training = 0;
+    goto cleanup;
+  }
+  char *e;
+  long x;
+  for (i = 0; i < self->n_channels; i++){
+    x = strtol(s, &e, 10);
+    GST_DEBUG("channel %d got %ld s is %s, %p  e is %p", i, x, s, s, e);
+    if (s == e){ /*no digits at all */
+      goto parse_error;
+    }
+    self->channels[i].current_target = x;
+    s = e + 1;
+    if (*e == '\0'  && i != self->n_channels - 1){ /*ran out of numbers */
+      goto parse_error;
+    }
+  }
+  GST_DEBUG("target %d", self->channels[0].current_target);
+  self->training = 1;
+  goto cleanup;
+ parse_error:
+  GST_DEBUG("Can't parse '%s' into %d channels: stopping after %d",
+      self->target_string, self->n_channels, i);
+ cleanup:
+  free(self->target_string);
+  self->target_string = NULL;
+  return;
 }
 
 static inline void
@@ -186,40 +268,6 @@ set_string_prop(const GValue *value, const char **target){
   }
 }
 
-static inline void
-parse_target_string(GstClassify *self, const char *s){
-  int i;
-  if (s == NULL){
-    return;
-  }
-  if (*s == 0){
-    for (i = 0; i < self->n_channels; i++){
-      self->channels[i].current_target = -1;
-    }
-    self->training = 0;
-    return;
-  }
-  const char *orig = s;
-  char *e;
-  long x;
-  for (i = 0; i < self->n_channels; i++){
-    x = strtol(s, &e, 10);
-    if (s == e){ /*no digits at all */
-      goto parse_error;
-    }
-    self->channels[i].current_target = x;
-    s = e + 1;
-    if (*e == '\0'  && i != self->n_channels - 1){ /*ran out of numbers */
-      goto parse_error;
-    }
-  }
-  return;
- parse_error:
-  GST_DEBUG("Can't parse '%s' into %d channels: stopping after %d",
-      orig, self->n_channels, i);
-  return;
-}
-
 static void
 gst_classify_set_property (GObject * object, guint prop_id, const GValue * value,
     GParamSpec * pspec)
@@ -229,7 +277,11 @@ gst_classify_set_property (GObject * object, guint prop_id, const GValue * value
   if (value){
     switch (prop_id) {
     case PROP_TARGET:
-      parse_target_string(self, g_value_get_string(value));
+      if (self->target_string){
+        free(self->target_string);
+      }
+      self->target_string = g_value_dup_string(value);
+      maybe_parse_target_string(self);
       break;
     case PROP_CLASSES:
       //XXX has no effect if set late.
@@ -319,10 +371,11 @@ queue_audio_segment(GstClassify *self, GstBuffer *inbuf)
 
 
 static inline void
-possibly_save_net(RecurNN *net)
+possibly_save_net(RecurNN *net, char *filename)
 {
+  GST_LOG("possibly saving to %s", filename);
   if (PERIODIC_SAVE_NET && (net->generation & 511) == 0){
-    rnn_save_net(net, NET_FILENAME);
+    rnn_save_net(net, filename);
   }
   if (REGULAR_PGM_DUMP)
     rnn_multi_pgm_dump(net, "ihw hhw");
@@ -332,29 +385,29 @@ possibly_save_net(RecurNN *net)
 
 
 static GstMessage *
-prepare_message (GstClassify *self, float err_sum, int n_correct)
+prepare_message (GstClassify *self, float mean_err)
 {
-  char *name = "classification";
-  float scale = 1.0f / self->n_channels;
+  char *name = "classify";
   GstStructure *s;
   s = gst_structure_new (name,
-      "error", G_TYPE_FLOAT, err_sum * scale,
-      "correct", G_TYPE_FLOAT, n_correct * scale,
+      "error", G_TYPE_FLOAT, mean_err,
       NULL);
   for (int i = 0; i < self->n_channels; i++){
     char key[30];
     RecurNN *net = self->channels[i].net;
     for (int j = 0; j < net->output_size; j++){
-      snprintf(key, sizeof(key), "channel %d, input %d", i, j);
-      gst_structure_set(s, key, G_TYPE_FLOAT, net->output_layer[j], NULL);
+      snprintf(key, sizeof(key), "channel %d, output %d", i, j);
+      gst_structure_set(s, key, G_TYPE_FLOAT, net->bptt->o_error[j], NULL);
     }
+    snprintf(key, sizeof(key), "channel %d winner", i);
+    gst_structure_set(s, key, G_TYPE_INT, self->channels[i].current_winner, NULL);
   }
   return gst_message_new_element(GST_OBJECT(self), s);
 }
 
 static inline void
-send_message(GstClassify *self, float err_sum, int n_correct){
-  GstMessage *msg = prepare_message (self, err_sum, n_correct);
+send_message(GstClassify *self, float mean_err){
+  GstMessage *msg = prepare_message (self, mean_err);
   gst_element_post_message(GST_ELEMENT(self), msg);
 }
 
@@ -394,7 +447,6 @@ maybe_learn(GstClassify *self){
 
   while (len >= chunk_size){
     float err_sum = 0.0f;
-    int n_correct = 0;
     s16 *buffer_i = self->incoming_queue + self->incoming_start;
 
     for (j = 0; j < self->n_channels; j++){
@@ -412,21 +464,26 @@ maybe_learn(GstClassify *self){
       pcm_to_features(self->mfcc_factory, c->features, c->pcm_now);
 
       float *answer;
-      int correct;
 
-      if (self->training){
+      int valid_target = c->current_target >= 0 && c->current_target < self->n_classes;
+      int training = valid_target && self->training;
+
+      //GST_DEBUG("channel %d target %d", j , c->current_target);
+      if (training){
         bptt_advance(net);
         answer = rnn_opinion(net, c->features);
         err_sum += softmax_best_guess(net->bptt->o_error, answer,
-            net->output_size, c->current_target, &correct);
+            net->output_size, c->current_target, &c->current_winner);
         bptt_calc_deltas(net);
       }
-      else {
+      else if (valid_target){
         answer = rnn_opinion(net, c->features);
         err_sum += softmax_best_guess(net->bptt->o_error, answer,
-            net->output_size, c->current_target, &correct);
+            net->output_size, c->current_target, &c->current_winner);
       }
-      n_correct += correct;
+      else {
+        GST_DEBUG("Ignoring channel %d with target %d", j , c->current_target);
+      }
 
       float *tmp;
       tmp = c->pcm_next;
@@ -436,10 +493,11 @@ maybe_learn(GstClassify *self){
 
     if (self->training){
       consolidate_and_apply_learning(self);
-      possibly_save_net(self->net);
+      possibly_save_net(self->net, self->net_filename);
     }
+    self->net->generation = self->channels[0].net->generation;
 
-    send_message(self, err_sum, n_correct);
+    send_message(self, err_sum / self->n_channels);
 
     self->incoming_start += chunk_size;
     self->incoming_start %= CLASSIFY_INCOMING_QUEUE_SIZE;

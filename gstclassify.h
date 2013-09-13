@@ -15,7 +15,7 @@ G_BEGIN_DECLS
 #define CLASSIFY_PASSTHROUGH 0
 #define CLASSIFY_TRAIN 1
 
-#define CLASSIFY_N_HIDDEN 303
+#define CLASSIFY_N_HIDDEN 200
 #define CLASSIFY_RNG_SEED 11
 #define CLASSIFY_BPTT_DEPTH 20
 #define LEARN_RATE 0.001
@@ -59,13 +59,11 @@ typedef s16 audio_sample;
 #define PERIODIC_PGM_DUMP 255
 #define REGULAR_PGM_DUMP 0
 
-#define CLASSIFY_WINDOW_SIZE 512
+#define CLASSIFY_WINDOW_SIZE 256
 #define CLASSIFY_HALF_WINDOW (CLASSIFY_WINDOW_SIZE / 2)
 
 /*queues sizes need to be an multiple of window size */
 #define CLASSIFY_INCOMING_QUEUE_SIZE (50 * CLASSIFY_WINDOW_SIZE)
-
-#define NET_FILENAME "classify-" QUOTE(CLASSIFY_N_FEATURES) "x" QUOTE(CLASSIFY_N_HIDDEN) "-" QUOTE(CLASSIFY_BIAS) "-" QUOTE(CLASSIFY_RATE) "-" QUOTE(CLASSIFY_WINDOW_SIZE) ".net"
 
 #define GST_TYPE_CLASSIFY (gst_classify_get_type())
 #define GST_CLASSIFY(obj) \
@@ -88,6 +86,7 @@ typedef struct _ClassifyChannel
   float *pcm_now;
   float *pcm_next;
   int current_target;
+  int current_winner;
 } ClassifyChannel;
 
 struct _GstClassify
@@ -103,6 +102,8 @@ struct _GstClassify
   int incoming_end;
   RecurAudioBinner *mfcc_factory;
   int training;
+  char *target_string;
+  char *net_filename;
 };
 
 

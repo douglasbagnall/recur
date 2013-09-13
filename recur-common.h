@@ -23,6 +23,8 @@
 
 #define VERBOSE_DEBUG 0
 
+#define streq(a,b) (strcmp((a),(b)) == 0)
+
 #define QUOTE_(x) #x
 #define QUOTE(x) QUOTE_(x)
 #ifdef GST_DEBUG
