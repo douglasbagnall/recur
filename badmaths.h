@@ -87,7 +87,7 @@ softmax(float *restrict dest, const float *restrict src, int len){
 
 static inline float
 softmax_best_guess(float *restrict error, const float *restrict src,
-                   int len, int target, int *correct)
+                   int len, int target, int *winner)
 {
   softmax(error, src, len);
   /*softmax error is 0-1. all values should be 0, EXCEPT the hot one, which
@@ -106,8 +106,8 @@ softmax_best_guess(float *restrict error, const float *restrict src,
     error[i] = -error[i];
   }
   //DEBUG("best guess %d next %d", best_i, next);
-  if (correct){
-    *correct = (best_i == target);
+  if (winner){
+    *winner = best_i;
   }
   error[target] += 1.0f;
   return error[target];

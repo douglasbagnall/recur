@@ -111,8 +111,10 @@ static inline float
 net_error_bptt(RecurNN *net, float *restrict error, int c, int next, int *correct){
   ASSUME_ALIGNED(error);
   float *answer = one_hot_opinion(net, c);
-
-  return softmax_best_guess(error, answer, net->output_size, next, correct);
+  int winner;
+  float err = softmax_best_guess(error, answer, net->output_size, next, &winner);
+  *correct = winner == next;
+  return err;
 }
 
 static void
