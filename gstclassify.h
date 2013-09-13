@@ -97,6 +97,7 @@ struct _GstClassify
   RecurNN *net;
   ClassifyChannel *channels;
   int n_channels;
+  int n_classes;
   s16 *incoming_queue;
   int incoming_start;
   int incoming_end;

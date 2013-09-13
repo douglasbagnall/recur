@@ -21,10 +21,13 @@ enum
 {
   PROP_0,
   PROP_TARGET,
+  PROP_CLASSES,
 };
 
-#define DEFAULT_PROP_TARGET ""
-
+#define DEFAULT_PROP_TARGET "0"
+#define DEFAULT_PROP_CLASSES 2
+#define MIN_PROP_CLASSES 1
+#define MAX_PROP_CLASSES 1000000
 
 /* static_functions */
 /* plugin_init    - registers plugin (once)
@@ -48,11 +51,13 @@ G_DEFINE_TYPE (GstClassify, gst_classify, GST_TYPE_AUDIO_FILTER);
       ", layout = (string) interleaved"
 
 
+
 /* Clean up */
 static void
 gst_classify_finalize (GObject * obj){
   GST_DEBUG("in gst_classify_finalize!\n");
   GstClassify *self = GST_CLASSIFY(obj);
+  rnn_save_net(self->net, NET_FILENAME);
   recur_audio_binner_delete(self->mfcc_factory);
   if (self->channels){
     for (int i = 0; i < self->n_channels; i++){
@@ -66,6 +71,7 @@ gst_classify_finalize (GObject * obj){
     self->channels = NULL;
   }
   free(self->incoming_queue);
+  rnn_delete_net(self->net);
 }
 
 static void
@@ -97,6 +103,13 @@ gst_classify_class_init (GstClassifyClass * klass)
           DEFAULT_PROP_TARGET,
           G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
+  g_object_class_install_property (gobject_class, PROP_CLASSES,
+      g_param_spec_int("classes", "classes",
+          "Use this many classes",
+          MIN_PROP_CLASSES, MAX_PROP_CLASSES,
+          DEFAULT_PROP_CLASSES,
+          G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+
   trans_class->transform_ip = GST_DEBUG_FUNCPTR (gst_classify_transform_ip);
   af_class->setup = GST_DEBUG_FUNCPTR (gst_classify_setup);
   GST_INFO("gst audio class init\n");
@@ -105,20 +118,17 @@ gst_classify_class_init (GstClassifyClass * klass)
 static void
 gst_classify_init (GstClassify * self)
 {
-
-  self->net = TRY_RELOAD ? rnn_load_net(NET_FILENAME) : NULL;
-  if (self->net == NULL){
-    self->net = rnn_new(CLASSIFY_N_FEATURES, CLASSIFY_N_HIDDEN,
-        CLASSIFY_HALF_WINDOW, CLASSIFY_RNN_FLAGS, CLASSIFY_RNG_SEED,
-        NET_LOG_FILE, CLASSIFY_BPTT_DEPTH, LEARN_RATE, MOMENTUM, MOMENTUM_WEIGHT,
-        CLASSIFY_BATCH_SIZE);
-  }
-  else {
-    self->net->bptt->learn_rate = LEARN_RATE;
-    rnn_set_log_file(self->net, NET_LOG_FILE);
-  }
   self->channels = NULL;
   self->n_channels = 0;
+  GST_INFO("gst classify init\n");
+}
+
+static gboolean
+gst_classify_setup(GstAudioFilter *base, const GstAudioInfo *info){
+  GST_INFO("gst_classify_setup\n");
+  GstClassify *self = GST_CLASSIFY(base);
+  //self->info = info;
+
   self->incoming_queue = malloc_aligned_or_die(CLASSIFY_INCOMING_QUEUE_SIZE * sizeof(s16));
 
   self->mfcc_factory = recur_audio_binner_new(CLASSIFY_WINDOW_SIZE,
@@ -129,14 +139,28 @@ gst_classify_init (GstClassify * self)
       CLASSIFY_RATE,
       1
   );
-  GST_INFO("gst classify init\n");
-}
 
-static gboolean
-gst_classify_setup(GstAudioFilter *base, const GstAudioInfo *info){
-  GST_INFO("gst_classify_setup\n");
-  GstClassify *self = GST_CLASSIFY(base);
-  //self->info = info;
+  RecurNN *net = TRY_RELOAD ? rnn_load_net(NET_FILENAME) : NULL;
+  if (net){
+    if (net->output_size != self->n_classes){
+      GST_WARNING("loaded net doesn't seem to match!");
+      rnn_delete_net(net);
+      net = NULL;
+    }
+  }
+  if (net == NULL){
+    net = rnn_new(CLASSIFY_N_FEATURES, CLASSIFY_N_HIDDEN,
+        self->n_classes, CLASSIFY_RNN_FLAGS, CLASSIFY_RNG_SEED,
+        NET_LOG_FILE, CLASSIFY_BPTT_DEPTH, LEARN_RATE, MOMENTUM, MOMENTUM_WEIGHT,
+        CLASSIFY_BATCH_SIZE);
+  }
+  else {
+    net->bptt->learn_rate = LEARN_RATE;
+    rnn_set_log_file(net, NET_LOG_FILE);
+  }
+
+  self->net = net;
+
   self->n_channels = info->channels;
   self->channels = malloc_aligned_or_die(self->n_channels * sizeof(ClassifyChannel));
   u32 train_flags = self->net->flags & ~RNN_NET_FLAG_OWN_WEIGHTS;
@@ -207,6 +231,16 @@ gst_classify_set_property (GObject * object, guint prop_id, const GValue * value
     case PROP_TARGET:
       parse_target_string(self, g_value_get_string(value));
       break;
+    case PROP_CLASSES:
+      //XXX has no effect if set late.
+      if (self->net == NULL){
+        self->n_classes = g_value_get_int(value);
+      }
+      else {
+        GST_WARNING("it is TOO LATE fto set the number of classes!"
+            " (is %d, requested %d)", self->n_classes, g_value_get_int(value));
+      }
+      break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
       break;
@@ -225,21 +259,23 @@ gst_classify_get_property (GObject * object, guint prop_id, GValue * value,
   int wrote;
   int i;
   switch (prop_id) {
-    case PROP_TARGET:
-      for (i = 0; i < self->n_channels; i++){
-        wrote = snprintf(t, remaining, "%d.", self->channels[i].current_target);
-        remaining -= wrote;
-        t += wrote;
-        if (remaining < 11)
-          break;
-      }
-      *t = 0;
-      g_value_set_string(value, s);
-      break;
-
-    default:
-      G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
-      break;
+  case PROP_TARGET:
+    for (i = 0; i < self->n_channels; i++){
+      wrote = snprintf(t, remaining, "%d.", self->channels[i].current_target);
+      remaining -= wrote;
+      t += wrote;
+      if (remaining < 11)
+        break;
+    }
+    *t = 0;
+    g_value_set_string(value, s);
+    break;
+  case PROP_CLASSES:
+    g_value_set_int(value, self->n_classes);
+    break;
+  default:
+    G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
+    break;
   }
 }
 
