@@ -42,7 +42,6 @@ class Classifier(object):
         self.sink = make_add_link('fakesink', None)
         self.classifier = make_add_link('classify', self.sink)
         self.capsfilter = make_add_link('capsfilter', self.classifier)
-        #print dir(self.capsfilter)
         caps =  Gst.caps_from_string("audio/x-raw, "
                                      "layout=(string)interleaved, "
                                      "rate=8000, channels=%s"
@@ -89,25 +88,17 @@ class Classifier(object):
         self.next_fileset()
         self.pipeline.set_state(Gst.State.PLAYING)
 
-        #self.pipeline.seek_simple(
-        #    Gst.Format.TIME,
-        #    Gst.SeekFlags.FLUSH | Gst.SeekFlags.KEY_UNIT,
-        #    0
-        #)
-
     def on_error(self, bus, msg):
         print('on_error():', msg.parse_error())
 
     def on_element(self, bus, msg):
         s = msg.get_structure()
-        #print dir(s)
-        #print s.name
         v = s.get_value
         error = v('error')
-        print error
+        print error,
         for i in range(self.channels):
-            winner = s.get_value('channel %d winner' % i)
-            scores = tuple(s.get_value('channel %d, output %d' % (i, j))
+            winner = v('channel %d winner' % i)
+            scores = tuple(v('channel %d, output %d' % (i, j))
                            for j in range(len(self.classes)))
             score_format = "%.2f " * len(self.classes)
             wc = self.classes[winner]
