@@ -1,4 +1,5 @@
 #include "mfcc.h"
+#include "pgm_dump.h"
 
 #define HZ_TO_MEL(x) (1127.0f * logf(1.0f + (x) / 700.0f))
 #define MEL_TO_HZ(x) (700.0f * (expf((x) / 1127.0f) - 1.0f))
@@ -142,6 +143,44 @@ recur_bin_slopes_new(const int n_bins, const int fft_len,
   return slopes;
 }
 
+/*mfcc_slopes_dump draws a PGM showing whether the slope calculations worked*/
+static void
+mfcc_slopes_dump(RecurAudioBinner *ab){
+  int i, j;
+  int wsize = ab->window_size / ab->value_size;
+  u8 *img = malloc_aligned_or_die(ab->n_bins * wsize);
+  float mul = 0.0;
+  RecurAudioBinSlope *bin;
+
+  printf("window size %d value size %d bins %d\n",
+         ab->window_size, ab->value_size, ab->n_bins);
+
+  for (i = 0; i < ab->n_bins; i++){
+    bin = &ab->slopes[i];
+    mul = 0.0;
+    for (j = bin->left; j < bin->right; j++){
+      mul += bin->slope;
+      img[i * wsize + j] = mul * 255;
+      if (i){
+        img[(i - 1) * wsize + j] = (1.0 - mul) * 255;
+      }
+    }
+    printf("%2d. left %3d right %3d slope %f mul at end %f\n",
+        i, bin->left, bin->right, bin->slope, mul);
+  }
+  bin = &ab->slopes[i];
+  mul = 0.0;
+  for (j = bin->left; j < bin->right; j++){
+    mul += bin->slope;
+    //img[i * size + j] = mul * 255;
+    img[(i - 1) * wsize + j] = (1.0 - mul) * 255;
+  }
+    printf("%2d. left %3d right %3d slope %f mul at end %f\n",
+        i, bin->left, bin->right, bin->slope, mul);
+  pgm_dump(img, wsize, ab->n_bins, IMAGE_DIR "/mfcc-bins.pgm");
+  free(img);
+}
+
 
 RecurAudioBinner *
 recur_audio_binner_new(int window_size, int window_type,
@@ -195,6 +234,8 @@ recur_audio_binner_new(int window_size, int window_type,
       max_freq,
       audio_rate
   );
+  mfcc_slopes_dump(ab);
+
   ab->fft_bins = malloc_aligned_or_die((n_bins + 2) * sizeof(float));
   ab->dct_bins = malloc_aligned_or_die((n_bins + 2) * sizeof(float));
   return ab;
