@@ -20,7 +20,7 @@ DEFAULT_AUDIO_DIR = "/home/douglas/maori-language-monitoring/data/split/wav-8k/t
 TEST_AUDIO_DIR = "/home/douglas/maori-language-monitoring/data/split/wav-8k/test"
 
 class Classifier(object):
-    def __init__(self, dir, ext='.wav', training=True, classes=CLASSES, channels=1):
+    def __init__(self, _dir, ext='.wav', training=True, classes=CLASSES, channels=1):
         self.mainloop = GObject.MainLoop()
         self.pipeline = Gst.Pipeline()
         self.bus = self.pipeline.get_bus()
@@ -33,8 +33,8 @@ class Classifier(object):
         self.classes = classes
         self.channels = channels
 
-        self.dir = dir
-        self.pending_files = [x for x in os.listdir(dir) if x.endswith(ext)]
+        self.dir = _dir
+        self.pending_files = [x for x in os.listdir(_dir) if x.endswith(ext)]
         random.shuffle(self.pending_files)
 
         def make_add(el, name=None):
