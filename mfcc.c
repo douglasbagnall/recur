@@ -27,7 +27,6 @@ recur_bin_real(RecurAudioBinner *ab, float *data)
       sum_right += (1.0f - mul) * power;
       mul += slope->slope;
     }
-    sum_right /= slope->right - slope->left;
     if (i){
       ab->fft_bins[i - 1] = logf(sum_right + 0.01f);
     }
@@ -52,13 +51,17 @@ recur_bin_complex(RecurAudioBinner *ab, GstFFTF32Complex *f)
     slope = &ab->slopes[i];
     for (j = slope->left; j < slope->right; j++){
       power = f[j].r * f[j].r + f[j].i * f[j].i;
+      //DEBUG("%d: %g + %gi = %g", j, f[j].r, f[j].i, power);
       sum_left += mul * power;
       sum_right += (1.0f - mul) * power;
       mul += slope->slope;
     }
-    sum_right /= slope->right - slope->left;
-    if (i)
+    /*scale for approximately equal triangles */
+    //sum_right *= slope->slope;
+    if (i){
       ab->fft_bins[i - 1] = logf(sum_right + 0.01f);
+      //DEBUG("%d: %f", i - 1, ab->fft_bins[i - 1]);
+    }
   }
   return ab->fft_bins;
 }
