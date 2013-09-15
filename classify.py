@@ -5,15 +5,10 @@ import random
 
 _dirname = os.path.dirname(os.path.abspath(__file__))
 os.environ['GST_PLUGIN_PATH'] = _dirname
-print _dirname
 
 import gi
 gi.require_version('Gst', '1.0')
 from gi.repository import Gst, GObject
-#from gi.repository import Gtk
-
-
-#Gst.registry_get_default().scan_path(_dirname)
 
 CLASSES = "MEN"
 DEFAULT_AUDIO_DIR = "/home/douglas/maori-language-monitoring/data/split/wav-8k/train"
