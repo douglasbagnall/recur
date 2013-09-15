@@ -135,10 +135,14 @@ recur_bin_slopes_new(const int n_bins, const int fft_len,
   float mel = mmin;
   float hz_to_samples = fft_len * 2 / audio_rate;
   for (i = 0; i < n_slopes; i++){
-    slopes[i].left = (int)(MEL_TO_HZ(mel) * hz_to_samples + 0.5);
-    mel += step;
-    slopes[i].right = (int)(MEL_TO_HZ(mel) * hz_to_samples + 0.5);
-    slopes[i].slope = 1.0 / (slopes[i].right - slopes[i].left);
+    RecurAudioBinSlope *s = &slopes[i];
+    s->left = (int)(MEL_TO_HZ(mel) * hz_to_samples + 0.5);
+    do {
+      step = (mmax - mel) / (n_slopes - i);
+      mel += step;
+      s->right = (int)(MEL_TO_HZ(mel) * hz_to_samples + 0.5);
+    } while (s->right == s->left);
+    s->slope = 1.0 / (s->right - s->left);
   }
   return slopes;
 }
