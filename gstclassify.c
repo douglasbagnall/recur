@@ -437,7 +437,7 @@ static inline void
 pcm_to_features(RecurAudioBinner *mf, float *features, float *pcm){
   float *answer;
 #if CLASSIFY_USE_MFCCS
-  answer = recur_extract_mfccs(mf, pcm);
+  answer = recur_extract_mfccs(mf, pcm) + 1;
 #else
   answer = recur_extract_log_freq_bins(mf, pcm);
 #endif
