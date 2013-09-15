@@ -32,29 +32,32 @@ class Classifier(object):
         self.pending_files = [x for x in os.listdir(_dir) if x.endswith(ext)]
         random.shuffle(self.pending_files)
 
-        def make_add(el, name=None):
+        def make_add_link(el, link=None, name=None):
             x = Gst.ElementFactory.make(el, name)
             self.pipeline.add(x)
+            if link is not None:
+                x.link(link)
             return x
 
-
-        self.interleave = make_add('interleave')
+        self.sink = make_add_link('fakesink', None)
+        self.classifier = make_add_link('classify', self.sink)
+        self.capsfilter = make_add_link('capsfilter', self.classifier)
+        #print dir(self.capsfilter)
+        caps =  Gst.caps_from_string("audio/x-raw, "
+                                     "layout=(string)interleaved, "
+                                     "rate=8000, channels=%s"
+                                     % self.channels)
+        self.capsfilter.set_property("caps", caps)
+        self.interleave = make_add_link('interleave', self.capsfilter)
         self.filesrcs = []
-        self.wavparses = []
         for i in range(channels):
-            fs = make_add('filesrc')
-            wp = make_add('wavparse')
-            fs.link(wp)
-            wp.link(self.interleave)
+            ac = make_add_link('audioconvert', self.interleave)
+            ar = make_add_link('audioresample', ac)
+            wp = make_add_link('wavparse', ar)
+            fs = make_add_link('filesrc', wp)
             self.filesrcs.append(fs)
-            self.wavparses.append(wp)
 
-        self.classifier = make_add('classify')
         self.classifier.set_property('classes', len(self.classes))
-        self.sink = make_add('fakesink')
-
-        self.interleave.link(self.classifier)
-        self.classifier.link(self.sink)
         self.next_fileset()
 
 
