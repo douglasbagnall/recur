@@ -52,6 +52,35 @@ G_DEFINE_TYPE (GstClassify, gst_classify, GST_TYPE_AUDIO_FILTER);
       ", layout = (string) interleaved"
 
 
+static inline void
+init_channel(ClassifyChannel *c, RecurNN *net, int id)
+{
+  u32 flags = net->flags & ~RNN_NET_FLAG_OWN_WEIGHTS;
+  c->net = rnn_clone(net, flags, RECUR_RNG_SUBSEED, NULL);
+  c->pcm_next = zalloc_aligned_or_die(CLASSIFY_WINDOW_SIZE * sizeof(float));
+  c->pcm_now = zalloc_aligned_or_die(CLASSIFY_WINDOW_SIZE * sizeof(float));
+  c->features = zalloc_aligned_or_die(CLASSIFY_N_FEATURES * sizeof(float));
+  if (PGM_DUMP_FEATURES){
+    c->mfcc_image = temporal_ppm_alloc(CLASSIFY_N_FEATURES, 300, "mfcc", id);
+    //c->mfcc_image = temporal_ppm_alloc(CLASSIFY_WINDOW_SIZE, 300, "mfcc", id);
+  }
+  else {
+    c->mfcc_image = NULL;
+  }
+}
+
+static inline void
+finalise_channel(ClassifyChannel *c)
+{
+  rnn_delete_net(c->net);
+  free(c->pcm_next);
+  free(c->pcm_now);
+  free(c->features);
+  if (c->mfcc_image){
+    free_temporal_ppm(c->mfcc_image);
+    c->mfcc_image = NULL;
+  }
+}
 
 /* Clean up */
 static void
@@ -62,11 +91,7 @@ gst_classify_finalize (GObject * obj){
   recur_audio_binner_delete(self->mfcc_factory);
   if (self->channels){
     for (int i = 0; i < self->n_channels; i++){
-      ClassifyChannel *c = &self->channels[i];
-      rnn_delete_net(c->net);
-      free(c->pcm_next);
-      free(c->pcm_now);
-      free(c->features);
+      finalise_channel(&self->channels[i]);
     }
     free(self->channels);
     self->channels = NULL;
@@ -200,13 +225,8 @@ gst_classify_setup(GstAudioFilter *base, const GstAudioInfo *info){
   }
   if (self->channels == NULL){
     self->channels = malloc_aligned_or_die(self->n_channels * sizeof(ClassifyChannel));
-    u32 train_flags = self->net->flags & ~RNN_NET_FLAG_OWN_WEIGHTS;
     for (int i = 0; i < self->n_channels; i++){
-      ClassifyChannel *c = &self->channels[i];
-      c->net = rnn_clone(self->net, train_flags, RECUR_RNG_SUBSEED, NULL);
-      c->pcm_next = zalloc_aligned_or_die(CLASSIFY_WINDOW_SIZE * sizeof(float));
-      c->pcm_now = zalloc_aligned_or_die(CLASSIFY_WINDOW_SIZE * sizeof(float));
-      c->features = zalloc_aligned_or_die(CLASSIFY_N_FEATURES * sizeof(float));
+      init_channel(&self->channels[i], self->net, i);
     }
   }
   maybe_parse_target_string(self);
@@ -452,7 +472,7 @@ maybe_learn(GstClassify *self){
     for (j = 0; j < self->n_channels; j++){
       /*load first half of pcm_next, second part of pcm_now.*/
       /*second part of pcm_next retains previous data */
-      ClassifyChannel *c = & self->channels[j];
+      ClassifyChannel *c = &self->channels[j];
       RecurNN *net = c->net;
       for(i = 0, k = j; i < CLASSIFY_HALF_WINDOW; i++, k += self->n_channels){
         float s = buffer_i[k] / 32768.0f;
@@ -462,7 +482,10 @@ maybe_learn(GstClassify *self){
 
       /*get the features -- after which pcm_now is finished with. */
       pcm_to_features(self->mfcc_factory, c->features, c->pcm_now);
-
+      if (c->mfcc_image){
+        temporal_ppm_add_row(c->mfcc_image, c->features);
+        //temporal_ppm_add_row(c->mfcc_image, c->pcm_now);
+      }
       float *answer;
 
       int valid_target = c->current_target >= 0 && c->current_target < self->n_classes;

@@ -53,6 +53,7 @@ typedef s16 audio_sample;
 
 #define PERIODIC_PGM_DUMP 255
 #define REGULAR_PGM_DUMP 0
+#define PGM_DUMP_FEATURES 1
 
 #define CLASSIFY_WINDOW_SIZE 256
 #define CLASSIFY_HALF_WINDOW (CLASSIFY_WINDOW_SIZE / 2)
@@ -82,6 +83,7 @@ typedef struct _ClassifyChannel
   float *pcm_next;
   int current_target;
   int current_winner;
+  TemporalPPM *mfcc_image;
 } ClassifyChannel;
 
 struct _GstClassify
