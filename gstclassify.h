@@ -6,14 +6,9 @@
 #include "recur-common.h"
 #include "recur-nn.h"
 #include "mfcc.h"
-#include "window.h"
 #include "badmaths.h"
 
 G_BEGIN_DECLS
-
-#define CLASSIFY_DRIFT 1
-#define CLASSIFY_PASSTHROUGH 0
-#define CLASSIFY_TRAIN 1
 
 #define CLASSIFY_N_HIDDEN 200
 #define CLASSIFY_RNG_SEED 11
