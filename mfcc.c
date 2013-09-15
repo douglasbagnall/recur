@@ -69,27 +69,15 @@ recur_bin_complex(RecurAudioBinner *ab, GstFFTF32Complex *f)
 
 /* Apply the cached window function, returning the actually used destination.
 
-   if src is NULL, use ab->pcm_data as src
-   if dest is NULL:
-     if window is RECUR_WINDOW_NONE, and dest is NULL:
-       return src unmodified
-     otherwise:
-       use ab->pcm_data as dest
-   apply the window (or copy, for RECUR_WINDOW_NONE)
-   return dest
 */
 
 const float *
 recur_apply_window(RecurAudioBinner *ab, const float *src, float *dest)
 {
   int i;
-  float *actual_dest = dest ? dest : ab->pcm_data;
-  if (src == NULL)
-    src = ab->pcm_data;
-
   if (ab->window_type == RECUR_WINDOW_NONE){
-    if (dest != NULL){
-      memmove(actual_dest, src, ab->window_size * sizeof(float));
+    if (dest != src){
+      memmove(dest, src, ab->window_size * sizeof(float));
     }
     else {
       return src;
@@ -97,17 +85,17 @@ recur_apply_window(RecurAudioBinner *ab, const float *src, float *dest)
   }
   else {
     for (i = 0; i < ab->window_size; i++){
-      actual_dest[i] = src[i] * ab->mask[i];
+      dest[i] = src[i] * ab->mask[i];
     }
   }
-  return actual_dest;
+  return dest;
 }
 
 /* extract log scaled, mel-shaped, frequency bins */
 float *
-recur_extract_log_freq_bins(RecurAudioBinner *ab, const float *data){
+recur_extract_log_freq_bins(RecurAudioBinner *ab, float *data){
   /* XXX assumes ab->value_size is 2 */
-  const float *windowed_data = recur_apply_window(ab, data, NULL);
+  const float *windowed_data = recur_apply_window(ab, data, data);
   gst_fft_f32_fft(ab->fft,
       windowed_data,
       ab->freq_data

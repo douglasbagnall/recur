@@ -32,7 +32,7 @@ enum {
 };
 
 float *
-recur_extract_log_freq_bins(RecurAudioBinner *ab, const float *data);
+recur_extract_log_freq_bins(RecurAudioBinner *ab, float *data);
 
 float *
 recur_extract_mfccs(RecurAudioBinner *ab, float *data);
