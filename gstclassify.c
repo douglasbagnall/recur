@@ -434,13 +434,14 @@ send_message(GstClassify *self, float mean_err){
 
 static inline void
 pcm_to_features(RecurAudioBinner *mf, float *features, float *pcm){
+  float *answer;
 #if CLASSIFY_USE_MFCCS
-  recur_extract_mfccs(mf, pcm);
+  answer = recur_extract_mfccs(mf, pcm);
 #else
-  recur_extract_log_freq_bins(mf, pcm);
+  answer = recur_extract_log_freq_bins(mf, pcm);
 #endif
   for (int i = 0; i < CLASSIFY_N_FEATURES; i++){
-    features[i] = mf->dct_bins[i];
+    features[i] = answer[i];
   }
 }
 
