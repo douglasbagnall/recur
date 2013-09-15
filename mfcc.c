@@ -177,6 +177,39 @@ mfcc_slopes_dump(RecurAudioBinner *ab){
 }
 
 
+void
+recur_window_init(float *mask, int len, int type, float scale){
+  int i;
+  const float half_pi = G_PI * 0.5;
+  //const float half_pi_norm = G_PI * 0.5 / len;
+  const float pi_norm = G_PI / len;
+  switch (type){
+  case RECUR_WINDOW_HANN:
+    for (i = 0; i < len; i++){
+      mask[i] = (0.5 - 0.5 * cos(2.0 * pi_norm * i)) * scale;
+    }
+    break;
+  case RECUR_WINDOW_MP3:
+    for (i = 0; i < len; i++){
+      mask[i] = sin(pi_norm * (i + 0.5f)) * scale;
+    }
+    break;
+  case RECUR_WINDOW_VORBIS:
+    for (i = 0; i < len; i++){
+      float z = pi_norm * (i + 0.5f);
+      mask[i] = sin(half_pi * sin(z) * sin(z)) * scale;
+    }
+    break;
+ case RECUR_WINDOW_NONE:
+ default:
+    for (i = 0; i < len; i++){
+      mask[i] = 1.0f;
+    }
+    break;
+  }
+}
+
+
 RecurAudioBinner *
 recur_audio_binner_new(int window_size, int window_type,
     int n_bins,
@@ -186,42 +219,18 @@ recur_audio_binner_new(int window_size, int window_type,
     float scale,
     int value_size /*1 for real, 2 for complex*/
 ){
-  int i;
   RecurAudioBinner *ab = calloc(1, sizeof(*ab));
   ab->window_size = window_size;
   ab->window_type = window_type;
   ab->n_bins = n_bins;
   ab->pcm_data = malloc_aligned_or_die((window_size + 2) * sizeof(float));
   ab->freq_data = malloc_aligned_or_die((window_size + 2) * sizeof(float));
-  float *mask = malloc_aligned_or_die((window_size + 2) * sizeof(float));
   ab->fft = gst_fft_f32_new(window_size, FALSE);
-  const float half_pi = G_PI * 0.5;
-  const float half_pi_norm = G_PI * 0.5 / window_size;
-  switch (window_type){
-  case RECUR_WINDOW_HANN:
-    for (i = 0; i < window_size; i++){
-      mask[i] = (0.5 - 0.5 * cos (2.0 * G_PI * i / window_size)) * scale;
-    }
-    break;
-  case RECUR_WINDOW_MP3:
-    for (i = 0; i < window_size; i++){
-      mask[i] = half_pi_norm * (i / window_size + 0.5f) * scale;
-    }
-    break;
-  case RECUR_WINDOW_VORBIS:
-    for (i = 0; i < window_size; i++){
-      float z = half_pi_norm * (i / window_size + 0.5f);
-      mask[i] = sin(half_pi * sin(z) * sin(z)) * scale;
-    }
-    break;
- case RECUR_WINDOW_NONE:
- default:
-    for (i = 0; i < window_size; i++){
-      mask[i] = 1.0f;
-    }
-    break;
-  }
+
+  float *mask = malloc_aligned_or_die((window_size + 2) * sizeof(float));
+  recur_window_init(mask, window_size, window_type, scale);
   ab->mask = mask;
+
   ab->value_size = value_size;
   ab->slopes = recur_bin_slopes_new(n_bins,
       window_size / value_size,

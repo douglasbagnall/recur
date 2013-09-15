@@ -55,6 +55,9 @@ recur_audio_binner_new(int window_size, int window_type,
 
 void recur_audio_binner_delete(RecurAudioBinner *ab);
 
+void recur_window_init(float *mask, int len, int type, float scale);
+
+
 //void recur_dct(const float *restrict input, float *restrict output, int len);
 //void recur_idct(const float *restrict input, float *restrict output, int len);
 
