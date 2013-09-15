@@ -306,6 +306,7 @@ recur_context_set_video_properties(RecurContext *context, GstVideoInfo *info)
       RECUR_MFCC_MIN_FREQ,
       RECUR_MFCC_MAX_FREQ,
       RECUR_AUDIO_RATE,
+      1.0f / (1 << 12),
       2
   );
 }

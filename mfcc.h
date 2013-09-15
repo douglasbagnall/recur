@@ -49,6 +49,7 @@ recur_audio_binner_new(int window_size, int window_type,
     float min_freq,
     float max_freq,
     float audio_rate,
+    float scale,
     int value_size
 );
 

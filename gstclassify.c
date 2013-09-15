@@ -212,12 +212,13 @@ gst_classify_setup(GstAudioFilter *base, const GstAudioInfo *info){
 
   if (self->mfcc_factory == NULL){
     self->mfcc_factory = recur_audio_binner_new(CLASSIFY_WINDOW_SIZE,
-        RECUR_WINDOW_NONE,
+        RECUR_WINDOW_HANN,
         CLASSIFY_N_FFT_BINS,
         CLASSIFY_MFCC_MIN_FREQ,
         CLASSIFY_MFCC_MAX_FREQ,
         CLASSIFY_RATE,
-        1
+        1.0f / 32768,
+        CLASSIFY_VALUE_SIZE
     );
   }
   if (self->net == NULL){
@@ -476,9 +477,8 @@ maybe_learn(GstClassify *self){
       ClassifyChannel *c = &self->channels[j];
       RecurNN *net = c->net;
       for(i = 0, k = j; i < CLASSIFY_HALF_WINDOW; i++, k += self->n_channels){
-        float s = buffer_i[k] / 32768.0f;
-        c->pcm_next[i] = s;
-        c->pcm_now[CLASSIFY_HALF_WINDOW + i] = s;
+        c->pcm_next[i] = buffer_i[k];
+        c->pcm_now[CLASSIFY_HALF_WINDOW + i] = buffer_i[k];
       }
 
       /*get the features -- after which pcm_now is finished with. */

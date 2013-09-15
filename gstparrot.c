@@ -127,7 +127,8 @@ gst_parrot_init (GstParrot * self)
       PARROT_MFCC_MIN_FREQ,
       PARROT_MFCC_MAX_FREQ,
       PARROT_RATE,
-      1
+      1,
+      2
   );
   GST_INFO("gst parrot init\n");
 }

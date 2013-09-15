@@ -143,14 +143,13 @@ recur_bin_slopes_new(const int n_bins, const int fft_len,
 }
 
 
-/*XXX could also introduce window_scale, e.g. 1.0/32768, saving operations
-  elsewhere. */
 RecurAudioBinner *
 recur_audio_binner_new(int window_size, int window_type,
     int n_bins,
     float min_freq,
     float max_freq,
     float audio_rate,
+    float scale,
     int value_size /*1 for real, 2 for complex*/
 ){
   int i;
@@ -167,18 +166,18 @@ recur_audio_binner_new(int window_size, int window_type,
   switch (window_type){
   case RECUR_WINDOW_HANN:
     for (i = 0; i < window_size; i++){
-      mask[i] = (0.5 - 0.5 * cos (2.0 * G_PI * i / window_size)) / (1 << 12);
+      mask[i] = (0.5 - 0.5 * cos (2.0 * G_PI * i / window_size)) * scale;
     }
     break;
   case RECUR_WINDOW_MP3:
     for (i = 0; i < window_size; i++){
-      mask[i] = half_pi_norm * (i + 0.5f);
+      mask[i] = half_pi_norm * (i / window_size + 0.5f) * scale;
     }
     break;
   case RECUR_WINDOW_VORBIS:
     for (i = 0; i < window_size; i++){
-      float z = half_pi_norm * (i + 0.5f);
-      mask[i] = sin(half_pi * sin(z) * sin(z));
+      float z = half_pi_norm * (i / window_size + 0.5f);
+      mask[i] = sin(half_pi * sin(z) * sin(z)) * scale;
     }
     break;
  case RECUR_WINDOW_NONE:
