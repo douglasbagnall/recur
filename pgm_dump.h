@@ -165,6 +165,7 @@ ppm_dump_signed_unnormalised_float(const float *weights, int width, int height, 
 #endif
 }
 
+
 static inline void
 ppm_dump_signed_unnormalised_colweighted_float(const float *weights, int width, int height, const char *name)
 {
@@ -217,41 +218,48 @@ typedef struct _TemporalPPM {
   int width;
   int height;
   int y;
+  int id;
+  int counter;
+  char *basename;
 } TemporalPPM;
 
-static inline void
-temporal_ppm_init(TemporalPPM **ppm, int width, int height){
-  *ppm = malloc(sizeof(TemporalPPM));
-  (*ppm)->im = malloc_aligned_or_die(width * height * sizeof(float));
-  (*ppm)->width = width;
-  (*ppm)->height = height;
-  (*ppm)->y = 0;
+static inline TemporalPPM *
+temporal_ppm_alloc(int width, int height, const char *basename, int id){
+  TemporalPPM *p = malloc(sizeof(TemporalPPM));
+  p->im = malloc_aligned_or_die(width * height * sizeof(float));
+  p->width = width;
+  p->height = height;
+  p->y = 0;
+  p->id = id;
+  p->counter = 0;
+  p->basename = strdup(basename);
+  return p;
 }
 
 static inline void
-free_temporal_ppm(TemporalPPM **ppm){
-  free((*ppm)->im);
-  free(*ppm);
+free_temporal_ppm(TemporalPPM *ppm){
+  free(ppm->im);
+  free(ppm->basename);
+  free(ppm);
 }
 
+
 static inline void
-temporal_ppm_add_row(TemporalPPM **ppm, const float *row, int width, int height,
-    const char *desc, int id){
-  if (*ppm == NULL){
-    temporal_ppm_init(ppm, width, height);
-  }
-  if (width != (*ppm)->width || height != (*ppm)->height){
-    DEBUG("temporal PPM size has changed (was %dx%d, now %dx%d); doing nothing!",
-        (*ppm)->width, (*ppm)->height, width, height);
+temporal_ppm_add_row(TemporalPPM *ppm, const float *row){
+  if (ppm == NULL){
+    DEBUG("temporal PPM not initialised!");
     return;
   }
-  memcpy((*ppm)->im + (*ppm)->y * width, row, width * sizeof(float));
-  (*ppm)->y++;
-  if ((*ppm)->y == height){
-    char name[100];
-    snprintf(name, sizeof(name), IMAGE_DIR "%s-%08d-%dx%d.ppm", desc, id, width, height);
-    ppm_dump_signed_unnormalised_float((*ppm)->im, width, height, name);
-    (*ppm)->y = 0;
+  memcpy(ppm->im + ppm->y * ppm->width, row, ppm->width * sizeof(float));
+  ppm->y++;
+  if (ppm->y == ppm->height){
+    char name[200];
+    snprintf(name, sizeof(name), IMAGE_DIR "%s-%d-%08d-%dx%d.ppm",
+             ppm->basename, ppm->id, ppm->counter, ppm->width, ppm->height);
+
+    ppm_dump_signed_unnormalised_float(ppm->im, ppm->width, ppm->height, name);
+    ppm->y = 0;
+    ppm->counter++;
   }
 }
 

@@ -229,6 +229,8 @@ long_confab(RecurNN *net, int len, int rows, int c, int hidden_ppm){
   return c;
 }
 
+static TemporalPPM *input_ppm;
+
 void
 epoch(RecurNN *net, const u8 *text, const int len){
   int i;
@@ -250,12 +252,7 @@ epoch(RecurNN *net, const u8 *text, const int len){
       entropy -= 50;
 
     if (TEMPORAL_PGM_DUMP){
-      static TemporalPPM *inputs;
-      //static TemporalPPM *hiddens;
-      temporal_ppm_add_row(&inputs, net->input_layer, net->i_size, 500,
-          "input_layer", net->generation);
-      //temporal_ppm_add_row(&hiddens, net->hidden_layer, net->h_size, 500,
-      //    "hidden", net->generation);
+      temporal_ppm_add_row(input_ppm, net->input_layer);
     }
 
     if ((net->generation & 1023) == 0){
@@ -318,6 +315,9 @@ main(void){
   create_char_lut(CHAR_TO_NET, NET_TO_CHAR);
   long len;
   u8* text = alloc_and_collapse_text(SRC_TEXT, &len);
+  if (TEMPORAL_PGM_DUMP){
+    input_ppm = temporal_ppm_alloc(net->i_size, 500, "input_layer", 0);
+  }
   START_TIMER(run);
   for (int i = 0; i < 200; i++){
     DEBUG("Starting epoch %d. learn rate %f.", i, net->bptt->learn_rate);
@@ -328,4 +328,5 @@ main(void){
   }
   free(text);
   rnn_delete_net(net);
+  free_temporal_ppm(input_ppm);
 }
