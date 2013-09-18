@@ -2,6 +2,7 @@
 #ifndef _GOT_RECUR_NN_H
 #define _GOT_RECUR_NN_H 1
 
+#include <unistd.h>
 #include <string.h>
 #include "recur-common.h"
 #include "recur-rng.h"
@@ -135,6 +136,7 @@ RecurNN * rnn_clone(RecurNN *parent, int flags,
     u64 rng_seed, const char *log_file);
 
 void rnn_set_log_file(RecurNN *net, const char * log_file);
+void rnn_fd_dup_log(RecurNN *net, RecurNN* src);
 
 void rnn_randomise_weights(RecurNN *net, float variance);
 

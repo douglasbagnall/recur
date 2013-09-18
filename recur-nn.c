@@ -139,6 +139,21 @@ rnn_set_log_file(RecurNN *net, const char *log_file){
   }
 }
 
+void
+rnn_fd_dup_log(RecurNN *net, RecurNN* src)
+{
+  int fd, srcfd;
+  if (src->log){
+    srcfd = fileno(src->log);
+      fd = dup(srcfd);
+    net->log = fdopen(fd, "w");
+  }
+  else{
+    DEBUG("not duping NULL log file");
+    net->log = NULL;
+  }
+}
+
 
 
 /*clone a net.
