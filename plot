@@ -8,7 +8,8 @@ import random
 import sys
 import os
 
-DEFAULT_LOGFILE = "parrot.log"
+DEFAULT_LOGFILE = "classify.log"
+DEFAULT_KEYS = ('error_sum', 'error_gain', 'hidden_sum', 'depth')
 
 def seek_start(f, start):
     f.seek(0, os.SEEK_END)
@@ -98,9 +99,13 @@ def plot(logfile, args):
     numbers = [int(x) for x in args if x.isdigit()]
     keys = [x for x in args if not x.isdigit()]
     if keys == []:
-        keys= ('error_sum', 'error_gain', 'hidden_sum', 'depth')
+        keys= DEFAULT_KEYS
     #numbers are start, length, step tuple
     lists = read_log(logfile, keys, *numbers)
+    empties = [k for k, v in lists.items() if len(v) == 0]
+    for k in empties:
+        print "ignoring unknown key %r" % k
+        del lists[k]
     #if it doesn't finish cleanly, the lists could be of differing sizes.
     shortest = min(len(x) for x in lists.values())
     for x in lists.values():
@@ -113,7 +118,7 @@ def search_for_keys(logfile):
     from collections import defaultdict
     from math import log
     keys = defaultdict(float)
-    f = open("bptt.log")
+    f = open(logfile)
     i = 0
     for i, line in enumerate(f):
         try:
