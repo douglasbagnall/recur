@@ -49,7 +49,7 @@ G_DEFINE_TYPE (GstClassify, gst_classify, GST_TYPE_AUDIO_FILTER);
 #define CLASSIFY_CAPS_STRING "audio/x-raw, format = (string) " QUOTE(CLASSIFY_FORMAT) \
       ", rate = (int) " QUOTE(CLASSIFY_RATE) \
       ", channels = (int) [ " QUOTE(CLASSIFY_MIN_CHANNELS) " , " QUOTE(CLASSIFY_MAX_CHANNELS) " ] " \
-      ", layout = (string) interleaved"
+      ", layout = (string) interleaved, channel-mask = (bitmask)0x0"
 
 
 static inline void
