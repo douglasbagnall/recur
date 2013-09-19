@@ -295,6 +295,7 @@ maybe_scale_hiddens(RecurNN *net){
   }
   if (sum > softclip){
     softclip_scale(sum, softclip, hiddens, net->h_size);
+#if 0
     /*scale the weights as well, but not quite as much */
     float scale = (1.0f + soft_clip(sum, softclip)) * 0.5f;
     scale_aligned_array(net->ih_weights, net->ih_size, scale);
@@ -303,6 +304,7 @@ maybe_scale_hiddens(RecurNN *net){
     }
     MAYBE_DEBUG("scaling weights (hidden sum %f > %f)", sum, softclip);
     bptt_log_float(net, "weight_scale", scale);
+#endif
   }
 }
 
