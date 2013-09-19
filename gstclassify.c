@@ -24,7 +24,7 @@ enum
   PROP_CLASSES,
 };
 
-#define DEFAULT_PROP_TARGET "0"
+#define DEFAULT_PROP_TARGET ""
 #define DEFAULT_PROP_CLASSES 2
 #define MIN_PROP_CLASSES 1
 #define MAX_PROP_CLASSES 1000000
@@ -505,13 +505,13 @@ maybe_learn(GstClassify *self){
         err_sum += net->bptt->o_error[c->current_target];
         bptt_calc_deltas(net);
       }
-      else if (valid_target){
+      else{
         answer = rnn_opinion(net, c->features);
-        err_sum += softmax_best_guess(net->bptt->o_error, answer,
-            net->output_size, c->current_target, &c->current_winner);
-      }
-      else {
-        GST_DEBUG("Ignoring channel %d with target %d", j , c->current_target);
+        c->current_winner = softmax_best_guess(net->bptt->o_error, answer,
+            net->output_size);
+        if (valid_target){
+          err_sum += net->bptt->o_error[c->current_target];
+        }
       }
 
       float *tmp;
