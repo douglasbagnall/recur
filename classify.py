@@ -69,6 +69,7 @@ class Classifier(object):
                                      "rate=8000, channels=%s"
                                      % channels)
         self.capsfilter.set_property("caps", caps)
+        self.summaries = [[]] * channels
 
     def train(self, data, iterations=100):
         """data is a dictionary mapping class IDs to lists of filenames.
@@ -96,26 +97,61 @@ class Classifier(object):
         target_string = '.'.join(str(self.classes.index(x)) for x in self.targets)
         self.classifier.set_property('target', target_string)
 
-    def evaluate(self, files):
-        self.next_fileset()
+    def identify(self, *files):
+        #self.next_fileset()
+        for fn, fs in zip(files, self.filesrcs):
+            fs.set_property('location', fn)
         self.pipeline.set_state(Gst.State.PLAYING)
         self.mainloop.run()
+        return self.winner
+
+    def remember(self, s):
+        v = s.get_value
+        #print self.summaries
+        for i in range(self.channels):
+            winner = v('channel %d winner' % i)
+            scores = tuple(v('channel %d, output %d' % (i, j))
+                           for j in range(len(self.classes)))
+            self.summaries[i].append((winner, scores))
+
+
+    def summarise(self):
+        for i, s in enumerate(self.summaries):
+            #print s
+            winners = [0] * len(self.classes)
+            score_sums = [0] * len(self.classes)
+            for w, scores in s:
+                winners[w] += 1
+                score_sums = [x + y for x, y in zip(score_sums, scores)]
+            mean_scores = [x/ len(s) for x in score_sums]
+            winner = winners.index(max(winners))
+            #print self.filesrcs[i].get_property('location')
+            print "channel %s  winner %s " % (i, self.classes[winner])
+            #print zip(self.classes, scores)
+            for a, b in zip(self.classes, scores):
+                print " %s:%.2f" % (a, -b)
+            self.winner = winner
+        self.summaries = [[]] * self.channels
+
 
     def on_eos(self, bus, msg):
-        print('on_eos()')
+        #print('on_eos()')
+        self.summarise()
         self.pipeline.set_state(Gst.State.READY)
         if self.trainers is not None:
             self.next_training_set()
+            self.pipeline.set_state(Gst.State.PLAYING)
         else:
-            self.next_fileset()
-        self.pipeline.set_state(Gst.State.PLAYING)
+            self.stop()
+            return
 
     def on_error(self, bus, msg):
         print('on_error():', msg.parse_error())
 
     def on_element(self, bus, msg):
+        s = msg.get_structure()
+        self.remember(s)
         if self.report:
-            s = msg.get_structure()
             self.report(self, s)
 
     def stop(self):
@@ -134,15 +170,14 @@ def report_stderr(c, s):
         scores = tuple(v('channel %d, output %d' % (i, j))
                        for j in range(len(c.classes)))
         score_format = "%.2f " * len(c.classes)
+        print c.classes, winner
         wc = c.classes[winner]
         tc = c.targets[i]
         print ("channel %d winner %s target %s "
                + score_format)  % ((i, wc, tc) + scores)
 
 
-
-
-def train(_dir, cycles=250, channels=48):
+def train(_dir, cycles=1000, channels=72):
     files = [x for x in os.listdir(_dir) if x.endswith('.wav')]
     random.shuffle(files)
     categories = {}
@@ -152,9 +187,18 @@ def train(_dir, cycles=250, channels=48):
     c = Classifier(report=report_stderr, channels=channels)
     c.train(categories, cycles)
 
-def test():
-    c = Classifier(TEST_AUDIO_DIR, training=False)
-    c.run()
+def test(_dir=TEST_AUDIO_DIR):
+    files = [x for x in os.listdir(_dir) if x.endswith('.wav')]
+    random.shuffle(files)
+    c = Classifier(report=None, channels=1)
+    score = 0
+    #files = files[:10]
+    for f in files:
+        print f
+        winner = c.identify(os.path.join(_dir, f))
+        score += winner == c.classes.find(f[0])
+    print "%s/%s = %0.2f" % (score, len(files), float(score) / len(files))
+
 
 def main(argv):
     if argv:
@@ -164,8 +208,7 @@ def main(argv):
 
     GObject.threads_init()
     Gst.init(None)
-    train(_dir)
-
+    #train(_dir)
+    test()
 
 main(sys.argv[1:])
-#test()
