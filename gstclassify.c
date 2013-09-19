@@ -22,10 +22,12 @@ enum
   PROP_0,
   PROP_TARGET,
   PROP_CLASSES,
+  PROP_FORGET,
 };
 
 #define DEFAULT_PROP_TARGET ""
 #define DEFAULT_PROP_CLASSES 2
+#define DEFAULT_PROP_FORGET 0
 #define MIN_PROP_CLASSES 1
 #define MAX_PROP_CLASSES 1000000
 
@@ -135,6 +137,12 @@ gst_classify_class_init (GstClassifyClass * klass)
           MIN_PROP_CLASSES, MAX_PROP_CLASSES,
           DEFAULT_PROP_CLASSES,
           G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+
+  g_object_class_install_property (gobject_class, PROP_FORGET,
+      g_param_spec_boolean("forget", "forget",
+          "Forget the current hidden layer (all channels)",
+          DEFAULT_PROP_FORGET,
+          G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
   trans_class->transform_ip = GST_DEBUG_FUNCPTR (gst_classify_transform_ip);
   af_class->setup = GST_DEBUG_FUNCPTR (gst_classify_setup);
@@ -313,6 +321,14 @@ gst_classify_set_property (GObject * object, guint prop_id, const GValue * value
       else {
         GST_WARNING("it is TOO LATE fto set the number of classes!"
             " (is %d, requested %d)", self->n_classes, g_value_get_int(value));
+      }
+      break;
+    case PROP_FORGET:
+      if (self->net){
+        rnn_forget_history(self->net, 0);
+      }
+      for (int i = 0; i < self->n_channels; i++){
+        rnn_forget_history(self->channels[i].net, 0);
       }
       break;
     default:

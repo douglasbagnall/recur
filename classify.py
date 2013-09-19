@@ -99,6 +99,7 @@ class Classifier(object):
 
     def identify(self, *files):
         #self.next_fileset()
+        self.classifier.set_property("forget", True)
         for fn, fs in zip(files, self.filesrcs):
             fs.set_property('location', fn)
         self.pipeline.set_state(Gst.State.PLAYING)

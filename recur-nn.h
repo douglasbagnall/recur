@@ -160,7 +160,7 @@ void bptt_calc_deltas(RecurNN *net);
 void rnn_condition_net(RecurNN *net);
 void rnn_log_net(RecurNN *net);
 
-
+void rnn_forget_history(RecurNN *net, int bptt_too);
 
 static inline void
 bptt_log_float(RecurNN *net, char *name, float value){
