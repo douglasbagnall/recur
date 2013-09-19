@@ -187,12 +187,12 @@ load_or_create_net(GstClassify *self){
   if (net == NULL){
     net = rnn_new(CLASSIFY_N_FEATURES, CLASSIFY_N_HIDDEN,
         self->n_classes, CLASSIFY_RNN_FLAGS, CLASSIFY_RNG_SEED,
-        NET_LOG_FILE, CLASSIFY_BPTT_DEPTH, LEARN_RATE, MOMENTUM, MOMENTUM_WEIGHT,
+        NULL, CLASSIFY_BPTT_DEPTH, LEARN_RATE, MOMENTUM, MOMENTUM_WEIGHT,
         CLASSIFY_BATCH_SIZE);
   }
   else {
     net->bptt->learn_rate = LEARN_RATE;
-    rnn_set_log_file(net, NET_LOG_FILE);
+    rnn_set_log_file(net, NULL, 0);
   }
   return net;
 }
@@ -230,6 +230,7 @@ gst_classify_setup(GstAudioFilter *base, const GstAudioInfo *info){
       init_channel(&self->channels[i], self->net, i);
     }
   }
+  rnn_set_log_file(self->channels[0].net, NET_LOG_FILE, 1);
   maybe_parse_target_string(self);
 
   GST_DEBUG_OBJECT (self,

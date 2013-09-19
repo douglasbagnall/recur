@@ -112,7 +112,7 @@ gst_parrot_init (GstParrot * self)
   }
   else {
     self->net->bptt->learn_rate = LEARN_RATE;
-    rnn_set_log_file(self->net, NET_LOG_FILE);
+    rnn_set_log_file(self->net, NET_LOG_FILE, 0);
   }
   self->channels = NULL;
   self->n_channels = 0;

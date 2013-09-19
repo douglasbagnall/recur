@@ -303,7 +303,7 @@ main(void){
 #if TRY_RELOAD
   net = rnn_load_net(NET_FILENAME);
   if (net)
-    rnn_set_log_file(net, NET_LOG_FILE);
+    rnn_set_log_file(net, NET_LOG_FILE, 0);
   DEBUG("net is %p", net);
 #endif
   if (net == NULL)

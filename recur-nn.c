@@ -99,7 +99,7 @@ rnn_new(uint input_size, uint hidden_size, uint output_size, int flags,
   }
 
   if (log_file){
-    rnn_set_log_file(net, log_file);
+    rnn_set_log_file(net, log_file, flags & RNN_NET_FLAG_LOG_APPEND);
   }
   return net;
 }
@@ -117,20 +117,22 @@ rnn_delete_net(RecurNN *net){
 }
 
 /*to start logging, use
-  rnn_set_log_file(net, "path-to-log-file");
+  rnn_set_log_file(net, "path-to-log-file", append_dont_truncate);
 
-  The log file will be truncated and overwritten.
+  If append_dont_truncate is true, the log file will be extended, otherwise it
+  will be truncated and overwritten.
 
   To stop logging:
-  rnn_set_log_file(net, NULL);
+  rnn_set_log_file(net, NULL, 0);
  */
 void
-rnn_set_log_file(RecurNN *net, const char *log_file){
+rnn_set_log_file(RecurNN *net, const char *log_file, int append_dont_truncate){
   if (net->log){
     fclose(net->log);
   }
   if (log_file){
-    net->log = fopen(log_file, "w");
+    char *mode = append_dont_truncate ? "a" : "w";
+    net->log = fopen(log_file, mode);
     bptt_log_int(net, "generation", net->generation);
   }
   else{

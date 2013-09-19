@@ -62,6 +62,7 @@ enum {
   RNN_NET_FLAG_OWN_BPTT = 1,
   RNN_NET_FLAG_OWN_WEIGHTS = 2,
   RNN_NET_FLAG_BIAS = 4,
+  RNN_NET_FLAG_LOG_APPEND = 8,
 
   RNN_COND_MASK_SCALE = (1 << (RNN_COND_BIT_SCALE + RNN_COND_MASK_OFFSET)),
   RNN_COND_MASK_ZERO = (1 << (RNN_COND_BIT_ZERO + RNN_COND_MASK_OFFSET)),
@@ -135,7 +136,7 @@ RecurNN * rnn_new(uint input_size, uint hidden_size, uint output_size,
 RecurNN * rnn_clone(RecurNN *parent, int flags,
     u64 rng_seed, const char *log_file);
 
-void rnn_set_log_file(RecurNN *net, const char * log_file);
+void rnn_set_log_file(RecurNN *net, const char * log_file, int append_dont_truncate);
 void rnn_fd_dup_log(RecurNN *net, RecurNN* src);
 
 void rnn_randomise_weights(RecurNN *net, float variance);

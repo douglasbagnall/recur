@@ -87,7 +87,7 @@ recur_setup_nets(RecurContext *context, const char *log_file)
 #if TRY_RELOAD
   net = rnn_load_net(NET_FILENAME);
   if (net)
-    rnn_set_log_file(net, log_file);
+    rnn_set_log_file(net, log_file, 0);
   DEBUG("net is %p", net);
 #endif
 
