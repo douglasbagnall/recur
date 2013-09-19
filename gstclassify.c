@@ -424,6 +424,7 @@ prepare_message (GstClassify *self, float mean_err)
     snprintf(key, sizeof(key), "channel %d winner", i);
     gst_structure_set(s, key, G_TYPE_INT, self->channels[i].current_winner, NULL);
   }
+  /*XXX check ownership of s, msg*/
   return gst_message_new_element(GST_OBJECT(self), s);
 }
 
