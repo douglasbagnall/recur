@@ -263,6 +263,12 @@ train-parrot-duo: libgstparrot.so
 		uridecodebin uri=$(AUD_URI_CALE_CAT) ! audioconvert ! audioresample \
 		! $(PARROT_CAPS) ! il.
 
+.PHONY: classify-test
+
+classify-test: libgstclassify.so
+	mv classify*.net nets || echo no net to move
+	rm classify.log || echo no log to nuke
+	time python classify.py > log.log
 
 include $(wildcard *.d)
 
