@@ -499,8 +499,10 @@ maybe_learn(GstClassify *self){
       if (training){
         bptt_advance(net);
         answer = rnn_opinion(net, c->features);
-        err_sum += softmax_best_guess(net->bptt->o_error, answer,
-            net->output_size, c->current_target, &c->current_winner);
+        c->current_winner = softmax_best_guess(net->bptt->o_error, answer,
+            net->output_size);
+        net->bptt->o_error[c->current_target] += 1.0f;
+        err_sum += net->bptt->o_error[c->current_target];
         bptt_calc_deltas(net);
       }
       else if (valid_target){
