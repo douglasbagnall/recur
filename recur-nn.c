@@ -578,7 +578,7 @@ bptt_and_accumulate_error(RecurNN *net, float *ih_delta, float top_error_sum)
       hidden_sum += net->hidden_layer[i];
     }
     bptt_log_float(net, "hidden_sum", hidden_sum);
-#if 0
+#if 1
     float weight_sum = 0;
     for (int i = 0; i < net->ih_size; i++){
       weight_sum += fabsf(weights[i]);

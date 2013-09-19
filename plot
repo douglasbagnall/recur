@@ -9,7 +9,7 @@ import sys
 import os
 
 DEFAULT_LOGFILE = "classify.log"
-DEFAULT_KEYS = ('error_sum', 'error_gain', 'hidden_sum', 'depth')
+DEFAULT_KEYS = ('error_sum', 'error', 'hidden_sum', 'depth', 'weight_sum')
 
 def seek_start(f, start):
     f.seek(0, os.SEEK_END)
