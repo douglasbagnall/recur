@@ -142,8 +142,8 @@ def report_stderr(c, s):
 
 
 
-def train(_dir, cycles=250, channels=6):
-    files = os.listdir(_dir)
+def train(_dir, cycles=250, channels=48):
+    files = [x for x in os.listdir(_dir) if x.endswith('.wav')]
     random.shuffle(files)
     categories = {}
     for c in CLASSES:
