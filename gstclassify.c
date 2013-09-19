@@ -431,6 +431,7 @@ static inline void
 send_message(GstClassify *self, float mean_err){
   GstMessage *msg = prepare_message (self, mean_err);
   gst_element_post_message(GST_ELEMENT(self), msg);
+  bptt_log_float(self->channels[0].net, "error", mean_err);
 }
 
 
@@ -519,9 +520,11 @@ maybe_learn(GstClassify *self){
     if (self->training){
       consolidate_and_apply_learning(self);
       possibly_save_net(self->net, self->net_filename);
+      rnn_condition_net(self->net);
+      rnn_log_net(self->channels[0].net);
+      rnn_log_net(self->net);
     }
     self->net->generation = self->channels[0].net->generation;
-
     send_message(self, err_sum / self->n_channels);
 
     self->incoming_start += chunk_size;
