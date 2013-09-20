@@ -56,12 +56,12 @@ typedef s16 audio_sample;
 #define REGULAR_PGM_DUMP 0
 #define PGM_DUMP_FEATURES 0
 
-#define CLASSIFY_WINDOW_SIZE 512
+#define CLASSIFY_WINDOW_SIZE 256
 #define CLASSIFY_HALF_WINDOW (CLASSIFY_WINDOW_SIZE / 2)
 
 /*queues size needs to be a multiple of window size, and big enough to
   accommodate all the expected audio channels. */
-#define CLASSIFY_INCOMING_QUEUE_SIZE (1000 * CLASSIFY_WINDOW_SIZE)
+#define CLASSIFY_INCOMING_QUEUE_SIZE (1500 * CLASSIFY_WINDOW_SIZE)
 
 #define GST_TYPE_CLASSIFY (gst_classify_get_type())
 #define GST_CLASSIFY(obj) \
