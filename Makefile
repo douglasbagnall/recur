@@ -268,7 +268,8 @@ train-parrot-duo: libgstparrot.so
 classify-test: libgstclassify.so
 	mv classify*.net nets || echo no net to move
 	rm classify.log || echo no log to nuke
-	time python classify.py > log.log
+	time python classify.py train > log.log
+	python classify.py test
 
 include $(wildcard *.d)
 
