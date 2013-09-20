@@ -144,6 +144,7 @@ mfcc_slopes_dump(RecurAudioBinner *ab){
   int i, j;
   int wsize = ab->window_size / ab->value_size;
   u8 *img = malloc_aligned_or_die(ab->n_bins * wsize);
+  memset(img, 0, ab->n_bins * wsize);
   float mul = 0.0;
   RecurAudioBinSlope *bin;
 
