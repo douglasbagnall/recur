@@ -422,9 +422,10 @@ possibly_save_net(RecurNN *net, char *filename)
 }
 
 
-static GstMessage *
-prepare_message (GstClassify *self, float mean_err)
+static inline void
+send_message(GstClassify *self, float mean_err)
 {
+  GstMessage *msg;
   char *name = "classify";
   GstStructure *s;
   s = gst_structure_new (name,
@@ -440,14 +441,10 @@ prepare_message (GstClassify *self, float mean_err)
     snprintf(key, sizeof(key), "channel %d winner", i);
     gst_structure_set(s, key, G_TYPE_INT, self->channels[i].current_winner, NULL);
   }
-  /*XXX check ownership of s, msg*/
-  return gst_message_new_element(GST_OBJECT(self), s);
-}
-
-static inline void
-send_message(GstClassify *self, float mean_err){
-  GstMessage *msg = prepare_message (self, mean_err);
+  msg = gst_message_new_element(GST_OBJECT(self), s);
   gst_element_post_message(GST_ELEMENT(self), msg);
+  //free(msg);
+  //free(s);
   bptt_log_float(self->channels[0].net, "error", mean_err);
 }
 
