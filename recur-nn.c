@@ -245,6 +245,7 @@ rnn_randomise_weights(RecurNN *net, float variance){
 void
 rnn_forget_history(RecurNN *net, int bptt_too){
   memset(net->hidden_layer, 0, net->h_size * sizeof(float));
+  memset(net->input_layer, 0, net->hidden_size * sizeof(float));
   if (bptt_too && net->bptt){
     memset(net->bptt->history, 0, net->bptt->depth * net->i_size * sizeof(float));
   }
