@@ -268,7 +268,7 @@ train-parrot-duo: libgstparrot.so
 classify-test: libgstclassify.so
 	mv classify*.net nets || echo no net to move
 	rm classify.log || echo no log to nuke
-	time python classify.py train > log.log
+	time ./classify-train > log.log
 	python classify.py test
 
 valgrind-classify:
