@@ -1,0 +1,87 @@
+#!/usr/bin/python
+import os, sys
+import random
+import itertools
+
+TRAIN_AUDIO_DIR = "/home/douglas/maori-language-monitoring/data/split/wav-8k/train"
+from classify import BaseClassifier, Gst, gst_init, CLASSES
+
+def eternal_alternator(iters, max_iterations=-1):
+    cycles = [itertools.cycle(x) for x in iters]
+    i = 0
+    while i != max_iterations:
+        for c in cycles:
+            yield c.next()
+        i += 1
+
+
+class Trainer(BaseClassifier):
+    trainers = None
+
+    def train(self, data, iterations=100):
+        """data is a dictionary mapping class IDs to lists of filenames.
+        """
+        trainers = []
+        for k in self.classes:
+            trainers.append([(k, x) for x in data[k]])
+        self.trainers = eternal_alternator(trainers, iterations)
+        self.next_training_set()
+        self.pipeline.set_state(Gst.State.PLAYING)
+        self.mainloop.run()
+
+    def next_training_set(self):
+        self.targets = []
+        for fs in self.filesrcs:
+            try:
+                c, fn = self.trainers.next()
+            except StopIteration:
+                self.stop()
+                break
+            self.targets.append(c)
+            fs.set_property('location', fn)
+            print c, fn
+
+        target_string = '.'.join(str(self.classes.index(x)) for x in self.targets)
+        self.classifier.set_property('target', target_string)
+
+    def on_eos(self, bus, msg):
+        self.pipeline.set_state(Gst.State.READY)
+        self.next_training_set()
+        self.pipeline.set_state(Gst.State.PLAYING)
+
+    def on_error(self, bus, msg):
+        print('Error:', msg.parse_error())
+
+    def on_element(self, bus, msg):
+        s = msg.get_structure()
+        if s.get_name() != "classify":
+            return
+        v = s.get_value
+        error = v('error')
+        print error
+        fmt = "channel %d %s %s %s " + ("%.2f " * len(self.classes))
+        for i in range(self.channels):
+            winner = v('channel %d winner' % i)
+            scores = tuple(v('channel %d, output %d' % (i, j))
+                           for j in range(len(self.classes)))
+            wc = self.classes[winner]
+            tc = self.targets[i]
+            ok = ("\033[01;32m==\033[00m" if wc == tc else "\033[01;31m!=\033[00m")
+            print (fmt % ((i, wc, ok, tc) + scores))
+
+
+def train(_dir=TRAIN_AUDIO_DIR, cycles=1000, channels=72, classes=CLASSES):
+    files = [x for x in os.listdir(_dir) if x.endswith('.wav')]
+    random.shuffle(files)
+    categories = {c: [os.path.join(_dir, x) for x in files if x[0] == c]
+                  for c in classes}
+
+    c = Trainer(channels=channels)
+    c.train(categories, cycles)
+
+
+def main(argv):
+    gst_init()
+    train()
+
+main(sys.argv[1:])
