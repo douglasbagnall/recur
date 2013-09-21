@@ -477,7 +477,7 @@ send_message(GstClassify *self, float mean_err)
       "error", G_TYPE_FLOAT, mean_err,
       NULL);
   for (int i = 0; i < self->n_channels; i++){
-    char key[30];
+    char key[50];
     RecurNN *net = self->channels[i].net;
     for (int j = 0; j < net->output_size; j++){
       snprintf(key, sizeof(key), "channel %d, output %d", i, j);
@@ -488,8 +488,6 @@ send_message(GstClassify *self, float mean_err)
   }
   msg = gst_message_new_element(GST_OBJECT(self), s);
   gst_element_post_message(GST_ELEMENT(self), msg);
-  //free(msg);
-  //free(s);
   bptt_log_float(self->channels[0].net, "error", mean_err);
 }
 
