@@ -720,8 +720,6 @@ bptt_calc_deltas(RecurNN *net){
   if (net->log){
     bptt_log_float(net, "top_error_scaled", top_error_scaled);
     bptt_log_float(net, "top_error_raw", top_error_sum);
-    //bptt_log_float(net, "error_sum", bptt_error_sum);
-    //bptt_log_float(net, "error_gain", bptt_error_sum / (top_error_scaled + 1e-6));
     bptt_log_int(net, "generation", net->generation);
   }
   net->generation++;

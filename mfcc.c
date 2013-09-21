@@ -148,8 +148,8 @@ mfcc_slopes_dump(RecurAudioBinner *ab){
   float mul = 0.0;
   RecurAudioBinSlope *bin;
 
-  printf("window size %d value size %d bins %d\n",
-         ab->window_size, ab->value_size, ab->n_bins);
+  MAYBE_DEBUG("window size %d value size %d bins %d\n",
+      ab->window_size, ab->value_size, ab->n_bins);
 
   for (i = 0; i < ab->n_bins; i++){
     bin = &ab->slopes[i];
@@ -161,7 +161,7 @@ mfcc_slopes_dump(RecurAudioBinner *ab){
         img[(i - 1) * wsize + j] = (1.0 - mul) * 255;
       }
     }
-    printf("%2d. left %3d right %3d slope %f mul at end %f\n",
+    MAYBE_DEBUG("%2d. left %3d right %3d slope %f mul at end %f\n",
         i, bin->left, bin->right, bin->slope, mul);
   }
   bin = &ab->slopes[i];
@@ -171,8 +171,8 @@ mfcc_slopes_dump(RecurAudioBinner *ab){
     //img[i * size + j] = mul * 255;
     img[(i - 1) * wsize + j] = (1.0 - mul) * 255;
   }
-    printf("%2d. left %3d right %3d slope %f mul at end %f\n",
-        i, bin->left, bin->right, bin->slope, mul);
+  MAYBE_DEBUG("%2d. left %3d right %3d slope %f mul at end %f\n",
+      i, bin->left, bin->right, bin->slope, mul);
   pgm_dump(img, wsize, ab->n_bins, IMAGE_DIR "/mfcc-bins.pgm");
   free(img);
 }
@@ -211,7 +211,7 @@ recur_window_init(float *mask, int len, int type, float scale){
 }
 
 
-RecurAudioBinner *
+RecurAudioBinner *  __attribute__((malloc))
 recur_audio_binner_new(int window_size, int window_type,
     int n_bins,
     float min_freq,
