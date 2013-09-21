@@ -171,7 +171,7 @@ TIMER =
 #TIMER = time -f '\nused %P CPU\n' timeout 10
 GDB =
 #GDB = gdb --args
-VALGRIND = valgrind --tool=memcheck --log-file=valgrind.log --trace-children=yes --suppressions=valgrind-python.supp
+VALGRIND = valgrind --tool=memcheck --log-file=valgrind.log --trace-children=yes --suppressions=valgrind-python.supp  --leak-check=full --show-reachable=yes
 
 
 TEST_PIPELINE_CORE = gst-launch-1.0  \
@@ -270,6 +270,11 @@ classify-test: libgstclassify.so
 	rm classify.log || echo no log to nuke
 	time python classify.py train > log.log
 	python classify.py test
+
+valgrind-classify:
+	mv classify*.net nets || echo no net to move
+	rm classify.log || echo no log to nuke
+	$(VALGRIND) --leak-check=full --show-reachable=yes python classify.py train
 
 include $(wildcard *.d)
 
