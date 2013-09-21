@@ -10,10 +10,8 @@
 
 G_BEGIN_DECLS
 
-#define CLASSIFY_N_HIDDEN 199
 #define CLASSIFY_RNG_SEED 11
 #define CLASSIFY_BPTT_DEPTH 30
-#define LEARN_RATE 0.0001
 #define MOMENTUM 0.95
 #define MOMENTUM_WEIGHT 0.5
 
@@ -102,6 +100,9 @@ struct _GstClassify
   char *target_string;
   char *net_filename;
   int queue_size;
+
+  int hidden_size;
+  float learn_rate;
 };
 
 

@@ -18,9 +18,11 @@ def eternal_alternator(iters, max_iterations=-1):
 class Trainer(BaseClassifier):
     trainers = None
 
-    def train(self, data, iterations=100):
+    def train(self, data, iterations=100, learn_rate=None, learn_decay=1.0):
         """data is a dictionary mapping class IDs to lists of filenames.
         """
+        self.learn_rate = learn_rate
+        self.learn_decay = learn_decay
         trainers = []
         for k in self.classes:
             trainers.append([(k, x) for x in data[k]])
@@ -31,6 +33,11 @@ class Trainer(BaseClassifier):
 
     def next_training_set(self):
         self.targets = []
+        if self.learn_rate:
+            print "learn_rate %s" % self.learn_rate
+            self.classifier.set_property('learn_rate', self.learn_rate)
+            self.learn_rate *= self.learn_decay
+
         for fs in self.filesrcs:
             try:
                 c, fn = self.trainers.next()
@@ -77,7 +84,7 @@ def train(_dir=TRAIN_AUDIO_DIR, cycles=1000, channels=72, classes=CLASSES):
                   for c in classes}
 
     c = Trainer(channels=channels)
-    c.train(categories, cycles)
+    c.train(categories, cycles, learn_rate=0.0003, learn_decay=0.92)
 
 
 def main(argv):

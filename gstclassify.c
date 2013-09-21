@@ -23,13 +23,21 @@ enum
   PROP_TARGET,
   PROP_CLASSES,
   PROP_FORGET,
+  PROP_LEARN_RATE,
+  PROP_HIDDEN_SIZE,
 };
 
 #define DEFAULT_PROP_TARGET ""
 #define DEFAULT_PROP_CLASSES 2
 #define DEFAULT_PROP_FORGET 0
+#define DEFAULT_HIDDEN_SIZE 199
+#define DEFAULT_LEARN_RATE 0.0001
 #define MIN_PROP_CLASSES 1
 #define MAX_PROP_CLASSES 1000000
+#define MIN_HIDDEN_SIZE 1
+#define MAX_HIDDEN_SIZE 1000000
+#define LEARN_RATE_MIN 0.0
+#define LEARN_RATE_MAX 1.0
 
 /* static_functions */
 /* plugin_init    - registers plugin (once)
@@ -55,10 +63,11 @@ G_DEFINE_TYPE (GstClassify, gst_classify, GST_TYPE_AUDIO_FILTER);
 
 
 static inline void
-init_channel(ClassifyChannel *c, RecurNN *net, int id)
+init_channel(ClassifyChannel *c, RecurNN *net, int id, float learn_rate)
 {
   u32 flags = net->flags & ~RNN_NET_FLAG_OWN_WEIGHTS;
   c->net = rnn_clone(net, flags, RECUR_RNG_SUBSEED, NULL);
+  c->net->bptt->learn_rate = learn_rate;
   c->pcm_next = zalloc_aligned_or_die(CLASSIFY_WINDOW_SIZE * sizeof(float));
   c->pcm_now = zalloc_aligned_or_die(CLASSIFY_WINDOW_SIZE * sizeof(float));
   c->features = zalloc_aligned_or_die(CLASSIFY_N_FEATURES * sizeof(float));
@@ -144,6 +153,21 @@ gst_classify_class_init (GstClassifyClass * klass)
           DEFAULT_PROP_FORGET,
           G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
+  g_object_class_install_property (gobject_class, PROP_LEARN_RATE,
+      g_param_spec_float("learn-rate", "learn-rate",
+          "Learning rate for the RNN",
+          LEARN_RATE_MIN, LEARN_RATE_MAX,
+          DEFAULT_LEARN_RATE,
+          G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+
+  g_object_class_install_property (gobject_class, PROP_HIDDEN_SIZE,
+      g_param_spec_int("hidden-size", "hidden-size",
+          "Size of the RNN hidden layer",
+          MIN_HIDDEN_SIZE, MAX_HIDDEN_SIZE,
+          DEFAULT_HIDDEN_SIZE,
+          G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+
+
   trans_class->transform_ip = GST_DEBUG_FUNCPTR (gst_classify_transform_ip);
   af_class->setup = GST_DEBUG_FUNCPTR (gst_classify_setup);
   GST_INFO("gst audio class init\n");
@@ -158,6 +182,8 @@ gst_classify_init (GstClassify * self)
   self->mfcc_factory = NULL;
   self->incoming_queue = NULL;
   self->net_filename = NULL;
+  self->learn_rate = DEFAULT_LEARN_RATE;
+  self->hidden_size = DEFAULT_HIDDEN_SIZE;
   GST_INFO("gst classify init\n");
 }
 
@@ -166,7 +192,7 @@ static void
 reset_net_filename(GstClassify *self){
   char s[200];
   snprintf(s, sizeof(s), "classify-i%d-h%d-o%d-b%d-%dHz-w%d.net",
-      CLASSIFY_N_FEATURES, CLASSIFY_N_HIDDEN, self->n_classes,
+      CLASSIFY_N_FEATURES, self->hidden_size, self->n_classes,
       CLASSIFY_BIAS, CLASSIFY_RATE, CLASSIFY_WINDOW_SIZE);
 
   if (self->net_filename){
@@ -193,13 +219,12 @@ load_or_create_net(GstClassify *self){
     }
   }
   if (net == NULL){
-    net = rnn_new(CLASSIFY_N_FEATURES, CLASSIFY_N_HIDDEN,
+    net = rnn_new(CLASSIFY_N_FEATURES, self->hidden_size,
         self->n_classes, CLASSIFY_RNN_FLAGS, CLASSIFY_RNG_SEED,
-        NULL, CLASSIFY_BPTT_DEPTH, LEARN_RATE, MOMENTUM, MOMENTUM_WEIGHT,
+        NULL, CLASSIFY_BPTT_DEPTH, self->learn_rate, MOMENTUM, MOMENTUM_WEIGHT,
         CLASSIFY_BATCH_SIZE);
   }
   else {
-    net->bptt->learn_rate = LEARN_RATE;
     rnn_set_log_file(net, NULL, 0);
   }
   return net;
@@ -234,7 +259,7 @@ gst_classify_setup(GstAudioFilter *base, const GstAudioInfo *info){
   if (self->channels == NULL){
     self->channels = malloc_aligned_or_die(self->n_channels * sizeof(ClassifyChannel));
     for (int i = 0; i < self->n_channels; i++){
-      init_channel(&self->channels[i], self->net, i);
+      init_channel(&self->channels[i], self->net, i, self->learn_rate);
     }
   }
   rnn_set_log_file(self->channels[0].net, NET_LOG_FILE, 1);
@@ -325,9 +350,24 @@ gst_classify_set_property (GObject * object, guint prop_id, const GValue * value
     case PROP_FORGET:
       if (self->net){
         rnn_forget_history(self->net, 0);
+        for (int i = 0; i < self->n_channels; i++){
+          rnn_forget_history(self->channels[i].net, 0);
+        }
       }
-      for (int i = 0; i < self->n_channels; i++){
-        rnn_forget_history(self->channels[i].net, 0);
+      break;
+    case PROP_LEARN_RATE:
+      self->learn_rate = g_value_get_float(value);
+      if (self->net){
+        float learn_rate = g_value_get_float(value);
+        for (int i = 0; i < self->n_channels; i++){
+          self->channels[i].net->bptt->learn_rate = learn_rate;
+        }
+      }
+      break;
+    case PROP_HIDDEN_SIZE:
+      self->hidden_size = g_value_get_int(value);
+      if (self->net){
+        GST_WARNING("It is too late to set hidden size");
       }
       break;
     default:
@@ -361,6 +401,12 @@ gst_classify_get_property (GObject * object, guint prop_id, GValue * value,
     break;
   case PROP_CLASSES:
     g_value_set_int(value, self->n_classes);
+    break;
+  case PROP_LEARN_RATE:
+    g_value_set_float(value, self->learn_rate);
+    break;
+  case PROP_HIDDEN_SIZE:
+    g_value_set_int(value, self->hidden_size);
     break;
   default:
     G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);

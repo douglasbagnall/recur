@@ -67,7 +67,6 @@ fast_tanhf(float x)
 }
 
 
-
 static inline void
 softmax(float *restrict dest, const float *restrict src, int len){
   int i;
