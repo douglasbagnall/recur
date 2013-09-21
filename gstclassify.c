@@ -212,10 +212,9 @@ gst_classify_setup(GstAudioFilter *base, const GstAudioInfo *info){
   GstClassify *self = GST_CLASSIFY(base);
   //self->info = info;
   self->n_channels = info->channels;
-
   if (self->incoming_queue == NULL){
-    self->incoming_queue = malloc_aligned_or_die(CLASSIFY_INCOMING_QUEUE_SIZE *
-        sizeof(s16));
+    self->queue_size = info->channels * CLASSIFY_QUEUE_PER_CHANNEL;
+    self->incoming_queue = malloc_aligned_or_die(self->queue_size * sizeof(s16));
   }
 
   if (self->mfcc_factory == NULL){
@@ -379,14 +378,14 @@ queue_audio_segment(GstClassify *self, GstBuffer *inbuf)
 {
   GstMapInfo map;
   gst_buffer_map(inbuf, &map, 0);
-  size_t len = map.size / sizeof(s16);
+  int len = map.size / sizeof(s16);
   int end = self->incoming_end;
-  if (end + len < CLASSIFY_INCOMING_QUEUE_SIZE){
+  if (end + len < self->queue_size){
     memcpy(self->incoming_queue + end, map.data, map.size);
     self->incoming_end += len;
   }
   else {
-    int snip = CLASSIFY_INCOMING_QUEUE_SIZE - end;
+    int snip = self->queue_size - end;
     int snip8 = snip * sizeof(s16);
     memcpy(self->incoming_queue + end, map.data, snip8);
     memcpy(self->incoming_queue, map.data + snip8,
@@ -396,11 +395,11 @@ queue_audio_segment(GstClassify *self, GstBuffer *inbuf)
 
   int lag = self->incoming_end - self->incoming_start;
   if (lag < 0){
-    lag += CLASSIFY_INCOMING_QUEUE_SIZE;
+    lag += self->queue_size;
   }
-  if (lag + len > CLASSIFY_INCOMING_QUEUE_SIZE){
+  if (lag + len > self->queue_size){
     GST_DEBUG("incoming lag %d seems to exceed queue size %d",
-        lag, CLASSIFY_INCOMING_QUEUE_SIZE);
+        lag, self->queue_size);
   }
   GST_LOG("queueing audio starting %llu, ending %llu",
       GST_BUFFER_PTS(inbuf), GST_BUFFER_PTS(inbuf) + GST_BUFFER_DURATION(inbuf));
@@ -479,7 +478,7 @@ maybe_learn(GstClassify *self){
   int i, j, k;
   int len = self->incoming_end - self->incoming_start;
   if (len < 0){ //XXX or less than or equal?
-    len += CLASSIFY_INCOMING_QUEUE_SIZE;
+    len += self->queue_size;
   }
   int chunk_size = CLASSIFY_HALF_WINDOW * self->n_channels;
 
@@ -544,7 +543,7 @@ maybe_learn(GstClassify *self){
     send_message(self, err_sum / self->n_channels);
 
     self->incoming_start += chunk_size;
-    self->incoming_start %= CLASSIFY_INCOMING_QUEUE_SIZE;
+    self->incoming_start %= self->queue_size;
     len -= chunk_size;
   }
 }
