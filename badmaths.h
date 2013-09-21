@@ -71,11 +71,29 @@ fast_tanhf(float x)
 static inline void
 softmax(float *restrict dest, const float *restrict src, int len){
   int i;
-  float sum = 0.0;
+  float sum = 0.0f;
+  float adj = 0.0f;
+  float min = src[0];
+  float max = src[0];
+  const float max_exp = 50.0f;
+  const float min_exp = -60.0f;
+  /* for safety, avoid really big numbers. Addition/subtraction of a constant
+     to the src vector doesn't affect the outcome.*/
+  for (i = 1; i < len; i++){
+    max = MAX(max, src[i]);
+    min = MIN(min, src[i]);
+  }
+  if (max > max_exp){
+    adj = max_exp - max;
+  }
+  else if (min < min_exp){
+    adj = MIN(min_exp - min, max_exp - max);
+  }
+  //else if (max - min < max_exp){
+  //  adj = -0.5 * (max - min);
+  //}
   for (i = 0; i < len; i++){
-    float f = src[i];
-    f = MIN(f, 60);
-    f = MAX(f, -60);
+    float f = src[i] + adj;
     float x = fast_expf(f);
     sum += x;
     dest[i] = x;
