@@ -1,5 +1,3 @@
-#!/usr/bin/python
-
 import os, sys
 import random
 import itertools
@@ -12,6 +10,7 @@ gi.require_version('Gst', '1.0')
 from gi.repository import Gst, GObject
 
 CLASSES = "MEN"
+HIDDEN_SIZE = 99
 
 def gst_init():
     GObject.threads_init()
@@ -53,6 +52,9 @@ class BaseClassifier(object):
         self.channels = channels
         self.sink = self.make_add_link('fakesink', None)
         self.classifier = self.make_add_link('classify', self.sink)
+        self.classifier.set_property('classes', len(self.classes))
+        self.classifier.set_property('hidden-size', HIDDEN_SIZE)
+
         self.capsfilter = self.make_add_link('capsfilter', self.classifier)
         self.interleave = self.make_add_link('interleave', self.capsfilter)
         self.filesrcs = []
@@ -63,7 +65,6 @@ class BaseClassifier(object):
             fs = self.make_add_link('filesrc', wp)
             self.filesrcs.append(fs)
 
-        self.classifier.set_property('classes', len(self.classes))
         self.set_channels(channels)
 
     def __init__(self, categories=None,
