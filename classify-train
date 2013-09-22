@@ -18,11 +18,13 @@ def eternal_alternator(iters, max_iterations=-1):
 class Trainer(BaseClassifier):
     trainers = None
 
-    def train(self, data, iterations=100, learn_rate=None, learn_decay=1.0):
+    def train(self, data, iterations=100, learn_rate=None):
         """data is a dictionary mapping class IDs to lists of filenames.
         """
-        self.learn_rate = learn_rate
-        self.learn_decay = learn_decay
+        if isinstance(learn_rate, float):
+            self.learn_rate = itertools.repeat(learn_rate)
+        else:
+            self.learn_rate = learn_rate
         trainers = []
         for k in self.classes:
             trainers.append([(k, x) for x in data[k]])
@@ -33,10 +35,10 @@ class Trainer(BaseClassifier):
 
     def next_training_set(self):
         self.targets = []
-        if self.learn_rate:
-            print "learn_rate %s" % self.learn_rate
-            self.classifier.set_property('learn_rate', self.learn_rate)
-            self.learn_rate *= self.learn_decay
+        if self.learn_rate is not None:
+            r = self.learn_rate.next()
+            print "learn_rate %s" % r
+            self.classifier.set_property('learn_rate', r)
 
         for fs in self.filesrcs:
             try:
@@ -77,14 +79,27 @@ class Trainer(BaseClassifier):
             print (fmt % ((i, wc, ok, tc) + scores))
 
 
-def train(_dir=TRAIN_AUDIO_DIR, cycles=1000, channels=72, classes=CLASSES):
+def steps(*args):
+    args = list(args)
+    while len(args) > 2:
+        rate = args.pop(0)
+        n = args.pop(0)
+        for i in xrange(n):
+            yield rate
+    #odd number of args --> repeat forever
+    while args:
+        yield args[0]
+
+
+def train(_dir=TRAIN_AUDIO_DIR, cycles=20, channels=72, classes=CLASSES):
     files = [x for x in os.listdir(_dir) if x.endswith('.wav')]
     random.shuffle(files)
     categories = {c: [os.path.join(_dir, x) for x in files if x[0] == c]
                   for c in classes}
 
     c = Trainer(channels=channels)
-    c.train(categories, cycles, learn_rate=0.0003, learn_decay=0.92)
+    c.train(categories, cycles * channels,
+            learn_rate=steps(1e-3, 5, 3e-4, 20, 1e-4, 100, 3e-5))
 
 
 def main(argv):
