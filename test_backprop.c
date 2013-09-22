@@ -3,6 +3,7 @@
 #define PERIODIC_PGM_DUMP 0
 #define TEMPORAL_PGM_DUMP 0
 #define CONFAB_HIDDEN_IMG 0
+#define DETERMINISTIC_CONFAB 0
 #define PERIODIC_SAVE_NET 1
 #define TRY_RELOAD 0
 
@@ -29,7 +30,7 @@
 u8 CHAR_TO_NET[257];
 const u8 NET_TO_CHAR[] = "abcdefghijklmnopqrstuvwxyz,'- .\"#";
 
-#define HIDDEN_SIZE 200
+#define HIDDEN_SIZE 199
 #define INPUT_SIZE (sizeof(NET_TO_CHAR) - 1)
 
 #define NET_FILENAME ("test_backprop-" QUOTE(HIDDEN_SIZE) "-" QUOTE(BIAS) ".net")
@@ -258,7 +259,8 @@ epoch(RecurNN *net, const u8 *text, const int len){
     if ((net->generation & 1023) == 0){
       int k = net->generation >> 10;
       entropy /= -1024.0f;
-      confabulate(net, confab, CONFAB_SIZE, text[i], CONFAB_HIDDEN_IMG, 1);
+      confabulate(net, confab, CONFAB_SIZE, text[i], CONFAB_HIDDEN_IMG,
+          DETERMINISTIC_CONFAB);
       DEBUG("%4dk .%02d %.2f .%02d |%s|", k, (int)(error / 10.24f + 0.5), entropy,
           (int)(correct / 10.24f + 0.5), confab);
       bptt_log_float(net, "error", error / 1024.0f);
