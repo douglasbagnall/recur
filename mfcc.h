@@ -7,6 +7,8 @@ typedef struct _RecurAudioBinSlope RecurAudioBinSlope;
 struct _RecurAudioBinSlope {
   int left;
   int right;
+  float left_fraction;
+  float right_fraction;
   float slope;
 };
 

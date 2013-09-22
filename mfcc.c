@@ -4,35 +4,7 @@
 #define HZ_TO_MEL(x) (1127.0f * logf(1.0f + (x) / 700.0f))
 #define MEL_TO_HZ(x) (700.0f * (expf((x) / 1127.0f) - 1.0f))
 
-/*recur_bin_real puts already calculated real-valued frequency data (e.g.
-  mdct) into log squared mel bins */
-float *
-recur_bin_real(RecurAudioBinner *ab, float *data)
-{
-  int i, j;
-  float mul;
-  float sum_left = 0.0f;
-  float sum_right;
-  float power;
-  RecurAudioBinSlope *slope;
-  /*first slope is left side only, last slope is right only*/
-  for (i = 0; i <= ab->n_bins; i++){
-    sum_right = sum_left;
-    sum_left = 0.0f;
-    mul = 0.0f;
-    slope = &ab->slopes[i];
-    for (j = slope->left; j < slope->right; j++){
-      power = data[j] * data[j];
-      sum_left += mul * power;
-      sum_right += (1.0f - mul) * power;
-      mul += slope->slope;
-    }
-    if (i){
-      ab->fft_bins[i - 1] = logf(sum_right + 0.01f);
-    }
-  }
-  return ab->fft_bins;
-}
+#define POWER(x) (x.r * x.r + x.i * x.i)
 
 float *
 recur_bin_complex(RecurAudioBinner *ab, GstFFTF32Complex *f)
@@ -45,22 +17,33 @@ recur_bin_complex(RecurAudioBinner *ab, GstFFTF32Complex *f)
   RecurAudioBinSlope *slope;
   /*first slope is left side only, last slope is right only*/
   for (i = 0; i <= ab->n_bins; i++){
-    sum_right = sum_left;
-    sum_left = 0.0f;
-    mul = 0.0f;
     slope = &ab->slopes[i];
-    for (j = slope->left; j < slope->right; j++){
-      power = f[j].r * f[j].r + f[j].i * f[j].i;
-      //DEBUG("%d: %g + %gi = %g", j, f[j].r, f[j].i, power);
-      sum_left += mul * power;
-      sum_right += (1.0f - mul) * power;
-      mul += slope->slope;
+    j = slope->left;
+    /*left fractional part*/
+    mul = slope->slope * slope->left_fraction;
+    power = POWER(f[j]) * slope->left_fraction;
+
+    sum_right = sum_left + (1.0f - mul) * power;
+    /*Note sum_right is old sum_left */
+    sum_left = mul * power;
+
+    if (slope->left != slope->right){
+      /*centre */
+      for (j = slope->left + 1; j < slope->right; j++){
+        mul += slope->slope;
+        power = POWER(f[j]);
+        sum_left += mul * power;
+        sum_right += (1.0f - mul) * power;
+      }
     }
-    /*scale for approximately equal triangles */
-    //sum_right *= slope->slope;
+    /*right fraction */
+    mul += slope->slope * slope->right_fraction;
+    power = POWER(f[j]) * slope->right_fraction;
+    sum_left += mul * power;
+    sum_right += (1.0f - mul) * power;
+
     if (i){
       ab->fft_bins[i - 1] = logf(sum_right + 0.01f);
-      //DEBUG("%d: %f", i - 1, ab->fft_bins[i - 1]);
     }
   }
   return ab->fft_bins;
@@ -68,7 +51,6 @@ recur_bin_complex(RecurAudioBinner *ab, GstFFTF32Complex *f)
 
 
 /* Apply the cached window function, returning the actually used destination.
-
 */
 
 const float *
@@ -125,15 +107,22 @@ recur_bin_slopes_new(const int n_bins, const int fft_len,
   float step = (mmax - mmin) / n_slopes;
   float mel = mmin;
   float hz_to_samples = fft_len * 2 / audio_rate;
+  float right = MEL_TO_HZ(mel) * hz_to_samples;
   for (i = 0; i < n_slopes; i++){
     RecurAudioBinSlope *s = &slopes[i];
-    s->left = (int)(MEL_TO_HZ(mel) * hz_to_samples + 0.5);
-    do {
-      step = (mmax - mel) / (n_slopes - i);
-      mel += step;
-      s->right = (int)(MEL_TO_HZ(mel) * hz_to_samples + 0.5);
-    } while (s->right == s->left);
-    s->slope = 1.0 / (s->right - s->left);
+    float left = right;
+    s->left = (int)left;
+    s->left_fraction = 1.0 - (left - s->left);
+    mel += step;
+    right = MEL_TO_HZ(mel) * hz_to_samples;
+    s->right = (int)right;
+    s->right_fraction = right - s->right;
+    s->slope = 1.0 / (right - left);
+    if (s->left == s->right){
+      /*triangle is too little! */
+      s->left_fraction = (right - left);
+      s->right_fraction = 0;
+    }
   }
   return slopes;
 }
@@ -145,34 +134,58 @@ mfcc_slopes_dump(RecurAudioBinner *ab){
   int wsize = ab->window_size / ab->value_size;
   u8 *img = malloc_aligned_or_die(ab->n_bins * wsize);
   memset(img, 0, ab->n_bins * wsize);
-  float mul = 0.0;
-  RecurAudioBinSlope *bin;
 
-  MAYBE_DEBUG("window size %d value size %d bins %d\n",
-      ab->window_size, ab->value_size, ab->n_bins);
+  float mul;
+  RecurAudioBinSlope *slope;
+  /*first slope is left side only, last slope is right only*/
+  for (i = 0; i <= ab->n_bins; i++){
+    u8 *left = (i < ab->n_bins) ? img + i * wsize : NULL;
+    u8 *right = (i) ? img + (i - 1) * wsize : NULL;
+    slope = &ab->slopes[i];
 
-  for (i = 0; i < ab->n_bins; i++){
-    bin = &ab->slopes[i];
-    mul = 0.0;
-    for (j = bin->left; j < bin->right; j++){
-      mul += bin->slope;
-      img[i * wsize + j] = mul * 255;
-      if (i){
-        img[(i - 1) * wsize + j] = (1.0 - mul) * 255;
+    float sum_left = 0.0;
+    float sum_right = 0.0;
+
+    /*left fractional part*/
+    mul = slope->slope * slope->left_fraction;
+    if (left){
+      left[slope->left] += 255 * mul * slope->left_fraction;
+      sum_left += mul * slope->left_fraction;
+    }
+    if (right){
+      right[slope->left] += 255 * (1.0 - mul) * slope->left_fraction;
+      sum_right += (1.0 - mul) * slope->left_fraction;
+    }
+    if (slope->left != slope->right){
+      /*centre */
+      for (j = slope->left + 1; j < slope->right; j++){
+        mul += slope->slope;
+        if (left){
+          left[j] += mul * 255;
+          sum_left += mul;
+        }
+        if (right){
+          right[j] += (1.0 - mul) * 255;
+          sum_right += (1.0 - mul);
+        }
       }
     }
-    MAYBE_DEBUG("%2d. left %3d right %3d slope %f mul at end %f\n",
-        i, bin->left, bin->right, bin->slope, mul);
+    /*right fraction */
+    mul += slope->slope * slope->right_fraction;
+    if (left){
+      left[slope->right] += 255 * mul * slope->right_fraction;
+      sum_left += mul * slope->right_fraction;
+    }
+    if (right){
+      right[slope->right] += 255 * (1.0f - mul) * slope->right_fraction;
+      sum_right += (1.0f - mul) * slope->right_fraction;
+    }
+
+    DEBUG("%2d. left%3d right%3d slope %.3f fractions: L %.3f R %.3f  mul at end %.3f"
+        " sum_L %.3f sum_R %.3f sum %.3f",
+        i, slope->left, slope->right, slope->slope, slope->left_fraction,
+        slope->right_fraction,  mul, sum_left, sum_right, sum_left + sum_right);
   }
-  bin = &ab->slopes[i];
-  mul = 0.0;
-  for (j = bin->left; j < bin->right; j++){
-    mul += bin->slope;
-    //img[i * size + j] = mul * 255;
-    img[(i - 1) * wsize + j] = (1.0 - mul) * 255;
-  }
-  MAYBE_DEBUG("%2d. left %3d right %3d slope %f mul at end %f\n",
-      i, bin->left, bin->right, bin->slope, mul);
   pgm_dump(img, wsize, ab->n_bins, IMAGE_DIR "/mfcc-bins.pgm");
   free(img);
 }
