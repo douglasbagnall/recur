@@ -10,7 +10,7 @@ gi.require_version('Gst', '1.0')
 from gi.repository import Gst, GObject
 
 CLASSES = "MEN"
-HIDDEN_SIZE = 99
+HIDDEN_SIZE = 199
 
 def gst_init():
     GObject.threads_init()
