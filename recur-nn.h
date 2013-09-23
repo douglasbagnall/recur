@@ -30,8 +30,8 @@ typedef float v4ss __attribute__ ((vector_size (16))) __attribute__ ((aligned (1
  1e-3f is safe, but less accurate than 1e-4f */
 #define RNN_HIDDEN_PENALTY 3e-4f
 /*scaling for hidden and input numbers */
-#define HIDDEN_MEAN_SOFT_TOP 10.0f
-#define INPUT_MEAN_SOFT_TOP 10.0f
+#define HIDDEN_MEAN_SOFT_TOP 4.0f
+#define INPUT_MEAN_SOFT_TOP 2.0f
 
 #define RNN_INITIAL_WEIGHT_VARIANCE_FACTOR 8.0f
 #define WEIGHT_SCALE (1.0f - 1e-6f)
