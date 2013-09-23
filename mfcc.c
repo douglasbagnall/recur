@@ -1,5 +1,6 @@
 #include "mfcc.h"
 #include "pgm_dump.h"
+#include "badmaths.h"
 
 #define HZ_TO_MEL(x) (1127.0f * logf(1.0f + (x) / 700.0f))
 #define MEL_TO_HZ(x) (700.0f * (expf((x) / 1127.0f) - 1.0f))
@@ -125,6 +126,27 @@ recur_bin_slopes_new(const int n_bins, const int fft_len,
     }
   }
   return slopes;
+}
+
+
+static void
+mfcc_slopes_dump2(RecurAudioBinner *ab){
+  int i;
+  int wsize = ab->window_size / ab->value_size;
+  TemporalPPM *ppm = temporal_ppm_alloc(ab->n_bins, wsize, "mfcc", 0, PGM_DUMP_GREY);
+  GstFFTF32Complex *f = calloc(sizeof(float), ab->window_size);
+  for (i = 0; i <= wsize; i++){
+    f[i].r = 1.0f;
+    f[i].i = 1.0f;
+    float *row = recur_bin_complex(ab, f);
+    for (int j = 0; j < ab->n_bins; j++){
+      row[j] = fast_expf(row[j]);
+    }
+    temporal_ppm_add_row(ppm, row);
+    f[i].r = 0.0f;
+    f[i].i = 0.0f;
+  }
+  temporal_ppm_free(ppm);
 }
 
 /*mfcc_slopes_dump draws a PGM showing whether the slope calculations worked*/
@@ -253,9 +275,9 @@ recur_audio_binner_new(int window_size, int window_type,
       audio_rate
   );
   mfcc_slopes_dump(ab);
-
   ab->fft_bins = malloc_aligned_or_die((n_bins + 2) * sizeof(float));
   ab->dct_bins = malloc_aligned_or_die((n_bins + 2) * sizeof(float));
+  mfcc_slopes_dump2(ab);
   return ab;
 }
 
