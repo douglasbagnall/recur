@@ -79,7 +79,7 @@ class Trainer(BaseClassifier):
             print (fmt % ((i, wc, ok, tc) + scores))
 
 
-def steps(*args):
+def lr_steps(*args):
     args = list(args)
     while len(args) > 2:
         rate = args.pop(0)
@@ -91,7 +91,7 @@ def steps(*args):
         yield args[0]
 
 
-def train(_dir=TRAIN_AUDIO_DIR, cycles=20, channels=72, classes=CLASSES):
+def train(learn_rate, _dir=TRAIN_AUDIO_DIR, cycles=20, channels=72, classes=CLASSES):
     files = [x for x in os.listdir(_dir) if x.endswith('.wav')]
     random.shuffle(files)
     categories = {c: [os.path.join(_dir, x) for x in files if x[0] == c]
@@ -99,11 +99,14 @@ def train(_dir=TRAIN_AUDIO_DIR, cycles=20, channels=72, classes=CLASSES):
 
     c = Trainer(channels=channels)
     c.train(categories, cycles * channels,
-            learn_rate=steps(1e-3, 5, 3e-4, 20, 1e-4, 100, 3e-5))
+            learn_rate=learn_rate)
 
 
 def main(argv):
     gst_init()
-    train()
+    if argv:
+        train(lr_steps(*(float(x) for x in argv)))
+    else:
+        train(lr_steps(3e-4, 5, 1e-4, 5, 3e-5, 5, 1e-5))
 
 main(sys.argv[1:])

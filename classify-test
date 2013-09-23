@@ -83,7 +83,7 @@ class Classifier(BaseClassifier):
 
 
 def test(_dir=TEST_AUDIO_DIR):
-    c = Classifier(report=None, channels=1)
+    c = Classifier(channels=1)
 
     files = [os.path.join(_dir, x) for x in os.listdir(_dir) if x.endswith('.wav')
              and x[0] in c.classes]

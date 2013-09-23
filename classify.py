@@ -68,7 +68,7 @@ class BaseClassifier(object):
         self.set_channels(channels)
 
     def __init__(self, categories=None,
-                 classes=CLASSES, channels=1, report=None):
+                 classes=CLASSES, channels=1):
         self.mainloop = GObject.MainLoop()
         self.build_pipeline(classes, channels)
 
