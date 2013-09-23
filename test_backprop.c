@@ -318,7 +318,7 @@ main(void){
   long len;
   u8* text = alloc_and_collapse_text(SRC_TEXT, &len);
   if (TEMPORAL_PGM_DUMP){
-    input_ppm = temporal_ppm_alloc(net->i_size, 500, "input_layer", 0);
+    input_ppm = temporal_ppm_alloc(net->i_size, 500, "input_layer", 0, PGM_DUMP_COLOUR);
   }
   START_TIMER(run);
   for (int i = 0; i < 200; i++){
@@ -330,5 +330,5 @@ main(void){
   }
   free(text);
   rnn_delete_net(net);
-  free_temporal_ppm(input_ppm);
+  temporal_ppm_free(input_ppm);
 }

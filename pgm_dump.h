@@ -213,6 +213,11 @@ dump_colour_weights_autoname(const float *weights, int width, int height,
   ppm_dump_signed_unnormalised_float(weights, width, height, name);
 }
 
+enum {
+  PGM_DUMP_GREY,
+  PGM_DUMP_COLOUR,
+};
+
 typedef struct _TemporalPPM {
   float *im;
   int width;
@@ -221,10 +226,12 @@ typedef struct _TemporalPPM {
   int id;
   int counter;
   char *basename;
+  int mode;
 } TemporalPPM;
 
 static inline TemporalPPM *
-temporal_ppm_alloc(int width, int height, const char *basename, int id){
+temporal_ppm_alloc(int width, int height, const char *basename, int id,
+    int mode){
   TemporalPPM *p = malloc(sizeof(TemporalPPM));
   p->im = malloc_aligned_or_die(width * height * sizeof(float));
   p->width = width;
@@ -233,16 +240,31 @@ temporal_ppm_alloc(int width, int height, const char *basename, int id){
   p->id = id;
   p->counter = 0;
   p->basename = strdup(basename);
+  p->mode = mode;
   return p;
 }
 
 static inline void
-free_temporal_ppm(TemporalPPM *ppm){
+temporal_ppm_free(TemporalPPM *ppm){
   free(ppm->im);
   free(ppm->basename);
   free(ppm);
 }
 
+static inline void
+temporal_ppm_write(TemporalPPM *ppm){
+  char name[200];
+  snprintf(name, sizeof(name), IMAGE_DIR "%s-%d-%08d-%dx%d.ppm",
+      ppm->basename, ppm->id, ppm->counter, ppm->width, ppm->height);
+  if (ppm->mode == PGM_DUMP_GREY){
+    pgm_dump_unnormalised_float(ppm->im, ppm->width, ppm->height, name);
+  }
+  else {
+    ppm_dump_signed_unnormalised_float(ppm->im, ppm->width, ppm->height, name);
+  }
+  ppm->y = 0;
+  ppm->counter++;
+}
 
 static inline void
 temporal_ppm_add_row(TemporalPPM *ppm, const float *row){
@@ -253,13 +275,7 @@ temporal_ppm_add_row(TemporalPPM *ppm, const float *row){
   memcpy(ppm->im + ppm->y * ppm->width, row, ppm->width * sizeof(float));
   ppm->y++;
   if (ppm->y == ppm->height){
-    char name[200];
-    snprintf(name, sizeof(name), IMAGE_DIR "%s-%d-%08d-%dx%d.ppm",
-             ppm->basename, ppm->id, ppm->counter, ppm->width, ppm->height);
-
-    ppm_dump_signed_unnormalised_float(ppm->im, ppm->width, ppm->height, name);
-    ppm->y = 0;
-    ppm->counter++;
+    temporal_ppm_write(ppm);
   }
 }
 

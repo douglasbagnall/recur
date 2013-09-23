@@ -72,8 +72,8 @@ init_channel(ClassifyChannel *c, RecurNN *net, int id, float learn_rate)
   c->pcm_now = zalloc_aligned_or_die(CLASSIFY_WINDOW_SIZE * sizeof(float));
   c->features = zalloc_aligned_or_die(CLASSIFY_N_FEATURES * sizeof(float));
   if (PGM_DUMP_FEATURES){
-    c->mfcc_image = temporal_ppm_alloc(CLASSIFY_N_FEATURES, 300, "mfcc", id);
-    //c->mfcc_image = temporal_ppm_alloc(CLASSIFY_WINDOW_SIZE, 300, "mfcc", id);
+    c->mfcc_image = temporal_ppm_alloc(CLASSIFY_N_FEATURES, 300, "mfcc", id,
+        PGM_DUMP_COLOUR);
   }
   else {
     c->mfcc_image = NULL;
@@ -88,7 +88,7 @@ finalise_channel(ClassifyChannel *c)
   free(c->pcm_now);
   free(c->features);
   if (c->mfcc_image){
-    free_temporal_ppm(c->mfcc_image);
+    temporal_ppm_free(c->mfcc_image);
     c->mfcc_image = NULL;
   }
 }
