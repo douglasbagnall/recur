@@ -44,7 +44,7 @@ recur_bin_complex(RecurAudioBinner *ab, GstFFTF32Complex *f)
     sum_right += (1.0f - mul) * power;
 
     if (i){
-      ab->fft_bins[i - 1] = logf(sum_right + 0.01f);
+      ab->fft_bins[i - 1] = logf(sum_right + 0.01f) - slope->log_scale;
     }
   }
   return ab->fft_bins;
@@ -124,6 +124,7 @@ recur_bin_slopes_new(const int n_bins, const int fft_len,
       s->left_fraction = (right - left);
       s->right_fraction = 0;
     }
+    s->log_scale = logf(1.0f + right - left);
   }
   return slopes;
 }

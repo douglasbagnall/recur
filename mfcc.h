@@ -9,6 +9,7 @@ struct _RecurAudioBinSlope {
   int right;
   float left_fraction;
   float right_fraction;
+  float log_scale;
   float slope;
 };
 
