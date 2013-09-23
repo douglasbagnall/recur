@@ -488,7 +488,6 @@ send_message(GstClassify *self, float mean_err)
   }
   msg = gst_message_new_element(GST_OBJECT(self), s);
   gst_element_post_message(GST_ELEMENT(self), msg);
-  bptt_log_float(self->channels[0].net, "error", mean_err);
 }
 
 
@@ -528,6 +527,7 @@ maybe_learn(GstClassify *self){
 
   while (len >= chunk_size){
     float err_sum = 0.0f;
+    float winners = 0.0f;
     s16 *buffer_i = self->incoming_queue + self->incoming_start;
 
     for (j = 0; j < self->n_channels; j++){
@@ -560,6 +560,7 @@ maybe_learn(GstClassify *self){
         net->bptt->o_error[c->current_target] += 1.0f;
         err_sum += net->bptt->o_error[c->current_target];
         bptt_calc_deltas(net);
+        winners += c->current_winner == c->current_target;
       }
       else{
         answer = rnn_opinion(net, c->features);
@@ -581,7 +582,9 @@ maybe_learn(GstClassify *self){
       possibly_save_net(self->net, self->net_filename);
       rnn_condition_net(self->net);
       rnn_log_net(self->channels[0].net);
-      rnn_log_net(self->net);
+      //rnn_log_net(self->net);
+      bptt_log_float(self->channels[0].net, "error", err_sum / self->n_channels);
+      bptt_log_float(self->channels[0].net, "correct", winners / self->n_channels);
     }
     self->net->generation = self->channels[0].net->generation;
     send_message(self, err_sum / self->n_channels);
