@@ -111,7 +111,7 @@ test_mfcc_table: %: recur-context.o recur-nn.o recur-nn-io.o rescale.o %.o
 test_%: test_%.o
 	$(CC) -Wl,-O1 $^   $(INCLUDES) $(DEFINES)  $(LINKS)   -o $@
 
-test_window_functions: %: mfcc.o %.o
+test_window_functions test_dct: %: mfcc.o %.o
 	$(CC) -Wl,-O1 $^   $(INCLUDES) $(DEFINES)  $(LINKS)  -o $@
 
 test_simple_rescale test_rescale: %: rescale.o %.o

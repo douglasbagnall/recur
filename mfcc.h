@@ -61,35 +61,6 @@ void recur_audio_binner_delete(RecurAudioBinner *ab);
 void recur_window_init(float *mask, int len, int type, float scale);
 
 
-//void recur_dct(const float *restrict input, float *restrict output, int len);
-//void recur_idct(const float *restrict input, float *restrict output, int len);
-
-/* dct/idct based on recur/test/pydct.py, originally from Mimetic TV*/
-
-static inline void
-recur_dct(const float *restrict input, float *restrict output, int len){
-  int j, k;
-  float pin = G_PI / len;
-  for (j = 0; j < len; j++){
-    float a = 0.0f;
-    for (k = 0; k < len; k++){
-      a += input[k] * cosf(pin * j * (k + 0.5f));
-    }
-    output[j] = a;
-  }
-  output[0] *= 0.7071067811865476f;
-}
-
-static inline void
-recur_idct(const float *restrict input, float *restrict output, int len){
-  int j, k;
-  float pin = G_PI / len;
-  float scale = 2.0f / len;
-  for (j = 0; j < len; j++){
-    float a = 0.7071067811865476f * input[0];
-    for (k = 1; k < len; k++){
-      a += input[k] * cosf(pin * k * (j + 0.5f));
-    }
-    output[j] = a * scale;
-  }
-}
+void recur_dct(const float *restrict input, float *restrict output, int len);
+void recur_dct_cached(const float *restrict input, float *restrict output, int len);
+void recur_idct(const float *restrict input, float *restrict output, int len);

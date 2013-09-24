@@ -90,7 +90,7 @@ float *
 recur_extract_mfccs(RecurAudioBinner *ab, float *data){
   float *fft_bins = recur_extract_log_freq_bins(ab, data);
 
-  recur_dct(fft_bins, ab->dct_bins, ab->n_bins);
+  recur_dct_cached(fft_bins, ab->dct_bins, ab->n_bins);
   return ab->dct_bins;
 }
 
@@ -292,4 +292,92 @@ recur_audio_binner_delete(RecurAudioBinner *ab){
   free(ab->dct_bins);
   gst_fft_f32_free(ab->fft);
   free(ab);
+}
+
+
+/* dct/idct based on recur/test/pydct.py, originally from Mimetic TV*/
+/* XXX see ffmpeg's dct32.c for a relatively optimal dct32 (LGPL) */
+
+void
+recur_dct(const float *restrict input, float *restrict output, int len){
+  int j, k;
+  float pin = G_PI / len;
+  for (j = 0; j < len; j++){
+    float a = 0.0f;
+    for (k = 0; k < len; k++){
+      a += input[k] * cosf(pin * j * (k + 0.5f));
+    }
+    output[j] = a;
+  }
+  output[0] *= 0.7071067811865476f;
+}
+
+void
+recur_idct(const float *restrict input, float *restrict output, int len){
+  int j, k;
+  float pin = G_PI / len;
+  float scale = 2.0f / len;
+  for (j = 0; j < len; j++){
+    float a = 0.7071067811865476f * input[0];
+    for (k = 1; k < len; k++){
+      a += input[k] * cosf(pin * k * (j + 0.5f));
+    }
+    output[j] = a * scale;
+  }
+}
+
+/*recur_dct_cached is still a quadratic DCT, but it exploits the fact that the
+  cos() calls are all using a small set of arguments, and caches the results
+  in memory. Presumably because it can use double precision to calculate the
+  cache, the results seem to be more accurate as well as faster.
+
+  It uses a simple caching strategy: the calculated cosines are saved between
+  consecutive transforms (the overwhelmingly common case so far) -- if the
+  size of the transforms changes frequently the cache will be repeatedly
+  recalculated, but this is still faster than the naive method.
+
+  A proper DCT with butterflies and so on will be quicker, but needs to be
+  tuned for its particular size.
+
+  The indexing strategy has been determined experimentally -- other sequences
+  may well be simpler.
+
+  XXX a passed in cache pointer would be the thing if ever two DCT sizes are
+  being used alternately.
+ */
+
+void
+recur_dct_cached(const float *restrict input, float *restrict output, int len){
+  int j, k;
+  static float *cos_lut = NULL;
+  static int cos_len = 0;
+  if (cos_len != len * 2){
+    if (cos_lut){
+      free(cos_lut);
+    }
+    cos_len = len * 2;
+    cos_lut = malloc_aligned_or_die((cos_len + 1) * sizeof(float));
+    for (j = 0; j <= cos_len; j++){
+      cos_lut[j] = cos(G_PI / cos_len * j);
+    }
+  }
+  for (j = 0; j < len; j++){
+    float a = 0.0f;
+    int step = j * 2;
+    int i = j;
+    for (k = 0; k < len; k++){
+      a += input[k] * cos_lut[i];
+      i += step;
+      if (i > cos_len){ /*bounce off the top */
+        i = 2 * cos_len - i;
+        step = -step;
+      }
+      else if (i < 0){
+        i = -i;
+        step = -step;
+      }
+    }
+    output[j] = a;
+  }
+  output[0] *= 0.7071067811865476f;
 }
