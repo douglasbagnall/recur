@@ -11,13 +11,12 @@ from gi.repository import Gst, GObject
 
 
 FILE_LENGTH=60
-CLASSES = "MEN"
+CLASSES = "ME"
 HIDDEN_SIZE = 199
 
 def gst_init():
     GObject.threads_init()
     Gst.init(None)
-
 
 class BaseClassifier(object):
     pipeline = None
