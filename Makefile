@@ -63,7 +63,7 @@ OBJECTS := $(patsubst %.c,%.o,$(SOURCES))
 #PLUGINS := $(patsubst %.c,lib%.so,$(SOURCES))
 
 
-all:: libgstrecur.so
+all:: libgstclassify.so
 
 clean:
 	rm -f *.so *.o *.a *.d *.s
