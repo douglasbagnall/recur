@@ -691,8 +691,6 @@ void bptt_consolidate_many_nets(RecurNN **nets, int n){
     /*saxpy -> scale and add */
     cblas_saxpy(net->ho_size, 1, bptt->ho_delta, 1, ho_gradient, 1);
     cblas_saxpy(net->ih_size, bptt->ih_scale, bptt->ih_delta, 1, ih_gradient, 1);
-    memset(bptt->ho_delta, 0, net->ho_size * sizeof(float));
-    memset(bptt->ih_delta, 0, net->ih_size * sizeof(float));
   }
   /*All nets (should) have the same weights and momentums, so just use the last one */
   apply_learning_with_momentum(net->ho_weights, ho_gradient, bptt->ho_momentum,
