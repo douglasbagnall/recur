@@ -852,7 +852,7 @@ rnn_multi_pgm_dump(RecurNN *net, const char *dumpees){
         array = net->ih_weights;
       else if (v == 'm')
         array = bptt->ih_momentum;
-      else if (v == 't')
+      else if (v == 'd')
         array = bptt->ih_delta;
       else
         continue;
@@ -864,6 +864,8 @@ rnn_multi_pgm_dump(RecurNN *net, const char *dumpees){
         array = net->ho_weights;
       else if (v == 'm')
         array = bptt->ho_momentum;
+      else if (v == 'd')
+        array = bptt->ho_delta;
       else
         continue;
     }
