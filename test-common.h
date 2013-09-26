@@ -2,8 +2,8 @@
 #include "pgm_dump.h"
 #include <math.h>
 #include "path.h"
-#define SRC_TEXT TEST_IMAGE_DIR "/erewhon.txt"
-#define SRC_TEXT2 TEST_IMAGE_DIR "/erewhon-erewhon"\
+#define SRC_TEXT TEST_DATA_DIR "/erewhon.txt"
+#define SRC_TEXT2 TEST_DATA_DIR "/erewhon-erewhon"\
   "-revisited-sans-gutenberg.txt"
 
 

@@ -3,8 +3,6 @@
 #include <math.h>
 #include "path.h"
 
-#define IMG_DIR TEST_IMAGE_DIR
-
 static const char *names[] = {
   "cake",
   "zoo-odd-size",
@@ -31,10 +29,10 @@ main(void){
   uint i, j;
   char name[100];
   for (j = 0; j < sizeof(names) / sizeof(names[0]); j++){
-    snprintf(name, sizeof(name), "%s/%s.pgm", IMG_DIR, names[j]);
+    snprintf(name, sizeof(name), "%s/%s.pgm", TEST_DATA_DIR, names[j]);
     Image * im = recur_load_pgm_file(name);
     for (i = 1; i < 6; i++){
-      snprintf(name, sizeof(name), "%s/generated/simple-%s-%d.pgm", IMG_DIR, names[j], i);
+      snprintf(name, sizeof(name), "%s/generated/simple-%s-%d.pgm", TEST_DATA_DIR, names[j], i);
       save_scaled_image(im->data, im->width, 100, 100, i, name);
     }
   }
