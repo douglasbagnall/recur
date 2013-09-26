@@ -494,6 +494,7 @@ calc_sgd_top_layer(RecurNN *net){
       }
     }
   }
+  bptt->ho_scale = 1.0f;
   return error_sum;
 }
 
