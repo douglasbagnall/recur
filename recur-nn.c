@@ -33,6 +33,7 @@ new_bptt(RecurNN *net, int depth, float learn_rate, float momentum,
   MAYBE_DEBUG("allocated %lu floats, used %lu", vlen, fm - bptt->mem);
 
   bptt->index = 0;
+  bptt->ho_scale = ((float) net->output_size) / net->hidden_size;
   MAYBE_DEBUG("weights:   ih %p ho %p", net->ih_weights, net->ho_weights);
   MAYBE_DEBUG("momentum:  ih %p ho %p", bptt->ih_momentum, bptt->ho_momentum);
   MAYBE_DEBUG("delta:     ih %p ho %p", bptt->ih_delta, bptt->ho_delta);
@@ -698,7 +699,8 @@ void bptt_consolidate_many_nets(RecurNN **nets, int n){
   net = nets[0];
   bptt = net->bptt;
   apply_learning_with_momentum(net->ho_weights, ho_gradient, bptt->ho_momentum,
-      net->ho_size, bptt->learn_rate, bptt->momentum, bptt->momentum_weight);
+      net->ho_size, bptt->learn_rate * bptt->ho_scale,
+      bptt->momentum, bptt->momentum_weight);
 
   apply_learning_with_momentum(net->ih_weights, ih_gradient, bptt->ih_momentum,
       net->ih_size, bptt->learn_rate, bptt->momentum, bptt->momentum_weight);
