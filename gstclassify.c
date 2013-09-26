@@ -464,10 +464,6 @@ possibly_save_net(RecurNN *net, char *filename)
   if (PERIODIC_SAVE_NET && (net->generation & 511) == 0){
     rnn_save_net(net, filename);
   }
-  if (REGULAR_PGM_DUMP)
-    rnn_multi_pgm_dump(net, "ihw hhw");
-  else if (PERIODIC_PGM_DUMP && net->generation % PERIODIC_PGM_DUMP == 0)
-    rnn_multi_pgm_dump(net, "how ihw");
 }
 
 
@@ -512,9 +508,15 @@ pcm_to_features(RecurAudioBinner *mf, float *features, float *pcm){
 static inline void
 consolidate_and_apply_learning(GstClassify *self)
 {
-  possibly_save_net(self->net, self->net_filename);
+  RecurNN *net = self->subnets[0];
+  if (REGULAR_PGM_DUMP)
+    rnn_multi_pgm_dump(net, "ihw hhw");
+  else if (PERIODIC_PGM_DUMP && net->generation % PERIODIC_PGM_DUMP == 0)
+    rnn_multi_pgm_dump(net, "how ihw hod ihd hom ihm");
   bptt_consolidate_many_nets(self->subnets, self->n_channels);
-  rnn_condition_net(self->net);
+  rnn_condition_net(net);
+  possibly_save_net(self->net, self->net_filename);
+
 }
 
 static inline float
