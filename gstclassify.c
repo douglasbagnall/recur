@@ -512,8 +512,8 @@ pcm_to_features(RecurAudioBinner *mf, float *features, float *pcm){
 static inline void
 consolidate_and_apply_learning(GstClassify *self)
 {
-  bptt_consolidate_many_nets(self->subnets, self->n_channels);
   possibly_save_net(self->net, self->net_filename);
+  bptt_consolidate_many_nets(self->subnets, self->n_channels);
   rnn_condition_net(self->net);
 }
 
