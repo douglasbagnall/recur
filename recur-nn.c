@@ -217,6 +217,7 @@ rnn_clone(RecurNN *parent, int flags,
     net->ih_weights = parent->ih_weights;
     net->ho_weights = parent->ho_weights;
   }
+  net->generation = parent->generation;
   return net;
 }
 
