@@ -4,9 +4,7 @@ import os, sys
 import random
 import itertools
 
-from classify import BaseClassifier, gst_init, Gst
-
-FILE_LENGTH=15
+from classify import BaseClassifier, gst_init, Gst, FILE_LENGTH
 
 TEST_AUDIO_DIR = ("/home/douglas/maori-language-monitoring/"
                    "data/8k-%ss/test" % FILE_LENGTH)

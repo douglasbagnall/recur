@@ -3,12 +3,10 @@ import os, sys
 import random
 import itertools
 
-FILE_LENGTH=15
+from classify import BaseClassifier, Gst, gst_init, CLASSES, FILE_LENGTH
 
 TRAIN_AUDIO_DIR = ("/home/douglas/maori-language-monitoring/"
                    "data/8k-%ss/train" % FILE_LENGTH)
-
-from classify import BaseClassifier, Gst, gst_init, CLASSES
 
 def eternal_alternator(iters, max_iterations=-1):
     cycles = [itertools.cycle(x) for x in iters]
