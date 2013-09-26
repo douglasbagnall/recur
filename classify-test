@@ -11,6 +11,7 @@ TEST_AUDIO_DIR = ("/home/douglas/maori-language-monitoring/"
 
 class Classifier(BaseClassifier):
     pending_files = []
+    quiet = False
     def classify_files(self, *files):
         self.all_results = []
         self.pending_files = list(reversed(files))
@@ -47,7 +48,7 @@ class Classifier(BaseClassifier):
 
         topscorer = mean_scores.index(max(mean_scores))
         winchar = self.classes[topscorer]
-        fn = os.path.basename(self.filesrcs[0].get_property('location'))
+        fn = self.filesrcs[0].get_property('location')
 
         r = (winchar,
              mean_scores,
@@ -57,19 +58,24 @@ class Classifier(BaseClassifier):
         return r
 
     def report(self, winchar, mean_scores, votes, fn):
-        if fn[0] == winchar:
-            print (u"winner %s == %s \033[01;32m%s\033[00m\u263A".encode('utf-8') %
-                   (winchar, fn[0], fn))
+        if self.quiet:
+            return
+        target = os.path.basename(fn)[0]
+        if target == winchar:
+            print (u"winner %s == %s \033[00m"
+                   u"file://\033[01;32m%s\033[00m\u263A".encode('utf-8') %
+                   (winchar, target, fn))
         else:
-            print (u"winner %s != %s \033[01;31m%s\033[00m\u2620".encode('utf-8') %
-                   (winchar, fn[0], fn))
+            print (u"winner %s != %s \033[00m"
+                   u"file://\033[01;31m%s\033[00m\u2620".encode('utf-8') %
+                   (winchar, target, fn))
 
         for c, v, s in zip(self.classes, votes, mean_scores):
             print (" %s: %s%4d\033[00m %s%.2f\033[00m %s%s\033[00m" %
                    (c,
                     ("\033[01;35m" if v == max(votes) else ""), v,
                     ("\033[01;36m" if s == max(mean_scores) else ""), s,
-                    ("\033[01;33m" if c == fn[0] else ""),
+                    ("\033[01;33m" if c == target else ""),
                     '=' * int(s * 50)))
 
     def on_eos(self, bus, msg):
@@ -83,9 +89,9 @@ class Classifier(BaseClassifier):
             self.pipeline.set_state(Gst.State.PLAYING)
 
 
-def test(_dir=TEST_AUDIO_DIR):
+def test(_dir=TEST_AUDIO_DIR, quiet=False):
     c = Classifier(channels=1)
-
+    c.quiet = quiet
     files = [os.path.join(_dir, x) for x in os.listdir(_dir) if x.endswith('.wav')
              and x[0] in c.classes]
     random.shuffle(files)
@@ -102,14 +108,19 @@ def test(_dir=TEST_AUDIO_DIR):
         else:
             misses.append(fn)
 
-    print "MISSES:"
-    print '\n'.join('file://' + os.path.join(_dir, x) for x in misses)
-    print
+    if 0:
+        print "MISSES:"
+        print '\n'.join('file://' + os.path.join(_dir, x) for x in misses)
+        print
     print "%s/%s = %0.2f" % (score, len(files), float(score) / len(files))
 
 
 def main(argv):
+    quiet = False
+    if '-q' in argv:
+        argv.remove('-q')
+        quiet = True
     gst_init()
-    test()
+    test(quiet=quiet)
 
 main(sys.argv[1:])

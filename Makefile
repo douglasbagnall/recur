@@ -279,7 +279,7 @@ classify: libgstclassify.so
 	mv classify*.net nets || echo no net to move
 	rm classify.log || echo no log to nuke
 	time ./classify-train -q
-	time ./classify-test
+	time ./classify-test -q
 
 valgrind-classify:
 	mv classify*.net nets || echo no net to move
