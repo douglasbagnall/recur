@@ -467,7 +467,7 @@ possibly_save_net(RecurNN *net, char *filename)
   if (REGULAR_PGM_DUMP)
     rnn_multi_pgm_dump(net, "ihw hhw");
   else if (PERIODIC_PGM_DUMP && net->generation % PERIODIC_PGM_DUMP == 0)
-    rnn_multi_pgm_dump(net, "hhw ihw");
+    rnn_multi_pgm_dump(net, "how ihw");
 }
 
 
