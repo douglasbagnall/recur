@@ -3,7 +3,11 @@ import os, sys
 import random
 import itertools
 
-TRAIN_AUDIO_DIR = "/home/douglas/maori-language-monitoring/data/split/wav-8k/train"
+FILE_LENGTH=15
+
+TRAIN_AUDIO_DIR = ("/home/douglas/maori-language-monitoring/"
+                   "data/8k-%ss/train" % FILE_LENGTH)
+
 from classify import BaseClassifier, Gst, gst_init, CLASSES
 
 def eternal_alternator(iters, max_iterations=-1):
@@ -91,7 +95,8 @@ def lr_steps(*args):
         yield args[0]
 
 
-def train(learn_rate, _dir=TRAIN_AUDIO_DIR, cycles=20, channels=72, classes=CLASSES):
+def train(learn_rate, _dir=TRAIN_AUDIO_DIR, cycles=1200 // FILE_LENGTH,
+          channels=72, classes=CLASSES):
     files = [x for x in os.listdir(_dir) if x.endswith('.wav')]
     random.shuffle(files)
     categories = {c: [os.path.join(_dir, x) for x in files if x[0] == c]

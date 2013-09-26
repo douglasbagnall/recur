@@ -263,9 +263,9 @@ train-parrot-duo: libgstparrot.so
 		uridecodebin uri=$(AUD_URI_CALE_CAT) ! audioconvert ! audioresample \
 		! $(PARROT_CAPS) ! il.
 
-.PHONY: classify-test
+.PHONY: classify
 
-classify-test: libgstclassify.so
+classify: libgstclassify.so
 	mv classify*.net nets || echo no net to move
 	rm classify.log || echo no log to nuke
 	time ./classify-train > log.log
