@@ -1,7 +1,8 @@
 #include "recur-context.h"
+#include "mfcc.h"
 #include "pgm_dump.h"
 #include <gst/fft/gstfftf32.h>
-
+#include "path.h"
 
 int
 main(void){
@@ -53,5 +54,5 @@ main(void){
   }
     printf("%2d. left %3d right %3d slope %f mul at end %f\n",
         i, bin->left, bin->right, bin->slope, mul);
-  pgm_dump(img, window_size / 2, RECUR_N_FFT_BINS, "/tmp/recur_mfcc4.pgm");
+  pgm_dump(img, window_size / 2, RECUR_N_FFT_BINS, DEBUG_IMAGE_DIR "/mfcc4.pgm");
 }

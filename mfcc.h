@@ -1,3 +1,6 @@
+#ifndef HAVE_MFCC_H
+#define HAVE_MFCC_H
+
 #include "recur-common.h"
 #include <gst/fft/gstfftf32.h>
 
@@ -64,3 +67,4 @@ void recur_window_init(float *mask, int len, int type, float scale);
 void recur_dct(const float *restrict input, float *restrict output, int len);
 void recur_dct_cached(const float *restrict input, float *restrict output, int len);
 void recur_idct(const float *restrict input, float *restrict output, int len);
+#endif

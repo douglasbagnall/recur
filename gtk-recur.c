@@ -3,11 +3,12 @@
 #include "recur-common.h"
 #include <gtk/gtk.h>
 #include <gdk/gdkx.h>
+#include "path.h"
 
 #define WIDTH  800
 #define HEIGHT 600
 
-#define URI_PREFIX "file:///home/douglas/recur/test-video/"
+#define URI_PREFIX "file://" TEST_VIDEO_DIR
 #define VID_LAGOS "movies/louis-theroux-lagos/louis.theroux.law.and.disorder.in.lagos.ws.pdtv.xvid-waters.avi"
 
 #define VID_TEARS "F30275.mov"

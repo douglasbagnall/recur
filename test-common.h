@@ -1,8 +1,9 @@
 #include "recur-nn.h"
 #include "pgm_dump.h"
 #include <math.h>
-#define SRC_TEXT "/home/douglas/recur/test-images/erewhon.txt"
-#define SRC_TEXT2 "/home/douglas/recur/test-images/erewhon-erewhon"\
+#include "path.h"
+#define SRC_TEXT TEST_IMAGE_DIR "/erewhon.txt"
+#define SRC_TEXT2 TEST_IMAGE_DIR "/erewhon-erewhon"\
   "-revisited-sans-gutenberg.txt"
 
 

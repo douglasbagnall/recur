@@ -1,8 +1,9 @@
 #include "rescale.h"
 #include "pgm_dump.h"
 #include <math.h>
+#include "path.h"
 
-#define IMG_DIR "/home/douglas/recur/test-images"
+#define IMG_DIR TEST_IMAGE_DIR
 
 static const char *names[] = {
   "cake",
