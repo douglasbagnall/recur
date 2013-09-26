@@ -50,7 +50,8 @@ class Trainer(BaseClassifier):
                 break
             self.targets.append(c)
             fs.set_property('location', fn)
-            print c, fn
+            if not self.quiet:
+                print c, fn
 
         target_string = '.'.join(str(self.classes.index(x)) for x in self.targets)
         self.classifier.set_property('target', target_string)
@@ -64,6 +65,8 @@ class Trainer(BaseClassifier):
         print('Error:', msg.parse_error())
 
     def on_element(self, bus, msg):
+        if self.quiet:
+            return
         s = msg.get_structure()
         if s.get_name() != "classify":
             return
@@ -93,23 +96,37 @@ def lr_steps(*args):
         yield args[0]
 
 
-def train(learn_rate, _dir=TRAIN_AUDIO_DIR, cycles=1200 // FILE_LENGTH,
-          channels=72, classes=CLASSES):
+def train(learn_rate, _dir=TRAIN_AUDIO_DIR, cycles=20,
+          channels=72, classes=CLASSES, quiet=False):
     files = [x for x in os.listdir(_dir) if x.endswith('.wav')]
     random.shuffle(files)
     categories = {c: [os.path.join(_dir, x) for x in files if x[0] == c]
                   for c in classes}
 
     c = Trainer(channels=channels)
+    c.quiet = quiet
     c.train(categories, cycles * channels,
             learn_rate=learn_rate)
 
 
 def main(argv):
     gst_init()
-    if argv:
-        train(lr_steps(*(float(x) for x in argv)))
+    if '-q' in argv:
+        argv.remove('-q')
+        quiet = True
     else:
-        train(lr_steps(3e-4, 5, 1e-4, 5, 3e-5, 5, 1e-5))
+        quiet = False
+    if argv:
+        lr = lr_steps(*(float(x) for x in argv))
+
+    else:
+        lr = lr_steps(1e-3, 300 // FILE_LENGTH,
+                      3e-4, 300 // FILE_LENGTH,
+                      1e-4, 300 // FILE_LENGTH,
+                      3e-5)
+
+    train(lr,
+          cycles=1000 // FILE_LENGTH,
+          quiet=quiet)
 
 main(sys.argv[1:])

@@ -278,8 +278,8 @@ train-parrot-duo: libgstparrot.so
 classify: libgstclassify.so
 	mv classify*.net nets || echo no net to move
 	rm classify.log || echo no log to nuke
-	time ./classify-train > log.log
-	python classify.py test
+	time ./classify-train -q
+	time ./classify-test
 
 valgrind-classify:
 	mv classify*.net nets || echo no net to move
