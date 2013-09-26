@@ -122,7 +122,6 @@ struct _RecurNNBPTT {
   float *mem;
   float learn_rate;
   float ih_scale;
-  float ho_scale;
   float momentum;
   float momentum_weight;
   int batch_size;

@@ -495,7 +495,7 @@ calc_sgd_top_layer(RecurNN *net){
       }
     }
   }
-  bptt->ho_scale = 1.0f;
+
   return error_sum;
 }
 
@@ -684,13 +684,12 @@ void bptt_consolidate_many_nets(RecurNN **nets, int n){
   /*Use first net's delta as gradient accumulator.*/
   float *ho_gradient = bptt->ho_delta;
   float *ih_gradient = bptt->ih_delta;
-  scale_aligned_array(ho_gradient, net->ho_size, bptt->ho_scale);
   scale_aligned_array(ih_gradient, net->ih_size, bptt->ih_scale);
   for (int i = 1; i < n; i++){
     net = nets[i];
     bptt = net->bptt;
     /*saxpy -> scale and add */
-    cblas_saxpy(net->ho_size, bptt->ho_scale, bptt->ho_delta, 1, ho_gradient, 1);
+    cblas_saxpy(net->ho_size, 1, bptt->ho_delta, 1, ho_gradient, 1);
     cblas_saxpy(net->ih_size, bptt->ih_scale, bptt->ih_delta, 1, ih_gradient, 1);
     memset(bptt->ho_delta, 0, net->ho_size * sizeof(float));
     memset(bptt->ih_delta, 0, net->ih_size * sizeof(float));
