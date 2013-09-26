@@ -67,6 +67,7 @@ all:: libgstrecur.so
 
 clean:
 	rm -f *.so *.o *.a *.d *.s
+	rm -f path.h
 
 pgm-clean:
 	#find images -maxdepth 1 -name '*.p?m' | xargs rm -f
@@ -108,19 +109,19 @@ libgstclassify.so: recur-nn.o recur-nn-io.o gstclassify.o mfcc.o
 test_mfcc_table: %: recur-context.o recur-nn.o recur-nn-io.o rescale.o %.o
 	$(CC) -Wl,-O1 $^   $(INCLUDES) $(DEFINES)  $(LINKS)  -o $@
 
-test_%: test_%.o
+test_%: test_%.o path.h
 	$(CC) -Wl,-O1 $^   $(INCLUDES) $(DEFINES)  $(LINKS)   -o $@
 
-test_window_functions test_dct: %: mfcc.o %.o
+test_window_functions test_dct: %: mfcc.o %.o path.h
 	$(CC) -Wl,-O1 $^   $(INCLUDES) $(DEFINES)  $(LINKS)  -o $@
 
-test_simple_rescale test_rescale: %: rescale.o %.o
+test_simple_rescale test_rescale: %: rescale.o %.o  path.h
 	$(CC) -Wl,-O1 $^   $(INCLUDES) $(DEFINES)  $(LINKS)  -o $@
 
-test_backprop test_fb_backprop: %: recur-nn.o recur-nn-io.o %.o
+test_backprop test_fb_backprop: %: recur-nn.o recur-nn-io.o %.o path.h
 	$(CC) -Wl,-O1 $^   $(INCLUDES) $(DEFINES)  $(LINKS)  -o $@
 
-test_mdct: %: recur-nn.o mdct.o window.o %.o
+test_mdct: %: recur-nn.o mdct.o window.o %.o  path.h
 	$(CC) -Wl,-O1 $^   $(INCLUDES) $(DEFINES)  $(LINKS)  -o $@
 
 path.h:
@@ -135,7 +136,7 @@ path.h:
 	@echo "#endif"                                    >>$@
 
 
-gtk-recur.o: gtk-recur.c
+gtk-recur.o: gtk-recur.c  path.h
 	$(CC) -c  -MMD $(ALL_CFLAGS) $(CPPFLAGS)  $(INCLUDES)  $(GTK_INCLUDES) -o $@ $<
 
 
