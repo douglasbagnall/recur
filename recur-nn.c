@@ -692,7 +692,11 @@ void bptt_consolidate_many_nets(RecurNN **nets, int n){
     cblas_saxpy(net->ho_size, 1, bptt->ho_delta, 1, ho_gradient, 1);
     cblas_saxpy(net->ih_size, bptt->ih_scale, bptt->ih_delta, 1, ih_gradient, 1);
   }
-  /*All nets (should) have the same weights and momentums, so just use the last one */
+  /*All nets (should) have the same weights and usable momentums, so it would
+    be OK to just use the last one, but nets[0] is the one that gets debugging
+    attention (ppm, etc). */
+  net = nets[0];
+  bptt = net->bptt;
   apply_learning_with_momentum(net->ho_weights, ho_gradient, bptt->ho_momentum,
       net->ho_size, bptt->learn_rate, bptt->momentum, bptt->momentum_weight);
 
