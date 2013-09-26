@@ -14,7 +14,6 @@
 #define VID_TEARS "F30275.mov"
 
 static const char *PIPELINE_TEMPLATE = ("uridecodebin name=src "
-    //" uri=file:///home/douglas/recur/test-video/" VID_LAGOS
     " ! videoscale method=nearest-neighbour ! videoconvert"
     " ! video/x-raw, format=I420, width=" QUOTE(WIDTH) ", height=" QUOTE(HEIGHT)
     " ! recur_manager name=recur osdebug=0 ! videoconvert"

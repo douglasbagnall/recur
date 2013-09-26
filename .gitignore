@@ -19,3 +19,4 @@ test_*
 /debug/
 /gtk-recur
 /nets
+/path.h
