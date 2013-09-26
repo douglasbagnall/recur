@@ -517,6 +517,19 @@ consolidate_and_apply_learning(GstClassify *self)
   rnn_condition_net(self->net);
 }
 
+static inline float
+train_channel(ClassifyChannel *c){
+  RecurNN *net = c->net;
+  bptt_advance(net);
+  float *answer = rnn_opinion(net, c->features);
+  c->current_winner = softmax_best_guess(net->bptt->o_error, answer,
+      net->output_size);
+  net->bptt->o_error[c->current_target] += 1.0f;
+  bptt_calc_deltas(net);
+  return net->bptt->o_error[c->current_target];
+}
+
+
 static inline void
 maybe_learn(GstClassify *self){
   int i, j, k;
@@ -554,13 +567,7 @@ maybe_learn(GstClassify *self){
 
       //GST_DEBUG("channel %d target %d", j , c->current_target);
       if (training){
-        bptt_advance(net);
-        answer = rnn_opinion(net, c->features);
-        c->current_winner = softmax_best_guess(net->bptt->o_error, answer,
-            net->output_size);
-        net->bptt->o_error[c->current_target] += 1.0f;
-        err_sum += net->bptt->o_error[c->current_target];
-        bptt_calc_deltas(net);
+        err_sum += train_channel(c);
         winners += c->current_winner == c->current_target;
       }
       else{
@@ -580,10 +587,7 @@ maybe_learn(GstClassify *self){
 
     if (self->training){
       consolidate_and_apply_learning(self);
-      possibly_save_net(self->net, self->net_filename);
-      rnn_condition_net(self->net);
       rnn_log_net(self->channels[0].net);
-      //rnn_log_net(self->net);
       bptt_log_float(self->channels[0].net, "error", err_sum / self->n_channels);
       bptt_log_float(self->channels[0].net, "correct", winners / self->n_channels);
     }
@@ -595,6 +599,8 @@ maybe_learn(GstClassify *self){
     len -= chunk_size;
   }
 }
+
+
 
 static GstFlowReturn
 gst_classify_transform_ip (GstBaseTransform * base, GstBuffer *buf)
