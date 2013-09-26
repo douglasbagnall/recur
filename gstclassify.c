@@ -103,9 +103,11 @@ gst_classify_finalize (GObject * obj){
   if (self->channels){
     for (int i = 0; i < self->n_channels; i++){
       finalise_channel(&self->channels[i]);
+      self->subnets[i] = NULL;
     }
     free(self->channels);
     self->channels = NULL;
+    free(self->subnets);
   }
   free(self->incoming_queue);
   rnn_delete_net(self->net);
@@ -258,11 +260,13 @@ gst_classify_setup(GstAudioFilter *base, const GstAudioInfo *info){
   }
   if (self->channels == NULL){
     self->channels = malloc_aligned_or_die(self->n_channels * sizeof(ClassifyChannel));
+    self->subnets = malloc_aligned_or_die(self->n_channels * sizeof(RecurNN *));
     for (int i = 0; i < self->n_channels; i++){
       init_channel(&self->channels[i], self->net, i, self->learn_rate);
+      self->subnets[i] = self->channels[i].net;
     }
   }
-  rnn_set_log_file(self->channels[0].net, NET_LOG_FILE, 1);
+  rnn_set_log_file(self->subnets[0], NET_LOG_FILE, 1);
   maybe_parse_target_string(self);
 
   GST_DEBUG_OBJECT (self,
@@ -505,15 +509,12 @@ pcm_to_features(RecurAudioBinner *mf, float *features, float *pcm){
 }
 
 
-static void
+static inline void
 consolidate_and_apply_learning(GstClassify *self)
 {
-  /*XXX nets doesn't change, can be set at start up */
-  RecurNN *nets[self->n_channels];
-  for (int j = 0; j < self->n_channels; j++){
-    nets[j] = self->channels[j].net;
-  }
-  bptt_consolidate_many_nets(nets, self->n_channels);
+  bptt_consolidate_many_nets(self->subnets, self->n_channels);
+  possibly_save_net(self->net, self->net_filename);
+  rnn_condition_net(self->net);
 }
 
 static inline void

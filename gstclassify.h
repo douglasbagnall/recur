@@ -89,6 +89,7 @@ struct _GstClassify
   GstAudioFilter audiofilter;
   GstAudioInfo *info;
   RecurNN *net;
+  RecurNN **subnets;
   ClassifyChannel *channels;
   int n_channels;
   int n_classes;
