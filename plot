@@ -7,6 +7,9 @@ import matplotlib.pyplot as plt
 import random
 import sys
 import os
+from collections import defaultdict
+from math import log
+
 
 DEFAULT_LOGFILE = "classify.log"
 DEFAULT_KEYS = ('error_sum', 'error', 'hidden_sum', 'depth',
@@ -76,18 +79,18 @@ def read_log(fn, names,
 
 def graph(lists):
     times = lists.pop('generation')
-    n = 100 * len(lists) + 10
+    i = 0
     ax = None
     subplots = []
     for k, v in lists.items():
         if ax is None:
-            ax2 = ax = plt.subplot(n)
+            ax2 = ax = plt.subplot(len(lists), 1, i)
         else:
-            ax2 = plt.subplot(n, sharex=ax)
+            ax2 = plt.subplot(len(lists), 1, i, sharex=ax)
         ax2.plot(times, v, 'r.', linewidth=0.5, label=k)
         #plt.legend(bbox_to_anchor=(0.2, 1.1),  loc=9)
         plt.legend(loc='upper left', numpoints=1, frameon=False, markerscale=0,borderpad=0)
-        n += 1
+        i += 1
         plt.grid(True)
     plt.show()
 
@@ -117,8 +120,6 @@ def plot(logfile, args):
     graph(lists)
 
 def search_for_keys(logfile):
-    from collections import defaultdict
-    from math import log
     keys = defaultdict(float)
     f = open(logfile)
     i = 0
@@ -130,11 +131,8 @@ def search_for_keys(logfile):
             break
         if i >= 100000:
             break
-    for k, v in sorted(keys.iteritems()):
-        print "%-20s %s" % (k, '+' * int(log(v)))
-
-
-
+    del keys['generation']
+    return keys
 
 
 def main(args):
@@ -146,7 +144,13 @@ def main(args):
             break
 
     if '--keys' in sys.argv:
-        search_for_keys(logfile)
+        keys = search_for_keys(logfile)
+        for k, v in sorted(keys.iteritems()):
+            print "%-20s %s" % (k, '+' * int(log(v)))
+    elif '--all' in sys.argv:
+        keys = search_for_keys(logfile)
+        print keys
+        plot(logfile, keys.keys())
     else:
         plot(logfile, args)
 
