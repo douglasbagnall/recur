@@ -204,7 +204,7 @@ mfcc_slopes_dump(RecurAudioBinner *ab){
       sum_right += (1.0f - mul) * slope->right_fraction;
     }
 
-    DEBUG("%2d. left%3d right%3d slope %.3f fractions: L %.3f R %.3f  mul at end %.3f"
+    MAYBE_DEBUG("%2d. left%3d right%3d slope %.3f fractions: L %.3f R %.3f  mul at end %.3f"
         " sum_L %.3f sum_R %.3f sum %.3f",
         i, slope->left, slope->right, slope->slope, slope->left_fraction,
         slope->right_fraction,  mul, sum_left, sum_right, sum_left + sum_right);

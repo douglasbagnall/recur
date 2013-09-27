@@ -191,6 +191,9 @@ rnn_clone(RecurNN *parent, int flags,
   float momentum;
   float momentum_weight;
   int batch_size;
+
+  /*XXXX It would be nice to have a half bptt state -- with shared momentum
+    but separate deltas, history */
   if (parent->bptt && (flags & RNN_NET_FLAG_OWN_BPTT)){
     learn_rate = parent->bptt->learn_rate;
     bptt_depth = parent->bptt->depth;
@@ -485,6 +488,8 @@ calc_sgd_top_layer(RecurNN *net){
     hiddens[0] = 1.0f;
   }
 
+  MAYBE_DEBUG("top error:[0] %g, [1] %g", o_error[0], o_error[1]);
+
   error_sum = backprop_top_layer(net);
   for (y = 0; y < net->h_size; y++){
     if (hiddens[y]){
@@ -495,6 +500,9 @@ calc_sgd_top_layer(RecurNN *net){
         drow[x] = o_error[x] * hiddens[y];
       }
     }
+    MAYBE_DEBUG("y: %d drow[0] %g [1] %g", y,
+        *(delta + y * net->o_size),
+        *(delta + y * net->o_size + 1));
   }
 
   return error_sum;
