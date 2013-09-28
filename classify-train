@@ -5,8 +5,25 @@ import itertools
 
 from classify import BaseClassifier, Gst, gst_init, CLASSES, FILE_LENGTH
 
+COLOURS = {
+    "Z": "\033[00m",
+    "g": '\033[00;32m',
+    "G": '\033[01;32m',
+    "r": '\033[00;31m',
+    "R": '\033[01;31m',
+    "M": "\033[01;35m",
+    "P": "\033[00;35m",
+    "C": "\033[01;36m",
+    "Y": "\033[01;33m",
+    "W": "\033[01;37m",
+}
+
 TRAIN_AUDIO_DIR = ("/home/douglas/maori-language-monitoring/"
                    "data/8k-%ss/train" % FILE_LENGTH)
+TEST_AUDIO_DIR = ("/home/douglas/maori-language-monitoring/"
+                   "data/8k-%ss/test" % FILE_LENGTH)
+
+TEST_INTERVAL = 4
 
 def eternal_alternator(iters, max_iterations=-1):
     cycles = [itertools.cycle(x) for x in iters]
@@ -16,29 +33,77 @@ def eternal_alternator(iters, max_iterations=-1):
             yield c.next()
         i += 1
 
+TRAINING = 0
+TESTING = 1
 
 class Trainer(BaseClassifier):
     trainers = None
-
-    def train(self, data, iterations=100, learn_rate=None):
+    lr_adjust = 1.0
+    def train(self, training_data, testing_data, iterations=100, learn_rate=None):
         """data is a dictionary mapping class IDs to lists of filenames.
         """
         if isinstance(learn_rate, float):
             self.learn_rate = itertools.repeat(learn_rate)
         else:
             self.learn_rate = learn_rate
+        self.counter = 0
         trainers = []
+        testers = []
         for k in self.classes:
-            trainers.append([(k, x) for x in data[k]])
+            trainers.append([(k, x) for x in training_data[k]])
+            testers.append([(k, x) for x in testing_data[k]])
         self.trainers = eternal_alternator(trainers, iterations)
+        self.testers = eternal_alternator(testers)
+        self.test_scores = None
         self.next_training_set()
         self.pipeline.set_state(Gst.State.PLAYING)
         self.mainloop.run()
 
+    def test_set(self):
+        self.test_targets = []
+        self.test_scores = [0] * self.channels
+        self.test_n = 0
+        for fs in self.filesrcs:
+            c, fn = self.testers.next()
+            self.test_targets.append(self.classes.index(c))
+            fs.set_property('location', fn)
+            if not self.quiet:
+                print c, fn
+        self.classifier.set_property('target', '')
+        self.mode = TESTING
+
+    def evaluate_test(self):
+        #print self.test_scores
+        scores = [x / float(self.test_n) for x in self.test_scores]
+        colours = [COLOURS[x] for x in 'PrrrRRYYGgW']
+        output = []
+        rightness = 0
+        wrongness2 = 0
+        for x in scores:
+            i = int(x * 9.99)
+            c = str(i)
+            output.append(colours[i])
+            output.append(c)
+            rightness += x
+            wrongness2 += (1.0 - x) * (1.0 - x)
+        rightness /= len(scores)
+        wrongness2 /= len(scores)
+        output += " %s%.2f%s %.2f%s" % (colours[int(rightness * 9.99)], rightness,
+                                        colours[int(wrongness2 * 9.99)], rightness2,
+                                        COLOURS['Z'])
+        print ''.join(output)
+        if rightness > 0.75:
+            if rightness > 0.9:
+                print "got there!"
+            self.lr_adjust = 0.1 / (rightness - 0.65)
+        else:
+            self.lr_adjust = 1.0
+
+
     def next_training_set(self):
         self.targets = []
         if self.learn_rate is not None:
-            r = self.learn_rate.next()
+            r = self.learn_rate.next() * self.lr_adjust
             print "learn_rate %s" % r
             self.classifier.set_property('learn_rate', r)
 
@@ -55,33 +120,63 @@ class Trainer(BaseClassifier):
 
         target_string = '.'.join(str(self.classes.index(x)) for x in self.targets)
         self.classifier.set_property('target', target_string)
+        self.mode = TRAINING
 
     def on_eos(self, bus, msg):
+        #s = msg.get_structure()
+        #print s.to_string()
+        if self.test_scores:
+            self.evaluate_test()
+            self.test_scores = None
+        self.counter += 1
         self.pipeline.set_state(Gst.State.READY)
-        self.next_training_set()
+        if self.counter % TEST_INTERVAL:
+            self.next_training_set()
+        else:
+            self.test_set()
         self.pipeline.set_state(Gst.State.PLAYING)
 
     def on_error(self, bus, msg):
         print('Error:', msg.parse_error())
 
     def on_element(self, bus, msg):
-        if self.quiet:
+        total = 0
+        if self.mode == TESTING:
+            self.test_n += 1
+            s = msg.get_structure()
+            if s.get_name() != "classify":
+                return
+            v = s.get_value
+            #print self.test_targets
+            for i, t in enumerate(self.test_targets):
+                winner = v('channel %d winner' % i)
+                ok = winner == t
+                self.test_scores[i] += ok
+                total += ok
+            if not self.quiet:
+                score = total / float(self.channels)
+                colour = COLOURS['PRRRRYYGGC'[int(score * 10)]]
+                print "%s%s%s %s/%s" % (colour, "=" * total, COLOURS['Z'],
+                                        total, self.channels)
+
+        elif self.quiet:
             return
-        s = msg.get_structure()
-        if s.get_name() != "classify":
-            return
-        v = s.get_value
-        error = v('error')
-        print error
-        fmt = "channel %d %s %s %s " + ("%.2f " * len(self.classes))
-        for i in range(self.channels):
-            winner = v('channel %d winner' % i)
-            scores = tuple(v('channel %d, output %d' % (i, j))
-                           for j in range(len(self.classes)))
-            wc = self.classes[winner]
-            tc = self.targets[i]
-            ok = ("\033[01;32m==\033[00m" if wc == tc else "\033[01;31m!=\033[00m")
-            print (fmt % ((i, wc, ok, tc) + scores))
+        else:
+            s = msg.get_structure()
+            if s.get_name() != "classify":
+                return
+            v = s.get_value
+            error = v('error')
+            print error
+            fmt = "channel %d %s %s %s " + ("%.2f " * len(self.classes))
+            for i in range(self.channels):
+                winner = v('channel %d winner' % i)
+                scores = tuple(v('channel %d, output %d' % (i, j))
+                               for j in range(len(self.classes)))
+                wc = self.classes[winner]
+                tc = self.targets[i]
+                ok = ("\033[01;32m==\033[00m" if wc == tc else "\033[01;31m!=\033[00m")
+                print (fmt % ((i, wc, ok, tc) + scores))
 
 
 def lr_steps(*args):
@@ -95,17 +190,19 @@ def lr_steps(*args):
     while args:
         yield args[0]
 
-
-def train(learn_rate, _dir=TRAIN_AUDIO_DIR, cycles=20,
-          channels=72, classes=CLASSES, quiet=False):
+def categorised_files(_dir, classes):
     files = [x for x in os.listdir(_dir) if x.endswith('.wav')]
     random.shuffle(files)
-    categories = {c: [os.path.join(_dir, x) for x in files if x[0] == c]
-                  for c in classes}
+    return {c: [os.path.join(_dir, x) for x in files if x[0] == c]
+            for c in classes}
 
+def train(learn_rate, cycles=20,
+          channels=72, classes=CLASSES, quiet=False):
+    train_data = categorised_files(TRAIN_AUDIO_DIR, classes)
+    test_data = categorised_files(TEST_AUDIO_DIR, classes)
     c = Trainer(channels=channels)
     c.quiet = quiet
-    c.train(categories, cycles * channels,
+    c.train(train_data, test_data, cycles * channels,
             learn_rate=learn_rate)
 
 
@@ -120,13 +217,14 @@ def main(argv):
         lr = lr_steps(*(float(x) for x in argv))
 
     else:
-        lr = lr_steps(1e-3, 300 // FILE_LENGTH,
-                      3e-4, 300 // FILE_LENGTH,
-                      1e-4, 300 // FILE_LENGTH,
-                      3e-5)
+        lr = lr_steps(#1e-3, 240 // FILE_LENGTH,
+                      #1e-4, 240 // FILE_LENGTH,
+                      1e-5, 240 // FILE_LENGTH,
+                      3e-6, 480 // FILE_LENGTH,
+                      1e-6)
 
     train(lr,
-          cycles=1000 // FILE_LENGTH,
+          cycles=2000 // FILE_LENGTH,
           quiet=quiet)
 
 main(sys.argv[1:])
