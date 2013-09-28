@@ -63,11 +63,11 @@ class Classifier(BaseClassifier):
         target = os.path.basename(fn)[0]
         if target == winchar:
             print (u"winner %s == %s \033[00m"
-                   u"file://\033[01;32m%s\033[00m\u263A".encode('utf-8') %
+                   u"file://\033[01;32m%s\033[00m \u2714".encode('utf-8') %
                    (winchar, target, fn))
         else:
             print (u"winner %s != %s \033[00m"
-                   u"file://\033[01;31m%s\033[00m\u2620".encode('utf-8') %
+                   u"file://\033[01;31m%s\033[00m \u2717".encode('utf-8') %
                    (winchar, target, fn))
 
         for c, v, s in zip(self.classes, votes, mean_scores):
