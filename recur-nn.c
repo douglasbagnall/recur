@@ -386,10 +386,10 @@ backprop_top_layer(RecurNN *net)
   int x, y;
   float error_sum = 0.0f;
 
-  float *restrict hiddens = net->hidden_layer;
+  const float *restrict hiddens = net->hidden_layer;
   float *restrict h_error = net->bptt->h_error;
-  float *restrict o_error = net->bptt->o_error;
-  float *restrict weights = net->ho_weights;
+  const float *restrict o_error = net->bptt->o_error;
+  const float *restrict weights = net->ho_weights;
   ASSUME_ALIGNED(hiddens);
   ASSUME_ALIGNED(h_error);
   ASSUME_ALIGNED(o_error);
@@ -398,7 +398,7 @@ backprop_top_layer(RecurNN *net)
   for (y = net->bias; y < net->h_size; y++){
     float e = 0.0f;
     if (hiddens[y]){
-      float *restrict row = weights + y * net->o_size;
+      const float *restrict row = weights + y * net->o_size;
       ASSUME_ALIGNED(row);
       for (x = 0; x < net->o_size; x++){
         e += row[x] * o_error[x];
@@ -421,7 +421,7 @@ static float
 apply_sgd_top_layer(RecurNN *net){
   //cblas_ger
   RecurNNBPTT *bptt = net->bptt;
-  float *restrict o_error = bptt->o_error;
+  const float *restrict o_error = bptt->o_error;
   float *restrict hiddens = net->hidden_layer;
   float *restrict weights = net->ho_weights;
   float *restrict momentums = bptt->ho_momentum;
@@ -477,7 +477,7 @@ static float
 calc_sgd_top_layer(RecurNN *net){
   //cblas_ger
   RecurNNBPTT *bptt = net->bptt;
-  float *restrict o_error = bptt->o_error;
+  const float *restrict o_error = bptt->o_error;
   float *restrict hiddens = net->hidden_layer;
   float *restrict delta = bptt->ho_delta;
   float error_sum = 0;
