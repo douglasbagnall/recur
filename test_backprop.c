@@ -25,7 +25,6 @@
 #define K_STOP 0
 #define BPTT_BATCH_SIZE 1
 
-#define SAFE_CONFAB 1
 
 u8 CHAR_TO_NET[257];
 const u8 NET_TO_CHAR[] = "abcdefghijklmnopqrstuvwxyz,'- .\"#";
@@ -161,29 +160,21 @@ opinion_probabilistic(RecurNN *net, int hot){
   }
 }
 
-static int
-confabulate(RecurNN *net, char *text, int len, int c,
+static void
+confabulate(RecurNN *net, char *text, int len,
     int hidden_ppm, int deterministic){
   int i;
-#if SAFE_CONFAB
-  float tmp_hiddens[net->h_size];
-  float tmp_inputs[net->i_size];
-  memcpy(tmp_hiddens, net->hidden_layer, sizeof(tmp_hiddens));
-  memcpy(tmp_inputs, net->input_layer, sizeof(tmp_inputs));
-#endif
   float *im;
   if (hidden_ppm){
     im = malloc_aligned_or_die(net->h_size * len * sizeof(float));
   }
-  if (c < 0 || c > 255)
-    c = ' ';
-  int n = CHAR_TO_NET[c];
+  static int n = 0;
   for (i = 0; i < len; i++){
     if (deterministic)
       n = opinion_deterministic(net, n);
     else
       n = opinion_probabilistic(net, n);
-    c = NET_TO_CHAR[n];
+    int c = NET_TO_CHAR[n];
     text[i] = c;
     if (hidden_ppm)
       memcpy(&im[net->h_size * i], net->hidden_layer, net->h_size * sizeof(float));
@@ -193,19 +184,14 @@ confabulate(RecurNN *net, char *text, int len, int c,
       "confab-hiddens", net->generation);
     free(im);
   }
-#if SAFE_CONFAB
-  memcpy(net->hidden_layer, tmp_hiddens, sizeof(tmp_hiddens));
-  memcpy(net->input_layer, tmp_inputs, sizeof(tmp_inputs));
-#endif
-  return c;
 }
 
-static inline int
-long_confab(RecurNN *net, int len, int rows, int c, int hidden_ppm){
+static inline void
+long_confab(RecurNN *net, int len, int rows, int hidden_ppm){
   int i, j;
   char confab[len * rows + 1];
   confab[len * rows] = 0;
-  c = confabulate(net, confab, len * rows, c, hidden_ppm, 0);
+  confabulate(net, confab, len * rows, hidden_ppm, 0);
   for (i = 1; i < rows; i++){
     int target = i * len;
     int linebreak = target;
@@ -227,13 +213,12 @@ long_confab(RecurNN *net, int len, int rows, int c, int hidden_ppm){
     }
   }
   DEBUG("%s", confab);
-  return c;
 }
 
 static TemporalPPM *input_ppm;
 
 void
-epoch(RecurNN *net, const u8 *text, const int len){
+epoch(RecurNN *net, RecurNN *confab_net, const u8 *text, const int len){
   int i;
   char confab[CONFAB_SIZE + 1];
   confab[CONFAB_SIZE] = 0;
@@ -259,7 +244,7 @@ epoch(RecurNN *net, const u8 *text, const int len){
     if ((net->generation & 1023) == 0){
       int k = net->generation >> 10;
       entropy /= -1024.0f;
-      confabulate(net, confab, CONFAB_SIZE, text[i], CONFAB_HIDDEN_IMG,
+      confabulate(confab_net, confab, CONFAB_SIZE, CONFAB_HIDDEN_IMG,
           DETERMINISTIC_CONFAB);
       DEBUG("%4dk .%02d %.2f .%02d |%s|", k, (int)(error / 10.24f + 0.5), entropy,
           (int)(correct / 10.24f + 0.5), confab);
@@ -279,7 +264,7 @@ epoch(RecurNN *net, const u8 *text, const int len){
         exit(0);
     }
   }
-  long_confab(net, CONFAB_SIZE, 6, ' ', CONFAB_HIDDEN_IMG);
+  long_confab(confab_net, CONFAB_SIZE, 6, CONFAB_HIDDEN_IMG);
 }
 
 void dump_parameters(void){
@@ -314,6 +299,11 @@ main(void){
         NET_LOG_FILE, BPTT_DEPTH, LEARN_RATE, MOMENTUM, MOMENTUM_WEIGHT,
         BPTT_BATCH_SIZE);
 
+  RecurNN *confab_net = rnn_clone(net,
+      net->flags & ~(RNN_NET_FLAG_OWN_BPTT | RNN_NET_FLAG_OWN_WEIGHTS),
+      RECUR_RNG_SUBSEED,
+      NULL);
+
   create_char_lut(CHAR_TO_NET, NET_TO_CHAR);
   long len;
   u8* text = alloc_and_collapse_text(SRC_TEXT, &len);
@@ -324,7 +314,7 @@ main(void){
   for (int i = 0; i < 200; i++){
     DEBUG("Starting epoch %d. learn rate %f.", i, net->bptt->learn_rate);
     START_TIMER(epoch);
-    epoch(net, text, len);
+    epoch(net, confab_net, text, len);
     DEBUG_TIMER(epoch);
     net->bptt->learn_rate *= LEARN_RATE_DECAY;
   }
