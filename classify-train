@@ -69,6 +69,7 @@ class Trainer(BaseClassifier):
             fs.set_property('location', fn)
             if not self.quiet:
                 print c, fn
+        self.classifier.set_property('forget', 0)
         self.classifier.set_property('target', '')
         self.mode = TESTING
 
@@ -119,6 +120,7 @@ class Trainer(BaseClassifier):
                 print c, fn
 
         target_string = '.'.join(str(self.classes.index(x)) for x in self.targets)
+        #self.classifier.set_property('forget', 0)
         self.classifier.set_property('target', target_string)
         self.mode = TRAINING
 

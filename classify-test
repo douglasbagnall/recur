@@ -22,7 +22,7 @@ class Classifier(BaseClassifier):
 
     def load_next_file(self):
         fn = self.pending_files.pop()
-        self.classifier.set_property("forget", True)
+        self.classifier.set_property("forget", 0)
         self.filesrcs[0].set_property('location', fn)
         self.file_results = []
 

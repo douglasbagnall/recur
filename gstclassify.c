@@ -353,9 +353,10 @@ gst_classify_set_property (GObject * object, guint prop_id, const GValue * value
       break;
     case PROP_FORGET:
       if (self->net){
-        rnn_forget_history(self->net, 0);
+        gboolean bptt_too = g_value_get_boolean(value);
+        rnn_forget_history(self->net, bptt_too);
         for (int i = 0; i < self->n_channels; i++){
-          rnn_forget_history(self->channels[i].net, 0);
+          rnn_forget_history(self->channels[i].net, bptt_too);
         }
       }
       break;
