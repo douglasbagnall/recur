@@ -39,6 +39,11 @@ typedef float v4ss __attribute__ ((vector_size (16))) __attribute__ ((aligned (1
 /*RNN_CONDITIONING_INTERVAL should be <= 32, ideally a power of 2 */
 #define RNN_CONDITIONING_INTERVAL 8
 
+/*whether to log the hidden sum */
+#define RNN_LOG_HIDDEN_SUM 1
+/*whether to log the weight sum (relatively costly, often uninformative) */
+#define RNN_LOG_WEIGHT_SUM 0
+
 #define ASM_MARKER(x) asm("/**" QUOTE(x) "**/")
 
 /* Conditioning flags go in bits 16-23 of net->flags.
