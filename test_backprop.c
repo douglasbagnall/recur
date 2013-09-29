@@ -293,12 +293,14 @@ main(void){
     rnn_set_log_file(net, NET_LOG_FILE, 0);
   DEBUG("net is %p", net);
 #endif
-  if (net == NULL)
+  if (net == NULL){
+    u32 flags = BIAS ? RNN_NET_FLAG_STANDARD : RNN_NET_FLAG_NO_BIAS;
+    flags = flags & ~(RNN_COND_MASK_RAND);
     net = rnn_new(INPUT_SIZE, HIDDEN_SIZE,
-        INPUT_SIZE, BIAS ? RNN_NET_FLAG_STANDARD : RNN_NET_FLAG_NO_BIAS, 1,
+        INPUT_SIZE, flags, 1,
         NET_LOG_FILE, BPTT_DEPTH, LEARN_RATE, MOMENTUM, MOMENTUM_WEIGHT,
         BPTT_BATCH_SIZE);
-
+  }
   RecurNN *confab_net = rnn_clone(net,
       net->flags & ~(RNN_NET_FLAG_OWN_BPTT | RNN_NET_FLAG_OWN_WEIGHTS),
       RECUR_RNG_SUBSEED,
