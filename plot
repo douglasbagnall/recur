@@ -62,7 +62,7 @@ def read_log(fn, names,
         try:
             name, value = line.split()
         except:
-            print line
+            print "malformed line: %r" % line
             continue
         if name == "generation":
             generation = float(value)
@@ -115,7 +115,7 @@ def plot(logfile, args):
     shortest = min(len(x) for x in lists.values())
     for x in lists.values():
         del x[shortest:]
-    print [(k, len(v)) for k,v in lists.items()]
+    #print [(k, len(v)) for k,v in lists.items()]
 
     graph(lists)
 
@@ -149,7 +149,7 @@ def main(args):
             print "%-20s %s" % (k, '+' * int(log(v)))
     elif '--all' in sys.argv:
         keys = search_for_keys(logfile)
-        print keys
+        #print keys
         plot(logfile, keys.keys())
     else:
         plot(logfile, args)
