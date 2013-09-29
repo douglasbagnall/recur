@@ -126,7 +126,7 @@ sgd_one(RecurNN *net, const int current, const int next, float *error, int *corr
 
   bptt_calculate(net);
 
-  if (EXCESSIVE_PGM_DUMP && 0){
+  if (EXCESSIVE_PGM_DUMP){
     dump_colour_weights_autoname(net->ho_weights, net->o_size, net->h_size,
         "ho", net->generation);
   }
@@ -258,7 +258,7 @@ epoch(RecurNN *net, RecurNN *confab_net, const u8 *text, const int len){
         rnn_save_net(net, NET_FILENAME);
       }
       if (PERIODIC_PGM_DUMP){
-        rnn_multi_pgm_dump(net, "ihw ihm how hom");
+        rnn_multi_pgm_dump(net, "ihw how");
       }
       if (K_STOP && k > K_STOP)
         exit(0);
