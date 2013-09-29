@@ -2,6 +2,7 @@
 import os, sys
 import random
 import itertools
+import time
 
 from classify import BaseClassifier, Gst, gst_init, CLASSES, FILE_LENGTH
 
@@ -35,6 +36,8 @@ def eternal_alternator(iters, max_iterations=-1):
 
 TRAINING = 0
 TESTING = 1
+
+SAVE_LOCATION = 'nets/autosave'
 
 class Trainer(BaseClassifier):
     trainers = None
@@ -93,13 +96,20 @@ class Trainer(BaseClassifier):
                                         colours[int(wrongness2 * 9.99)], rightness2,
                                         COLOURS['Z'])
         print ''.join(output)
+        if winners > 0.9:
+            print "got there!"
+            self.save_net(tag='goodness-%d-%d' %
+                          (int(rightness * 100), int(winners * 100)))
         if rightness > 0.75:
-            if rightness > 0.9:
-                print "got there!"
             self.lr_adjust = 0.1 / (rightness - 0.65)
         else:
             self.lr_adjust = 1.0
 
+
+    def save_net(self, tag='', dir=SAVE_LOCATION):
+        fn = ("%s/classify-%s-%s.net" %
+              (dir, time.time(), tag))
+        self.classifier.set_property('save-net', fn)
 
     def next_training_set(self):
         self.targets = []

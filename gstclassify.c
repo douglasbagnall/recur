@@ -25,9 +25,11 @@ enum
   PROP_FORGET,
   PROP_LEARN_RATE,
   PROP_HIDDEN_SIZE,
+  PROP_SAVE_NET,
 };
 
 #define DEFAULT_PROP_TARGET ""
+#define DEFAULT_PROP_SAVE_NET NULL
 #define DEFAULT_PROP_CLASSES 2
 #define DEFAULT_PROP_FORGET 0
 #define DEFAULT_HIDDEN_SIZE 199
@@ -141,6 +143,12 @@ gst_classify_class_init (GstClassifyClass * klass)
           "Target outputs for all channels (dot separated)",
           DEFAULT_PROP_TARGET,
           G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+
+  g_object_class_install_property (gobject_class, PROP_SAVE_NET,
+      g_param_spec_string("save-net", "save-net",
+          "Save the net here, now.",
+          DEFAULT_PROP_SAVE_NET,
+          G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class, PROP_CLASSES,
       g_param_spec_int("classes", "classes",
@@ -333,6 +341,7 @@ gst_classify_set_property (GObject * object, guint prop_id, const GValue * value
   GstClassify *self = GST_CLASSIFY (object);
   GST_DEBUG("gst_classify_set_property\n");
   if (value){
+    const char *filename;
     switch (prop_id) {
     case PROP_TARGET:
       if (self->target_string){
@@ -340,6 +349,11 @@ gst_classify_set_property (GObject * object, guint prop_id, const GValue * value
       }
       self->target_string = g_value_dup_string(value);
       maybe_parse_target_string(self);
+      break;
+    case PROP_SAVE_NET:
+      filename = g_value_get_string(value);
+      if (filename)
+        rnn_save_net(self->net, filename);
       break;
     case PROP_CLASSES:
       //XXX has no effect if set late.
