@@ -48,10 +48,10 @@ class BaseClassifier(object):
         self.capsfilter.set_property("caps", caps)
         self.summaries = [[]] * channels
 
-    def build_pipeline(self, classes, channels):
+    def build_pipeline(self, classes, channels, sinkname='fakesink'):
         self.classes = classes
         self.channels = channels
-        self.sink = self.make_add_link('fakesink', None)
+        self.sink = self.make_add_link(sinkname, None)
         self.classifier = self.make_add_link('classify', self.sink)
         self.classifier.set_property('classes', len(self.classes))
         self.classifier.set_property('hidden-size', HIDDEN_SIZE)
@@ -68,9 +68,10 @@ class BaseClassifier(object):
 
         self.set_channels(channels)
 
-    def __init__(self, categories=None,
-                 classes=CLASSES, channels=1):
-        self.mainloop = GObject.MainLoop()
+    def __init__(self, classes=CLASSES, channels=1, mainloop=None):
+        if mainloop is None:
+            mainloop = GObject.MainLoop()
+        self.mainloop = mainloop
         self.build_pipeline(classes, channels)
 
     def on_eos(self, bus, msg):
