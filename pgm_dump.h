@@ -137,7 +137,7 @@ putc_colourcoded_float(float f, FILE *fh){
   else {/* zero is blue */
     putc(0, fh);
     putc(0, fh);
-    putc(200, fh);
+    putc(180, fh);
   }
 }
 
