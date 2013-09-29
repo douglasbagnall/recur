@@ -832,7 +832,7 @@ void rnn_log_net(RecurNN *net)
     for (i = 0; i < net->h_size; i++){
       hidden_error += fabsf(net->bptt->h_error[i]);
     }
-    bptt_log_float(net, "top_error", top_error);
+    bptt_log_float(net, "output_error", top_error);
     bptt_log_float(net, "hidden_error", hidden_error);
   }
 #if 0
