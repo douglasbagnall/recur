@@ -231,28 +231,16 @@ rnn_randomise_weights(RecurNN *net, float variance){
   for (y = 0; y < net->i_size; y++){
     /*zero for bias, will be overwritten if inapplicable*/
     net->ih_weights[y * net->h_size] = 0;
-    for (x = net->bias; x < net->hidden_size; x++){
+    for (x = net->bias; x < net->hidden_size + net->bias; x++){
       net->ih_weights[y * net->h_size + x] = cheap_gaussian_noise(&net->rng) * variance;
     }
-    for (x = net->hidden_size; x < net->h_size; x++){
+    for (x = net->hidden_size + net->bias; x < net->h_size; x++){
       net->ih_weights[y * net->h_size + x] = 0;
     }
   }
-
-  for (y = 0; y < net->i_size; y++){
-    /*zero for bias, will be overwritten if inapplicable*/
-    net->ih_weights[y * net->h_size] = 0;
-    for (x = net->bias; x < net->hidden_size; x++){
-      net->ih_weights[y * net->h_size + x] = cheap_gaussian_noise(&net->rng) * variance;
-    }
-    for (x = net->hidden_size; x < net->h_size; x++){
-      net->ih_weights[y * net->h_size + x] = 0;
-    }
-  }
-
   for (y = 0; y < net->h_size; y++){
     for (x = 0; x < net->output_size; x++){
-      net->ho_weights[y * net->o_size + x] = cheap_gaussian_noise(&net->rng);
+      net->ho_weights[y * net->o_size + x] = cheap_gaussian_noise(&net->rng) * variance;
     }
     for (x = net->output_size; x < net->o_size; x++){
       net->ho_weights[y * net->o_size + x] = 0;
@@ -372,7 +360,9 @@ rnn_raw_opinion(RecurNN *net){
 
   if (net->bias)
     net->hidden_layer[0] = 1.0f;
-
+  for (int i = net->hidden_size + net->bias; i < net->h_size; i++){
+    net->hidden_layer[i] = 0;
+  }
   calculate_interlayer(net->hidden_layer, net->h_size,
       net->output_layer, net->o_size, net->ho_weights);
 }
@@ -553,6 +543,9 @@ bptt_and_accumulate_error(RecurNN *net, float *ih_delta, float top_error_sum)
     if (net->bias){
       inputs[0] = 1.0f;
       h_error[0] = 0.0;
+    }
+    for (int i = net->hidden_size + net->bias; i < net->h_size; i++){
+      h_error[i] = 0.0;
     }
     for (y = 0; y < net->i_size; y++){
       if (inputs[y] != 0.0f){
