@@ -194,13 +194,13 @@ TEST_PIPELINE_CORE = gst-launch-1.0  \
 
 
 
-test-pipeline: all
-	GST_DEBUG=$(GST_DEBUG) $(TIMER) $(GDB) $(TEST_PIPELINE_CORE)  2> gst.log
+test-pipeline: libgstrecur.so
+	GST_DEBUG=$(GST_DEBUG) $(TIMER) $(GDB) $(TEST_PIPELINE_CORE)
 
-test-pipeline-valgrind: all
+test-pipeline-valgrind: libgstrecur.so
 	$(VALGRIND) $(TEST_PIPELINE_CORE)
 
-test-pipeline-kcachegrind: all
+test-pipeline-kcachegrind: libgstrecur.so
 	kcachegrind &
 	valgrind --tool=callgrind $(TEST_PIPELINE_CORE) 2>callgrind.log
 

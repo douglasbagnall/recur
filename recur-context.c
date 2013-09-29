@@ -127,7 +127,8 @@ consume_audio_samples(GQueue *queue, float *destination,
 
 static void
 extract_audio_features(RecurContext *context){
-  const float *dct_bins = recur_extract_mfccs(context->audio_binner, NULL);
+  const float *dct_bins = recur_extract_mfccs(context->audio_binner,
+      context->audio_binner->pcm_data);
 
   /*normalise all by dc component (volume), and replace dc component by change from
     previous volume */
