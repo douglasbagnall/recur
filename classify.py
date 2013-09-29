@@ -12,7 +12,7 @@ from gi.repository import Gst, GObject
 
 FILE_LENGTH=15
 CLASSES = "MEN"
-HIDDEN_SIZE = 199
+HIDDEN_SIZE = 399
 
 def gst_init():
     GObject.threads_init()

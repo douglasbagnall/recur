@@ -252,7 +252,7 @@ def main(argv):
                       1e-6)
 
     train(lr,
-          cycles=4000 // FILE_LENGTH,
+          cycles=6000 // FILE_LENGTH,
           quiet=quiet)
 
 main(sys.argv[1:])
