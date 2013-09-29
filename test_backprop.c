@@ -295,7 +295,7 @@ main(void){
 #endif
   if (net == NULL){
     u32 flags = BIAS ? RNN_NET_FLAG_STANDARD : RNN_NET_FLAG_NO_BIAS;
-    flags = flags & ~(RNN_COND_MASK_RAND);
+    flags = flags | RNN_COND_MASK_RAND;
     net = rnn_new(INPUT_SIZE, HIDDEN_SIZE,
         INPUT_SIZE, flags, 1,
         NET_LOG_FILE, BPTT_DEPTH, LEARN_RATE, MOMENTUM, MOMENTUM_WEIGHT,
