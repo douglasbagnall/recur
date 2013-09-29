@@ -10,7 +10,7 @@ gi.require_version('Gst', '1.0')
 from gi.repository import Gst, GObject
 
 
-FILE_LENGTH=60
+FILE_LENGTH=15
 CLASSES = "ME"
 HIDDEN_SIZE = 199
 

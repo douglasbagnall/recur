@@ -32,6 +32,14 @@ def eternal_alternator(iters, max_iterations=-1):
     while i != max_iterations:
         for c in cycles:
             yield c.next()
+        i += len(cycles)
+
+def eternal_shuffler(iters, max_iterations=-1):
+    #Yield from a randomly chosen stream
+    i = 0
+    cycles = [itertools.cycle(x) for x in iters]
+    while i != max_iterations:
+        yield random.choice(cycles).next()
         i += 1
 
 TRAINING = 0
@@ -55,8 +63,9 @@ class Trainer(BaseClassifier):
         for k in self.classes:
             trainers.append([(k, x) for x in training_data[k]])
             testers.append([(k, x) for x in testing_data[k]])
-        self.trainers = eternal_alternator(trainers, iterations)
-        self.testers = eternal_alternator(testers)
+        self.trainers = eternal_shuffler(trainers, iterations)
+        testers = eternal_alternator(testers)
+        self.testset = [testers.next() for i in range(self.channels)]
         self.test_scores = None
         self.next_training_set()
         self.pipeline.set_state(Gst.State.PLAYING)
@@ -66,8 +75,8 @@ class Trainer(BaseClassifier):
         self.test_targets = []
         self.test_scores = [0] * self.channels
         self.test_n = 0
-        for fs in self.filesrcs:
-            c, fn = self.testers.next()
+        for x, fs in zip(self.testset, self.filesrcs):
+            c, fn = x
             self.test_targets.append(self.classes.index(c))
             fs.set_property('location', fn)
             if not self.quiet:
@@ -79,22 +88,29 @@ class Trainer(BaseClassifier):
     def evaluate_test(self):
         #print self.test_scores
         scores = [x / float(self.test_n) for x in self.test_scores]
-        colours = [COLOURS[x] for x in 'PrrrRRYYGgW']
+        colours = [COLOURS[x] for x in 'PPrRYYGGgWW']
         output = []
         rightness = 0
         wrongness2 = 0
-        for x in scores:
+        winners = 0
+        good_enough = 10 / len(self.classes)
+        results = zip(self.test_targets, scores)
+        results.sort()
+        for t, x in results:
             i = int(x * 9.99)
-            c = str(i)
             output.append(colours[i])
-            output.append(c)
+            output.append(self.classes[t])
             rightness += x
+            winners += i > good_enough
             wrongness2 += (1.0 - x) * (1.0 - x)
         rightness /= len(scores)
-        wrongness2 /= len(scores)
-        output += " %s%.2f%s %.2f%s" % (colours[int(rightness * 9.99)], rightness,
-                                        colours[int(wrongness2 * 9.99)], rightness2,
-                                        COLOURS['Z'])
+        wrongness2 = (wrongness2 ** 0.5) / len(scores)
+        winners /= float(len(scores))
+        output += (" %s%.2f%s %.2f %s%.2f%s" %
+                   (colours[int(rightness * 9.99)], rightness,
+                    colours[int(10 - wrongness2 * 9.99)], wrongness2,
+                    colours[int(winners * 9.99)], winners,
+                    COLOURS['Z']))
         print ''.join(output)
         if winners > 0.9:
             print "got there!"
@@ -236,7 +252,7 @@ def main(argv):
                       1e-6)
 
     train(lr,
-          cycles=2000 // FILE_LENGTH,
+          cycles=4000 // FILE_LENGTH,
           quiet=quiet)
 
 main(sys.argv[1:])
