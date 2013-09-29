@@ -11,7 +11,7 @@ from gi.repository import Gst, GObject
 
 
 FILE_LENGTH=15
-CLASSES = "ME"
+CLASSES = "MEN"
 HIDDEN_SIZE = 199
 
 def gst_init():
