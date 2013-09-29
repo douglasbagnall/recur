@@ -4,10 +4,10 @@ import os, sys
 import random
 import itertools
 
-from classify import BaseClassifier, gst_init, Gst, FILE_LENGTH
+from classify import BaseClassifier, gst_init, Gst, TEST_FILE_LENGTH
 
 TEST_AUDIO_DIR = ("/home/douglas/maori-language-monitoring/"
-                   "data/8k-%ss/test" % FILE_LENGTH)
+                   "data/8k-%ss/test" % TEST_FILE_LENGTH)
 
 class Classifier(BaseClassifier):
     pending_files = []

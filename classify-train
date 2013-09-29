@@ -4,7 +4,7 @@ import random
 import itertools
 import time
 
-from classify import BaseClassifier, Gst, gst_init, CLASSES, FILE_LENGTH
+from classify import BaseClassifier, Gst, gst_init, CLASSES, TRAIN_FILE_LENGTH
 
 COLOURS = {
     "Z": "\033[00m",
@@ -20,11 +20,11 @@ COLOURS = {
 }
 
 TRAIN_AUDIO_DIR = ("/home/douglas/maori-language-monitoring/"
-                   "data/8k-%ss/train" % FILE_LENGTH)
+                   "data/8k-60s/train-%ss" % TRAIN_FILE_LENGTH)
 TEST_AUDIO_DIR = ("/home/douglas/maori-language-monitoring/"
-                   "data/8k-%ss/test" % FILE_LENGTH)
+                   "data/8k-60s/validate-%ss" % TRAIN_FILE_LENGTH)
 
-TEST_INTERVAL = 4
+TEST_INTERVAL = 3
 
 def eternal_alternator(iters, max_iterations=-1):
     cycles = [itertools.cycle(x) for x in iters]
@@ -58,12 +58,13 @@ class Trainer(BaseClassifier):
         else:
             self.learn_rate = learn_rate
         self.counter = 0
+        self.iterations = iterations
         trainers = []
         testers = []
         for k in self.classes:
             trainers.append([(k, x) for x in training_data[k]])
             testers.append([(k, x) for x in testing_data[k]])
-        self.trainers = eternal_shuffler(trainers, iterations)
+        self.trainers = eternal_shuffler(trainers)
         testers = eternal_alternator(testers)
         self.testset = [testers.next() for i in range(self.channels)]
         self.test_scores = None
@@ -113,7 +114,6 @@ class Trainer(BaseClassifier):
                     COLOURS['Z']))
         print ''.join(output)
         if winners > 0.9:
-            print "got there!"
             self.save_net(tag='goodness-%d-%d' %
                           (int(rightness * 100), int(winners * 100)))
         if rightness > 0.75:
@@ -125,21 +125,18 @@ class Trainer(BaseClassifier):
     def save_net(self, tag='', dir=SAVE_LOCATION):
         fn = ("%s/classify-%s-%s.net" %
               (dir, time.time(), tag))
+        print "saving %s" % fn
         self.classifier.set_property('save-net', fn)
 
     def next_training_set(self):
         self.targets = []
         if self.learn_rate is not None:
             r = self.learn_rate.next() * self.lr_adjust
-            print "learn_rate %s" % r
+            print "%s/%s learn_rate %s" % (self.counter, self.iterations, r)
             self.classifier.set_property('learn_rate', r)
 
         for fs in self.filesrcs:
-            try:
-                c, fn = self.trainers.next()
-            except StopIteration:
-                self.stop()
-                break
+            c, fn = self.trainers.next()
             self.targets.append(c)
             fs.set_property('location', fn)
             if not self.quiet:
@@ -151,17 +148,20 @@ class Trainer(BaseClassifier):
         self.mode = TRAINING
 
     def on_eos(self, bus, msg):
-        #s = msg.get_structure()
-        #print s.to_string()
+        self.pipeline.set_state(Gst.State.READY)
+        #print self.counter
         if self.test_scores:
             self.evaluate_test()
             self.test_scores = None
-        self.counter += 1
-        self.pipeline.set_state(Gst.State.READY)
-        if self.counter % TEST_INTERVAL:
             self.next_training_set()
         else:
-            self.test_set()
+            self.counter += 1
+            if self.counter == self.iterations:
+                self.stop()
+            elif self.counter % TEST_INTERVAL:
+                self.next_training_set()
+            else:
+                self.test_set()
         self.pipeline.set_state(Gst.State.PLAYING)
 
     def on_error(self, bus, msg):
@@ -224,15 +224,6 @@ def categorised_files(_dir, classes):
     return {c: [os.path.join(_dir, x) for x in files if x[0] == c]
             for c in classes}
 
-def train(learn_rate, cycles=20,
-          channels=72, classes=CLASSES, quiet=False):
-    train_data = categorised_files(TRAIN_AUDIO_DIR, classes)
-    test_data = categorised_files(TEST_AUDIO_DIR, classes)
-    c = Trainer(channels=channels)
-    c.quiet = quiet
-    c.train(train_data, test_data, cycles * channels,
-            learn_rate=learn_rate)
-
 
 def main(argv):
     gst_init()
@@ -245,14 +236,19 @@ def main(argv):
         lr = lr_steps(*(float(x) for x in argv))
 
     else:
-        lr = lr_steps(#1e-3, 240 // FILE_LENGTH,
-                      #1e-4, 240 // FILE_LENGTH,
-                      1e-5, 240 // FILE_LENGTH,
-                      3e-6, 480 // FILE_LENGTH,
+        lr = lr_steps(#1e-3, 240 // TRAIN_FILE_LENGTH,
+                      #1e-4, 240 // TRAIN_FILE_LENGTH,
+                      1e-5, 360 // TRAIN_FILE_LENGTH,
+                      3e-6, 720 // TRAIN_FILE_LENGTH,
                       1e-6)
 
-    train(lr,
-          cycles=6000 // FILE_LENGTH,
-          quiet=quiet)
+    train_data = categorised_files(TRAIN_AUDIO_DIR, CLASSES)
+    test_data = categorised_files(TEST_AUDIO_DIR, CLASSES)
+
+    c = Trainer(channels=72)
+    c.quiet = quiet
+    c.train(train_data, test_data, iterations=1000 // TRAIN_FILE_LENGTH,
+            learn_rate=lr)
+
 
 main(sys.argv[1:])

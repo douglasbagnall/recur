@@ -10,9 +10,10 @@ gi.require_version('Gst', '1.0')
 from gi.repository import Gst, GObject
 
 
-FILE_LENGTH=15
+TRAIN_FILE_LENGTH=5
+TEST_FILE_LENGTH=60
 CLASSES = "MEN"
-HIDDEN_SIZE = 399
+HIDDEN_SIZE = 499
 
 def gst_init():
     GObject.threads_init()
