@@ -227,22 +227,35 @@ rnn_clone(RecurNN *parent, int flags,
 
 void
 rnn_randomise_weights(RecurNN *net, float variance){
-  int i;
-  for (i = 0; i < net->ih_size; i += 2){
-    doublecheap_gaussian_noise_f(&net->rng,
-        &net->ih_weights[i],
-        &net->ih_weights[i + 1],
-        variance);
+  int x, y;
+  for (y = 0; y < net->i_size; y++){
+    /*zero for bias, will be overwritten if inapplicable*/
+    net->ih_weights[y * net->h_size] = 0;
+    for (x = net->bias; x < net->hidden_size; x++){
+      net->ih_weights[y * net->h_size + x] = cheap_gaussian_noise(&net->rng) * variance;
+    }
+    for (x = net->hidden_size; x < net->h_size; x++){
+      net->ih_weights[y * net->h_size + x] = 0;
+    }
   }
-  for (i = 0; i < net->ho_size; i += 2){
-    doublecheap_gaussian_noise_f(&net->rng,
-        &net->ho_weights[i],
-        &net->ho_weights[i + 1],
-        variance);
+
+  for (y = 0; y < net->i_size; y++){
+    /*zero for bias, will be overwritten if inapplicable*/
+    net->ih_weights[y * net->h_size] = 0;
+    for (x = net->bias; x < net->hidden_size; x++){
+      net->ih_weights[y * net->h_size + x] = cheap_gaussian_noise(&net->rng) * variance;
+    }
+    for (x = net->hidden_size; x < net->h_size; x++){
+      net->ih_weights[y * net->h_size + x] = 0;
+    }
   }
-  if (net->bias){
-    for (int y = 0; y < net->i_size; y++){
-      net->ih_weights[y * net->h_size] = 0.0f;
+
+  for (y = 0; y < net->h_size; y++){
+    for (x = 0; x < net->output_size; x++){
+      net->ho_weights[y * net->o_size + x] = cheap_gaussian_noise(&net->rng);
+    }
+    for (x = net->output_size; x < net->o_size; x++){
+      net->ho_weights[y * net->o_size + x] = 0;
     }
   }
 }
