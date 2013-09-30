@@ -253,7 +253,7 @@ def main(argv):
 
     c = Trainer(channels=72)
     c.quiet = quiet
-    c.train(train_data, test_data, iterations=1000 // TRAIN_FILE_LENGTH,
+    c.train(train_data, test_data, iterations=10000 // TRAIN_FILE_LENGTH,
             learn_rate=lr)
 
 
