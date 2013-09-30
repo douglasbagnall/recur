@@ -69,11 +69,11 @@ class BaseClassifier(object):
 
         self.set_channels(channels)
 
-    def __init__(self, classes=CLASSES, channels=1, mainloop=None):
+    def __init__(self, classes=CLASSES, channels=1, mainloop=None, sinkname='fakesink'):
         if mainloop is None:
             mainloop = GObject.MainLoop()
         self.mainloop = mainloop
-        self.build_pipeline(classes, channels)
+        self.build_pipeline(classes, channels, sinkname=sinkname)
 
     def on_eos(self, bus, msg):
         print('on_eos()')
