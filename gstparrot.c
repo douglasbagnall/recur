@@ -159,15 +159,6 @@ gst_parrot_setup(GstAudioFilter *base, const GstAudioInfo *info){
   return TRUE;
 }
 
-static inline void
-set_string_prop(const GValue *value, const char **target){
-  const char *s = g_value_dup_string(value);
-  size_t len = strlen(s);
-  if(len){
-    *target = s;
-  }
-}
-
 static void
 gst_parrot_set_property (GObject * object, guint prop_id, const GValue * value,
     GParamSpec * pspec)
