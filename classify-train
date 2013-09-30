@@ -6,6 +6,10 @@ import time
 
 from classify import BaseClassifier, Gst, gst_init, CLASSES, TRAIN_FILE_LENGTH
 
+NET_LOG_FILE = "classify.log"
+
+
+
 COLOURS = {
     "Z": "\033[00m",
     "g": '\033[00;32m',
@@ -68,6 +72,7 @@ class Trainer(BaseClassifier):
         testers = eternal_alternator(testers)
         self.testset = [testers.next() for i in range(self.channels)]
         self.test_scores = None
+        self.classifier.set_property('log-name', NET_LOG_FILE)
         self.next_training_set()
         self.pipeline.set_state(Gst.State.PLAYING)
         self.mainloop.run()
@@ -155,6 +160,7 @@ class Trainer(BaseClassifier):
             self.test_scores = None
             self.next_training_set()
         else:
+            self.classifier.set_property('save-net', '')
             self.counter += 1
             if self.counter == self.iterations:
                 self.stop()

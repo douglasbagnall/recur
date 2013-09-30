@@ -26,9 +26,13 @@ enum
   PROP_LEARN_RATE,
   PROP_HIDDEN_SIZE,
   PROP_SAVE_NET,
+  PROP_PGM_DUMP,
+  PROP_LOG_FILE,
 };
 
 #define DEFAULT_PROP_TARGET ""
+#define DEFAULT_PROP_PGM_DUMP ""
+#define DEFAULT_PROP_LOG_FILE ""
 #define DEFAULT_PROP_SAVE_NET NULL
 #define DEFAULT_PROP_CLASSES 2
 #define DEFAULT_PROP_FORGET 0
@@ -54,6 +58,8 @@ static void gst_classify_get_property(GObject *object, guint prop_id, GValue *va
 static GstFlowReturn gst_classify_transform_ip(GstBaseTransform *base, GstBuffer *buf);
 static gboolean gst_classify_setup(GstAudioFilter * filter, const GstAudioInfo * info);
 static void maybe_parse_target_string(GstClassify *self);
+static void maybe_start_logging(GstClassify *self);
+
 
 #define gst_classify_parent_class parent_class
 G_DEFINE_TYPE (GstClassify, gst_classify, GST_TYPE_AUDIO_FILTER);
@@ -144,11 +150,23 @@ gst_classify_class_init (GstClassifyClass * klass)
           DEFAULT_PROP_TARGET,
           G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
+  g_object_class_install_property (gobject_class, PROP_PGM_DUMP,
+      g_param_spec_string("pgm-dump", "pgm-dump",
+          "Dump weight images (space separated \"ih* hh* ho*\", *one of \"wdm\")",
+          DEFAULT_PROP_PGM_DUMP,
+          G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
+
   g_object_class_install_property (gobject_class, PROP_SAVE_NET,
       g_param_spec_string("save-net", "save-net",
           "Save the net here, now.",
           DEFAULT_PROP_SAVE_NET,
           G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
+
+  g_object_class_install_property (gobject_class, PROP_LOG_FILE,
+      g_param_spec_string("log-file", "log-file",
+          "Log to this file (empty for none)",
+          DEFAULT_PROP_LOG_FILE,
+          G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class, PROP_CLASSES,
       g_param_spec_int("classes", "classes",
@@ -192,6 +210,7 @@ gst_classify_init (GstClassify * self)
   self->mfcc_factory = NULL;
   self->incoming_queue = NULL;
   self->net_filename = NULL;
+  self->pending_logfile = NULL;
   self->learn_rate = DEFAULT_LEARN_RATE;
   self->hidden_size = DEFAULT_HIDDEN_SIZE;
   GST_INFO("gst classify init\n");
@@ -274,7 +293,7 @@ gst_classify_setup(GstAudioFilter *base, const GstAudioInfo *info){
       self->subnets[i] = self->channels[i].net;
     }
   }
-  rnn_set_log_file(self->subnets[0], NET_LOG_FILE, 1);
+  maybe_start_logging(self);
   maybe_parse_target_string(self);
 
   GST_DEBUG_OBJECT (self,
@@ -325,8 +344,20 @@ maybe_parse_target_string(GstClassify *self){
   return;
 }
 
+static void
+maybe_start_logging(GstClassify *self){
+  if (self->pending_logfile && self->subnets){
+    if (self->pending_logfile[0] == 0){
+      rnn_set_log_file(self->subnets[0], NULL, 0);
+    }
+    else {
+      rnn_set_log_file(self->subnets[0], self->pending_logfile, 1);
+    }
+    free(self->pending_logfile);
+    self->pending_logfile = NULL;
   }
 }
+
 
 static void
 gst_classify_set_property (GObject * object, guint prop_id, const GValue * value,
@@ -335,7 +366,7 @@ gst_classify_set_property (GObject * object, guint prop_id, const GValue * value
   GstClassify *self = GST_CLASSIFY (object);
   GST_DEBUG("gst_classify_set_property\n");
   if (value){
-    const char *filename;
+    const char *strvalue;
     switch (prop_id) {
     case PROP_TARGET:
       if (self->target_string){
@@ -344,11 +375,31 @@ gst_classify_set_property (GObject * object, guint prop_id, const GValue * value
       self->target_string = g_value_dup_string(value);
       maybe_parse_target_string(self);
       break;
-    case PROP_SAVE_NET:
-      filename = g_value_get_string(value);
-      if (filename)
-        rnn_save_net(self->net, filename);
+
+    case PROP_PGM_DUMP:
+      strvalue = g_value_get_string(value);
+      rnn_multi_pgm_dump(self->net, strvalue);
       break;
+
+    case PROP_SAVE_NET:
+      strvalue = g_value_get_string(value);
+      if (strvalue && strvalue[0] != 0){
+        rnn_save_net(self->net, strvalue);
+      }
+      else {
+        rnn_save_net(self->net, self->net_filename);
+      }
+      break;
+
+    case PROP_LOG_FILE:
+      /*defer setting the actual log file, in case the nets aren't ready yet*/
+      if (self->pending_logfile){
+        free(self->pending_logfile);
+      }
+      self->pending_logfile = g_value_dup_string(value);
+      maybe_start_logging(self);
+      break;
+
     case PROP_CLASSES:
       //XXX has no effect if set late.
       if (self->net == NULL){
@@ -359,6 +410,7 @@ gst_classify_set_property (GObject * object, guint prop_id, const GValue * value
             " (is %d, requested %d)", self->n_classes, g_value_get_int(value));
       }
       break;
+
     case PROP_FORGET:
       if (self->net){
         gboolean bptt_too = g_value_get_boolean(value);
@@ -368,6 +420,7 @@ gst_classify_set_property (GObject * object, guint prop_id, const GValue * value
         }
       }
       break;
+
     case PROP_LEARN_RATE:
       self->learn_rate = g_value_get_float(value);
       if (self->net){
@@ -377,12 +430,14 @@ gst_classify_set_property (GObject * object, guint prop_id, const GValue * value
         }
       }
       break;
+
     case PROP_HIDDEN_SIZE:
       self->hidden_size = g_value_get_int(value);
       if (self->net){
         GST_WARNING("It is too late to set hidden size");
       }
       break;
+
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
       break;

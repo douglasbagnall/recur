@@ -49,8 +49,6 @@ typedef s16 audio_sample;
 #define PERIODIC_SAVE_NET 1
 #define TRY_RELOAD 1
 
-#define NET_LOG_FILE "classify.log"
-
 #define PERIODIC_PGM_DUMP 511
 #define REGULAR_PGM_DUMP 0
 #define PGM_DUMP_FEATURES 0
@@ -101,6 +99,8 @@ struct _GstClassify
   int training;
   char *target_string;
   char *net_filename;
+  char *pending_logfile;
+
   int queue_size;
 
   int hidden_size;
