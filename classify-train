@@ -72,7 +72,7 @@ class Trainer(BaseClassifier):
         testers = eternal_alternator(testers)
         self.testset = [testers.next() for i in range(self.channels)]
         self.test_scores = None
-        self.classifier.set_property('log-name', NET_LOG_FILE)
+        self.classifier.set_property('log-file', NET_LOG_FILE)
         self.next_training_set()
         self.pipeline.set_state(Gst.State.PLAYING)
         self.mainloop.run()
