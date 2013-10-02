@@ -66,6 +66,8 @@ class ClassifierDisplay(Gtk.DrawingArea):
         self.queue_draw()
 
     def on_draw(self, widget, cr):
+        if not self.results:
+            return
         cr.save()
         w = widget.get_allocated_width()
         h = widget.get_allocated_height()
