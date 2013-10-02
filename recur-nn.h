@@ -28,7 +28,7 @@ typedef float v4ss __attribute__ ((vector_size (16))) __attribute__ ((aligned (1
 #define MIN_ERROR_FACTOR 3e-8f
 /* RNN_HIDDEN_PENALTY is subtracted from each hidden node, forcing low numbers to zero.
  1e-3f is safe, but less accurate than 1e-4f */
-#define RNN_HIDDEN_PENALTY 3e-4f
+#define RNN_HIDDEN_PENALTY 1e-4f
 /*scaling for hidden and input numbers */
 #define HIDDEN_MEAN_SOFT_TOP 16.0f
 #define INPUT_MEAN_SOFT_TOP 4.0f
