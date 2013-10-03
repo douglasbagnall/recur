@@ -62,8 +62,10 @@ SOURCES =  gst$(BASENAME)_manager.c gst$(BASENAME)_audio.c gst$(BASENAME)_video.
 OBJECTS := $(patsubst %.c,%.o,$(SOURCES))
 #PLUGINS := $(patsubst %.c,lib%.so,$(SOURCES))
 
+images nets:
+	mkdir -p $@
 
-all:: libgstclassify.so
+all:: libgstclassify.so images nets
 
 clean:
 	rm -f *.so *.o *.a *.d *.s
