@@ -217,9 +217,8 @@ mfcc_slopes_dump(RecurAudioBinner *ab){
 void
 recur_window_init(float *mask, int len, int type, float scale){
   int i;
-  const float half_pi = G_PI * 0.5;
-  //const float half_pi_norm = G_PI * 0.5 / len;
-  const float pi_norm = G_PI / len;
+  const double half_pi = G_PI * 0.5;
+  const double pi_norm = G_PI / len;
   switch (type){
   case RECUR_WINDOW_HANN:
     for (i = 0; i < len; i++){
@@ -233,7 +232,7 @@ recur_window_init(float *mask, int len, int type, float scale){
     break;
   case RECUR_WINDOW_VORBIS:
     for (i = 0; i < len; i++){
-      float z = pi_norm * (i + 0.5f);
+      double z = pi_norm * (i + 0.5);
       mask[i] = sin(half_pi * sin(z) * sin(z)) * scale;
     }
     break;
