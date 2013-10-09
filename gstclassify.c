@@ -139,9 +139,9 @@ gst_classify_class_init (GstClassifyClass * klass)
   gst_audio_filter_class_add_pad_templates (af_class, caps);
   //free(caps);
   gst_element_class_set_static_metadata (element_class,
-      "Parror audio element",
-      "Filter/Audio",
-      "Mangles audio",
+      "Audio classifying element",
+      "Analyzer/Audio",
+      "Classifies audio",
       "Douglas Bagnall <douglas@halo.gen.nz>");
 
   g_object_class_install_property (gobject_class, PROP_TARGET,
