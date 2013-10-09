@@ -202,6 +202,13 @@ TEST_PIPELINE_CORE = gst-launch-1.0  \
 test-pipeline: libgstrecur.so
 	GST_DEBUG=$(GST_DEBUG) $(TIMER) $(GDB) $(TEST_PIPELINE_CORE)
 
+%-recur.ogv: libgstrecur.so
+	timeout 30 gst-launch-1.0  \
+	  --gst-plugin-path=$(CURDIR) \
+	$(VID_FILE_SRC_6) ! recur_manager name=recur ! videoconvert ! queue ! theoraenc ! oggmux ! filesink location="$@" \
+	recur. ! fakesink \
+	src. ! $(AUD_LINE) ! recur.
+
 test-pipeline-valgrind: libgstrecur.so
 	$(VALGRIND) $(TEST_PIPELINE_CORE)
 
