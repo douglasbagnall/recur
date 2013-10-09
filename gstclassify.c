@@ -653,11 +653,12 @@ maybe_learn(GstClassify *self){
 
     if (self->training){
       consolidate_and_apply_learning(self);
-      rnn_log_net(self->channels[0].net);
-      bptt_log_float(self->channels[0].net, "error", err_sum / self->n_channels);
-      bptt_log_float(self->channels[0].net, "correct", winners / self->n_channels);
+      RecurNN *net = self->channels[0].net;
+      rnn_log_net(net);
+      bptt_log_float(net, "error", err_sum / self->n_channels);
+      bptt_log_float(net, "correct", winners / self->n_channels);
+      self->net->generation = net->generation;
     }
-    self->net->generation = self->channels[0].net->generation;
     send_message(self, err_sum / self->n_channels);
 
     self->incoming_start += chunk_size;
