@@ -81,14 +81,12 @@ def graph(lists):
     times = lists.pop('generation')
     i = 0
     ax = None
-    subplots = []
     for k, v in lists.items():
         if ax is None:
             ax2 = ax = plt.subplot(len(lists), 1, i)
         else:
             ax2 = plt.subplot(len(lists), 1, i, sharex=ax)
         ax2.plot(times, v, 'r.', linewidth=0.5, label=k)
-        #plt.legend(bbox_to_anchor=(0.2, 1.1),  loc=9)
         plt.legend(loc='upper left', numpoints=1, frameon=False, markerscale=0,borderpad=0)
         i += 1
         plt.grid(True)

@@ -2,7 +2,6 @@
 
 import os, sys
 import random
-import itertools
 
 from classify import BaseClassifier, gst_init, Gst, TEST_FILE_LENGTH
 
