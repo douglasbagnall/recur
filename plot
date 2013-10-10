@@ -141,11 +141,11 @@ def main(args):
             args.remove(x)
             break
 
-    if '--keys' in sys.argv:
+    if '--keys' in args:
         keys = search_for_keys(logfile)
         for k, v in sorted(keys.iteritems()):
             print "%-20s %s" % (k, '+' * int(log(v)))
-    elif '--all' in sys.argv:
+    elif '--all' in args:
         keys = search_for_keys(logfile)
         #print keys
         plot(logfile, keys.keys())
