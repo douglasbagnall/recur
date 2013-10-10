@@ -244,13 +244,15 @@ AUD_URI_REED_CAT = file://$(CURDIR)/test-audio/Lou\ Reed-10\ Sad\ Song.mp3
 
 TEST_PARROT_CORE = gst-launch-1.0  \
 	  --gst-plugin-path=$(CURDIR) \
-	uridecodebin name=src uri=$(AUD_URI_6)  ! $(AUD_LINE) \
+	uridecodebin name=src uri=$(AUD_URI_3)  ! $(AUD_LINE) \
 	 ! parrot name=parrot
 
 PARROT_DEBUG=parrot*:5
 #PARROT_DEBUG=5
+#PARROT_GDB=gdb --args
+#PARROT_GDB=valgrind --tool=memcheck  --track-origins=yes
 test-parrot: libgstparrot.so
-	GST_DEBUG=$(PARROT_DEBUG) $(TIMER) $(GDB) $(TEST_PARROT_CORE) ! autoaudiosink  2> gst.log
+	GST_DEBUG=$(PARROT_DEBUG)  $(TIMER) $(PARROT_GDB) $(TEST_PARROT_CORE) ! autoaudiosink # 2> gst.log
 
 train-parrot: libgstparrot.so
 	$(TEST_PARROT_CORE) ! fakesink

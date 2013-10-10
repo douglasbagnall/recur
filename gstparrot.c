@@ -49,7 +49,7 @@ static void gst_parrot_class_init(GstParrotClass *g_class);
 static void gst_parrot_init(GstParrot *self);
 static void gst_parrot_set_property(GObject *object, guint prop_id, const GValue *value, GParamSpec *pspec);
 static void gst_parrot_get_property(GObject *object, guint prop_id, GValue *value, GParamSpec *pspec);
-static GstFlowReturn gst_parrot_transform(GstBaseTransform *base, GstBuffer *inbuf, GstBuffer *outbuf);
+static GstFlowReturn gst_parrot_transform_ip(GstBaseTransform *base, GstBuffer *buf);
 static gboolean gst_parrot_setup(GstAudioFilter * filter, const GstAudioInfo * info);
 static void maybe_start_logging(GstParrot *self);
 
@@ -92,6 +92,8 @@ finalise_channel(ParrotChannel *c)
   rnn_delete_net(c->dream_net);
   free(c->pcm_prev);
   free(c->pcm_now);
+  free(c->play_prev);
+  free(c->play_now);
   free(c->mdct_target);
   free(c->features);
   if (c->mfcc_image){
@@ -191,7 +193,7 @@ gst_parrot_class_init (GstParrotClass * klass)
           G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
 
-  trans_class->transform = GST_DEBUG_FUNCPTR (gst_parrot_transform);
+  trans_class->transform_ip = GST_DEBUG_FUNCPTR (gst_parrot_transform_ip);
   af_class->setup = GST_DEBUG_FUNCPTR (gst_parrot_setup);
   GST_INFO("gst audio class init\n");
 }
@@ -262,12 +264,12 @@ gst_parrot_setup(GstAudioFilter *base, const GstAudioInfo *info){
   self->n_channels = info->channels;
   if (self->incoming_queue == NULL){
     self->queue_size = info->channels * PARROT_QUEUE_PER_CHANNEL;
-    self->incoming_queue = malloc_aligned_or_die(self->queue_size * sizeof(s16) * 2);
-    self->outgoing_queue = self->incoming_queue + self->queue_size * sizeof(s16);
+    self->incoming_queue = malloc_aligned_or_die((self->queue_size) * sizeof(s16));
+    self->outgoing_queue = malloc_aligned_or_die((self->queue_size) * sizeof(s16));
   }
   self->window = malloc_aligned_or_die(PARROT_WINDOW_SIZE * sizeof(float));
   recur_window_init(self->window, PARROT_WINDOW_SIZE,
-      RECUR_WINDOW_VORBIS, 0.9999f / (1<<15));
+      RECUR_WINDOW_VORBIS, 1.0f / 32768.0f);
 
   mdct_init(&self->mdct_lut, PARROT_WINDOW_SIZE);
 
@@ -503,7 +505,7 @@ pcm_to_features(RecurAudioBinner *mf, float *features, float *pcm){
 static inline float *
 tanh_opinion(RecurNN *net, float *in){
   float *answer = rnn_opinion(net, in);
-  for (int i = 0; i < (PARROT_WINDOW_SIZE / 2); i++){
+  for (int i = 0; i < net->output_size; i++){
     answer[i] = fast_tanhf(answer[i]);
   }
   return answer;
@@ -597,29 +599,36 @@ maybe_learn(GstParrot *self){
 
 static inline void
 generate_audio(GstParrot *self){
-  int i, j, k;
+  int i, j;
   int len_o = self->outgoing_end - self->outgoing_start;
   if (len_o < 0)
     len_o += self->queue_size;
+  const int n_channels = self->n_channels;
   int half_window = PARROT_WINDOW_SIZE / 2;
-  int chunk_size =  half_window * self->n_channels;
+  int chunk_size =  half_window * n_channels;
   const float *window = self->window;
 
   while (len_o < self->queue_size){
-    s16 *buffer_o = self->outgoing_queue + self->outgoing_end;
-    for (j = 0; j < self->n_channels; j++){
+    DEBUG("len %d, chunk size %d, start %d end %d",
+        len_o, chunk_size, self->outgoing_start, self->outgoing_end);
+    for (j = 0; j < n_channels; j++){
       ParrotChannel *c = & self->channels[j];
 
+      s16 *buffer = self->outgoing_queue + self->outgoing_end + j;
       pcm_to_features(self->mfcc_factory, c->features, c->play_prev);
 
       float *answer = tanh_opinion(c->dream_net, c->features);
       mdct_backward(&self->mdct_lut, answer, c->play_now);
-
-      for(i = 0, k = j; i < half_window; i++, k += self->n_channels){
+      for(i = 0; i < half_window; i++){
         float s = (c->play_prev[half_window + i] * window[half_window - 1 - i] +
             c->play_now[i] * window[i]);
         /*window is scaled by 1 / 32768; scale back, doubly */
-        buffer_o[k] = s * 1073741823.99f;
+        //DEBUG("k is %d. len_o %d", k, len_o);
+        if (buffer >= self->outgoing_queue + self->queue_size){
+          DEBUG("looping buffer %d %d", i, len_o);
+          buffer -= self->queue_size;
+        }
+        buffer[i * n_channels] = s * 1073741823.99f;
       }
       float *tmp;
       tmp = c->play_now;
@@ -637,20 +646,18 @@ generate_audio(GstParrot *self){
 
 
 static GstFlowReturn
-gst_parrot_transform (GstBaseTransform * base, GstBuffer *inbuf, GstBuffer *outbuf)
+gst_parrot_transform_ip(GstBaseTransform * base, GstBuffer *buf)
 {
   GstParrot *self = GST_PARROT(base);
   GstFlowReturn ret = GST_FLOW_OK;
-
-  queue_audio_segment(self, inbuf);
-  if (self->training)
+  if (self->training){
+    queue_audio_segment(self, buf);
     maybe_learn(self);
-  if (self->playing)
+  }
+  if (self->playing){
     generate_audio(self);
-  fill_audio_segment(self, outbuf);
-
-  GST_LOG("parrot_transform returning OK");
-  //exit:
+    fill_audio_segment(self, buf);
+  }
   return ret;
 }
 

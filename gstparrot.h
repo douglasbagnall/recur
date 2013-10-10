@@ -7,7 +7,6 @@
 #include "recur-nn.h"
 #include "mdct.h"
 #include "mfcc.h"
-#include "window.h"
 #include "badmaths.h"
 
 G_BEGIN_DECLS

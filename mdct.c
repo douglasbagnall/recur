@@ -55,7 +55,7 @@
 #include "mdct.h"
 //#include "os.h"
 //#include "misc.h"
-#include "test-common.h"
+#include "recur-common.h"
 
 #define STIN static inline
 #define _ogg_malloc malloc_aligned_or_die
