@@ -71,9 +71,8 @@ G_BEGIN_DECLS
 #define GST_IS_PARROT_CLASS(klass) \
   (G_TYPE_CHECK_CLASS_TYPE((klass),GST_TYPE_PARROT))
 
-/*queue sizes need to be an multiple of window size, and needs to grow with
-  the number of channels. Both queues might as well be the same size. */
-#define PARROT_QUEUE_PER_CHANNEL (30 * PARROT_WINDOW_SIZE)
+/*how many chunks in the incoming buffer */
+#define PARROT_QUEUE_N_CHUNKS 30
 
 typedef struct _GstParrot GstParrot;
 typedef struct _GstParrotClass GstParrotClass;
@@ -102,9 +101,9 @@ struct _GstParrot
   s16 *incoming_queue;
   int incoming_start;
   int incoming_end;
-  s16 *outgoing_queue;
-  int outgoing_start;
-  int outgoing_end;
+  s16 *outgoing_buffer;
+  s16 *outgoing_start;
+  int outgoing_len;
   mdct_lookup mdct_lut;
   RecurAudioBinner *mfcc_factory;
   float *window;
