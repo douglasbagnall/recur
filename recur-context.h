@@ -8,8 +8,8 @@
 #define PERIODIC_PGM_DUMP 0
 #define REGULAR_PGM_DUMP 0
 #define TEMPORAL_PGM_DUMP 0
-//#define NET_LOG_FILE "video.log"
-#define NET_LOG_FILE NULL
+#define NET_LOG_FILE "video.log"
+//#define NET_LOG_FILE NULL
 
 #define RECUR_TRAIN 1
 
@@ -40,7 +40,7 @@ typedef s16 audio_sample;
 #define RECUR_BATCH_SIZE 1
 #define RECUR_RNG_SEED -1
 
-#define NET_FILENAME "gst-" QUOTE(RECUR_N_HIDDEN) "-" QUOTE(RECUR_BIAS) ".net"
+#define NET_FILENAME "recur-" QUOTE(RECUR_N_HIDDEN) "-" QUOTE(RECUR_BIAS) ".net"
 #define PERIODIC_SAVE_NET 1
 #define TRY_RELOAD 1
 
