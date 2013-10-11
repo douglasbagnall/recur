@@ -101,9 +101,9 @@ struct _GstParrot
   s16 *incoming_queue;
   int incoming_start;
   int incoming_end;
-  s16 *outgoing_buffer;
-  s16 *outgoing_start;
-  int outgoing_len;
+  s16 *outgoing_queue;
+  int outgoing_start;
+  int outgoing_end;
   mdct_lookup mdct_lut;
   RecurAudioBinner *mfcc_factory;
   float *window;

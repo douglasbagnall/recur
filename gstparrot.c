@@ -123,7 +123,7 @@ gst_parrot_finalize (GObject * obj){
     free(self->training_nets);
   }
   free(self->incoming_queue);
-  free(self->outgoing_buffer);
+  free(self->outgoing_queue);
 
   mdct_clear(&self->mdct_lut);
   if (self->net){
@@ -265,8 +265,8 @@ gst_parrot_setup(GstAudioFilter *base, const GstAudioInfo *info){
   if (self->incoming_queue == NULL){
     int chunk_size = info->channels * PARROT_WINDOW_SIZE;
     self->queue_size = chunk_size * PARROT_QUEUE_N_CHUNKS;
-    self->incoming_queue = malloc_aligned_or_die((self->queue_size) * sizeof(s16));
-    self->outgoing_buffer = malloc_aligned_or_die(chunk_size * sizeof(s16));
+    self->incoming_queue = malloc_aligned_or_die(self->queue_size * sizeof(s16));
+    self->outgoing_queue = malloc_aligned_or_die(self->queue_size * sizeof(s16));
   }
   self->window = malloc_aligned_or_die(PARROT_WINDOW_SIZE * sizeof(float));
   recur_window_init(self->window, PARROT_WINDOW_SIZE,
@@ -596,46 +596,44 @@ fill_audio_chunk(GstParrot *self, s16 *dest){
 static inline void
 fill_audio_segment(GstParrot *self, GstBuffer *outbuf)
 {
-  /*XXX interlace */
+  /*calculate enough audio in the audio queue, then copy it across. It is
+    tricky to do directly because of the overlapping windows. */
   GstMapInfo map;
   gst_buffer_map(outbuf, &map, GST_MAP_WRITE);
   int len16 = map.size / sizeof(s16);
+
+  int qlen = self->outgoing_end - self->outgoing_start;
+  if (qlen < 0){
+    qlen += self->queue_size;
+  }
+
   int half_window = PARROT_WINDOW_SIZE / 2;
   int chunk_size =  half_window * self->n_channels;
-  s16 *dest = (s16*)map.data;
-  /*first check if there is a window waiting*/
-  GST_DEBUG("filling a buffer of %d samples",
-          len16);
 
-  if (self->outgoing_len){
-    int transfer = MIN(len16, self->outgoing_len);
-    memcpy(dest, self->outgoing_start, transfer * sizeof(s16));
-    self->outgoing_len -= transfer;
-    self->outgoing_start += transfer;
-    len16 -= transfer;
-    dest += transfer;
-    if (self->outgoing_len){
-      GST_DEBUG("short little buffer of %d samples, %d left",
-          len16, self->outgoing_len);
-      return;
+  while (qlen < len16 + half_window){
+    fill_audio_chunk(self, self->outgoing_queue + self->outgoing_end);
+    if (self->outgoing_end >= self->queue_size){
+      self->outgoing_end = 0;
     }
-    GST_DEBUG("we had %d left over, len now %d", transfer, len16);
+    qlen += chunk_size;
   }
-  while (len16 >= chunk_size){
-    fill_audio_chunk(self, dest);
-    len16 -= chunk_size;
-    dest += chunk_size;
-    GST_DEBUG("filled %d, %d left", chunk_size, len16);
+
+  int n_samples = MIN(len16, self->queue_size - self->outgoing_start);
+  GST_DEBUG("copying buffer of %d samples to buffer of %d",
+      n_samples, len16);
+
+  memcpy(map.data, self->outgoing_queue + self->outgoing_start,
+      n_samples * sizeof(s16));
+
+  if (n_samples < len16){
+    int remainder = len16 - n_samples;
+    GST_DEBUG("copying remainder of %d samples to buffer of %d",
+        remainder);
+    memcpy(map.data + n_samples, self->outgoing_queue, remainder * sizeof(s16));
+    self->outgoing_start = remainder;
   }
-  if (len16 != 0){
-    fill_audio_chunk(self, self->outgoing_buffer);
-    memcpy(dest, self->outgoing_buffer, len16 * sizeof(s16));
-    self->outgoing_start = self->outgoing_buffer + len16;
-    self->outgoing_len = chunk_size - len16;
-    GST_DEBUG("tail %d, reserve %d", len16, self->outgoing_len);
-  }
-  else{
-    self->outgoing_len = 0;
+  else {
+    self->outgoing_start += n_samples;
   }
   gst_buffer_unmap(outbuf, &map);
 }
