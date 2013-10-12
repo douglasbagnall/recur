@@ -74,7 +74,7 @@ init_channel(ParrotChannel *c, RecurNN *net, int id, float learn_rate)
   c->pcm_prev = zalloc_aligned_or_die(PARROT_WINDOW_SIZE * sizeof(float));
   c->play_now = zalloc_aligned_or_die(PARROT_WINDOW_SIZE * sizeof(float));
   c->play_prev = zalloc_aligned_or_die(PARROT_WINDOW_SIZE * sizeof(float));
-  c->mdct_target = zalloc_aligned_or_die(PARROT_WINDOW_SIZE * sizeof(float));
+  c->mdct_target = zalloc_aligned_or_die(PARROT_WINDOW_SIZE / 2 * sizeof(float));
   c->features = zalloc_aligned_or_die(PARROT_N_FEATURES * sizeof(float));
   if (PGM_DUMP_FEATURES){
     c->mfcc_image = temporal_ppm_alloc(PARROT_N_FEATURES, 300, "parrot-mfcc", id,
@@ -255,7 +255,7 @@ load_or_create_net(GstParrot *self){
   }
   if (net == NULL){
     net = rnn_new(PARROT_N_FEATURES, self->hidden_size,
-        PARROT_WINDOW_SIZE, PARROT_RNN_FLAGS, PARROT_RNG_SEED,
+        PARROT_WINDOW_SIZE / 2, PARROT_RNN_FLAGS, PARROT_RNG_SEED,
         NULL, PARROT_BPTT_DEPTH, self->learn_rate, MOMENTUM, MOMENTUM_WEIGHT,
         PARROT_BATCH_SIZE);
   }
@@ -285,12 +285,12 @@ gst_parrot_setup(GstAudioFilter *base, const GstAudioInfo *info){
 
   if (self->mfcc_factory == NULL){
     self->mfcc_factory = recur_audio_binner_new(PARROT_WINDOW_SIZE,
-        RECUR_WINDOW_HANN,
+        RECUR_WINDOW_NONE,
         PARROT_N_FFT_BINS,
         PARROT_MFCC_MIN_FREQ,
         PARROT_MFCC_MAX_FREQ,
         PARROT_RATE,
-        1.0f / 32768,
+        1.0f,
         PARROT_VALUE_SIZE
     );
   }
@@ -471,6 +471,9 @@ possibly_save_net(RecurNN *net, char *filename)
 static inline void
 pcm_to_features(RecurAudioBinner *mf, float *features, float *pcm){
   float *answer;
+  //float data[PARROT_WINDOW_SIZE];
+  //memcpy(data, pcm, PARROT_WINDOW_SIZE * sizeof(float));
+  //GST_DEBUG("data: %.3f %.3f %.3f", data[0],  data[10],  data[20]);
 #if PARROT_USE_MFCCS
   answer = recur_extract_mfccs(mf, pcm);
 #else
@@ -491,7 +494,7 @@ tanh_opinion(RecurNN *net, float *in){
   return answer;
 }
 
-static inline void
+static inline float *
 train_net(RecurNN *net, float *features, float *target){
   bptt_advance(net);
   float *answer = tanh_opinion(net, features);
@@ -608,12 +611,15 @@ fill_audio_chunk(GstParrot *self, s16 *dest){
     //mdct_forward(&self->mdct_lut, c->play_prev, c->play_now);
     //maybe_add_ppm_row(c->dct_image, c->play_now)
     mdct_backward(&self->mdct_lut, answer, c->play_now);
+    for (i = 0; i < PARROT_WINDOW_SIZE; i++){
+      c->play_now[i] *= window[i];
+    }
     for(i = 0; i < half_window; i++){
-      float s = (c->play_prev[half_window + i] * window[half_window - 1 - i] +
-          c->play_now[i] * window[i]);
+      float s = c->play_prev[i] + c->play_now[i];
       /*window is scaled by 1 / 32768; scale back, doubly */
       //DEBUG("k is %d. len_o %d", k, len_o);
       dest[j + i * n_channels] = s * 1073741823.99f;
+      //dest[j + i * n_channels] = s * 32768;
     }
     float *tmp;
     tmp = c->play_now;
@@ -630,7 +636,6 @@ fill_audio_segment(GstParrot *self, GstBuffer *outbuf)
   GstMapInfo map;
   gst_buffer_map(outbuf, &map, GST_MAP_WRITE);
   int len16 = map.size / sizeof(s16);
-
   int qlen = self->outgoing_end - self->outgoing_start;
   if (qlen < 0){
     qlen += self->queue_size;
@@ -640,15 +645,17 @@ fill_audio_segment(GstParrot *self, GstBuffer *outbuf)
   int chunk_size =  half_window * self->n_channels;
 
   while (qlen < len16 + half_window){
+    GST_LOG("filling chunk at %d / %d", self->outgoing_end, self->queue_size);
     fill_audio_chunk(self, self->outgoing_queue + self->outgoing_end);
+    self->outgoing_end += chunk_size;
+    qlen += chunk_size;
     if (self->outgoing_end >= self->queue_size){
       self->outgoing_end = 0;
     }
-    qlen += chunk_size;
   }
 
   int n_samples = MIN(len16, self->queue_size - self->outgoing_start);
-  GST_DEBUG("copying buffer of %d samples to buffer of %d",
+  GST_LOG("copying buffer of %d samples to buffer of %d",
       n_samples, len16);
 
   memcpy(map.data, self->outgoing_queue + self->outgoing_start,
@@ -656,9 +663,10 @@ fill_audio_segment(GstParrot *self, GstBuffer *outbuf)
 
   if (n_samples < len16){
     int remainder = len16 - n_samples;
-    GST_DEBUG("copying remainder of %d samples to buffer of %d",
+    GST_LOG("copying remainder of %d samples to buffer of %d",
         remainder);
-    memcpy(map.data + n_samples, self->outgoing_queue, remainder * sizeof(s16));
+    memcpy(map.data + n_samples * sizeof(s16),
+        self->outgoing_queue, remainder * sizeof(s16));
     self->outgoing_start = remainder;
   }
   else {
