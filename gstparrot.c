@@ -79,9 +79,18 @@ init_channel(ParrotChannel *c, RecurNN *net, int id, float learn_rate)
   if (PGM_DUMP_FEATURES){
     c->mfcc_image = temporal_ppm_alloc(PARROT_N_FEATURES, 300, "parrot-mfcc", id,
         PGM_DUMP_COLOUR);
+    c->pcm_image = temporal_ppm_alloc(PARROT_WINDOW_SIZE, 300, "parrot-pcm", id,
+        PGM_DUMP_COLOUR);
+    c->dct_image = temporal_ppm_alloc(PARROT_WINDOW_SIZE / 2, 300, "parrot-dct", id,
+        PGM_DUMP_COLOUR);
+    c->answer_image = temporal_ppm_alloc(PARROT_WINDOW_SIZE / 2, 300, "parrot-out", id,
+        PGM_DUMP_COLOUR);
   }
   else {
     c->mfcc_image = NULL;
+    c->pcm_image = NULL;
+    c->dct_image = NULL;
+    c->answer_image = NULL;
   }
 }
 
@@ -494,6 +503,7 @@ train_net(RecurNN *net, float *features, float *target){
     net->bptt->o_error[i] = (1 - a * a) * (target[i] - a);
   }
   bptt_calc_deltas(net);
+  return answer;
 }
 
 static inline void
@@ -507,6 +517,14 @@ consolidate_and_apply_learning(GstParrot *self)
   bptt_consolidate_many_nets(self->training_nets, self->n_channels);
   rnn_condition_net(net);
   possibly_save_net(self->net, self->net_filename);
+}
+
+static inline void
+maybe_add_ppm_row(TemporalPPM *ppm, float *row)
+{
+  if (ppm){
+    temporal_ppm_add_row(ppm, row);
+  }
 }
 
 static inline void
@@ -533,7 +551,9 @@ maybe_learn(GstParrot *self){
 
         pcm_prev should predict pcm_now
        */
+      //maybe_add_ppm_row(c->pcm_image, c->pcm_prev);
       pcm_to_features(self->mfcc_factory, c->features, c->pcm_prev);
+      //maybe_add_ppm_row(c->mfcc_image, c->features);
 
       /*load first half of pcm_prev, second part of pcm_now.*/
       /*second part of pcm_now retains previous data */
@@ -550,7 +570,10 @@ maybe_learn(GstParrot *self){
 
        */
       mdct_forward(&self->mdct_lut, c->pcm_now, target);
-      train_net(c->train_net, c->features, target);
+      //maybe_add_ppm_row(c->dct_image, target);
+
+      float *answer = train_net(c->train_net, c->features, target);
+      //maybe_add_ppm_row(c->answer_image, answer);
 
       float *tmp;
       tmp = c->pcm_now;
@@ -576,8 +599,14 @@ fill_audio_chunk(GstParrot *self, s16 *dest){
   const float *window = self->window;
   for (j = 0; j < n_channels; j++){
     ParrotChannel *c = & self->channels[j];
+    maybe_add_ppm_row(c->pcm_image, c->play_prev);
     pcm_to_features(self->mfcc_factory, c->features, c->play_prev);
+    maybe_add_ppm_row(c->mfcc_image, c->features);
+
     float *answer = tanh_opinion(c->dream_net, c->features);
+    maybe_add_ppm_row(c->answer_image, answer);
+    //mdct_forward(&self->mdct_lut, c->play_prev, c->play_now);
+    //maybe_add_ppm_row(c->dct_image, c->play_now)
     mdct_backward(&self->mdct_lut, answer, c->play_now);
     for(i = 0; i < half_window; i++){
       float s = (c->play_prev[half_window + i] * window[half_window - 1 - i] +

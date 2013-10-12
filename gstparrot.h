@@ -56,7 +56,7 @@ G_BEGIN_DECLS
 
 #define PERIODIC_PGM_DUMP 255
 #define REGULAR_PGM_DUMP 0
-#define PGM_DUMP_FEATURES 0
+#define PGM_DUMP_FEATURES 1
 
 #define PARROT_VALUE_SIZE 2
 #define PARROT_WINDOW_SIZE 512
@@ -88,6 +88,9 @@ typedef struct _ParrotChannel
   float *features;
   float *mdct_target;
   TemporalPPM *mfcc_image;
+  TemporalPPM *pcm_image;
+  TemporalPPM *dct_image;
+  TemporalPPM *answer_image;
 } ParrotChannel;
 
 struct _GstParrot
