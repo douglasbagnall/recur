@@ -27,19 +27,21 @@
 
 #define QUOTE_(x) #x
 #define QUOTE(x) QUOTE_(x)
-#ifdef GST_DEBUG
-#define DEBUG_LINENO() GST_DEBUG("%-25s  line %4d ooo\n", __func__, __LINE__ )
-#define DEBUG(args...) GST_DEBUG(args)
-#define MAYBE_DEBUG(args...) GST_LOG(args)
-#else
-#define DEBUG(format, ...) do {                                 \
+
+#define STDERR_DEBUG(format, ...) do {                                 \
     fprintf (stderr, (format),## __VA_ARGS__);                  \
     fputc('\n', stderr);                                         \
     fflush(stderr);                                             \
     } while (0)
 
+#ifdef GST_DEBUG
+#define DEBUG_LINENO() GST_DEBUG("%-25s  line %4d ooo\n", __func__, __LINE__ )
+#define DEBUG(args...) GST_DEBUG(args)
+#define MAYBE_DEBUG(args...) GST_LOG(args)
+#else
+#define DEBUG STDERR_DEBUG
 #if VERBOSE_DEBUG
-#define MAYBE_DEBUG(args...) DEBUG(args)
+#define MAYBE_DEBUG(args...) STDERR_DEBUG(args)
 #else
 #define MAYBE_DEBUG(args...) /*args */
 #endif

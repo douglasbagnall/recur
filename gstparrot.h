@@ -11,10 +11,6 @@
 
 G_BEGIN_DECLS
 
-#define PARROT_DRIFT 1
-#define PARROT_PASSTHROUGH 0
-#define PARROT_TRAIN 1
-
 #define PARROT_N_HIDDEN 203
 #define PARROT_RNG_SEED 11
 #define PARROT_BPTT_DEPTH 20
@@ -27,7 +23,7 @@ G_BEGIN_DECLS
 #define PARROT_RATE 16000
 #define PARROT_BIAS 1
 #define PARROT_BATCH_SIZE 1
-#define PARROT_USE_MFCCS 1
+#define PARROT_USE_MFCCS 0
 
 #define PARROT_N_FFT_BINS 40
 
@@ -56,7 +52,10 @@ G_BEGIN_DECLS
 
 #define PERIODIC_PGM_DUMP 0
 #define REGULAR_PGM_DUMP 0
-#define PGM_DUMP_FEATURES 1
+#define PGM_DUMP_LEARN 1
+#define PGM_DUMP_OUT 0
+
+#define PGM_DUMP_FEATURES (PGM_DUMP_LEARN | PGM_DUMP_OUT)
 
 #define PARROT_VALUE_SIZE 2
 #define PARROT_WINDOW_SIZE 512
@@ -89,6 +88,7 @@ typedef struct _ParrotChannel
   float *mdct_target;
   TemporalPPM *mfcc_image;
   TemporalPPM *pcm_image;
+  TemporalPPM *pcm_image2;
   TemporalPPM *dct_image;
   TemporalPPM *answer_image;
 } ParrotChannel;

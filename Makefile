@@ -249,16 +249,15 @@ TEST_PARROT_CORE = gst-launch-1.0  \
 	uridecodebin name=src uri=$(AUD_URI_KENDRICK) ! audioconvert ! audioresample \
 	! parrot name=parrot
 
-PARROT_DEBUG=parrot*:5
-#PARROT_DEBUG=5
+#PARROT_DEBUG=parrot*:5
+PARROT_DEBUG=5
 #PARROT_GDB=gdb --args
 #PARROT_GDB=valgrind --tool=memcheck  --track-origins=yes
 test-parrot: libgstparrot.so
-	GST_DEBUG=$(PARROT_DEBUG)  $(TIMER) $(PARROT_GDB) $(TEST_PARROT_CORE) ! autoaudiosink # 2> gst.log
+	GST_DEBUG=$(PARROT_DEBUG)  $(TIMER) $(PARROT_GDB) $(TEST_PARROT_CORE) ! autoaudiosink  #2> gst.log
 
 train-parrot: libgstparrot.so
-	$(TEST_PARROT_CORE) ! fakesink
-	$(TEST_PARROT_CORE) ! fakesink
+	GST_DEBUG=$(PARROT_DEBUG)  $(TIMER) $(PARROT_GDB) $(TEST_PARROT_CORE)   ! fakesink
 
 train-parrot-torben: libgstparrot.so
 	gst-launch-1.0 --gst-plugin-path=$(CURDIR) \
