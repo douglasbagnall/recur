@@ -266,7 +266,7 @@ load_or_create_net(GstParrot *self){
   reset_net_filename(self);
   RecurNN *net = TRY_RELOAD ? rnn_load_net(self->net_filename) : NULL;
   if (net){
-    if (net->output_size != PARROT_WINDOW_SIZE){
+    if (net->output_size != PARROT_WINDOW_SIZE / 2){
       GST_WARNING("loaded net doesn't seem to match!");
       rnn_delete_net(net);
       net = NULL;
