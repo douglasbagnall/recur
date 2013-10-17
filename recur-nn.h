@@ -52,10 +52,10 @@ typedef float v4ss __attribute__ ((vector_size (16))) __attribute__ ((aligned (1
    that various kinds of work will be done. They are deliberately sparsely
    spaced.
 
-   The RNN_COND_MASK_* flags turn off the respective conditioning task.
+   The RNN_COND_USE_* flags turn on the respective conditioning task.
  */
 
-#define RNN_COND_MASK_OFFSET 16
+#define RNN_COND_USE_OFFSET 16
 
 enum {
   RNN_COND_BIT_SCALE = 0U,
@@ -69,16 +69,15 @@ enum {
   RNN_NET_FLAG_BIAS = 4,
   RNN_NET_FLAG_LOG_APPEND = 8,
 
-
   /*conditioning flags start at 1 << 16 (65536) */
-  RNN_COND_MASK_SCALE = (1 << (RNN_COND_BIT_SCALE + RNN_COND_MASK_OFFSET)),
-  RNN_COND_MASK_ZERO = (1 << (RNN_COND_BIT_ZERO + RNN_COND_MASK_OFFSET)),
-  RNN_COND_MASK_RAND = (1 << (RNN_COND_BIT_RAND + RNN_COND_MASK_OFFSET)),
+  RNN_COND_USE_SCALE = (1 << (RNN_COND_BIT_SCALE + RNN_COND_USE_OFFSET)),
+  RNN_COND_USE_ZERO = (1 << (RNN_COND_BIT_ZERO + RNN_COND_USE_OFFSET)),
+  RNN_COND_USE_RAND = (1 << (RNN_COND_BIT_RAND + RNN_COND_USE_OFFSET)),
 
   /*more flags can fit after 1 << 24 or so */
 
   RNN_NET_FLAG_STANDARD = (RNN_NET_FLAG_OWN_BPTT | RNN_NET_FLAG_OWN_WEIGHTS \
-      | RNN_NET_FLAG_BIAS),
+       | RNN_COND_USE_ZERO | RNN_NET_FLAG_BIAS),
   RNN_NET_FLAG_NO_BIAS = RNN_NET_FLAG_STANDARD & ~ RNN_NET_FLAG_BIAS
 };
 

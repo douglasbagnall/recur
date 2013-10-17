@@ -780,9 +780,9 @@ bptt_calculate(RecurNN *net){
 void
 rnn_condition_net(RecurNN *net)
 {
-  u32 mask = net->flags >> RNN_COND_MASK_OFFSET;
+  u32 mask = net->flags >> RNN_COND_USE_OFFSET;
   u32 m = net->generation % RNN_CONDITIONING_INTERVAL;
-  if ((1 << m) & mask){
+  if (((1 << m) & mask) == 0){
     return;
   }
   switch (m){
@@ -794,8 +794,10 @@ rnn_condition_net(RecurNN *net)
   case RNN_COND_BIT_ZERO:
     zero_small_numbers(net->ih_weights, net->ih_size);
     zero_small_numbers(net->ho_weights, net->ho_size);
-    zero_small_numbers(net->bptt->ih_momentum, net->ih_size);
-    zero_small_numbers(net->bptt->ho_momentum, net->ho_size);
+    if (net->bptt){
+      zero_small_numbers(net->bptt->ih_momentum, net->ih_size);
+      zero_small_numbers(net->bptt->ho_momentum, net->ho_size);
+    }
     break;
   case RNN_COND_BIT_RAND:
     {
@@ -810,8 +812,6 @@ rnn_condition_net(RecurNN *net)
         net->ih_weights[t] += damage;
       }
     }
-    break;
-  default:
     break;
   }
 }
