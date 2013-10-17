@@ -250,8 +250,8 @@ TEST_PARROT_CORE = gst-launch-1.0  \
 	uridecodebin name=src uri=$(AUD_URI_RA) ! audioconvert ! audioresample \
 	! parrot name=parrot
 
-#PARROT_DEBUG=parrot*:5
-PARROT_DEBUG=5
+PARROT_DEBUG=parrot*:5
+#PARROT_DEBUG=5
 PARROT_SIZE=399
 #PARROT_GDB=gdb --args
 #PARROT_GDB=valgrind --tool=memcheck  --track-origins=yes
@@ -279,7 +279,7 @@ test-parrot-torben: libgstparrot.so
 	GST_DEBUG=recur:3 gst-launch-1.0 --gst-plugin-path=$(CURDIR) \
 		uridecodebin uri=$(AUD_URI_CALE)  ! $(AUD_LINE) ! parrot ! autoaudiosink
 
-PARROT_CAPS = "audio/x-raw,channels=1,rate=22050,format=S16LE"
+PARROT_CAPS = "audio/x-raw,channels=1,rate=16000,format=S16LE"
 
 test-parrot-duo: libgstparrot.so
 	GST_DEBUG=2 gst-launch-1.0 --gst-plugin-path=$(CURDIR) \

@@ -377,6 +377,7 @@ gst_parrot_set_property (GObject * object, guint prop_id, const GValue * value,
         free(self->pending_logfile);
       }
       self->pending_logfile = g_value_dup_string(value);
+      GST_DEBUG("set log file: %s", self->pending_logfile);
       maybe_start_logging(self);
       break;
 

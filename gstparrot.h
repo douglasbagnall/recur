@@ -14,7 +14,7 @@ G_BEGIN_DECLS
 #define PARROT_N_HIDDEN 203
 #define PARROT_RNG_SEED 11
 #define PARROT_BPTT_DEPTH 20
-#define LEARN_RATE 0.01
+#define LEARN_RATE 0.0001
 #define MOMENTUM 0.95
 #define MOMENTUM_WEIGHT 0.5
 
@@ -47,8 +47,6 @@ G_BEGIN_DECLS
 
 #define PERIODIC_SAVE_NET 1
 #define TRY_RELOAD 1
-
-#define NET_LOG_FILE "parrot.log"
 
 #define PERIODIC_PGM_DUMP 0
 #define REGULAR_PGM_DUMP 0
