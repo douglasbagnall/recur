@@ -684,7 +684,6 @@ gst_classify_transform_ip (GstBaseTransform * base, GstBuffer *buf)
 static gboolean
 plugin_init (GstPlugin * plugin)
 {
-  GST_INFO("classify plugin init\n");
   gboolean classify = gst_element_register (plugin, "classify", GST_RANK_NONE,\
       GST_TYPE_CLASSIFY);
   return classify;
