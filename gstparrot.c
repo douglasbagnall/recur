@@ -26,12 +26,16 @@ enum
   PROP_SAVE_NET,
   PROP_PGM_DUMP,
   PROP_LOG_FILE,
+  PROP_TRAINING,
+  PROP_PLAYING,
 };
 
 #define DEFAULT_PROP_PGM_DUMP ""
 #define DEFAULT_PROP_LOG_FILE ""
 #define DEFAULT_PROP_SAVE_NET NULL
 #define DEFAULT_PROP_FORGET 0
+#define DEFAULT_PROP_PLAYING 1
+#define DEFAULT_PROP_TRAINING 1
 #define DEFAULT_HIDDEN_SIZE 199
 #define DEFAULT_LEARN_RATE 0.0001
 #define MIN_HIDDEN_SIZE 1
@@ -190,6 +194,18 @@ gst_parrot_class_init (GstParrotClass * klass)
           DEFAULT_PROP_FORGET,
           G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
+  g_object_class_install_property (gobject_class, PROP_PLAYING,
+      g_param_spec_boolean("playing", "playing",
+          "Construct imaginary audio to play",
+          DEFAULT_PROP_PLAYING,
+          G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+
+  g_object_class_install_property (gobject_class, PROP_TRAINING,
+      g_param_spec_boolean("training", "training",
+          "Learn from incoming audio",
+          DEFAULT_PROP_TRAINING,
+          G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+
   g_object_class_install_property (gobject_class, PROP_LEARN_RATE,
       g_param_spec_float("learn-rate", "learn-rate",
           "Learning rate for the RNN",
@@ -222,8 +238,8 @@ gst_parrot_init (GstParrot * self)
   self->learn_rate = DEFAULT_LEARN_RATE;
   self->hidden_size = DEFAULT_HIDDEN_SIZE;
   /*XXX add switches */
-  self->training = 1;
-  self->playing = 0;
+  self->training = DEFAULT_PROP_TRAINING;
+  self->playing = DEFAULT_PROP_PLAYING;
   GST_INFO("gst parrot init\n");
 }
 
@@ -374,6 +390,14 @@ gst_parrot_set_property (GObject * object, guint prop_id, const GValue * value,
       }
       break;
 
+    case PROP_PLAYING:
+      self->playing = g_value_get_boolean(value);
+      break;
+
+    case PROP_TRAINING:
+      self->training = g_value_get_boolean(value);
+      break;
+
     case PROP_LEARN_RATE:
       self->learn_rate = g_value_get_float(value);
       if (self->net){
@@ -404,6 +428,14 @@ gst_parrot_get_property (GObject * object, guint prop_id, GValue * value,
 {
   GstParrot *self = GST_PARROT (object);
   switch (prop_id) {
+
+  case PROP_PLAYING:
+    g_value_set_boolean(value, self->playing);
+    break;
+
+  case PROP_TRAINING:
+    g_value_set_boolean(value, self->training);
+    break;
 
   case PROP_LEARN_RATE:
     g_value_set_float(value, self->learn_rate);
