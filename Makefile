@@ -237,6 +237,7 @@ AUD_URI_3 = file://$(MP3_DIR)/John_White/John\ White--Balloon\ Adventure--08\ En
 AUD_URI_4 = file://$(MP3_DIR)/Sam\ Hunt\ _\ Mammal/Beware\ The\ Man/Sam\ Hunt\ _\ Mammal--Beware\ The\ Man--08\ Lyn.mp3
 AUD_URI_5 = file://$(MP3_DIR)/Kraftwerk/Kraftwerk\ -\ Autobahn.mp3
 AUD_URI_KENDRICK = file://$(MP3_DIR)/spoken/sat-20110813-0910-john_kendrick_bird_watching-00.ogg
+AUD_URI_RA =  file://$(CURDIR)/test-audio/02_-_Sun_Ra_and_the_Blues_Project_-_Batmans_Batmorang.mp3-16000Hz-mono.wav
 AUD_URI_CALE = file://$(MP3_DIR)/John_Cale/03\ Hedda\ Gabbler.mp3
 AUD_URI_REED = file://$(MP3_DIR)/misc/Lou\ Reed-10\ Sad\ Song.mp3
 AUD_URI_CALE_CAT = file://$(CURDIR)/test-audio/03\ Hedda\ Gabbler.mp3
@@ -246,7 +247,7 @@ PARROT_CAPS = "audio/x-raw,channels=1,format=S16LE"
 
 TEST_PARROT_CORE = gst-launch-1.0  \
 	  --gst-plugin-path=$(CURDIR) \
-	uridecodebin name=src uri=$(AUD_URI_KENDRICK) ! audioconvert ! audioresample \
+	uridecodebin name=src uri=$(AUD_URI_RA) ! audioconvert ! audioresample \
 	! parrot name=parrot
 
 #PARROT_DEBUG=parrot*:5
