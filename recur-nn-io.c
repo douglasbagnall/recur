@@ -6,6 +6,7 @@
 
 int
 rnn_save_net(RecurNN *net, const char *filename){
+  MAYBE_DEBUG("saving net at generation %d", net->generation);
   struct cdb_make cdbm;
   int fd;
   char tmpfn[] = "tmp_net_XXXXXX";
