@@ -611,13 +611,32 @@ maybe_learn(GstParrot *self){
       mdct_forward(&self->mdct_lut, c->pcm_now, target);
       maybe_add_ppm_row(c->dct_image, target, PGM_DUMP_LEARN);
 
-      if(1){
+      if(PGM_DUMP_LEARN && 1){
         /*XXX need other half windows. */
-        mdct_backward(&self->mdct_lut, target, c->pcm_now);
-        for (i = 0; i < PARROT_WINDOW_SIZE; i++){
-          c->pcm_now[i] *= window[i] * 32768;
+        static float *pcm_image_prev = NULL;
+        static float *pcm_image_now = NULL;
+        static float *pcm_image_out = NULL;
+        if (pcm_image_prev == NULL){
+          pcm_image_prev = zalloc_aligned_or_die(PARROT_WINDOW_SIZE * sizeof(float));
+          pcm_image_now = zalloc_aligned_or_die(PARROT_WINDOW_SIZE * sizeof(float));
+          pcm_image_out = zalloc_aligned_or_die(PARROT_WINDOW_SIZE * sizeof(float));
         }
-        maybe_add_ppm_row(c->pcm_image2, c->pcm_now, PGM_DUMP_LEARN);
+        mdct_backward(&self->mdct_lut, target, pcm_image_now);
+
+        for (i = 0; i < half_window; i++){
+          int ii = half_window + i;
+          pcm_image_now[i] *= window[i] * 32768;
+          pcm_image_now[ii] *= window[ii] * 32768;
+          pcm_image_prev[ii] += pcm_image_now[i];
+          pcm_image_now[i] = pcm_image_prev[ii];
+          pcm_image_out[i] = pcm_image_prev[i] * window[i] * 32768;
+          pcm_image_out[ii] = pcm_image_prev[ii] * window[ii] * 32768;
+        }
+        maybe_add_ppm_row(c->pcm_image2, pcm_image_out, PGM_DUMP_LEARN);
+        float *tmp = pcm_image_now;
+        pcm_image_now = pcm_image_prev;
+        pcm_image_prev = tmp;
+
       }
       float *answer = train_net(c->train_net, c->features, target);
       maybe_add_ppm_row(c->answer_image, answer, PGM_DUMP_LEARN);
