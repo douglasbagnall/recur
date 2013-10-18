@@ -9,6 +9,7 @@ test_*
 !test_*.[ch]
 /test-images/generated
 /test-images/output
+/test-images/dickens
 /test-video
 /test-audio
 *.p[bgp]m

@@ -18,6 +18,7 @@
 #define CONFAB_SIZE 80
 #define LEARN_RATE 0.001
 #define LEARN_RATE_DECAY 0.96
+#define MIN_LEARN_RATE 1e-6
 
 #define MOMENTUM 0.95
 #define MOMENTUM_WEIGHT 0.5
@@ -27,7 +28,8 @@
 
 
 u8 CHAR_TO_NET[257];
-const u8 NET_TO_CHAR[] = "abcdefghijklmnopqrstuvwxyz,'- .\"#";
+const u8 NET_TO_CHAR[] = "abcdefghijklmnopqrstuvwxyz,'- .\"#;:!?";
+const u8 HASH_CHARS[] = "1234567890&@";
 
 #define HIDDEN_SIZE 199
 #define INPUT_SIZE (sizeof(NET_TO_CHAR) - 1)
@@ -35,14 +37,14 @@ const u8 NET_TO_CHAR[] = "abcdefghijklmnopqrstuvwxyz,'- .\"#";
 #define NET_FILENAME ("test_backprop-" QUOTE(HIDDEN_SIZE) "-" QUOTE(BIAS) ".net")
 
 static int
-create_char_lut(u8 *ctn, const u8 *ntc){
+create_char_lut(u8 *ctn, const u8 *ntc, const u8 *hash_chars){
   int i;
   int len = strlen((char *)ntc);
   int hash = strchr((char *)ntc, '#') - (char *)ntc;
   int space = strchr((char *)ntc, ' ') - (char *)ntc;
   memset(ctn, space, 257);
-  for (i = 33; i < 127; i++){
-    ctn[i] = hash;
+  for (i = 0; hash_chars[i]; i++){
+    ctn[hash_chars[i]] = hash;
   }
   for (i = 0; i < len; i++){
     u8 c = ntc[i];
@@ -262,6 +264,10 @@ epoch(RecurNN *net, RecurNN *confab_net, const u8 *text, const int len){
       }
       if (K_STOP && k > K_STOP)
         exit(0);
+      if ((k & 1023) == 1023){
+        net->bptt->learn_rate = MAX(MIN_LEARN_RATE,
+            net->bptt->learn_rate * LEARN_RATE_DECAY);
+      }
     }
   }
   long_confab(confab_net, CONFAB_SIZE, 6, CONFAB_HIDDEN_IMG);
@@ -305,9 +311,9 @@ main(void){
       RECUR_RNG_SUBSEED,
       NULL);
 
-  create_char_lut(CHAR_TO_NET, NET_TO_CHAR);
+  create_char_lut(CHAR_TO_NET, NET_TO_CHAR, HASH_CHARS);
   long len;
-  u8* text = alloc_and_collapse_text(SRC_TEXT, &len);
+  u8* text = alloc_and_collapse_text(SRC_TEXT3, &len);
   if (TEMPORAL_PGM_DUMP){
     input_ppm = temporal_ppm_alloc(net->i_size, 500, "input_layer", 0, PGM_DUMP_COLOUR);
   }
@@ -317,7 +323,6 @@ main(void){
     START_TIMER(epoch);
     epoch(net, confab_net, text, len);
     DEBUG_TIMER(epoch);
-    net->bptt->learn_rate *= LEARN_RATE_DECAY;
   }
   free(text);
   rnn_delete_net(net);
