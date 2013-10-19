@@ -78,8 +78,8 @@ init_channel(ParrotChannel *c, RecurNN *net, int id, float learn_rate)
   c->pcm_prev = zalloc_aligned_or_die(PARROT_WINDOW_SIZE * sizeof(float));
   c->play_now = zalloc_aligned_or_die(PARROT_WINDOW_SIZE * sizeof(float));
   c->play_prev = zalloc_aligned_or_die(PARROT_WINDOW_SIZE * sizeof(float));
-  c->mdct_target = zalloc_aligned_or_die(PARROT_WINDOW_SIZE / 2 * sizeof(float));
-  c->features = zalloc_aligned_or_die(PARROT_N_FEATURES * sizeof(float));
+  c->mdct_now = zalloc_aligned_or_die(PARROT_WINDOW_SIZE / 2 * sizeof(float));
+  c->mdct_prev = zalloc_aligned_or_die(PARROT_WINDOW_SIZE / 2 * sizeof(float));
   if (PGM_DUMP_FEATURES){
     c->mfcc_image = temporal_ppm_alloc(PARROT_N_FEATURES, 300, "parrot-mfcc", id,
         PGM_DUMP_COLOUR);
@@ -110,8 +110,8 @@ finalise_channel(ParrotChannel *c)
   free(c->pcm_now);
   free(c->play_prev);
   free(c->play_now);
-  free(c->mdct_target);
-  free(c->features);
+  free(c->mdct_prev);
+  free(c->mdct_now);
   if (c->mfcc_image){
     temporal_ppm_free(c->mfcc_image);
     c->mfcc_image = NULL;
@@ -274,7 +274,7 @@ load_or_create_net(GstParrot *self){
   }
   if (net == NULL){
     net = rnn_new(PARROT_N_FEATURES, self->hidden_size,
-        PARROT_WINDOW_SIZE / 2, PARROT_RNN_FLAGS, PARROT_RNG_SEED,
+        PARROT_N_FEATURES, PARROT_RNN_FLAGS, PARROT_RNG_SEED,
         NULL, PARROT_BPTT_DEPTH, self->learn_rate, MOMENTUM, MOMENTUM_WEIGHT,
         PARROT_BATCH_SIZE);
   }
@@ -504,23 +504,6 @@ possibly_save_net(RecurNN *net, char *filename)
     rnn_multi_pgm_dump(net, "hhw ihw");
 }
 
-static inline void
-pcm_to_features(RecurAudioBinner *mf, float *features, float *pcm){
-  float *answer;
-  //float data[PARROT_WINDOW_SIZE];
-  //memcpy(data, pcm, PARROT_WINDOW_SIZE * sizeof(float));
-  //GST_DEBUG("data: %.3f %.3f %.3f", data[0],  data[10],  data[20]);
-#if PARROT_USE_MFCCS
-  answer = recur_extract_mfccs(mf, pcm);
-#else
-  answer = recur_extract_log_freq_bins(mf, pcm);
-#endif
-  for (int i = 0; i < PARROT_N_FEATURES; i++){
-    features[i] = answer[i];
-  }
-}
-
-
 static inline float *
 tanh_opinion(RecurNN *net, float *in){
   float *answer = rnn_opinion(net, in);
@@ -581,20 +564,15 @@ maybe_learn(GstParrot *self){
     s16 *buffer_i = self->incoming_queue + self->incoming_start;
     for (j = 0; j < self->n_channels; j++){
       ParrotChannel *c = & self->channels[j];
-      float *target = c->mdct_target;
-
       /* Situation from previous round:
 
                  | side 1  |  side 2  |
         pcm_now  | -1      |   -2     |
         pcm_prev | -2      |   -1     | ready
 
-        pcm_prev should predict pcm_now
+        mdct_prev is based on pcm_prev.
+        mdct_prev should predict mdct_now
        */
-      //maybe_add_ppm_row(c->pcm_image, c->pcm_prev, PGM_DUMP_LEARN);
-      pcm_to_features(self->mfcc_factory, c->features, c->pcm_prev);
-      maybe_add_ppm_row(c->mfcc_image, c->features, PGM_DUMP_LEARN);
-
       /*load first half of pcm_prev, second part of pcm_now.*/
       /*second part of pcm_now retains previous data */
       /*NB: copy into pcm_{prev,now} casts to float*/
@@ -602,50 +580,27 @@ maybe_learn(GstParrot *self){
         c->pcm_prev[i] = buffer_i[k] * window[i];
         c->pcm_now[half_window + i] = buffer_i[k] * window[half_window + i];
       }
-      maybe_add_ppm_row(c->pcm_image, c->pcm_now, PGM_DUMP_LEARN);
+      //maybe_add_ppm_row(c->pcm_image, c->pcm_now, PGM_DUMP_LEARN);
       /*
                  | side 1  |  side 2  |
         pcm_now  | -1      |   0      | ready
         pcm_prev |  0      |  -1      |
 
        */
-      mdct_forward(&self->mdct_lut, c->pcm_now, target);
-      maybe_add_ppm_row(c->dct_image, target, PGM_DUMP_LEARN);
+      mdct_forward(&self->mdct_lut, c->pcm_now, c->mdct_now);
+      maybe_add_ppm_row(c->dct_image, c->mdct_now, PGM_DUMP_LEARN);
 
-      if(PGM_DUMP_LEARN && 1){
-        /*XXX need other half windows. */
-        static float *pcm_image_prev = NULL;
-        static float *pcm_image_now = NULL;
-        static float *pcm_image_out = NULL;
-        if (pcm_image_prev == NULL){
-          pcm_image_prev = zalloc_aligned_or_die(PARROT_WINDOW_SIZE * sizeof(float));
-          pcm_image_now = zalloc_aligned_or_die(PARROT_WINDOW_SIZE * sizeof(float));
-          pcm_image_out = zalloc_aligned_or_die(PARROT_WINDOW_SIZE * sizeof(float));
-        }
-        mdct_backward(&self->mdct_lut, target, pcm_image_now);
-
-        for (i = 0; i < half_window; i++){
-          int ii = half_window + i;
-          pcm_image_now[i] *= window[i] * 32768;
-          pcm_image_now[ii] *= window[ii] * 32768;
-          pcm_image_prev[ii] += pcm_image_now[i];
-          pcm_image_now[i] = pcm_image_prev[ii];
-          pcm_image_out[i] = pcm_image_prev[i] * window[i] * 32768;
-          pcm_image_out[ii] = pcm_image_prev[ii] * window[ii] * 32768;
-        }
-        maybe_add_ppm_row(c->pcm_image2, pcm_image_out, PGM_DUMP_LEARN);
-        float *tmp = pcm_image_now;
-        pcm_image_now = pcm_image_prev;
-        pcm_image_prev = tmp;
-
-      }
-      float *answer = train_net(c->train_net, c->features, target);
+      float *answer = train_net(c->train_net, c->mdct_prev, c->mdct_now);
       maybe_add_ppm_row(c->answer_image, answer, PGM_DUMP_LEARN);
 
       float *tmp;
       tmp = c->pcm_now;
       c->pcm_now = c->pcm_prev;
       c->pcm_prev = tmp;
+
+      tmp = c->mdct_prev;
+      c->mdct_prev = c->mdct_now;
+      c->mdct_now = tmp;
     }
 
     consolidate_and_apply_learning(self);
@@ -666,21 +621,18 @@ fill_audio_chunk(GstParrot *self, s16 *dest){
   const float *window = self->window;
   for (j = 0; j < n_channels; j++){
     ParrotChannel *c = & self->channels[j];
+    float *answer = c->dream_net->output_layer;
     maybe_add_ppm_row(c->pcm_image, c->play_prev, PGM_DUMP_OUT);
-    pcm_to_features(self->mfcc_factory, c->features, c->play_prev);
-    maybe_add_ppm_row(c->mfcc_image, c->features, PGM_DUMP_OUT);
-
-    float *answer = tanh_opinion(c->dream_net, c->features);
+    answer = tanh_opinion(c->dream_net, answer);
     maybe_add_ppm_row(c->answer_image, answer, PGM_DUMP_OUT);
     mdct_backward(&self->mdct_lut, answer, c->play_now);
-    for (i = 0; i < PARROT_WINDOW_SIZE; i++){
-      c->play_now[i] *= window[i] * 8192;
-    }
     for(i = 0; i < half_window; i++){
-      float s = c->play_prev[i] + c->play_now[i];
+      float s = (c->play_prev[half_window + i] * window[half_window + i] +
+          c->play_now[i] * window[i]);
+      //s = (c->play_prev[half_window + i] + c->play_now[i])/ 32768;
       /*window is scaled by 1 / 32768; scale back, doubly */
       //DEBUG("k is %d. len_o %d", k, len_o);
-      dest[j + i * n_channels] = s * 32768;
+      dest[j + i * n_channels] = s * 32768 * 32768;
     }
     float *tmp;
     tmp = c->play_now;

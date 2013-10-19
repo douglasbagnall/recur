@@ -26,11 +26,12 @@ G_BEGIN_DECLS
 #define PARROT_USE_MFCCS 0
 
 #define PARROT_N_FFT_BINS 40
+#define PARROT_WINDOW_SIZE 512
 
 #if PARROT_USE_MFCCS
 #define PARROT_N_FEATURES 20
 #else
-#define PARROT_N_FEATURES PARROT_N_FFT_BINS
+#define PARROT_N_FEATURES (PARROT_WINDOW_SIZE / 2)
 #endif
 
 #define PARROT_MFCC_MIN_FREQ 20
@@ -56,7 +57,6 @@ G_BEGIN_DECLS
 #define PGM_DUMP_FEATURES (PGM_DUMP_LEARN | PGM_DUMP_OUT)
 
 #define PARROT_VALUE_SIZE 2
-#define PARROT_WINDOW_SIZE 512
 
 #define GST_TYPE_PARROT (gst_parrot_get_type())
 #define GST_PARROT(obj) \
@@ -82,8 +82,8 @@ typedef struct _ParrotChannel
   float *pcm_prev;
   float *play_now;
   float *play_prev;
-  float *features;
-  float *mdct_target;
+  float *mdct_now;
+  float *mdct_prev;
   TemporalPPM *mfcc_image;
   TemporalPPM *pcm_image;
   TemporalPPM *pcm_image2;
