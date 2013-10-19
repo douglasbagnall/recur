@@ -100,7 +100,11 @@ libgstrecur.so: $(OBJECTS)
 	$(CC) -shared -Wl,-O1 $+  $(INCLUDES) $(DEFINES)  $(LINKS) -Wl,-soname -Wl,$@ \
 	  -o $@
 
-libgstparrot.so: recur-nn.o recur-nn-io.o  mdct.o window.o gstparrot.o mfcc.o
+libgstrnnca.so: recur-nn.o recur-nn-io.o gstrnnca.o
+	$(CC) -shared -Wl,-O1 $+  $(INCLUDES) $(DEFINES)  $(LINKS) -Wl,-soname -Wl,$@ \
+	  -o $@
+
+libgstparrot.so: recur-nn.o recur-nn-io.o  mdct.o gstparrot.o mfcc.o
 	$(CC) -shared -Wl,-O1 $+  $(INCLUDES) $(DEFINES)  $(LINKS) -Wl,-soname -Wl,$@ \
 	  -o $@
 
