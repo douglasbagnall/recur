@@ -39,12 +39,9 @@ static void gst_recur_video_set_property(GObject *object, guint prop_id, const G
 static void gst_recur_video_get_property(GObject *object, guint prop_id, GValue *value, GParamSpec *pspec);
 static GstFlowReturn gst_recur_video_transform_frame(GstVideoFilter *base, GstVideoFrame *inbuf, GstVideoFrame *outbuf);
 
-
-static gboolean set_caps (GstBaseTransform * trans, GstCaps * incaps, GstCaps * outcaps);
 static gboolean set_info (GstVideoFilter *filter,
     GstCaps *incaps, GstVideoInfo *in_info,
     GstCaps *outcaps, GstVideoInfo *out_info);
-
 
 #define VIDEO_FORMATS " { I420 } "
 
@@ -110,7 +107,6 @@ gst_recur_video_init (GstRecurVideo * self)
 }
 
 
-
 static gboolean
 set_info (GstVideoFilter *filter,
     GstCaps *incaps, GstVideoInfo *in_info,
@@ -120,47 +116,6 @@ set_info (GstVideoFilter *filter,
   recur_context_set_video_properties(self->context, in_info);
   return TRUE;
 }
-
-/*from videofilter code, which looks for transform_frame*/
-static gboolean UNUSED
-set_caps (GstBaseTransform * trans, GstCaps * incaps,
-    GstCaps * outcaps)
-{
-  GstVideoFilter *filter = GST_VIDEO_FILTER_CAST (trans);
-  GstVideoInfo in_info, out_info;
-
-  /* input caps */
-  if (!gst_video_info_from_caps (&in_info, incaps))
-    goto invalid_caps;
-
-  /* output caps */
-  if (!gst_video_info_from_caps (&out_info, outcaps))
-    goto invalid_caps;
-
-  GST_INFO("gst video set_caps");
-  GST_DEBUG("in info width %d, height %d, size %zu",
-      in_info.width, in_info.height, in_info.size);
-  GST_DEBUG("out info width %d, height %d, size %zu",
-      out_info.width, out_info.height, out_info.size);
-
-  set_info (filter, incaps, &in_info, outcaps, &out_info);
-
-  filter->in_info = in_info;
-  filter->out_info = out_info;
-  filter->negotiated = TRUE;
-
-  return TRUE;
-
-  /* ERRORS */
-invalid_caps:
-  {
-    GST_ERROR_OBJECT (filter, "invalid caps");
-    filter->negotiated = FALSE;
-    return FALSE;
-  }
-}
-
-
 
 
 static inline void
