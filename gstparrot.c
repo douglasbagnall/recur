@@ -633,6 +633,7 @@ fill_audio_chunk(GstParrot *self, s16 *dest){
       /*window is scaled by 1 / 32768; scale back, doubly */
       //DEBUG("k is %d. len_o %d", k, len_o);
       dest[j + i * n_channels] = s * 32768 * 32768;
+      answer[i] *= 1.0f + cheap_gaussian_noise(&self->net->rng);
     }
     float *tmp;
     tmp = c->play_now;
