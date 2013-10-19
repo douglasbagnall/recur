@@ -672,18 +672,15 @@ fill_audio_chunk(GstParrot *self, s16 *dest){
 
     float *answer = tanh_opinion(c->dream_net, c->features);
     maybe_add_ppm_row(c->answer_image, answer, PGM_DUMP_OUT);
-    //mdct_forward(&self->mdct_lut, c->play_prev, c->play_now);
-    //maybe_add_ppm_row(c->dct_image, c->play_now, PGM_DUMP_OUT)
     mdct_backward(&self->mdct_lut, answer, c->play_now);
     for (i = 0; i < PARROT_WINDOW_SIZE; i++){
-      c->play_now[i] *= window[i];
+      c->play_now[i] *= window[i] * 8192;
     }
     for(i = 0; i < half_window; i++){
       float s = c->play_prev[i] + c->play_now[i];
       /*window is scaled by 1 / 32768; scale back, doubly */
       //DEBUG("k is %d. len_o %d", k, len_o);
-      dest[j + i * n_channels] = s * 1073741823.99f;
-      //dest[j + i * n_channels] = s * 32768;
+      dest[j + i * n_channels] = s * 32768;
     }
     float *tmp;
     tmp = c->play_now;
