@@ -155,7 +155,10 @@ recur_train_nets(RecurContext *context, RecurFrame *src_frame,
         t->scale);
 
     for (int i = 0; i < net->o_size; i++){
-      net->bptt->o_error[i] -= answer[i];
+      float target = net->bptt->o_error[i];
+      float a = answer[i];
+      float slope = a * (1.0f - a);
+      net->bptt->o_error[i] = slope * (target - a);
     }
     bptt_calc_deltas(net);
     /*XXX want to delay momentum, weight updates until end */
