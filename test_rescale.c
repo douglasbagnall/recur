@@ -11,10 +11,13 @@ static const int sizes[] = {
     1024, 768,
     999, 750,
     64, 48,
-    30, 20
+    30, 20,
+    128, 96
   };
 
 static const char *names[] = {
+  "zoo-800-600",
+  "zoo-400-300",
   "zoo-odd-size",
   "butterfly"
 };
