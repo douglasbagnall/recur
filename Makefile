@@ -100,7 +100,7 @@ libgstrecur.so: $(OBJECTS)
 	$(CC) -shared -Wl,-O1 $+  $(INCLUDES) $(DEFINES)  $(LINKS) -Wl,-soname -Wl,$@ \
 	  -o $@
 
-libgstrnnca.so: recur-nn.o recur-nn-io.o gstrnnca.o
+libgstrnnca.so: recur-nn.o recur-nn-io.o gstrnnca.o rescale.o
 	$(CC) -shared -Wl,-O1 $+  $(INCLUDES) $(DEFINES)  $(LINKS) -Wl,-soname -Wl,$@ \
 	  -o $@
 
@@ -187,16 +187,23 @@ VID_FILE_SRC_8 = uridecodebin name=src uri=$(VID_URI_8) ! $(VID_LINE)
 
 #GST_DEBUG=uridecodebin:7
 #GST_DEBUG=recur*:5
-TIMER =
 #TIMER = time -f '\nused %P CPU\n' timeout 10
-GDB =
 #GDB = gdb --args
+#GDB=valgrind --tool=memcheck  --track-origins=yes
 VALGRIND = valgrind --tool=memcheck --log-file=valgrind.log --trace-children=yes --suppressions=valgrind-python.supp  --leak-check=full --show-reachable=yes
+
+RNNCA_DEBUG=GST_DEBUG=rnnca*:5,recur*:5
+
+test-rnnca: libgstrnnca.so
+	$(RNNCA_DEBUG)	$(GDB) 	gst-launch-1.0  \
+	  --gst-plugin-path=$(CURDIR) \
+	$(VID_FILE_SRC_3) ! rnnca ! videoconvert \
+	! xvimagesink force-aspect-ratio=false
 
 
 TEST_PIPELINE_CORE = gst-launch-1.0  \
 	  --gst-plugin-path=$(CURDIR) \
-	$(VID_FILE_SRC_3) ! recur_manager name=recur osdebug=0 ! videoconvert \
+	$(VID_FILE_SRC_8) ! recur_manager name=recur osdebug=0 ! videoconvert \
 	! xvimagesink force-aspect-ratio=false \
 	recur. ! autoaudiosink \
 	src. ! $(AUD_LINE) ! recur.
