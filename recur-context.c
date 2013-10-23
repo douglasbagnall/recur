@@ -5,6 +5,7 @@
 #include "recur-context.h"
 #include "badmaths.h"
 #include "context-helpers.h"
+#include "blit-helpers.h"
 #include "recur-common.h"
 #include "recur-nn.h"
 #include "rescale.h"
