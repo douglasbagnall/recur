@@ -203,14 +203,9 @@ reset_net_filename(GstRnnca *self){
       RNNCA_BIAS);
 
   if (self->net_filename){
-    if (! streq(s, self->net_filename)){
-      free(self->net_filename);
-      self->net_filename = strdup(s);
-    }
+    free(self->net_filename);
   }
-  else {
-    self->net_filename = strdup(s);
-  }
+  self->net_filename = strdup(s);
 }
 
 static void

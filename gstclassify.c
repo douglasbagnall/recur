@@ -223,16 +223,10 @@ reset_net_filename(GstClassify *self){
   snprintf(s, sizeof(s), "classify-i%d-h%d-o%d-b%d-%dHz-w%d.net",
       CLASSIFY_N_FEATURES, self->hidden_size, self->n_classes,
       CLASSIFY_BIAS, CLASSIFY_RATE, CLASSIFY_WINDOW_SIZE);
-
   if (self->net_filename){
-    if (! streq(s, self->net_filename)){
-      free(self->net_filename);
-      self->net_filename = strdup(s);
-    }
+    free(self->net_filename);
   }
-  else {
-    self->net_filename = strdup(s);
-  }
+  self->net_filename = strdup(s);
 }
 
 
