@@ -524,13 +524,6 @@ pcm_to_features(RecurAudioBinner *mf, float *features, float *pcm){
   }
 }
 
-
-static inline void
-consolidate_and_apply_learning(GstClassify *self)
-{
-
-}
-
 static inline float
 train_channel(ClassifyChannel *c){
   RecurNN *net = c->net;

@@ -63,9 +63,9 @@ static void maybe_start_logging(GstParrot *self);
 G_DEFINE_TYPE (GstParrot, gst_parrot, GST_TYPE_AUDIO_FILTER);
 
 #define PARROT_CAPS_STRING "audio/x-raw, format = (string) " QUOTE(PARROT_FORMAT) \
-      ", rate = (int) " QUOTE(PARROT_RATE) \
-      ", channels = (int) [ " QUOTE(PARROT_MIN_CHANNELS) " , " QUOTE(PARROT_MAX_CHANNELS) " ] " \
-                                                                                          ", layout = (string) interleaved"/*", channel-mask = (bitmask)0x0"*/
+  ", rate = (int) " QUOTE(PARROT_RATE)                                  \
+  ", channels = (int) [ " QUOTE(PARROT_MIN_CHANNELS) " , " QUOTE(PARROT_MAX_CHANNELS)  \
+  " ] , layout = (string) interleaved"/*", channel-mask = (bitmask)0x0"*/
 
 static inline void
 init_channel(ParrotChannel *c, RecurNN *net, int id, float learn_rate)
