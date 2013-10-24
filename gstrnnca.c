@@ -201,17 +201,22 @@ reset_net_filename(GstRnnca *self){
   snprintf(s, sizeof(s), "rnnca-i%d-h%d-o%d-b%d.net",
       RNNCA_N_FEATURES, self->hidden_size, 3,
       RNNCA_BIAS);
-
   if (self->net_filename){
     free(self->net_filename);
   }
   self->net_filename = strdup(s);
 }
 
+UNUSED static int
+compare_trainers(const void *a, const void *b){
+  const RnncaTrainer *at = (RnncaTrainer *)a;
+  const RnncaTrainer *bt = (RnncaTrainer *)b;
+  return (at->y * RNNCA_WIDTH + at->x) - (bt->y * RNNCA_WIDTH + bt->x);
+}
+
 static void
 construct_trainers(GstRnnca *self, int n_requested)
 {
-  /* XXX randomly plonked trainers -- bad memory order*/
   int i, j;
   RecurNN *net = self->net;
   u32 flags = self->net->flags & ~RNN_NET_FLAG_OWN_WEIGHTS;
@@ -245,6 +250,7 @@ construct_trainers(GstRnnca *self, int n_requested)
   }
   GST_ERROR("Could only fit %d out of %d desired training nets", j, n_requested);
  done:
+  qsort(self->trainers, j, sizeof(RnncaTrainer), compare_trainers);
   self->n_trainers = j;
   pgm_dump(mask, w, h, IMAGE_DIR "mask.pgm");
   free(mask);
