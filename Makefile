@@ -192,12 +192,12 @@ VID_FILE_SRC_8 = uridecodebin name=src uri=$(VID_URI_8) ! $(VID_LINE)
 #GDB=valgrind --tool=memcheck  --track-origins=yes
 VALGRIND = valgrind --tool=memcheck --log-file=valgrind.log --trace-children=yes --suppressions=valgrind-python.supp  --leak-check=full --show-reachable=yes
 
-RNNCA_DEBUG=GST_DEBUG=rnnca*:5,recur*:5
+#RNNCA_DEBUG=GST_DEBUG=rnnca*:5,recur*:5
 
 test-rnnca: libgstrnnca.so
 	$(RNNCA_DEBUG)	$(GDB) 	gst-launch-1.0  \
 	  --gst-plugin-path=$(CURDIR) \
-	$(VID_FILE_SRC_3) ! rnnca ! videoconvert \
+	$(VID_FILE_SRC_3) ! rnnca log-file=rnnca.log ! videoconvert \
 	! xvimagesink force-aspect-ratio=false
 
 

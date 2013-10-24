@@ -166,7 +166,6 @@ gst_rnnca_class_init (GstRnncaClass * g_class)
           DEFAULT_HIDDEN_SIZE,
           G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
-
   vf_class->transform_frame_ip = GST_DEBUG_FUNCPTR (gst_rnnca_transform_frame_ip);
   vf_class->set_info = GST_DEBUG_FUNCPTR (set_info);
   GST_INFO("gst class init\n");
@@ -340,10 +339,19 @@ static void
 gst_rnnca_set_property (GObject * object, guint prop_id, const GValue * value,
     GParamSpec * pspec)
 {
-  //GstRnnca *self = GST_RNNCA (object);
+  GstRnnca *self = GST_RNNCA (object);
   GST_DEBUG("gst_rnnca_set_property\n");
   if (value){
     switch (prop_id) {
+    case PROP_LOG_FILE:
+      /*defer setting the actual log file, in case the nets aren't ready yet*/
+      if (self->pending_logfile){
+        free(self->pending_logfile);
+      }
+      self->pending_logfile = g_value_dup_string(value);
+      maybe_start_logging(self);
+      break;
+
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
       break;
