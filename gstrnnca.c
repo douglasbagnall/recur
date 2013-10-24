@@ -457,6 +457,16 @@ maybe_learn(GstRnnca *self){
     train_net(&self->trainers[i], self->frame_prev, self->frame_now);
   }
   bptt_consolidate_many_nets(self->train_nets, self->n_trainers);
+  RecurNN *net = self->train_nets[0];
+  if (PERIODIC_PGM_DUMP && net->generation % PERIODIC_PGM_DUMP == 0){
+    rnn_multi_pgm_dump(net, "how ihw hod ihd hom ihm");
+  }
+  rnn_log_net(net);
+  self->net->generation = net->generation;
+  rnn_condition_net(self->net);
+  if (PERIODIC_SAVE_NET && (self->net->generation & PERIODIC_SAVE_NET) == 0){
+    rnn_save_net(self->net, self->net_filename);
+  }
 }
 
 static inline void

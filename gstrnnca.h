@@ -27,7 +27,8 @@ G_BEGIN_DECLS
 #define RNNCA_RNN_FLAGS (RNN_NET_FLAG_NO_BIAS)
 #endif
 
-
+#define PERIODIC_PGM_DUMP 255
+#define PERIODIC_SAVE_NET 255
 
 
 typedef struct _RnncaFrame {
