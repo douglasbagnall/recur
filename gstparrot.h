@@ -49,7 +49,6 @@ G_BEGIN_DECLS
 #define TRY_RELOAD 1
 
 #define PERIODIC_PGM_DUMP 0
-#define REGULAR_PGM_DUMP 0
 #define PGM_DUMP_LEARN 0
 #define PGM_DUMP_OUT 1
 

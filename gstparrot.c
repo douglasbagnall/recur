@@ -456,10 +456,6 @@ possibly_save_net(RecurNN *net, char *filename)
   if (PERIODIC_SAVE_NET && (net->generation & 511) == 0){
     rnn_save_net(net, filename);
   }
-  if (REGULAR_PGM_DUMP)
-    rnn_multi_pgm_dump(net, "ihw hhw");
-  else if (PERIODIC_PGM_DUMP && net->generation % PERIODIC_PGM_DUMP == 0)
-    rnn_multi_pgm_dump(net, "hhw ihw");
 }
 
 static inline float *
@@ -484,20 +480,6 @@ train_net(RecurNN *net, float *features, float *target){
   }
   bptt_calc_deltas(net);
   return answer;
-}
-
-static inline void
-consolidate_and_apply_learning(GstParrot *self)
-{
-  RecurNN *net = self->training_nets[0];
-  if (REGULAR_PGM_DUMP)
-    rnn_multi_pgm_dump(net, "ihw hhw");
-  else if (PERIODIC_PGM_DUMP && net->generation % PERIODIC_PGM_DUMP == 0)
-    rnn_multi_pgm_dump(net, "how ihw hod ihd hom ihm");
-  bptt_consolidate_many_nets(self->training_nets, self->n_channels);
-  rnn_condition_net(self->net);
-  self->net->generation = net->generation;
-  possibly_save_net(self->net, self->net_filename);
 }
 
 static inline void
@@ -561,8 +543,14 @@ maybe_learn(GstParrot *self){
       c->mdct_now = tmp;
     }
 
-    consolidate_and_apply_learning(self);
-    RecurNN *net = self->channels[0].train_net;
+    RecurNN *net = self->training_nets[0];
+    if (PERIODIC_PGM_DUMP && net->generation % PERIODIC_PGM_DUMP == 0){
+      rnn_multi_pgm_dump(net, "how ihw");
+    }
+    bptt_consolidate_many_nets(self->training_nets, self->n_channels);
+    rnn_condition_net(self->net);
+    self->net->generation = net->generation;
+    possibly_save_net(self->net, self->net_filename);
     rnn_log_net(net);
 
     self->incoming_start += chunk_size;

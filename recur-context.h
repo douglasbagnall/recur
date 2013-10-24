@@ -6,7 +6,6 @@
 #define HAVE_RECUR_CONTEXT_H
 
 #define PERIODIC_PGM_DUMP 0
-#define REGULAR_PGM_DUMP 0
 #define TEMPORAL_PGM_DUMP 0
 #define NET_LOG_FILE "video.log"
 //#define NET_LOG_FILE NULL

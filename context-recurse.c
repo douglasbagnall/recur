@@ -179,10 +179,9 @@ possibly_save_state(RecurContext *context)
     rnn_save_net(net, NET_FILENAME);
     DEBUG("in possibly_save_state with generation %d", context->net->generation);
   }
-  if (REGULAR_PGM_DUMP)
-    rnn_multi_pgm_dump(net, "ihw hhw");
-  else if (PERIODIC_PGM_DUMP && net->generation % PERIODIC_PGM_DUMP == 0)
+  if (PERIODIC_PGM_DUMP && net->generation % PERIODIC_PGM_DUMP == 0){
     rnn_multi_pgm_dump(net, "hhw ihw");
+  }
 }
 
 /*XXX unswizzle is for gain 2 only */

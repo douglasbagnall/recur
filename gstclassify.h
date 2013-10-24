@@ -49,7 +49,6 @@ typedef s16 audio_sample;
 #define TRY_RELOAD 1
 
 #define PERIODIC_PGM_DUMP 511
-#define REGULAR_PGM_DUMP 0
 #define PGM_DUMP_FEATURES 0
 
 #define CLASSIFY_WINDOW_SIZE 256
