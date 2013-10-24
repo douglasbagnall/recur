@@ -187,7 +187,9 @@ bptt_log_int(RecurNN *net, char *name, int value){
 static inline void
 scale_aligned_array(float *array, int len, float scale)
 {
-#if 0
+  /*Using cblas might create denormal numbers -- unless the blas library has
+    been compiled with -ffastmath. */
+#if 1
   ASSUME_ALIGNED(array);
   for (int i = 0; i < len; i++){
     array[i] *= scale;
@@ -223,7 +225,7 @@ zero_small_numbers(float *array, int len)
 {
   ASSUME_ALIGNED(array);
   for (int i = 0; i < len; i++){
-    array[i] = (fabsf(array[i]) > 1e-35f) ? array[i] : 0.0f;
+    array[i] = (fabsf(array[i]) > 1e-34f) ? array[i] : 0.0f;
   }
 }
 

@@ -495,7 +495,7 @@ consolidate_and_apply_learning(GstParrot *self)
   else if (PERIODIC_PGM_DUMP && net->generation % PERIODIC_PGM_DUMP == 0)
     rnn_multi_pgm_dump(net, "how ihw hod ihd hom ihm");
   bptt_consolidate_many_nets(self->training_nets, self->n_channels);
-  rnn_condition_net(net);
+  rnn_condition_net(self->net);
   self->net->generation = net->generation;
   possibly_save_net(self->net, self->net_filename);
 }

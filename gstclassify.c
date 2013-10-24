@@ -534,7 +534,7 @@ consolidate_and_apply_learning(GstClassify *self)
   else if (PERIODIC_PGM_DUMP && net->generation % PERIODIC_PGM_DUMP == 0)
     rnn_multi_pgm_dump(net, "how ihw hod ihd hom ihm");
   bptt_consolidate_many_nets(self->subnets, self->n_channels);
-  rnn_condition_net(net);
+  rnn_condition_net(self->net);
   possibly_save_net(self->net, self->net_filename);
 
 }
