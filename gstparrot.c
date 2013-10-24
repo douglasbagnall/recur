@@ -4,6 +4,7 @@
  */
 
 #include "gstparrot.h"
+#include "audio-common.h"
 #include <string.h>
 #include <math.h>
 
@@ -446,43 +447,6 @@ gst_parrot_get_property (GObject * object, guint prop_id, GValue * value,
   }
 }
 
-/* queue_audio_segment collects up the audio data, but leaves the
-   deinterlacing and interpretation till later. This is a decoupling step
-   because the incoming packet size is unrelated to the evaluation window
-   size.
- */
-static inline void
-queue_audio_segment(GstParrot *self, GstBuffer *inbuf)
-{
-  GstMapInfo map;
-  gst_buffer_map(inbuf, &map, 0);
-  int len = map.size / sizeof(s16);
-  int end = self->incoming_end;
-  if (end + len < self->queue_size){
-    memcpy(self->incoming_queue + end, map.data, map.size);
-    self->incoming_end += len;
-  }
-  else {
-    int snip = self->queue_size - end;
-    int snip8 = snip * sizeof(s16);
-    memcpy(self->incoming_queue + end, map.data, snip8);
-    memcpy(self->incoming_queue, map.data + snip8,
-        map.size - snip8);
-    self->incoming_end = len - snip;
-  }
-
-  int lag = self->incoming_end - self->incoming_start;
-  if (lag < 0){
-    lag += self->queue_size;
-  }
-  if (lag + len > self->queue_size){
-    GST_DEBUG("incoming lag %d seems to exceed queue size %d",
-        lag, self->queue_size);
-  }
-  GST_LOG("queueing audio starting %llu, ending %llu",
-      GST_BUFFER_PTS(inbuf), GST_BUFFER_PTS(inbuf) + GST_BUFFER_DURATION(inbuf));
-  gst_buffer_unmap(inbuf, &map);
-}
 
 
 static inline void
@@ -692,7 +656,8 @@ gst_parrot_transform_ip(GstBaseTransform * base, GstBuffer *buf)
   GstParrot *self = GST_PARROT(base);
   GstFlowReturn ret = GST_FLOW_OK;
   if (self->training){
-    queue_audio_segment(self, buf);
+    queue_audio_segment(buf, self->incoming_queue, self->queue_size,
+        &self->incoming_start, &self->incoming_end);
     maybe_learn(self);
   }
   if (self->playing){
