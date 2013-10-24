@@ -205,13 +205,10 @@ recur_skipping_downscale(const u8 *restrict src, const int s_width,
     const int s_height, const int s_stride,
     u8 *restrict dest, const int d_width,
     const int d_height, const int d_stride){
-
   uint acc, n_rows;
-  int y_step;
-  int x_step;
   int y;
-  y_step = 0x20000 * 2 * d_height / s_height;
-  x_step = 0x20000 * 2 * d_width / s_width;
+  const int y_step = 0x20000 * 2 * d_height / s_height;
+  const int x_step = 0x20000 * 2 * d_width / s_width;
 
   u64 tmp_row[s_width / sizeof(u64) + 1];
   memset(tmp_row, 0, sizeof(tmp_row));
