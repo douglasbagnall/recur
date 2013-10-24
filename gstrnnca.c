@@ -26,7 +26,6 @@ enum
 enum
 {
   PROP_0,
-  PROP_FORGET,
   PROP_LEARN_RATE,
   PROP_HIDDEN_SIZE,
   PROP_SAVE_NET,
@@ -39,7 +38,6 @@ enum
 #define DEFAULT_PROP_PGM_DUMP ""
 #define DEFAULT_PROP_LOG_FILE ""
 #define DEFAULT_PROP_SAVE_NET NULL
-#define DEFAULT_PROP_FORGET 0
 #define DEFAULT_PROP_PLAYING 1
 #define DEFAULT_PROP_TRAINING 1
 #define DEFAULT_HIDDEN_SIZE 99
@@ -142,21 +140,15 @@ gst_rnnca_class_init (GstRnncaClass * g_class)
           DEFAULT_PROP_LOG_FILE,
           G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
-  g_object_class_install_property (gobject_class, PROP_FORGET,
-      g_param_spec_boolean("forget", "forget",
-          "Forget the current hidden layer (all channels)",
-          DEFAULT_PROP_FORGET,
-          G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
-
   g_object_class_install_property (gobject_class, PROP_PLAYING,
       g_param_spec_boolean("playing", "playing",
-          "Construct imaginary audio to play",
+          "Construct imaginary video",
           DEFAULT_PROP_PLAYING,
           G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class, PROP_TRAINING,
       g_param_spec_boolean("training", "training",
-          "Learn from incoming audio",
+          "Learn from incoming video",
           DEFAULT_PROP_TRAINING,
           G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
