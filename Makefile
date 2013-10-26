@@ -164,10 +164,10 @@ VID_URI_4=file://$(VIDEO_DIR)/DEC.flv
 VID_URI_5=file://$(VIDEO_DIR)/alowhum/vts_16_1.vob.avi
 VID_URI_6=file://$(VIDEO_DIR)/movies/louis-theroux-lagos/louis.theroux.law.and.disorder.in.lagos.ws.pdtv.xvid-waters.avi
 VID_URI_7=file://$(VIDEO_DIR)/movies/InBruges.avi
-VID_URI_8=file://$(VIDEO_DIR)/movies/louis-theroux-zionists/Louis.Theroux.Ultra.Zionists.WS.PDTV.XviD-PVR.avi
+VID_URI_LAGOS=file://$(VIDEO_DIR)/movies/louis-theroux-zionists/Louis.Theroux.Ultra.Zionists.WS.PDTV.XviD-PVR.avi
 
-VID_W=800
-VID_H=600
+VID_W=640
+VID_H=480
 VID_SPECS = video/x-raw, format=I420, width=$(VID_W), height=$(VID_H)
 
 VID_TEST_SRC_1 = videotestsrc pattern=14 kt=2 kxt=1 kyt=3  kxy=3 !\
@@ -183,7 +183,7 @@ VID_FILE_SRC_4 = uridecodebin name=src uri=$(VID_URI_4) ! $(VID_LINE)
 VID_FILE_SRC_5 = uridecodebin name=src uri=$(VID_URI_5) ! $(VID_LINE)
 VID_FILE_SRC_6 = uridecodebin name=src uri=$(VID_URI_6) ! $(VID_LINE)
 VID_FILE_SRC_7 = uridecodebin name=src uri=$(VID_URI_7) ! $(VID_LINE)
-VID_FILE_SRC_8 = uridecodebin name=src uri=$(VID_URI_8) ! $(VID_LINE)
+VID_FILE_SRC_LAGOS = uridecodebin name=src uri=$(VID_URI_LAGOS) ! $(VID_LINE)
 
 #GST_DEBUG=uridecodebin:7
 #GST_DEBUG=recur*:5
@@ -197,13 +197,24 @@ VALGRIND = valgrind --tool=memcheck --log-file=valgrind.log --trace-children=yes
 test-rnnca: libgstrnnca.so
 	$(RNNCA_DEBUG)	$(GDB) 	gst-launch-1.0  \
 	  --gst-plugin-path=$(CURDIR) \
-	$(VID_FILE_SRC_3) ! rnnca log-file=rnnca.log ! videoconvert \
-	! xvimagesink force-aspect-ratio=false
+	$(VID_FILE_SRC_LAGOS) ! rnnca log-file=rnnca.log training=1 playing=1 \
+	! videoconvert ! xvimagesink force-aspect-ratio=false
+
+train-rnnca: libgstrnnca.so
+	$(RNNCA_DEBUG)	$(GDB) 	gst-launch-1.0  \
+	  --gst-plugin-path=$(CURDIR) \
+	$(VID_FILE_SRC_LAGOS) ! rnnca log-file=rnnca.log training=1 playing=0 ! fakesink
+
+play-rnnca: libgstrnnca.so
+	$(RNNCA_DEBUG)	$(GDB) 	gst-launch-1.0  \
+	  --gst-plugin-path=$(CURDIR) \
+	$(VID_FILE_SRC_LAGOS) ! rnnca training=0 playing=1 \
+	! videoconvert ! xvimagesink force-aspect-ratio=false
 
 
 TEST_PIPELINE_CORE = gst-launch-1.0  \
 	  --gst-plugin-path=$(CURDIR) \
-	$(VID_FILE_SRC_8) ! recur_manager name=recur osdebug=0 ! videoconvert \
+	$(VID_FILE_SRC_LAGOS) ! recur_manager name=recur osdebug=0 ! videoconvert \
 	! xvimagesink force-aspect-ratio=false \
 	recur. ! autoaudiosink \
 	src. ! $(AUD_LINE) ! recur.
