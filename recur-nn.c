@@ -662,6 +662,7 @@ apply_learning_with_momentum(float *restrict weights,
 static inline float
 apply_sgd_with_bptt(RecurNN *net, float top_error_sum){
   RecurNNBPTT *bptt = net->bptt;
+
   float error_sum = bptt_and_accumulate_error(net, bptt->ih_delta, top_error_sum);
   float rate = bptt->learn_rate * bptt->ih_scale;
 
@@ -697,6 +698,8 @@ void bptt_consolidate_many_nets(RecurNN **nets, int n){
   float *ho_gradient = bptt->ho_delta;
   float *ih_gradient = bptt->ih_delta;
   scale_aligned_array(ih_gradient, net->ih_size, bptt->ih_scale);
+  int ho_size = net->ho_size;
+  int ih_size = net->ih_size;
   for (int i = 1; i < n; i++){
     net = nets[i];
     bptt = net->bptt;
