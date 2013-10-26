@@ -41,7 +41,7 @@ enum
 #define DEFAULT_PROP_PLAYING 1
 #define DEFAULT_PROP_TRAINING 1
 #define DEFAULT_HIDDEN_SIZE 99
-#define DEFAULT_LEARN_RATE 0.0001
+#define DEFAULT_LEARN_RATE 0.0003
 #define MIN_HIDDEN_SIZE 1
 #define MAX_HIDDEN_SIZE 1000000
 #define LEARN_RATE_MIN 0.0
@@ -121,7 +121,6 @@ gst_rnnca_class_init (GstRnncaClass * g_class)
       "Mangles video",
       "Douglas Bagnall <douglas@halo.gen.nz>");
 
-
   g_object_class_install_property (gobject_class, PROP_PGM_DUMP,
       g_param_spec_string("pgm-dump", "pgm-dump",
           "Dump weight images (space separated \"ih* hh* ho*\", *one of \"wdm\")",
@@ -183,6 +182,7 @@ gst_rnnca_init (GstRnnca * self)
   self->training = 1;
   self->playing = 1;
   self->hidden_size = DEFAULT_HIDDEN_SIZE;
+  self->learn_rate = DEFAULT_LEARN_RATE;
   GST_INFO("gst rnnca init\n");
 }
 
@@ -447,11 +447,14 @@ train_net(RnncaTrainer *t, RnncaFrame *prev,  RnncaFrame *now){
   GST_DEBUG("x %d, y %d, offset %d", t->x, t->y, offset);
   plane_size = RNNCA_WIDTH * RNNCA_HEIGHT;
   for (i = 0; i < 3; i++){
-    GST_DEBUG("now %p Y %p plane_size %d, offset %d", now, now->Y, plane_size, offset);
+    GST_LOG("now %p prev %p Y %p/%p plane_size %d, offset %d",
+        now, prev, now->Y, prev->Y, plane_size, offset);
     float t = BYTE_TO_UNIT(now->Y[offset + plane_size * i]);
     float a = answer[i];
     float slope = a * (1.0f - a);
     net->bptt->o_error[i] = slope * (t - a);
+    GST_DEBUG("t %.2g a %.2g diff %.2g slope %.2g",
+        t, a, t - a, slope);
   }
   bptt_calc_deltas(net);
 }
@@ -466,8 +469,8 @@ maybe_learn(GstRnnca *self){
   }
   bptt_consolidate_many_nets(self->train_nets, self->n_trainers);
   RecurNN *net = self->train_nets[0];
-  if (PERIODIC_PGM_DUMP && net->generation % PERIODIC_PGM_DUMP == 0){
-    rnn_multi_pgm_dump(net, "how ihw hod ihd hom ihm");
+  if (PERIODIC_PGM_DUMP && (net->generation & PERIODIC_PGM_DUMP) == 0){
+    rnn_multi_pgm_dump(net, "how ihw");
   }
   rnn_log_net(net);
   self->net->generation = net->generation;

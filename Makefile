@@ -5,6 +5,7 @@ BASENAME = recur
 GDB_ALWAYS_FLAGS = -ggdb -O3
 WARNINGS = -Wall -Wextra -Wno-unused-parameter -Wno-missing-field-initializers -ftree-vectorizer-verbose=0 -fno-inline
 # -Wunsafe-loop-optimizations  -ftree-vectorizer-verbose=2  -fno-inline
+# -fno-trapping-math
 
 GST_VERSION = 1.0
 

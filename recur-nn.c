@@ -655,8 +655,9 @@ apply_learning_with_momentum(float *restrict weights,
     momentums[i] += t;
     momentums[i] *= momentum;
   }
-
 #endif
+  MAYBE_DEBUG("momentums %.2g %.2g %.2g %.2g %.2g",
+      momentums[0], momentums[3], momentums[6], momentums[10], momentums[11]);
 }
 
 static inline float
