@@ -11,7 +11,7 @@ from collections import defaultdict
 from math import log
 
 
-DEFAULT_LOGFILE = "parrot.log"
+DEFAULT_LOGFILE = "rnnca.log"
 DEFAULT_KEYS = ('error_sum', 'error', 'hidden_sum', 'depth',
                 'error_gain', 'correct'
                )
