@@ -69,7 +69,7 @@ pgm_dump_normalised_float(const float *data, u32 width, u32 height, const char *
 static inline void
 pgm_dump_unnormalised_float(const float *weights, int width, int height, const char *name)
 {
-  float biggest = 1e-30f;
+  float biggest = 1e-35f;
   for (int i = 0; i < width * height; i++){
     float f = fabsf(weights[i]);
     if (f > biggest)
@@ -147,7 +147,7 @@ static inline void
 ppm_dump_signed_unnormalised_float(const float *weights, int width, int height, const char *name)
 {
 #if ! DISABLE_PGM_DUMP
-  float biggest = 1e-30f;
+  float biggest = 1e-35f;
   for (int i = 0; i < width * height; i++){
     float f = fabsf(weights[i]);
     if (f > biggest)
