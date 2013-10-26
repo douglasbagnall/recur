@@ -681,8 +681,7 @@ apply_sgd_with_bptt_batch(RecurNN *net, float top_error_sum){
   float *gradient = malloc_aligned_or_die(net->ih_size * sizeof(float));
   float error_sum = bptt_and_accumulate_error(net, gradient, top_error_sum);
 
-  /*saxpy -> scale and add */
-  cblas_saxpy(net->ih_size, bptt->ih_scale, gradient, 1, bptt->ih_delta, 1);
+  add_aligned_arrays(bptt->ih_delta, net->ih_size, gradient, bptt->ih_scale);
 
   free(gradient);
 
@@ -703,9 +702,8 @@ void bptt_consolidate_many_nets(RecurNN **nets, int n){
   for (int i = 1; i < n; i++){
     net = nets[i];
     bptt = net->bptt;
-    /*saxpy -> scale and add */
-    cblas_saxpy(net->ho_size, 1, bptt->ho_delta, 1, ho_gradient, 1);
-    cblas_saxpy(net->ih_size, bptt->ih_scale, bptt->ih_delta, 1, ih_gradient, 1);
+    add_aligned_arrays(ho_gradient, ho_size, bptt->ho_delta, 1.0f);
+    add_aligned_arrays(ih_gradient, ih_size, bptt->ih_delta, bptt->ih_scale);
   }
   /*All nets (should) have the same weights and usable momentums, so it would
     be OK to just use the last one, but nets[0] is the one that gets debugging

@@ -199,6 +199,26 @@ scale_aligned_array(float *array, int len, float scale)
 #endif
 }
 
+static inline void
+add_aligned_arrays(float *restrict dest, int len, const float *restrict src, float scale)
+{
+  /*dest = dest + src * scale
+    cblas_saxpy can do it. */
+#if 1
+  ASSUME_ALIGNED(dest);
+  ASSUME_ALIGNED(src);
+  for (int i = 0; i < len; i++){
+    dest[i] += src[i] * scale;
+  }
+#else
+  cblas_saxpy(len, scale, src, 1, dest, 1);
+#endif
+}
+
+
+
+
+
 static inline float
 soft_clip(float sum, float halfmax){
   float x = sum / halfmax;
