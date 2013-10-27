@@ -57,6 +57,7 @@ LINKS = -L/usr/local/lib -lgstbase-$(GST_VERSION) -lgstreamer-$(GST_VERSION) \
 
 GTK_LINKS =  -lgtk-3 -lgdk-3
 
+OPT_OBJECTS = ccan/opt/opt.o ccan/opt/parse.o ccan/opt/helpers.o ccan/opt/usage.o
 
 SOURCES =  gst$(BASENAME)_manager.c gst$(BASENAME)_audio.c gst$(BASENAME)_video.c \
 	recur-context.c rescale.c recur-nn.c recur-nn-io.c context-recurse.c mfcc.c
@@ -71,11 +72,16 @@ all:: libgstclassify.so images nets
 clean:
 	rm -f *.so *.o *.a *.d *.s
 	rm -f path.h
+	rm -f ccan/*/*.[oad]
 
 pgm-clean:
 	#find images -maxdepth 1 -name '*.p?m' | xargs rm -f
 	rm -r images
 	mkdir images
+
+# Ensure we don't end up with empty file if configurator fails!
+config.h: ccan/tools/configurator/configurator
+	ccan/tools/configurator/configurator $(CC) $(CFLAGS) > $@.tmp && mv $@.tmp $@
 
 .c.o:
 	$(CC)  -c -MMD $(ALL_CFLAGS) $(CPPFLAGS) -o $@ $<
@@ -125,8 +131,8 @@ test_window_functions test_dct: %: mfcc.o %.o path.h
 test_simple_rescale test_rescale: %: rescale.o %.o  path.h
 	$(CC) -Wl,-O1 $^   $(INCLUDES) $(DEFINES)  $(LINKS)  -o $@
 
-test_backprop test_fb_backprop: %: recur-nn.o recur-nn-io.o %.o path.h
-	$(CC) -Wl,-O1 $^   $(INCLUDES) $(DEFINES)  $(LINKS)  -o $@
+test_backprop test_fb_backprop: %: recur-nn.o recur-nn-io.o %.o  path.h $(OPT_OBJECTS)
+	$(CC) -Iccan/opt/ -Wl,-O1 $^   $(INCLUDES) $(DEFINES)  $(LINKS)  -o $@
 
 test_mdct: %: recur-nn.o mdct.o window.o %.o  path.h
 	$(CC) -Wl,-O1 $^   $(INCLUDES) $(DEFINES)  $(LINKS)  -o $@

@@ -2,11 +2,11 @@
 #include "pgm_dump.h"
 #include <math.h>
 #include "path.h"
-#define SRC_TEXT3 TEST_DATA_DIR "/dickens.txt"
-#define SRC_TEXT TEST_DATA_DIR "/erewhon.txt"
-#define SRC_TEXT2 TEST_DATA_DIR "/erewhon-erewhon"\
+#define DICKENS_SHUFFLED_TEXT TEST_DATA_DIR "/dickens-shuffled.txt"
+#define DICKENS_TEXT TEST_DATA_DIR "/dickens.txt"
+#define EREWHON_TEXT TEST_DATA_DIR "/erewhon.txt"
+#define EREWHON_LONG_TEXT TEST_DATA_DIR "/erewhon-erewhon"\
   "-revisited-sans-gutenberg.txt"
-
 
 static inline int
 search_for_max(float *answer, int len){

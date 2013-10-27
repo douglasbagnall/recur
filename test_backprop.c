@@ -10,6 +10,8 @@
 #define NET_LOG_FILE "bptt.log"
 #include "test-common.h"
 #include "badmaths.h"
+#include "ccan/opt/opt.h"
+#include <errno.h>
 #include <stdio.h>
 #include <fenv.h>
 #include <ctype.h>
@@ -26,6 +28,10 @@
 #define K_STOP 0
 #define BPTT_BATCH_SIZE 1
 
+#define Q_DEBUG(quiet, ...) do {                                \
+                                if (quiet >= opt_quiet)         \
+                                  STDERR_DEBUG(__VA_ARGS__); \
+                                } while(0)
 
 u8 CHAR_TO_NET[257];
 const u8 NET_TO_CHAR[] = "abcdefghijklmnopqrstuvwxyz,'- .\"#;:!?";
@@ -35,6 +41,51 @@ const u8 HASH_CHARS[] = "1234567890&@";
 #define INPUT_SIZE (sizeof(NET_TO_CHAR) - 1)
 
 #define NET_FILENAME ("test_backprop-" QUOTE(HIDDEN_SIZE) "-" QUOTE(BIAS) ".net")
+
+static uint opt_hidden_size = HIDDEN_SIZE;
+static uint opt_bptt_depth = BPTT_DEPTH;
+static float opt_learn_rate = LEARN_RATE;
+static float opt_momentum = MOMENTUM;
+static int opt_quiet = 0;
+static char * opt_filename = TRY_RELOAD ? NET_FILENAME : NULL;
+
+/* Following ccan/opt/helpers.c opt_set_longval, etc */
+static char *
+opt_set_floatval(const char *arg, float *f)
+{
+  char *endp;
+  errno = 0;
+  *f = strtof(arg, &endp);
+  if (*endp || !arg[0] || errno){
+    char *s;
+    if (asprintf(&s, "'%s' doesn't seem like a number", arg) > 0){
+      return s;
+    }
+  }
+  return NULL;
+}
+
+void opt_show_floatval(char buf[OPT_SHOW_LEN], const float *f)
+{
+  snprintf(buf, OPT_SHOW_LEN, "%g", *f);
+}
+
+static struct opt_table options[] = {
+  OPT_WITH_ARG("-h|--hidden-size=<n>", opt_set_uintval, opt_show_uintval,
+      &opt_hidden_size, "number of hidden nodes (" QUOTE(HIDDEN_SIZE) ")"),
+  OPT_WITH_ARG("-d|--depth=<n>", opt_set_uintval, opt_show_uintval,
+      &opt_bptt_depth, "max depth of BPTT recursion (" QUOTE(BPTT_DEPTH) ")"),
+  OPT_WITH_ARG("-l|--learn-rate=<float>", opt_set_floatval, opt_show_floatval,
+      &opt_learn_rate, "learning rate (" QUOTE(LEARN_RATE) ")"),
+  OPT_WITH_ARG("-m|--momentum=<float>", opt_set_floatval, opt_show_floatval,
+      &opt_momentum, "momentum (" QUOTE(MOMENTUM) ")"),
+  OPT_WITHOUT_ARG("-q|--quiet", opt_inc_intval,
+      &opt_quiet, "print less (twice for even less)"),
+  OPT_WITH_ARG("-f|--filename=<file>", opt_set_charp, opt_show_charp, &opt_filename,
+      TRY_RELOAD ? "filename (" QUOTE(NET_FILENAME) ")" : "filename (None)"),
+
+  OPT_ENDTABLE
+};
 
 static int
 create_char_lut(u8 *ctn, const u8 *ntc, const u8 *hash_chars){
@@ -79,10 +130,10 @@ alloc_and_collapse_text(char *filename, long *len){
   }
   text[j] = 0;
   *len = j;
-  DEBUG("original text was %d chars, collapsed is %d", i, j);
+  Q_DEBUG(1, "original text was %d chars, collapsed is %d", i, j);
   err |= fclose(f);
   if (err){
-    DEBUG("something went wrong with the file %p (%s). error %d",
+    Q_DEBUG(2, "something went wrong with the file %p (%s). error %d",
     f, filename, err);
   }
   return text;
@@ -214,7 +265,7 @@ long_confab(RecurNN *net, int len, int rows, int hidden_ppm){
       confab[linebreak + 1] = '{';
     }
   }
-  DEBUG("%s", confab);
+  Q_DEBUG(0, "%s", confab);
 }
 
 static TemporalPPM *input_ppm;
@@ -248,7 +299,7 @@ epoch(RecurNN *net, RecurNN *confab_net, const u8 *text, const int len){
       entropy /= -1024.0f;
       confabulate(confab_net, confab, CONFAB_SIZE, CONFAB_HIDDEN_IMG,
           DETERMINISTIC_CONFAB);
-      DEBUG("%4dk .%02d %.2f .%02d |%s|", k, (int)(error / 10.24f + 0.5), entropy,
+      Q_DEBUG(0, "%4dk .%02d %.2f .%02d |%s|", k, (int)(error / 10.24f + 0.5), entropy,
           (int)(correct / 10.24f + 0.5), confab);
       bptt_log_float(net, "error", error / 1024.0f);
       bptt_log_float(net, "entropy", entropy);
@@ -273,37 +324,32 @@ epoch(RecurNN *net, RecurNN *confab_net, const u8 *text, const int len){
   long_confab(confab_net, CONFAB_SIZE, 6, CONFAB_HIDDEN_IMG);
 }
 
-void dump_parameters(void){
-#define DEBUG_CONSTANT(x, f) DEBUG("%-25s: " #f, #x, x)
-  DEBUG_CONSTANT(MAX_ERROR_GAIN , %g);
-  DEBUG_CONSTANT(MIN_ERROR_FACTOR , %g);
-  DEBUG_CONSTANT(HIDDEN_SIZE , %d);
-  DEBUG_CONSTANT(LEARN_RATE , %g);
-  DEBUG_CONSTANT(BIAS , %d);
-  DEBUG_CONSTANT(MOMENTUM , %g);
-  DEBUG_CONSTANT(MOMENTUM_WEIGHT , %g);
-  DEBUG_CONSTANT(BPTT_DEPTH , %d);
-  DEBUG_CONSTANT(BPTT_BATCH_SIZE, %d);
-#undef DEBUG_CONSTANT
-}
-
 int
-main(void){
-  dump_parameters();
+main(int argc, char *argv[]){
   feenableexcept(FE_DIVBYZERO | FE_INVALID | FE_OVERFLOW);
   //feenableexcept(FE_ALL_EXCEPT & ~ FE_INEXACT);
+  opt_register_table(options, NULL);
+  if (!opt_parse(&argc, argv, opt_log_stderr)){
+    exit(1);
+  }
+  if (argc > 1){
+    Q_DEBUG(1, "unused arguments:");
+    for (int i = 1; i < argc; i++){
+      Q_DEBUG(1, "   '%s'", argv[i]);
+    }
+  }
   RecurNN *net = NULL;
-#if TRY_RELOAD
-  net = rnn_load_net(NET_FILENAME);
-  if (net)
-    rnn_set_log_file(net, NET_LOG_FILE, 0);
-  DEBUG("net is %p", net);
-#endif
+  if (opt_filename){
+    net = rnn_load_net(opt_filename);
+    if (net){
+      rnn_set_log_file(net, NET_LOG_FILE, 0);
+    }
+  }
   if (net == NULL){
     u32 flags = BIAS ? RNN_NET_FLAG_STANDARD : RNN_NET_FLAG_NO_BIAS;
-    net = rnn_new(INPUT_SIZE, HIDDEN_SIZE,
+    net = rnn_new(INPUT_SIZE, opt_hidden_size,
         INPUT_SIZE, flags, 1,
-        NET_LOG_FILE, BPTT_DEPTH, LEARN_RATE, MOMENTUM, MOMENTUM_WEIGHT,
+        NET_LOG_FILE, opt_bptt_depth, opt_learn_rate, opt_momentum, MOMENTUM_WEIGHT,
         BPTT_BATCH_SIZE);
   }
   RecurNN *confab_net = rnn_clone(net,
@@ -313,13 +359,13 @@ main(void){
 
   create_char_lut(CHAR_TO_NET, NET_TO_CHAR, HASH_CHARS);
   long len;
-  u8* text = alloc_and_collapse_text(SRC_TEXT3, &len);
+  u8* text = alloc_and_collapse_text(DICKENS_SHUFFLED_TEXT, &len);
   if (TEMPORAL_PGM_DUMP){
     input_ppm = temporal_ppm_alloc(net->i_size, 500, "input_layer", 0, PGM_DUMP_COLOUR);
   }
   START_TIMER(run);
   for (int i = 0; i < 200; i++){
-    DEBUG("Starting epoch %d. learn rate %f.", i, net->bptt->learn_rate);
+    Q_DEBUG(1, "Starting epoch %d. learn rate %f.", i, net->bptt->learn_rate);
     START_TIMER(epoch);
     epoch(net, confab_net, text, len);
     DEBUG_TIMER(epoch);
