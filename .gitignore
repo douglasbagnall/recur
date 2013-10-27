@@ -21,3 +21,5 @@ test_*
 /gtk-recur
 /nets
 /path.h
+/ccan/tools/configurator/configurator
+/config.h
