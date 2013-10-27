@@ -22,36 +22,3 @@ search_for_max(float *answer, int len){
   }
   return best_offset;
 }
-
-
-typedef struct _FloatIm {
-  float * data;
-  int width;
-  int height;
-  int next_row;
-} FloatIm;
-
-static inline void
-init_error_image(FloatIm *im, int width, int height){
-  im->width = width;
-  im->height = height;
-  im->data = malloc_aligned_or_die(width * height * sizeof(float));
-  im->next_row = 0;
-}
-
-static inline void
-add_error_image_row(FloatIm *im, float *o_error){
-  if (im->next_row >= im->height){
-    DEBUG("trying to add row %d/%d", im->next_row, im->height);
-  }
-  else {
-    memcpy(im->data + im->next_row * im->width, o_error, im->width * sizeof(float));
-  }
-  im->next_row++;
-}
-
-static inline void
-finish_error_image(FloatIm *im, char *name, int id){
-  dump_colour_weights_autoname(im->data, im->width, im->height, name, id);
-  free(im->data);
-}
