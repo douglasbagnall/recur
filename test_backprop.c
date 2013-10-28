@@ -346,11 +346,15 @@ epoch(RecurNN *net, RecurNN *confab_net, const u8 *text, const int len){
 
 static char*
 construct_net_filename(void){
-  char s[200];
+  char s[260];
   int alpha_size = strlen(opt_alphabet);
-
-  snprintf(s, sizeof(s), "text-i%d-h%d-o%d-b%d.net",
-      alpha_size, opt_hidden_size, alpha_size,
+  uint sig = 0;
+  snprintf(s, sizeof(s), "%s--%s", opt_alphabet, opt_collapse_chars);
+  for (uint i = 0; i < strlen(s); i++){
+    sig ^= ROTATE(sig - s[i], 13) + s[i];
+  }
+  snprintf(s, sizeof(s), "text-s%0x-i%d-h%d-o%d-b%d.net",
+      sig, alpha_size, opt_hidden_size, alpha_size,
       opt_bias);
   return strdup(s);
 }
