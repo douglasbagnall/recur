@@ -1,11 +1,9 @@
-#define DISABLE_PGM_DUMP 0
-#define EXCESSIVE_PGM_DUMP 0
 #define PERIODIC_PGM_DUMP 0
 #define TEMPORAL_PGM_DUMP 0
 #define CONFAB_HIDDEN_IMG 0
 #define DETERMINISTIC_CONFAB 0
 #define PERIODIC_SAVE_NET 1
-#define TRY_RELOAD 0
+#define DEFAULT_RELOAD 0
 
 #define NET_LOG_FILE "bptt.log"
 #include "test-common.h"
@@ -22,9 +20,9 @@
 #define LEARN_RATE_DECAY 0.96
 #define MIN_LEARN_RATE 1e-6
 
-#define MOMENTUM 0.95
-#define MOMENTUM_WEIGHT 0.5
-#define BIAS 1
+#define DEFAULT_MOMENTUM 0.95
+#define DEFAULT_MOMENTUM_WEIGHT 0.5
+#define DEFAULT_BIAS 1
 #define K_STOP 0
 #define BPTT_BATCH_SIZE 1
 
@@ -33,21 +31,25 @@
                                   STDERR_DEBUG(__VA_ARGS__); \
                                 } while(0)
 
-u8 CHAR_TO_NET[257];
-const u8 NET_TO_CHAR[] = "abcdefghijklmnopqrstuvwxyz,'- .\"#;:!?";
-const u8 HASH_CHARS[] = "1234567890&@";
+#define NET_TO_CHAR "#abcdefghijklmnopqrstuvwxyz,'- .\";:!?"
+#define HASH_CHARS "1234567890&@"
 
 #define HIDDEN_SIZE 199
-#define INPUT_SIZE (sizeof(NET_TO_CHAR) - 1)
-
-#define NET_FILENAME ("test_backprop-" QUOTE(HIDDEN_SIZE) "-" QUOTE(BIAS) ".net")
 
 static uint opt_hidden_size = HIDDEN_SIZE;
 static uint opt_bptt_depth = BPTT_DEPTH;
 static float opt_learn_rate = LEARN_RATE;
-static float opt_momentum = MOMENTUM;
+static float opt_momentum = DEFAULT_MOMENTUM;
 static int opt_quiet = 0;
-static char * opt_filename = TRY_RELOAD ? NET_FILENAME : NULL;
+static char * opt_filename = NULL;
+static char * opt_logfile = NET_LOG_FILE;
+static char * opt_alphabet = NET_TO_CHAR;
+static char * opt_collapse_chars = HASH_CHARS;
+static char * opt_textfile = DICKENS_SHUFFLED_TEXT;
+static bool opt_bias = DEFAULT_BIAS;
+static bool opt_reload = DEFAULT_RELOAD;
+static float opt_momentum_weight = DEFAULT_MOMENTUM_WEIGHT;
+
 
 /* Following ccan/opt/helpers.c opt_set_longval, etc */
 static char *
@@ -71,18 +73,38 @@ void opt_show_floatval(char buf[OPT_SHOW_LEN], const float *f)
 }
 
 static struct opt_table options[] = {
-  OPT_WITH_ARG("-h|--hidden-size=<n>", opt_set_uintval, opt_show_uintval,
-      &opt_hidden_size, "number of hidden nodes (" QUOTE(HIDDEN_SIZE) ")"),
+  OPT_WITH_ARG("-H|--hidden-size=<n>", opt_set_uintval, opt_show_uintval,
+      &opt_hidden_size, "number of hidden nodes"),
   OPT_WITH_ARG("-d|--depth=<n>", opt_set_uintval, opt_show_uintval,
-      &opt_bptt_depth, "max depth of BPTT recursion (" QUOTE(BPTT_DEPTH) ")"),
+      &opt_bptt_depth, "max depth of BPTT recursion"),
   OPT_WITH_ARG("-l|--learn-rate=<float>", opt_set_floatval, opt_show_floatval,
-      &opt_learn_rate, "learning rate (" QUOTE(LEARN_RATE) ")"),
+      &opt_learn_rate, "learning rate"),
   OPT_WITH_ARG("-m|--momentum=<float>", opt_set_floatval, opt_show_floatval,
-      &opt_momentum, "momentum (" QUOTE(MOMENTUM) ")"),
+      &opt_momentum, "momentum"),
   OPT_WITHOUT_ARG("-q|--quiet", opt_inc_intval,
       &opt_quiet, "print less (twice for even less)"),
+  OPT_WITHOUT_ARG("--bias", opt_set_bool,
+      &opt_bias, "use bias (default)"),
+  OPT_WITHOUT_ARG("-N|--no-bias", opt_set_invbool,
+      &opt_bias, "Don't use bias"),
+  OPT_WITHOUT_ARG("--reload", opt_set_bool,
+      &opt_reload, "try to reload the net"),
+  OPT_WITHOUT_ARG("-N|--no-reload", opt_set_invbool,
+      &opt_reload, "Don't try to reload"),
   OPT_WITH_ARG("-f|--filename=<file>", opt_set_charp, opt_show_charp, &opt_filename,
-      TRY_RELOAD ? "filename (" QUOTE(NET_FILENAME) ")" : "filename (None)"),
+      "load/save net here"),
+  OPT_WITH_ARG("--log-file=<file>", opt_set_charp, opt_show_charp, &opt_logfile,
+      "log to this filename"),
+  OPT_WITH_ARG("-t|--text-file=<file>", opt_set_charp, opt_show_charp, &opt_textfile,
+      "learn from this text"),
+  OPT_WITHOUT_ARG("-h|--help", opt_usage_and_exit,
+      "Character level language model",
+      "Print this message."),
+  OPT_WITH_ARG("-A|--alphabet=<chars>", opt_set_charp, opt_show_charp, &opt_alphabet,
+      "Use only these characters"),
+  OPT_WITH_ARG("-C|--collapse-chars=<chars>", opt_set_charp, opt_show_charp,
+      &opt_collapse_chars, "Map these characters to first in alphabet"),
+
 
   OPT_ENDTABLE
 };
@@ -107,8 +129,11 @@ create_char_lut(u8 *ctn, const u8 *ntc, const u8 *hash_chars){
 }
 
 static inline u8*
-alloc_and_collapse_text(char *filename, long *len){
+alloc_and_collapse_text(char *filename, const u8 *alphabet, const u8 *collapse_chars,
+    long *len){
   int i, j;
+  u8 char_to_net[257];
+  create_char_lut(char_to_net, alphabet, collapse_chars);
   FILE *f = fopen(filename, "r");
   int err = fseek(f, 0, SEEK_END);
   *len = ftell(f);
@@ -117,11 +142,11 @@ alloc_and_collapse_text(char *filename, long *len){
   u8 prev = 0;
   u8 c;
   int chr = 0;
-  int space = CHAR_TO_NET[' '];
+  int space = char_to_net[' '];
   j = 0;
   for(i = 0; i < *len && chr != EOF; i++){
     chr = getc(f);
-    c = CHAR_TO_NET[chr];
+    c = char_to_net[chr];
     if (c != space || prev != space){
       prev = c;
       text[j] = c;
@@ -145,7 +170,7 @@ dump_collapsed_text(u8 *text, int len, char *name)
   int i;
   FILE *f = fopen(name, "w");
   for (i = 0; i < len; i++){
-    fputc(NET_TO_CHAR[text[i]], f);
+    fputc(opt_alphabet[text[i]], f);
   }
   fclose(f);
 }
@@ -153,7 +178,7 @@ dump_collapsed_text(u8 *text, int len, char *name)
 
 static inline float*
 one_hot_opinion(RecurNN *net, const int hot){
-  memset(net->real_inputs, 0, INPUT_SIZE * sizeof(float));
+  memset(net->real_inputs, 0, net->input_size * sizeof(float));
   net->real_inputs[hot] = 1.0f;
   float *answer = rnn_opinion(net, NULL);
   //net->real_inputs[hot] = 0.0;
@@ -179,10 +204,6 @@ sgd_one(RecurNN *net, const int current, const int next, float *error, int *corr
 
   bptt_calculate(net);
 
-  if (EXCESSIVE_PGM_DUMP){
-    dump_colour_weights_autoname(net->ho_weights, net->o_size, net->h_size,
-        "ho", net->generation);
-  }
   *error = sum;
 }
 
@@ -227,7 +248,7 @@ confabulate(RecurNN *net, char *text, int len,
       n = opinion_deterministic(net, n);
     else
       n = opinion_probabilistic(net, n);
-    int c = NET_TO_CHAR[n];
+    int c = opt_alphabet[n];
     text[i] = c;
     if (hidden_ppm)
       memcpy(&im[net->h_size * i], net->hidden_layer, net->h_size * sizeof(float));
@@ -307,8 +328,8 @@ epoch(RecurNN *net, RecurNN *confab_net, const u8 *text, const int len){
       correct = 0;
       error = 0.0f;
       entropy = 0.0f;
-      if (PERIODIC_SAVE_NET){
-        rnn_save_net(net, NET_FILENAME);
+      if (PERIODIC_SAVE_NET && opt_filename){
+        rnn_save_net(net, opt_filename);
       }
       if (PERIODIC_PGM_DUMP){
         rnn_multi_pgm_dump(net, "ihw how");
@@ -324,6 +345,17 @@ epoch(RecurNN *net, RecurNN *confab_net, const u8 *text, const int len){
   long_confab(confab_net, CONFAB_SIZE, 6, CONFAB_HIDDEN_IMG);
 }
 
+static char*
+construct_net_filename(void){
+  char s[200];
+  int alpha_size = strlen(opt_alphabet);
+
+  snprintf(s, sizeof(s), "text-i%d-h%d-o%d-b%d.net",
+      alpha_size, opt_hidden_size, alpha_size,
+      opt_bias);
+  return strdup(s);
+}
+
 int
 main(int argc, char *argv[]){
   feenableexcept(FE_DIVBYZERO | FE_INVALID | FE_OVERFLOW);
@@ -337,19 +369,24 @@ main(int argc, char *argv[]){
     for (int i = 1; i < argc; i++){
       Q_DEBUG(1, "   '%s'", argv[i]);
     }
+    opt_usage(argv[0], NULL);
   }
   RecurNN *net = NULL;
-  if (opt_filename){
+  if (opt_filename == NULL){
+    opt_filename = construct_net_filename();
+  }
+  if (opt_reload){
     net = rnn_load_net(opt_filename);
     if (net){
-      rnn_set_log_file(net, NET_LOG_FILE, 0);
+      rnn_set_log_file(net, opt_logfile, 0);
     }
   }
   if (net == NULL){
-    u32 flags = BIAS ? RNN_NET_FLAG_STANDARD : RNN_NET_FLAG_NO_BIAS;
-    net = rnn_new(INPUT_SIZE, opt_hidden_size,
-        INPUT_SIZE, flags, 1,
-        NET_LOG_FILE, opt_bptt_depth, opt_learn_rate, opt_momentum, MOMENTUM_WEIGHT,
+    int input_size = strlen(opt_alphabet);
+    u32 flags = opt_bias ? RNN_NET_FLAG_STANDARD : RNN_NET_FLAG_NO_BIAS;
+    net = rnn_new(input_size, opt_hidden_size,
+        input_size, flags, 1,
+        opt_logfile, opt_bptt_depth, opt_learn_rate, opt_momentum, opt_momentum_weight,
         BPTT_BATCH_SIZE);
   }
   RecurNN *confab_net = rnn_clone(net,
@@ -357,9 +394,9 @@ main(int argc, char *argv[]){
       RECUR_RNG_SUBSEED,
       NULL);
 
-  create_char_lut(CHAR_TO_NET, NET_TO_CHAR, HASH_CHARS);
   long len;
-  u8* text = alloc_and_collapse_text(DICKENS_SHUFFLED_TEXT, &len);
+  u8* text = alloc_and_collapse_text(DICKENS_SHUFFLED_TEXT,
+      (u8 *)opt_alphabet, (u8 *)opt_collapse_chars, &len);
   if (TEMPORAL_PGM_DUMP){
     input_ppm = temporal_ppm_alloc(net->i_size, 500, "input_layer", 0, PGM_DUMP_COLOUR);
   }

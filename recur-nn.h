@@ -87,7 +87,7 @@ typedef struct _RecurNNBPTT RecurNNBPTT;
 
 struct _RecurNN {
   /*aligned sizes, for quick calculation */
-  int i_size;
+  int i_size; /*includes hidden feedback and bias */
   int h_size;
   int o_size;
   /*actual requested sizes*/
