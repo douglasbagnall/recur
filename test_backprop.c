@@ -359,21 +359,8 @@ construct_net_filename(void){
   return strdup(s);
 }
 
-int
-main(int argc, char *argv[]){
-  feenableexcept(FE_DIVBYZERO | FE_INVALID | FE_OVERFLOW);
-  //feenableexcept(FE_ALL_EXCEPT & ~ FE_INEXACT);
-  opt_register_table(options, NULL);
-  if (!opt_parse(&argc, argv, opt_log_stderr)){
-    exit(1);
-  }
-  if (argc > 1){
-    Q_DEBUG(1, "unused arguments:");
-    for (int i = 1; i < argc; i++){
-      Q_DEBUG(1, "   '%s'", argv[i]);
-    }
-    opt_usage(argv[0], NULL);
-  }
+static RecurNN *
+load_or_create_net(void){
   RecurNN *net = NULL;
   if (opt_filename == NULL){
     opt_filename = construct_net_filename();
@@ -392,6 +379,27 @@ main(int argc, char *argv[]){
         opt_logfile, opt_bptt_depth, opt_learn_rate, opt_momentum, opt_momentum_weight,
         BPTT_BATCH_SIZE);
   }
+  return net;
+}
+
+
+int
+main(int argc, char *argv[]){
+  feenableexcept(FE_DIVBYZERO | FE_INVALID | FE_OVERFLOW);
+  //feenableexcept(FE_ALL_EXCEPT & ~ FE_INEXACT);
+  opt_register_table(options, NULL);
+  if (!opt_parse(&argc, argv, opt_log_stderr)){
+    exit(1);
+  }
+  if (argc > 1){
+    Q_DEBUG(1, "unused arguments:");
+    for (int i = 1; i < argc; i++){
+      Q_DEBUG(1, "   '%s'", argv[i]);
+    }
+    opt_usage(argv[0], NULL);
+  }
+
+  RecurNN *net = load_or_create_net();
   RecurNN *confab_net = rnn_clone(net,
       net->flags & ~(RNN_NET_FLAG_OWN_BPTT | RNN_NET_FLAG_OWN_WEIGHTS),
       RECUR_RNG_SUBSEED,
