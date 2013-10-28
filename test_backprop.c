@@ -1,6 +1,5 @@
 #define PERIODIC_PGM_DUMP 0
 #define TEMPORAL_PGM_DUMP 0
-#define CONFAB_HIDDEN_IMG 0
 #define DETERMINISTIC_CONFAB 0
 #define PERIODIC_SAVE_NET 1
 #define DEFAULT_RELOAD 0
@@ -14,15 +13,16 @@
 #include <fenv.h>
 #include <ctype.h>
 
-#define BPTT_DEPTH 20
+#define DEFAULT_BPTT_DEPTH 30
 #define CONFAB_SIZE 80
-#define LEARN_RATE 0.001
+#define DEFAULT_LEARN_RATE 0.001
 #define LEARN_RATE_DECAY 0.96
 #define MIN_LEARN_RATE 1e-6
 
 #define DEFAULT_MOMENTUM 0.95
 #define DEFAULT_MOMENTUM_WEIGHT 0.5
 #define DEFAULT_BIAS 1
+#define DEFAULT_RNG_SEED 1
 #define K_STOP 0
 #define BPTT_BATCH_SIZE 1
 
@@ -37,8 +37,8 @@
 #define HIDDEN_SIZE 199
 
 static uint opt_hidden_size = HIDDEN_SIZE;
-static uint opt_bptt_depth = BPTT_DEPTH;
-static float opt_learn_rate = LEARN_RATE;
+static uint opt_bptt_depth = DEFAULT_BPTT_DEPTH;
+static float opt_learn_rate = DEFAULT_LEARN_RATE;
 static float opt_momentum = DEFAULT_MOMENTUM;
 static int opt_quiet = 0;
 static char * opt_filename = NULL;
@@ -49,6 +49,7 @@ static char * opt_textfile = DICKENS_SHUFFLED_TEXT;
 static bool opt_bias = DEFAULT_BIAS;
 static bool opt_reload = DEFAULT_RELOAD;
 static float opt_momentum_weight = DEFAULT_MOMENTUM_WEIGHT;
+static u64 opt_rng_seed = DEFAULT_RNG_SEED;
 
 
 /* Following ccan/opt/helpers.c opt_set_longval, etc */
@@ -77,6 +78,8 @@ static struct opt_table options[] = {
       &opt_hidden_size, "number of hidden nodes"),
   OPT_WITH_ARG("-d|--depth=<n>", opt_set_uintval, opt_show_uintval,
       &opt_bptt_depth, "max depth of BPTT recursion"),
+  OPT_WITH_ARG("-r|--rng-seed=<n>", opt_set_ulongval_bi, opt_show_ulongval_bi,
+      &opt_rng_seed, "RNG seed (-1 for auto)"),
   OPT_WITH_ARG("-l|--learn-rate=<float>", opt_set_floatval, opt_show_floatval,
       &opt_learn_rate, "learning rate"),
   OPT_WITH_ARG("-m|--momentum=<float>", opt_set_floatval, opt_show_floatval,
@@ -85,7 +88,7 @@ static struct opt_table options[] = {
       &opt_quiet, "print less (twice for even less)"),
   OPT_WITHOUT_ARG("--bias", opt_set_bool,
       &opt_bias, "use bias (default)"),
-  OPT_WITHOUT_ARG("-N|--no-bias", opt_set_invbool,
+  OPT_WITHOUT_ARG("--no-bias", opt_set_invbool,
       &opt_bias, "Don't use bias"),
   OPT_WITHOUT_ARG("--reload", opt_set_bool,
       &opt_reload, "try to reload the net"),
@@ -97,43 +100,51 @@ static struct opt_table options[] = {
       "log to this filename"),
   OPT_WITH_ARG("-t|--text-file=<file>", opt_set_charp, opt_show_charp, &opt_textfile,
       "learn from this text"),
-  OPT_WITHOUT_ARG("-h|--help", opt_usage_and_exit,
-      "Character level language model",
-      "Print this message."),
   OPT_WITH_ARG("-A|--alphabet=<chars>", opt_set_charp, opt_show_charp, &opt_alphabet,
       "Use only these characters"),
   OPT_WITH_ARG("-C|--collapse-chars=<chars>", opt_set_charp, opt_show_charp,
       &opt_collapse_chars, "Map these characters to first in alphabet"),
 
 
+  OPT_WITHOUT_ARG("-h|--help", opt_usage_and_exit,
+      ": Rnn modelling of text at the character level",
+      "Print this message."),
   OPT_ENDTABLE
 };
 
-static int
-create_char_lut(u8 *ctn, const u8 *ntc, const u8 *hash_chars){
+static u8*
+new_char_lut(const char *alphabet, const u8 *collapse_chars){
   int i;
-  int len = strlen((char *)ntc);
-  int hash = strchr((char *)ntc, '#') - (char *)ntc;
-  int space = strchr((char *)ntc, ' ') - (char *)ntc;
+  int len = strlen(alphabet);
+  int collapse_target = 0;
+  int space;
+  char *space_p = strchr(alphabet, ' ');
+  if (space_p){
+    space = space_p - alphabet;
+  }
+  else {
+    space = 0;
+    DEBUG("space is not in alphabet: %s", alphabet);
+  }
+  u8 *ctn = malloc_aligned_or_die(257);
   memset(ctn, space, 257);
-  for (i = 0; hash_chars[i]; i++){
-    ctn[hash_chars[i]] = hash;
+  for (i = 0; collapse_chars[i]; i++){
+    ctn[collapse_chars[i]] = collapse_target;
   }
   for (i = 0; i < len; i++){
-    u8 c = ntc[i];
+    u8 c = alphabet[i];
     ctn[c] = i;
     if (islower(c))
       ctn[c - 32] = i;
   }
-  return len;
+  return ctn;
 }
 
 static inline u8*
-alloc_and_collapse_text(char *filename, const u8 *alphabet, const u8 *collapse_chars,
+alloc_and_collapse_text(char *filename, const char *alphabet, const u8 *collapse_chars,
     long *len){
   int i, j;
-  u8 char_to_net[257];
-  create_char_lut(char_to_net, alphabet, collapse_chars);
+  u8 *char_to_net = new_char_lut(alphabet, collapse_chars);
   FILE *f = fopen(filename, "r");
   int err = fseek(f, 0, SEEK_END);
   *len = ftell(f);
@@ -164,7 +175,7 @@ alloc_and_collapse_text(char *filename, const u8 *alphabet, const u8 *collapse_c
   return text;
 }
 
-static void UNUSED
+static inline void
 dump_collapsed_text(u8 *text, int len, char *name)
 {
   int i;
@@ -236,12 +247,8 @@ opinion_probabilistic(RecurNN *net, int hot){
 
 static void
 confabulate(RecurNN *net, char *text, int len,
-    int hidden_ppm, int deterministic){
+    int deterministic){
   int i;
-  float *im;
-  if (hidden_ppm){
-    im = malloc_aligned_or_die(net->h_size * len * sizeof(float));
-  }
   static int n = 0;
   for (i = 0; i < len; i++){
     if (deterministic)
@@ -250,22 +257,15 @@ confabulate(RecurNN *net, char *text, int len,
       n = opinion_probabilistic(net, n);
     int c = opt_alphabet[n];
     text[i] = c;
-    if (hidden_ppm)
-      memcpy(&im[net->h_size * i], net->hidden_layer, net->h_size * sizeof(float));
-  }
-  if (hidden_ppm){
-    dump_colour_weights_autoname(im, net->h_size, len,
-      "confab-hiddens", net->generation);
-    free(im);
   }
 }
 
 static inline void
-long_confab(RecurNN *net, int len, int rows, int hidden_ppm){
+long_confab(RecurNN *net, int len, int rows){
   int i, j;
   char confab[len * rows + 1];
   confab[len * rows] = 0;
-  confabulate(net, confab, len * rows, hidden_ppm, 0);
+  confabulate(net, confab, len * rows, 0);
   for (i = 1; i < rows; i++){
     int target = i * len;
     int linebreak = target;
@@ -318,8 +318,7 @@ epoch(RecurNN *net, RecurNN *confab_net, const u8 *text, const int len){
     if ((net->generation & 1023) == 0){
       int k = net->generation >> 10;
       entropy /= -1024.0f;
-      confabulate(confab_net, confab, CONFAB_SIZE, CONFAB_HIDDEN_IMG,
-          DETERMINISTIC_CONFAB);
+      confabulate(confab_net, confab, CONFAB_SIZE, DETERMINISTIC_CONFAB);
       Q_DEBUG(0, "%4dk .%02d %.2f .%02d |%s|", k, (int)(error / 10.24f + 0.5), entropy,
           (int)(correct / 10.24f + 0.5), confab);
       bptt_log_float(net, "error", error / 1024.0f);
@@ -342,7 +341,7 @@ epoch(RecurNN *net, RecurNN *confab_net, const u8 *text, const int len){
       }
     }
   }
-  long_confab(confab_net, CONFAB_SIZE, 6, CONFAB_HIDDEN_IMG);
+  long_confab(confab_net, CONFAB_SIZE, 6);
 }
 
 static char*
@@ -396,7 +395,7 @@ main(int argc, char *argv[]){
 
   long len;
   u8* text = alloc_and_collapse_text(DICKENS_SHUFFLED_TEXT,
-      (u8 *)opt_alphabet, (u8 *)opt_collapse_chars, &len);
+      opt_alphabet, (u8 *)opt_collapse_chars, &len);
   if (TEMPORAL_PGM_DUMP){
     input_ppm = temporal_ppm_alloc(net->i_size, 500, "input_layer", 0, PGM_DUMP_COLOUR);
   }
