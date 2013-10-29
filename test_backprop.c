@@ -26,8 +26,11 @@
 #define DEFAULT_STOP 0
 #define BPTT_BATCH_SIZE 1
 
-#define Q_DEBUG(quiet, ...) do {                                \
-                                if (quiet >= opt_quiet)         \
+
+#define BELOW_QUIET_LEVEL(quiet) if (opt_quiet < quiet)
+
+#define Q_DEBUG(quiet, ...) do {                               \
+                                if (opt_quiet < quiet)         \
                                   STDERR_DEBUG(__VA_ARGS__); \
                                 } while(0)
 
@@ -302,7 +305,7 @@ long_confab(RecurNN *net, int len, int rows){
       confab[linebreak + 1] = '{';
     }
   }
-  Q_DEBUG(0, "%s", confab);
+  Q_DEBUG(1, "%s", confab);
 }
 
 static TemporalPPM *input_ppm;
@@ -361,7 +364,9 @@ epoch(RecurNN *net, RecurNN *confab_net, const u8 *text, const int len){
       exit(0);
     }
   }
-  long_confab(confab_net, CONFAB_SIZE, 6);
+  BELOW_QUIET_LEVEL(1){
+    long_confab(confab_net, CONFAB_SIZE, 6);
+  }
 }
 
 static char*
