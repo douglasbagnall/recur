@@ -1,6 +1,5 @@
 #define DETERMINISTIC_CONFAB 0
 #define PERIODIC_SAVE_NET 1
-#define DEFAULT_RELOAD 0
 
 #define NET_LOG_FILE "bptt.log"
 #include "test-common.h"
@@ -11,14 +10,15 @@
 #include <fenv.h>
 #include <ctype.h>
 
-#define DEFAULT_BPTT_DEPTH 30
 #define CONFAB_SIZE 80
-#define DEFAULT_LEARN_RATE 0.001
 #define LEARN_RATE_DECAY 0.96
 #define MIN_LEARN_RATE 1e-6
 
 #define DEFAULT_PERIODIC_PGM_DUMP 0
 #define DEFAULT_TEMPORAL_PGM_DUMP 0
+#define DEFAULT_RELOAD 0
+#define DEFAULT_LEARN_RATE 0.001
+#define DEFAULT_BPTT_DEPTH 30
 #define DEFAULT_MOMENTUM 0.95
 #define DEFAULT_MOMENTUM_WEIGHT 0.5
 #define DEFAULT_BIAS 1
@@ -60,7 +60,6 @@ static uint opt_stop = DEFAULT_STOP;
 static int opt_validate_chars = DEFAULT_VALIDATE_CHARS;
 static bool opt_override = DEFAULT_OVERRIDE;
 static uint opt_bptt_batch_size = DEFAULT_BPTT_BATCH_SIZE;
-
 static bool opt_temporal_pgm_dump = DEFAULT_TEMPORAL_PGM_DUMP;
 static bool opt_periodic_pgm_dump = DEFAULT_PERIODIC_PGM_DUMP;
 
