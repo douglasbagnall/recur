@@ -134,7 +134,9 @@ rnn_set_log_file(RecurNN *net, const char *log_file, int append_dont_truncate){
   if (log_file){
     char *mode = append_dont_truncate ? "a" : "w";
     net->log = fopen(log_file, mode);
-    bptt_log_int(net, "generation", net->generation);
+    if (! append_dont_truncate){
+      bptt_log_int(net, "generation", net->generation);
+    }
   }
   else{
     DEBUG("not starting logging because log_file is NULL");
