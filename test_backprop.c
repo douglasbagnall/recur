@@ -438,7 +438,7 @@ load_or_create_net(void){
   if (opt_reload){
     net = rnn_load_net(opt_filename);
     if (net){
-      rnn_set_log_file(net, opt_logfile, 0);
+      rnn_set_log_file(net, opt_logfile, 1);
     }
   }
   if (net == NULL){
