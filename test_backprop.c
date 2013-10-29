@@ -87,7 +87,7 @@ static struct opt_table options[] = {
       &opt_hidden_size, "number of hidden nodes"),
   OPT_WITH_ARG("-d|--depth=<n>", opt_set_uintval, opt_show_uintval,
       &opt_bptt_depth, "max depth of BPTT recursion"),
-  OPT_WITH_ARG("-r|--rng-seed=<n>", opt_set_ulongval_bi, opt_show_ulongval_bi,
+  OPT_WITH_ARG("-r|--rng-seed=<seed>", opt_set_ulongval_bi, opt_show_ulongval_bi,
       &opt_rng_seed, "RNG seed (-1 for auto)"),
   OPT_WITH_ARG("-s|--stop-after=<n>", opt_set_uintval_bi, opt_show_uintval_bi,
       &opt_stop, "Stop after this many generations (0: no stop)"),
@@ -97,8 +97,12 @@ static struct opt_table options[] = {
       &opt_learn_rate, "learning rate"),
   OPT_WITH_ARG("-m|--momentum=<float>", opt_set_floatval, opt_show_floatval,
       &opt_momentum, "momentum"),
+  OPT_WITH_ARG("--momentum-weight=<float>", opt_set_floatval, opt_show_floatval,
+      &opt_momentum_weight, "momentum weight"),
   OPT_WITHOUT_ARG("-q|--quiet", opt_inc_intval,
       &opt_quiet, "print less (twice for even less)"),
+  OPT_WITHOUT_ARG("-v|--verbose", opt_dec_intval,
+      &opt_quiet, "print more, if possible"),
   OPT_WITHOUT_ARG("--bias", opt_set_bool,
       &opt_bias, "use bias (default)"),
   OPT_WITHOUT_ARG("--no-bias", opt_set_invbool,
@@ -218,10 +222,10 @@ search_for_max(float *answer, int len){
 
 static inline float*
 one_hot_opinion(RecurNN *net, const int hot){
+  //XXX could just set the previous one to zero (i.e. remember it)
   memset(net->real_inputs, 0, net->input_size * sizeof(float));
   net->real_inputs[hot] = 1.0f;
   float *answer = rnn_opinion(net, NULL);
-  //net->real_inputs[hot] = 0.0;
   return answer;
 }
 
