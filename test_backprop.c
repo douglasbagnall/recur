@@ -26,6 +26,7 @@
 #define DEFAULT_STOP 0
 #define BPTT_BATCH_SIZE 1
 #define DEFAULT_VALIDATE_CHARS 0
+#define DEFAULT_OVERRIDE 0
 
 
 #define BELOW_QUIET_LEVEL(quiet) if (opt_quiet < quiet)
@@ -34,6 +35,7 @@
                                 if (opt_quiet < quiet)         \
                                   STDERR_DEBUG(__VA_ARGS__); \
                                 } while(0)
+
 
 #define NET_TO_CHAR "#abcdefghijklmnopqrstuvwxyz,'- .\";:!?"
 #define HASH_CHARS "1234567890&@"
@@ -56,6 +58,7 @@ static float opt_momentum_weight = DEFAULT_MOMENTUM_WEIGHT;
 static u64 opt_rng_seed = DEFAULT_RNG_SEED;
 static uint opt_stop = DEFAULT_STOP;
 static int opt_validate_chars = DEFAULT_VALIDATE_CHARS;
+static bool opt_override = DEFAULT_OVERRIDE;
 
 
 /* Following ccan/opt/helpers.c opt_set_longval, etc */
@@ -102,6 +105,8 @@ static struct opt_table options[] = {
       &opt_bias, "Don't use bias"),
   OPT_WITHOUT_ARG("--reload", opt_set_bool,
       &opt_reload, "try to reload the net"),
+  OPT_WITHOUT_ARG("-o|--override-params", opt_set_bool,
+      &opt_override, "override meta-parameters in loaded net (where possible)"),
   OPT_WITHOUT_ARG("-N|--no-reload", opt_set_invbool,
       &opt_reload, "Don't try to reload"),
   OPT_WITH_ARG("-f|--filename=<file>", opt_set_charp, opt_show_charp, &opt_filename,
@@ -440,6 +445,13 @@ load_or_create_net(void){
         opt_logfile, opt_bptt_depth, opt_learn_rate, opt_momentum, opt_momentum_weight,
         BPTT_BATCH_SIZE);
   }
+  else if (opt_override){
+    RecurNNBPTT *bptt = net->bptt;
+    bptt->learn_rate = opt_learn_rate;
+    bptt->momentum = opt_momentum;
+    bptt->momentum_weight = opt_momentum_weight;
+  }
+
   return net;
 }
 
