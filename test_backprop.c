@@ -25,6 +25,7 @@
 #define DEFAULT_RNG_SEED 1
 #define DEFAULT_STOP 0
 #define BPTT_BATCH_SIZE 1
+#define DEFAULT_VALIDATE_CHARS 0
 
 
 #define BELOW_QUIET_LEVEL(quiet) if (opt_quiet < quiet)
@@ -54,6 +55,7 @@ static bool opt_reload = DEFAULT_RELOAD;
 static float opt_momentum_weight = DEFAULT_MOMENTUM_WEIGHT;
 static u64 opt_rng_seed = DEFAULT_RNG_SEED;
 static uint opt_stop = DEFAULT_STOP;
+static int opt_validate_chars = DEFAULT_VALIDATE_CHARS;
 
 
 /* Following ccan/opt/helpers.c opt_set_longval, etc */
@@ -86,6 +88,8 @@ static struct opt_table options[] = {
       &opt_rng_seed, "RNG seed (-1 for auto)"),
   OPT_WITH_ARG("-s|--stop-after=<n>", opt_set_uintval_bi, opt_show_uintval_bi,
       &opt_stop, "Stop after this many generations (0: no stop)"),
+  OPT_WITH_ARG("-V|--validate-chars=<n>", opt_set_intval_bi, opt_show_intval_bi,
+      &opt_validate_chars, "Retain this many characters for validation"),
   OPT_WITH_ARG("-l|--learn-rate=<float>", opt_set_floatval, opt_show_floatval,
       &opt_learn_rate, "learning rate"),
   OPT_WITH_ARG("-m|--momentum=<float>", opt_set_floatval, opt_show_floatval,
@@ -265,6 +269,30 @@ opinion_probabilistic(RecurNN *net, int hot){
   }
 }
 
+static float
+validate(RecurNN *net, const u8 *text, int len){
+  float error[net->output_size];
+  float entropy = 0.0f;
+  int i;
+  /*skip the first few because state depends too much on previous experience */
+  int skip = MIN(len / 10, 5);
+  for (i = 0; i < skip; i++){
+    one_hot_opinion(net, text[i]);
+  }
+  for (; i < len - 1; i++){
+    float *answer = one_hot_opinion(net, text[i]);
+    softmax(error, answer, net->output_size);
+    float e = error[text[i + 1]];
+    if (e > 0.0f)
+      entropy += log2f(e);
+    else
+      entropy -= 50;
+  }
+  entropy /= -(len - skip - 1);
+  return entropy;
+}
+
+
 static void
 confabulate(RecurNN *net, char *text, int len,
     int deterministic){
@@ -312,7 +340,9 @@ long_confab(RecurNN *net, int len, int rows){
 static TemporalPPM *input_ppm;
 
 void
-epoch(RecurNN *net, RecurNN *confab_net, const u8 *text, const int len){
+epoch(RecurNN *net, RecurNN *confab_net, RecurNN *validate_net,
+    const u8 *text, const int len,
+    const u8 *vtext, const int vlen){
   int i;
   char confab[CONFAB_SIZE + 1];
   confab[CONFAB_SIZE] = 0;
@@ -338,11 +368,16 @@ epoch(RecurNN *net, RecurNN *confab_net, const u8 *text, const int len){
     if ((net->generation & 1023) == 0){
       int k = net->generation >> 10;
       entropy /= -1024.0f;
-      confabulate(confab_net, confab, CONFAB_SIZE, DETERMINISTIC_CONFAB);
-      Q_DEBUG(0, "%4dk .%02d %.2f .%02d |%s|", k, (int)(error / 10.24f + 0.5), entropy,
-          (int)(correct / 10.24f + 0.5), confab);
+      float ventropy = validate(validate_net, vtext, vlen);
+      BELOW_QUIET_LEVEL(1){
+        confabulate(confab_net, confab, CONFAB_SIZE, DETERMINISTIC_CONFAB);
+        Q_DEBUG(1, "%5dk e.%02d t%.2f v%.2f a.%02d |%s|", k, (int)(error / 10.24f + 0.5),
+            entropy, ventropy,
+            (int)(correct / 10.24f + 0.5), confab);
+      }
       bptt_log_float(net, "error", error / 1024.0f);
-      bptt_log_float(net, "entropy", entropy);
+      bptt_log_float(net, "t_entropy", entropy);
+      bptt_log_float(net, "v_entropy", ventropy);
       bptt_log_float(net, "accuracy", correct / 1024.0f);
       correct = 0;
       error = 0.0f;
@@ -430,20 +465,46 @@ main(int argc, char *argv[]){
       net->flags & ~(RNN_NET_FLAG_OWN_BPTT | RNN_NET_FLAG_OWN_WEIGHTS),
       RECUR_RNG_SUBSEED,
       NULL);
+  RecurNN *validate_net = rnn_clone(net,
+      net->flags & ~(RNN_NET_FLAG_OWN_BPTT | RNN_NET_FLAG_OWN_WEIGHTS),
+      RECUR_RNG_SUBSEED,
+      NULL);
 
   long len;
-  u8* text = alloc_and_collapse_text(DICKENS_SHUFFLED_TEXT,
+  u8* validate_text;
+  u8* text = alloc_and_collapse_text(opt_textfile,
       opt_alphabet, (u8 *)opt_collapse_chars, &len);
+  if (opt_validate_chars > 2){
+    len -= opt_validate_chars;
+    validate_text = text + len;
+  }
+  else {
+    if (opt_validate_chars){
+      DEBUG("--validate-chars needs to be bigger");
+      opt_validate_chars = 0;
+    }
+    validate_text = NULL;
+  }
+
   if (TEMPORAL_PGM_DUMP){
     input_ppm = temporal_ppm_alloc(net->i_size, 500, "input_layer", 0, PGM_DUMP_COLOUR);
   }
-  START_TIMER(run);
-  for (int i = 0; i < 200; i++){
-    Q_DEBUG(1, "Starting epoch %d. learn rate %f.", i, net->bptt->learn_rate);
-    START_TIMER(epoch);
-    epoch(net, confab_net, text, len);
-    DEBUG_TIMER(epoch);
+  //DEBUG("quietness %d", opt_quiet);
+  BELOW_QUIET_LEVEL(2){
+    START_TIMER(run);
+    for (int i = 0;;i++){
+      DEBUG("Starting epoch %d. learn rate %g.", i, net->bptt->learn_rate);
+      START_TIMER(epoch);
+      epoch(net, confab_net, validate_net, text, len, validate_text, opt_validate_chars);
+      DEBUG_TIMER(epoch);
+      DEBUG_TIMER(run);
+    }
   }
+  else {
+    for (;;)
+      epoch(net, confab_net, validate_net, text, len, validate_text, opt_validate_chars);
+  }
+
   free(text);
   rnn_delete_net(net);
   temporal_ppm_free(input_ppm);
