@@ -53,6 +53,7 @@ static bool opt_bias = DEFAULT_BIAS;
 static bool opt_reload = DEFAULT_RELOAD;
 static float opt_momentum_weight = DEFAULT_MOMENTUM_WEIGHT;
 static u64 opt_rng_seed = DEFAULT_RNG_SEED;
+static uint opt_stop = DEFAULT_STOP;
 
 
 /* Following ccan/opt/helpers.c opt_set_longval, etc */
