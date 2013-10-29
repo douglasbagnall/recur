@@ -23,7 +23,7 @@
 #define DEFAULT_MOMENTUM_WEIGHT 0.5
 #define DEFAULT_BIAS 1
 #define DEFAULT_RNG_SEED 1
-#define K_STOP 0
+#define DEFAULT_STOP 0
 #define BPTT_BATCH_SIZE 1
 
 #define Q_DEBUG(quiet, ...) do {                                \
@@ -80,6 +80,8 @@ static struct opt_table options[] = {
       &opt_bptt_depth, "max depth of BPTT recursion"),
   OPT_WITH_ARG("-r|--rng-seed=<n>", opt_set_ulongval_bi, opt_show_ulongval_bi,
       &opt_rng_seed, "RNG seed (-1 for auto)"),
+  OPT_WITH_ARG("-s|--stop-after=<n>", opt_set_uintval_bi, opt_show_uintval_bi,
+      &opt_stop, "Stop after this many generations (0: no stop)"),
   OPT_WITH_ARG("-l|--learn-rate=<float>", opt_set_floatval, opt_show_floatval,
       &opt_learn_rate, "learning rate"),
   OPT_WITH_ARG("-m|--momentum=<float>", opt_set_floatval, opt_show_floatval,
@@ -347,12 +349,16 @@ epoch(RecurNN *net, RecurNN *confab_net, const u8 *text, const int len){
       if (PERIODIC_PGM_DUMP){
         rnn_multi_pgm_dump(net, "ihw how");
       }
-      if (K_STOP && k > K_STOP)
-        exit(0);
       if ((k & 1023) == 1023){
         net->bptt->learn_rate = MAX(MIN_LEARN_RATE,
             net->bptt->learn_rate * LEARN_RATE_DECAY);
       }
+    }
+    if (opt_stop && net->generation >= opt_stop){
+      if (opt_filename){
+        rnn_save_net(net, opt_filename);
+      }
+      exit(0);
     }
   }
   long_confab(confab_net, CONFAB_SIZE, 6);
