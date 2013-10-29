@@ -1,5 +1,3 @@
-#define PERIODIC_PGM_DUMP 0
-#define TEMPORAL_PGM_DUMP 0
 #define DETERMINISTIC_CONFAB 0
 #define PERIODIC_SAVE_NET 1
 #define DEFAULT_RELOAD 0
@@ -19,12 +17,14 @@
 #define LEARN_RATE_DECAY 0.96
 #define MIN_LEARN_RATE 1e-6
 
+#define DEFAULT_PERIODIC_PGM_DUMP 0
+#define DEFAULT_TEMPORAL_PGM_DUMP 0
 #define DEFAULT_MOMENTUM 0.95
 #define DEFAULT_MOMENTUM_WEIGHT 0.5
 #define DEFAULT_BIAS 1
 #define DEFAULT_RNG_SEED 1
 #define DEFAULT_STOP 0
-#define BPTT_BATCH_SIZE 1
+#define DEFAULT_BPTT_BATCH_SIZE 1
 #define DEFAULT_VALIDATE_CHARS 0
 #define DEFAULT_OVERRIDE 0
 
@@ -59,7 +59,10 @@ static u64 opt_rng_seed = DEFAULT_RNG_SEED;
 static uint opt_stop = DEFAULT_STOP;
 static int opt_validate_chars = DEFAULT_VALIDATE_CHARS;
 static bool opt_override = DEFAULT_OVERRIDE;
+static uint opt_bptt_batch_size = DEFAULT_BPTT_BATCH_SIZE;
 
+static bool opt_temporal_pgm_dump = DEFAULT_TEMPORAL_PGM_DUMP;
+static bool opt_periodic_pgm_dump = DEFAULT_PERIODIC_PGM_DUMP;
 
 /* Following ccan/opt/helpers.c opt_set_longval, etc */
 static char *
@@ -91,6 +94,8 @@ static struct opt_table options[] = {
       &opt_rng_seed, "RNG seed (-1 for auto)"),
   OPT_WITH_ARG("-s|--stop-after=<n>", opt_set_uintval_bi, opt_show_uintval_bi,
       &opt_stop, "Stop after this many generations (0: no stop)"),
+  OPT_WITH_ARG("--bptt-batch-size=<n>", opt_set_uintval_bi, opt_show_uintval_bi,
+      &opt_bptt_batch_size, "bptt minibatch size"),
   OPT_WITH_ARG("-V|--validate-chars=<n>", opt_set_intval_bi, opt_show_intval_bi,
       &opt_validate_chars, "Retain this many characters for validation"),
   OPT_WITH_ARG("-l|--learn-rate=<float>", opt_set_floatval, opt_show_floatval,
@@ -123,6 +128,10 @@ static struct opt_table options[] = {
       "Use only these characters"),
   OPT_WITH_ARG("-C|--collapse-chars=<chars>", opt_set_charp, opt_show_charp,
       &opt_collapse_chars, "Map these characters to first in alphabet"),
+  OPT_WITHOUT_ARG("--temporal-pgm-dump", opt_set_bool,
+      &opt_temporal_pgm_dump, "Dump ppm images showing inputs change over time"),
+  OPT_WITHOUT_ARG("--periodic-pgm-dump", opt_set_bool,
+      &opt_periodic_pgm_dump, "Dump ppm images of weights, every 1k generations"),
 
 
   OPT_WITHOUT_ARG("-h|--help", opt_usage_and_exit,
@@ -370,7 +379,7 @@ epoch(RecurNN *net, RecurNN *confab_net, RecurNN *validate_net,
     else
       entropy -= 50;
 
-    if (TEMPORAL_PGM_DUMP){
+    if (opt_temporal_pgm_dump){
       temporal_ppm_add_row(input_ppm, net->input_layer);
     }
 
@@ -394,7 +403,7 @@ epoch(RecurNN *net, RecurNN *confab_net, RecurNN *validate_net,
       if (PERIODIC_SAVE_NET && opt_filename){
         rnn_save_net(net, opt_filename);
       }
-      if (PERIODIC_PGM_DUMP){
+      if (opt_periodic_pgm_dump){
         rnn_multi_pgm_dump(net, "ihw how");
       }
       if ((k & 1023) == 1023){
@@ -423,9 +432,9 @@ construct_net_filename(void){
   for (uint i = 0; i < strlen(s); i++){
     sig ^= ROTATE(sig - s[i], 13) + s[i];
   }
-  snprintf(s, sizeof(s), "text-s%0x-i%d-h%d-o%d-b%d.net",
+  snprintf(s, sizeof(s), "text-s%0x-i%d-h%d-o%d-b%d-B%d.net",
       sig, alpha_size, opt_hidden_size, alpha_size,
-      opt_bias);
+      opt_bias, opt_bptt_batch_size);
   return strdup(s);
 }
 
@@ -447,7 +456,7 @@ load_or_create_net(void){
     net = rnn_new(input_size, opt_hidden_size,
         input_size, flags, 1,
         opt_logfile, opt_bptt_depth, opt_learn_rate, opt_momentum, opt_momentum_weight,
-        BPTT_BATCH_SIZE);
+        opt_bptt_batch_size);
   }
   else if (opt_override){
     RecurNNBPTT *bptt = net->bptt;
@@ -502,7 +511,7 @@ main(int argc, char *argv[]){
     validate_text = NULL;
   }
 
-  if (TEMPORAL_PGM_DUMP){
+  if (opt_temporal_pgm_dump){
     input_ppm = temporal_ppm_alloc(net->i_size, 500, "input_layer", 0, PGM_DUMP_COLOUR);
   }
   //DEBUG("quietness %d", opt_quiet);
