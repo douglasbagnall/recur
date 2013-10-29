@@ -186,6 +186,20 @@ dump_collapsed_text(u8 *text, int len, char *name)
   fclose(f);
 }
 
+static inline int
+search_for_max(float *answer, int len){
+  ASSUME_ALIGNED(answer);
+  int j;
+  int best_offset = 0;
+  float best_score = *answer;
+  for (j = 1; j < len; j++){
+    if (answer[j] >= best_score){
+      best_score = answer[j];
+      best_offset = j;
+    }
+  }
+  return best_offset;
+}
 
 static inline float*
 one_hot_opinion(RecurNN *net, const int hot){
