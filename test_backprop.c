@@ -1,4 +1,3 @@
-#define PERIODIC_SAVE_NET 1
 
 #define NET_LOG_FILE "bptt.log"
 #include "test-common.h"
@@ -27,7 +26,7 @@
 #define DEFAULT_VALIDATE_CHARS 0
 #define DEFAULT_OVERRIDE 0
 #define DEFAULT_DETERMINISTIC_CONFAB 0
-
+#define DEFAULT_SAVE_NET 1
 
 #define BELOW_QUIET_LEVEL(quiet) if (opt_quiet < quiet)
 
@@ -63,6 +62,7 @@ static uint opt_bptt_batch_size = DEFAULT_BPTT_BATCH_SIZE;
 static bool opt_temporal_pgm_dump = DEFAULT_TEMPORAL_PGM_DUMP;
 static bool opt_periodic_pgm_dump = DEFAULT_PERIODIC_PGM_DUMP;
 static bool opt_deterministic_confab = DEFAULT_DETERMINISTIC_CONFAB;
+static bool opt_save_net = DEFAULT_SAVE_NET;
 
 /* Following ccan/opt/helpers.c opt_set_longval, etc */
 static char *
@@ -134,6 +134,8 @@ static struct opt_table options[] = {
       &opt_periodic_pgm_dump, "Dump ppm images of weights, every 1k generations"),
   OPT_WITHOUT_ARG("--deterministic-confab", opt_set_bool,
       &opt_deterministic_confab, "Use best guess in confab, not random sampling"),
+  OPT_WITHOUT_ARG("--no-save-net", opt_set_invbool,
+      &opt_deterministic_confab, "Don't save learnt changes"),
 
 
   OPT_WITHOUT_ARG("-h|--help", opt_usage_and_exit,
@@ -402,7 +404,7 @@ epoch(RecurNN *net, RecurNN *confab_net, RecurNN *validate_net,
       correct = 0;
       error = 0.0f;
       entropy = 0.0f;
-      if (PERIODIC_SAVE_NET && opt_filename){
+      if (opt_save_net && opt_filename){
         rnn_save_net(net, opt_filename);
       }
       if (opt_periodic_pgm_dump){
@@ -414,7 +416,7 @@ epoch(RecurNN *net, RecurNN *confab_net, RecurNN *validate_net,
       }
     }
     if (opt_stop && net->generation >= opt_stop){
-      if (opt_filename){
+      if (opt_filename && opt_save_net){
         rnn_save_net(net, opt_filename);
       }
       exit(0);
