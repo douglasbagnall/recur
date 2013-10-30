@@ -1,5 +1,3 @@
-
-#define NET_LOG_FILE "bptt.log"
 #include "recur-nn.h"
 #include "pgm_dump.h"
 #include <math.h>
@@ -36,6 +34,8 @@
 #define DEFAULT_OVERRIDE 0
 #define DEFAULT_DETERMINISTIC_CONFAB 0
 #define DEFAULT_SAVE_NET 1
+#define DEFAULT_LOG_FILE "bptt.log"
+
 
 #define BELOW_QUIET_LEVEL(quiet) if (opt_quiet < quiet)
 
@@ -56,7 +56,7 @@ static float opt_learn_rate = DEFAULT_LEARN_RATE;
 static float opt_momentum = DEFAULT_MOMENTUM;
 static int opt_quiet = 0;
 static char * opt_filename = NULL;
-static char * opt_logfile = NET_LOG_FILE;
+static char * opt_logfile = DEFAULT_LOG_FILE;
 static char * opt_alphabet = NET_TO_CHAR;
 static char * opt_collapse_chars = HASH_CHARS;
 static char * opt_textfile = DICKENS_SHUFFLED_TEXT;
