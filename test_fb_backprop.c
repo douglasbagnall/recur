@@ -1,6 +1,9 @@
 #define PERIODIC_PGM_DUMP 1
-
-#include "test-common.h"
+#include "recur-nn.h"
+#include "pgm_dump.h"
+#include <math.h>
+#include "path.h"
+#include "badmaths.h"
 #include <stdio.h>
 #include <fenv.h>
 #include <ctype.h>

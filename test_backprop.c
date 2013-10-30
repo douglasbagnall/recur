@@ -1,12 +1,21 @@
 
 #define NET_LOG_FILE "bptt.log"
-#include "test-common.h"
+#include "recur-nn.h"
+#include "pgm_dump.h"
+#include <math.h>
+#include "path.h"
 #include "badmaths.h"
 #include "ccan/opt/opt.h"
 #include <errno.h>
 #include <stdio.h>
 #include <fenv.h>
 #include <ctype.h>
+
+#define DICKENS_SHUFFLED_TEXT TEST_DATA_DIR "/dickens-shuffled.txt"
+#define DICKENS_TEXT TEST_DATA_DIR "/dickens.txt"
+#define EREWHON_TEXT TEST_DATA_DIR "/erewhon.txt"
+#define EREWHON_LONG_TEXT TEST_DATA_DIR "/erewhon-erewhon"\
+  "-revisited-sans-gutenberg.txt"
 
 #define CONFAB_SIZE 80
 #define LEARN_RATE_DECAY 0.96

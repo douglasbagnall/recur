@@ -1,4 +1,5 @@
-#include "test-common.h"
+#include "recur-common.h"
+#include <math.h>
 #include "badmaths.h"
 #include <stdio.h>
 #include <fenv.h>
