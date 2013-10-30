@@ -1,4 +1,3 @@
-#define DETERMINISTIC_CONFAB 0
 #define PERIODIC_SAVE_NET 1
 
 #define NET_LOG_FILE "bptt.log"
@@ -27,6 +26,7 @@
 #define DEFAULT_BPTT_BATCH_SIZE 1
 #define DEFAULT_VALIDATE_CHARS 0
 #define DEFAULT_OVERRIDE 0
+#define DEFAULT_DETERMINISTIC_CONFAB 0
 
 
 #define BELOW_QUIET_LEVEL(quiet) if (opt_quiet < quiet)
@@ -62,6 +62,7 @@ static bool opt_override = DEFAULT_OVERRIDE;
 static uint opt_bptt_batch_size = DEFAULT_BPTT_BATCH_SIZE;
 static bool opt_temporal_pgm_dump = DEFAULT_TEMPORAL_PGM_DUMP;
 static bool opt_periodic_pgm_dump = DEFAULT_PERIODIC_PGM_DUMP;
+static bool opt_deterministic_confab = DEFAULT_DETERMINISTIC_CONFAB;
 
 /* Following ccan/opt/helpers.c opt_set_longval, etc */
 static char *
@@ -131,6 +132,8 @@ static struct opt_table options[] = {
       &opt_temporal_pgm_dump, "Dump ppm images showing inputs change over time"),
   OPT_WITHOUT_ARG("--periodic-pgm-dump", opt_set_bool,
       &opt_periodic_pgm_dump, "Dump ppm images of weights, every 1k generations"),
+  OPT_WITHOUT_ARG("--deterministic-confab", opt_set_bool,
+      &opt_deterministic_confab, "Use best guess in confab, not random sampling"),
 
 
   OPT_WITHOUT_ARG("-h|--help", opt_usage_and_exit,
@@ -387,7 +390,7 @@ epoch(RecurNN *net, RecurNN *confab_net, RecurNN *validate_net,
       entropy /= -1024.0f;
       float ventropy = validate(validate_net, vtext, vlen);
       BELOW_QUIET_LEVEL(1){
-        confabulate(confab_net, confab, CONFAB_SIZE, DETERMINISTIC_CONFAB);
+        confabulate(confab_net, confab, CONFAB_SIZE, opt_deterministic_confab);
         Q_DEBUG(1, "%5dk e.%02d t%.2f v%.2f a.%02d |%s|", k, (int)(error / 10.24f + 0.5),
             entropy, ventropy,
             (int)(correct / 10.24f + 0.5), confab);
