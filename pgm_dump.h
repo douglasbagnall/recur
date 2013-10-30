@@ -81,7 +81,7 @@ pgm_dump_unnormalised_float(const float *weights, int width, int height, const c
     im[i] = (u8)(fabs(weights[i]) * scale);
   }
   pgm_dump(im, width, height, name);
-  DEBUG("%s biggest is %.2g", name, biggest);
+  MAYBE_DEBUG("%s biggest is %.2g", name, biggest);
   free(im);
 }
 
@@ -154,7 +154,7 @@ ppm_dump_signed_unnormalised_float(const float *weights, int width, int height, 
       biggest = f;
   }
   float scale = 255.99f / biggest;
-  STDERR_DEBUG("%s biggest is %.2g", name, biggest);
+  MAYBE_DEBUG("%s biggest is %.2g", name, biggest);
   FILE *fh = fopen(name, "w");
   fprintf(fh, "P6\n%u %u\n255\n", width, height);
 
