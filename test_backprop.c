@@ -412,6 +412,7 @@ epoch(RecurNN *net, RecurNN *confab_net, RecurNN *validate_net,
       bptt_log_float(net, "t_entropy", entropy);
       bptt_log_float(net, "v_entropy", ventropy);
       bptt_log_float(net, "accuracy", correct / 1024.0f);
+      bptt_log_float(net, "learn-rate", net->bptt->learn_rate);
       correct = 0;
       error = 0.0f;
       entropy = 0.0f;
