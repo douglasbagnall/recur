@@ -32,11 +32,12 @@
 #define DEFAULT_STOP 0
 #define DEFAULT_BPTT_BATCH_SIZE 1
 #define DEFAULT_VALIDATE_CHARS 0
+#define DEFAULT_VALIDATION_OVERLAP 2
 #define DEFAULT_OVERRIDE 0
 #define DEFAULT_DETERMINISTIC_CONFAB 0
 #define DEFAULT_SAVE_NET 1
 #define DEFAULT_LOG_FILE "bptt.log"
-
+#define DEFAULT_START_CHAR -1
 
 #define BELOW_QUIET_LEVEL(quiet) if (opt_quiet < quiet)
 
@@ -67,6 +68,8 @@ static float opt_momentum_weight = DEFAULT_MOMENTUM_WEIGHT;
 static u64 opt_rng_seed = DEFAULT_RNG_SEED;
 static uint opt_stop = DEFAULT_STOP;
 static int opt_validate_chars = DEFAULT_VALIDATE_CHARS;
+static int opt_validation_overlap = DEFAULT_VALIDATION_OVERLAP;
+static int opt_start_char = DEFAULT_START_CHAR;
 static bool opt_override = DEFAULT_OVERRIDE;
 static uint opt_bptt_batch_size = DEFAULT_BPTT_BATCH_SIZE;
 static bool opt_temporal_pgm_dump = DEFAULT_TEMPORAL_PGM_DUMP;
@@ -108,6 +111,10 @@ static struct opt_table options[] = {
       &opt_bptt_batch_size, "bptt minibatch size"),
   OPT_WITH_ARG("-V|--validate-chars=<n>", opt_set_intval_bi, opt_show_intval_bi,
       &opt_validate_chars, "Retain this many characters for validation"),
+  OPT_WITH_ARG("--validation-overlap=<n>", opt_set_intval, opt_show_intval,
+      &opt_validation_overlap, "> 1 to use lapped validation (quicker)"),
+  OPT_WITH_ARG("--start-char=<n>", opt_set_intval, opt_show_intval,
+      &opt_start_char, "character to start epoch on (-1 for auto)"),
   OPT_WITH_ARG("-l|--learn-rate=<float>", opt_set_floatval, opt_show_floatval,
       &opt_learn_rate, "learning rate"),
   OPT_WITH_ARG("-m|--momentum=<float>", opt_set_floatval, opt_show_floatval,
@@ -375,14 +382,22 @@ void
 epoch(RecurNN *net, RecurNN *confab_net, RecurNN *validate_net,
     Schedule *schedule,
     const u8 *text, const int len,
-    const u8 *vtext, const int vlen){
+    const u8 *vtext, int vlen, const int vlap,
+    const int start){
   int i;
   char confab[CONFAB_SIZE + 1];
   confab[CONFAB_SIZE] = 0;
   float error = 0.0f;
   float entropy = 0.0f;
   int correct = 0;
-  for(i = 0; i < len - 1; i++){
+  vlen /= vlap;
+  float vhistory[vlap];
+  for (int j = 0; j < vlap; j++){
+    vhistory[j] = 0;
+  }
+
+  int vcounter = 0;
+  for(i = start; i < len - 1; i++){
     float e;
     int c;
     sgd_one(net, text[i], text[i + 1], &e, &c);
@@ -401,7 +416,19 @@ epoch(RecurNN *net, RecurNN *confab_net, RecurNN *validate_net,
     if ((net->generation & 1023) == 0){
       int k = net->generation >> 10;
       entropy /= -1024.0f;
-      float ventropy = validate(validate_net, vtext, vlen);
+      float ventropy = validate(validate_net, vtext + vlen * vcounter, vlen);
+      if (vlap > 1){
+        vcounter ++;
+        if (vcounter == vlap){
+          vcounter = 0;
+        }
+        vhistory[vcounter] = ventropy;
+        ventropy = 0; /*messy*/
+        for (int j = 0; j < vlap; j++){
+          ventropy += vhistory[j];
+        }
+        ventropy /= MIN(vlap, i);
+      }
       BELOW_QUIET_LEVEL(1){
         confabulate(confab_net, confab, CONFAB_SIZE, opt_deterministic_confab);
         Q_DEBUG(1, "%5dk e.%02d t%.2f v%.2f a.%02d |%s|", k, (int)(error / 10.24f + 0.5),
@@ -530,6 +557,13 @@ main(int argc, char *argv[]){
     }
     validate_text = NULL;
   }
+  int start_char;
+  if (opt_start_char >= 0 && opt_start_char < len - 1){
+    start_char = net->generation % len;
+  }
+  else {
+    start_char = net->generation % len;
+  }
 
   if (opt_temporal_pgm_dump){
     input_ppm = temporal_ppm_alloc(net->i_size, 500, "input_layer", 0, PGM_DUMP_COLOUR);
@@ -541,15 +575,20 @@ main(int argc, char *argv[]){
       DEBUG("Starting epoch %d. learn rate %g.", i, net->bptt->learn_rate);
       START_TIMER(epoch);
       epoch(net, confab_net, validate_net, &schedule,
-          text, len, validate_text, opt_validate_chars);
+          text, len, validate_text, opt_validate_chars,
+          opt_validation_overlap, start_char);
       DEBUG_TIMER(epoch);
       DEBUG_TIMER(run);
+      start_char = 0;
     }
   }
   else {
-    for (;;)
+    for (;;){
       epoch(net, confab_net, validate_net, &schedule,
-          text, len, validate_text, opt_validate_chars);
+          text, len, validate_text, opt_validate_chars, opt_validation_overlap,
+          start_char);
+      start_char = 0;
+    }
   }
 
   free(text);
