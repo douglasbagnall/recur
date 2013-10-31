@@ -3,6 +3,7 @@
 #include <math.h>
 #include "path.h"
 #include "badmaths.h"
+#include "schedule.h"
 #include "ccan/opt/opt.h"
 #include <errno.h>
 #include <stdio.h>
@@ -372,6 +373,7 @@ static TemporalPPM *input_ppm;
 
 void
 epoch(RecurNN *net, RecurNN *confab_net, RecurNN *validate_net,
+    Schedule *schedule,
     const u8 *text, const int len,
     const u8 *vtext, const int vlen){
   int i;
@@ -419,6 +421,8 @@ epoch(RecurNN *net, RecurNN *confab_net, RecurNN *validate_net,
       if (opt_periodic_pgm_dump){
         rnn_multi_pgm_dump(net, "ihw how");
       }
+      schedule->eval(schedule, net, ventropy);
+
       if ((k & 1023) == 1023){
         net->bptt->learn_rate = MAX(MIN_LEARN_RATE,
             net->bptt->learn_rate * LEARN_RATE_DECAY);
@@ -508,6 +512,8 @@ main(int argc, char *argv[]){
       RECUR_RNG_SUBSEED,
       NULL);
 
+  Schedule schedule;
+  init_schedule(&schedule, 20, 0, 1e-6, 0.5);
   long len;
   u8* validate_text;
   u8* text = alloc_and_collapse_text(opt_textfile,
@@ -533,14 +539,16 @@ main(int argc, char *argv[]){
     for (int i = 0;;i++){
       DEBUG("Starting epoch %d. learn rate %g.", i, net->bptt->learn_rate);
       START_TIMER(epoch);
-      epoch(net, confab_net, validate_net, text, len, validate_text, opt_validate_chars);
+      epoch(net, confab_net, validate_net, &schedule,
+          text, len, validate_text, opt_validate_chars);
       DEBUG_TIMER(epoch);
       DEBUG_TIMER(run);
     }
   }
   else {
     for (;;)
-      epoch(net, confab_net, validate_net, text, len, validate_text, opt_validate_chars);
+      epoch(net, confab_net, validate_net, &schedule,
+          text, len, validate_text, opt_validate_chars);
   }
 
   free(text);
