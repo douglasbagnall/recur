@@ -4,232 +4,19 @@ import random
 import itertools
 import time
 
-from classify import BaseClassifier, Gst, gst_init, CLASSES, TRAIN_FILE_LENGTH
+from classify import gst_init
+from classify import TMP_CLASSES as CLASSES
+from classify import TMP_HIDDEN_SIZE as HIDDEN_SIZE
+from classify import Trainer, lr_steps, categorised_files
+
+TRAIN_FILE_LENGTH=5
 
 NET_LOG_FILE = "classify.log"
-
-
-
-COLOURS = {
-    "Z": "\033[00m",
-    "g": '\033[00;32m',
-    "G": '\033[01;32m',
-    "r": '\033[00;31m',
-    "R": '\033[01;31m',
-    "M": "\033[01;35m",
-    "P": "\033[00;35m",
-    "C": "\033[01;36m",
-    "Y": "\033[01;33m",
-    "W": "\033[01;37m",
-}
 
 TRAIN_AUDIO_DIR = ("/home/douglas/maori-language-monitoring/"
                    "data/8k-60s/train-%ss" % TRAIN_FILE_LENGTH)
 TEST_AUDIO_DIR = ("/home/douglas/maori-language-monitoring/"
                    "data/8k-60s/validate-%ss" % TRAIN_FILE_LENGTH)
-
-TEST_INTERVAL = 3
-
-def eternal_alternator(iters, max_iterations=-1):
-    cycles = [itertools.cycle(x) for x in iters]
-    i = 0
-    while i != max_iterations:
-        for c in cycles:
-            yield c.next()
-        i += len(cycles)
-
-def eternal_shuffler(iters, max_iterations=-1):
-    #Yield from a randomly chosen stream
-    i = 0
-    cycles = [itertools.cycle(x) for x in iters]
-    while i != max_iterations:
-        yield random.choice(cycles).next()
-        i += 1
-
-TRAINING = 0
-TESTING = 1
-
-SAVE_LOCATION = 'nets/autosave'
-
-class Trainer(BaseClassifier):
-    trainers = None
-    lr_adjust = 1.0
-    def train(self, training_data, testing_data, iterations=100, learn_rate=None):
-        """data is a dictionary mapping class IDs to lists of filenames.
-        """
-        if isinstance(learn_rate, float):
-            self.learn_rate = itertools.repeat(learn_rate)
-        else:
-            self.learn_rate = learn_rate
-        self.counter = 0
-        self.iterations = iterations
-        trainers = []
-        testers = []
-        for k in self.classes:
-            trainers.append([(k, x) for x in training_data[k]])
-            testers.append([(k, x) for x in testing_data[k]])
-        self.trainers = eternal_shuffler(trainers)
-        testers = eternal_alternator(testers)
-        self.testset = [testers.next() for i in range(self.channels)]
-        self.test_scores = None
-        self.classifier.set_property('log-file', NET_LOG_FILE)
-        self.next_training_set()
-        self.pipeline.set_state(Gst.State.PLAYING)
-        self.mainloop.run()
-
-    def test_set(self):
-        self.test_targets = []
-        self.test_scores = [0] * self.channels
-        self.test_n = 0
-        for x, fs in zip(self.testset, self.filesrcs):
-            c, fn = x
-            self.test_targets.append(self.classes.index(c))
-            fs.set_property('location', fn)
-            if not self.quiet:
-                print c, fn
-        self.classifier.set_property('forget', 0)
-        self.classifier.set_property('target', '')
-        self.mode = TESTING
-
-    def evaluate_test(self):
-        #print self.test_scores
-        scores = [x / float(self.test_n) for x in self.test_scores]
-        colours = [COLOURS[x] for x in 'PPrRYYGGgWW']
-        output = []
-        rightness = 0
-        wrongness2 = 0
-        winners = 0
-        good_enough = 10 / len(self.classes)
-        results = zip(self.test_targets, scores)
-        results.sort()
-        for t, x in results:
-            i = int(x * 9.99)
-            output.append(colours[i])
-            output.append(self.classes[t])
-            rightness += x
-            winners += i > good_enough
-            wrongness2 += (1.0 - x) * (1.0 - x)
-        rightness /= len(scores)
-        wrongness2 = (wrongness2 ** 0.5) / len(scores)
-        winners /= float(len(scores))
-        output += (" %s%.2f%s %.2f %s%.2f%s" %
-                   (colours[int(rightness * 9.99)], rightness,
-                    colours[int(10 - wrongness2 * 9.99)], wrongness2,
-                    colours[int(winners * 9.99)], winners,
-                    COLOURS['Z']))
-        print ''.join(output)
-        if winners > 0.9:
-            self.save_net(tag='goodness-%d-%d' %
-                          (int(rightness * 100), int(winners * 100)))
-        if rightness > 0.75:
-            self.lr_adjust = 0.1 / (rightness - 0.65)
-        else:
-            self.lr_adjust = 1.0
-
-
-    def save_net(self, tag='', dir=SAVE_LOCATION):
-        fn = ("%s/classify-%s-%s.net" %
-              (dir, time.time(), tag))
-        print "saving %s" % fn
-        self.classifier.set_property('save-net', fn)
-
-    def next_training_set(self):
-        self.targets = []
-        if self.learn_rate is not None:
-            r = self.learn_rate.next() * self.lr_adjust
-            print "%s/%s learn_rate %s" % (self.counter, self.iterations, r)
-            self.classifier.set_property('learn_rate', r)
-
-        for fs in self.filesrcs:
-            c, fn = self.trainers.next()
-            self.targets.append(c)
-            fs.set_property('location', fn)
-            if not self.quiet:
-                print c, fn
-
-        target_string = '.'.join(str(self.classes.index(x)) for x in self.targets)
-        #self.classifier.set_property('forget', 0)
-        self.classifier.set_property('target', target_string)
-        self.mode = TRAINING
-
-    def on_eos(self, bus, msg):
-        self.pipeline.set_state(Gst.State.READY)
-        #print self.counter
-        if self.test_scores:
-            self.evaluate_test()
-            self.test_scores = None
-            self.next_training_set()
-        else:
-            self.classifier.set_property('save-net', '')
-            self.counter += 1
-            if self.counter == self.iterations:
-                self.stop()
-            elif self.counter % TEST_INTERVAL:
-                self.next_training_set()
-            else:
-                self.test_set()
-        self.pipeline.set_state(Gst.State.PLAYING)
-
-    def on_error(self, bus, msg):
-        print('Error:', msg.parse_error())
-
-    def on_element(self, bus, msg):
-        total = 0
-        if self.mode == TESTING:
-            self.test_n += 1
-            s = msg.get_structure()
-            if s.get_name() != "classify":
-                return
-            v = s.get_value
-            #print self.test_targets
-            for i, t in enumerate(self.test_targets):
-                winner = v('channel %d winner' % i)
-                ok = winner == t
-                self.test_scores[i] += ok
-                total += ok
-            if not self.quiet:
-                score = total / float(self.channels)
-                colour = COLOURS['PRRRRYYGGC'[int(score * 10)]]
-                print "%s%s%s %s/%s" % (colour, "=" * total, COLOURS['Z'],
-                                        total, self.channels)
-
-        elif self.quiet:
-            return
-        else:
-            s = msg.get_structure()
-            if s.get_name() != "classify":
-                return
-            v = s.get_value
-            error = v('error')
-            print error
-            fmt = "channel %d %s %s %s " + ("%.2f " * len(self.classes))
-            for i in range(self.channels):
-                winner = v('channel %d winner' % i)
-                scores = tuple(v('channel %d, output %d' % (i, j))
-                               for j in range(len(self.classes)))
-                wc = self.classes[winner]
-                tc = self.targets[i]
-                ok = ("\033[01;32m==\033[00m" if wc == tc else "\033[01;31m!=\033[00m")
-                print (fmt % ((i, wc, ok, tc) + scores))
-
-
-def lr_steps(*args):
-    args = list(args)
-    while len(args) > 2:
-        rate = args.pop(0)
-        n = args.pop(0)
-        for i in xrange(n):
-            yield rate
-    #odd number of args --> repeat forever
-    while args:
-        yield args[0]
-
-def categorised_files(_dir, classes):
-    files = [x for x in os.listdir(_dir) if x.endswith('.wav')]
-    random.shuffle(files)
-    return {c: [os.path.join(_dir, x) for x in files if x[0] == c]
-            for c in classes}
-
 
 def main(argv):
     gst_init()
@@ -251,10 +38,12 @@ def main(argv):
     train_data = categorised_files(TRAIN_AUDIO_DIR, CLASSES)
     test_data = categorised_files(TEST_AUDIO_DIR, CLASSES)
 
-    c = Trainer(channels=72)
+    c = Trainer(hsize=HIDDEN_SIZE,
+                channels=72,
+                classes=CLASSES)
     c.quiet = quiet
     c.train(train_data, test_data, iterations=10000 // TRAIN_FILE_LENGTH,
-            learn_rate=lr)
+            learn_rate=lr, log_file=NET_LOG_FILE)
 
 
 main(sys.argv[1:])

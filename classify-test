@@ -3,93 +3,18 @@
 import os, sys
 import random
 
-from classify import BaseClassifier, gst_init, Gst, TEST_FILE_LENGTH
+from classify import Classifier, gst_init
+from classify import TMP_CLASSES as CLASSES
+from classify import TMP_HIDDEN_SIZE as HIDDEN_SIZE
 
+TEST_FILE_LENGTH=60
 TEST_AUDIO_DIR = ("/home/douglas/maori-language-monitoring/"
                    "data/8k-%ss/test" % TEST_FILE_LENGTH)
 
-class Classifier(BaseClassifier):
-    pending_files = []
-    quiet = False
-    def classify_files(self, *files):
-        self.all_results = []
-        self.pending_files = list(reversed(files))
-        self.load_next_file()
-        self.pipeline.set_state(Gst.State.PLAYING)
-        self.mainloop.run()
-        return self.all_results
-
-    def load_next_file(self):
-        fn = self.pending_files.pop()
-        self.classifier.set_property("forget", 0)
-        self.filesrcs[0].set_property('location', fn)
-        self.file_results = []
-
-    def on_element(self, bus, msg):
-        s = msg.get_structure()
-        if s.get_name() != "classify":
-            return
-        v = s.get_value
-        winner = v('channel 0 winner')
-        scores = tuple(v('channel 0, output %d' % (j))
-                       for j in range(len(self.classes)))
-        self.file_results.append((winner, scores))
-
-    def collate_results(self):
-        votes = [0] * len(self.classes)
-        score_sums = [0] * len(self.classes)
-        for w, scores in self.file_results:
-            votes[w] += 1
-            #scores are negative.
-            score_sums = [x - y for x, y in zip(score_sums, scores)]
-
-        mean_scores = [x / len(self.file_results) for x in score_sums]
-
-        topscorer = mean_scores.index(max(mean_scores))
-        winchar = self.classes[topscorer]
-        fn = self.filesrcs[0].get_property('location')
-
-        r = (winchar,
-             mean_scores,
-             votes,
-             fn)
-        self.all_results.append(r)
-        return r
-
-    def report(self, winchar, mean_scores, votes, fn):
-        if self.quiet:
-            return
-        target = os.path.basename(fn)[0]
-        if target == winchar:
-            print (u"winner %s == %s \033[00m"
-                   u"file://\033[01;32m%s\033[00m \u2714".encode('utf-8') %
-                   (winchar, target, fn))
-        else:
-            print (u"winner %s != %s \033[00m"
-                   u"file://\033[01;31m%s\033[00m \u2717".encode('utf-8') %
-                   (winchar, target, fn))
-
-        for c, v, s in zip(self.classes, votes, mean_scores):
-            print (" %s: %s%4d\033[00m %s%.2f\033[00m %s%s\033[00m" %
-                   (c,
-                    ("\033[01;35m" if v == max(votes) else ""), v,
-                    ("\033[01;36m" if s == max(mean_scores) else ""), s,
-                    ("\033[01;33m" if c == target else ""),
-                    '=' * int(s * 50)))
-
-    def on_eos(self, bus, msg):
-        self.pipeline.set_state(Gst.State.READY)
-        r = self.collate_results()
-        self.report(*r)
-        if not self.pending_files:
-            self.stop()
-        else:
-            self.load_next_file()
-            self.pipeline.set_state(Gst.State.PLAYING)
-
-
 def test(_dir=TEST_AUDIO_DIR, quiet=False):
-    c = Classifier(channels=1)
+    c = Classifier(hsize=HIDDEN_SIZE,
+                   channels=1,
+                   classes=CLASSES)
     c.quiet = quiet
     files = [os.path.join(_dir, x) for x in os.listdir(_dir) if x.endswith('.wav')
              and x[0] in c.classes]

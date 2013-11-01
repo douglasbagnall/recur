@@ -5,9 +5,12 @@ import random
 
 import gi
 gi.require_version('Gst', '1.0')
-from classify import BaseClassifier, gst_init, Gst, TEST_FILE_LENGTH
+from classify import BaseClassifier, gst_init, Gst
 from gi.repository import Gtk, Gdk
 
+from classify import TMP_CLASSES as CLASSES
+from classify import TMP_HIDDEN_SIZE as HIDDEN_SIZE
+TEST_FILE_LENGTH=60
 TEST_AUDIO_DIR = ("/home/douglas/maori-language-monitoring/"
                    "data/8k-%ss/test" % TEST_FILE_LENGTH)
 
@@ -16,6 +19,8 @@ class GTKClassifier(BaseClassifier):
     widget = None
     def __init__(self, channels=1):
         BaseClassifier.__init__(self,
+                                classes=CLASSES,
+                                hsize=HIDDEN_SIZE,
                                 channels=channels,
                                 sinkname='autoaudiosink')
 
