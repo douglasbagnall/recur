@@ -13,7 +13,29 @@ from gi.repository import Gst, GObject
 TMP_CLASSES = "MEN"  #Maori, English, Noise
 KIWI_CLASSES = "MFN" #Male, Female, None
 TMP_HIDDEN_SIZE = 499
-KIWI_HIDDEN_SIZE = 499
+KIWI_HIDDEN_SIZE = 199
+
+DEFAULT_LOG_FILE = "classify.log"
+
+COLOURS = {
+    "Z": "\033[00m",
+    "g": '\033[00;32m',
+    "G": '\033[01;32m',
+    "r": '\033[00;31m',
+    "R": '\033[01;31m',
+    "M": "\033[01;35m",
+    "P": "\033[00;35m",
+    "C": "\033[01;36m",
+    "Y": "\033[01;33m",
+    "W": "\033[01;37m",
+}
+
+TEST_INTERVAL = 3
+
+TRAINING = 0
+TESTING = 1
+
+SAVE_LOCATION = 'nets/autosave'
 
 def gst_init():
     GObject.threads_init()
@@ -172,23 +194,6 @@ class Classifier(BaseClassifier):
             self.pipeline.set_state(Gst.State.PLAYING)
 
 
-DEFAULT_LOG_FILE = "classify.log"
-
-COLOURS = {
-    "Z": "\033[00m",
-    "g": '\033[00;32m',
-    "G": '\033[01;32m',
-    "r": '\033[00;31m',
-    "R": '\033[01;31m',
-    "M": "\033[01;35m",
-    "P": "\033[00;35m",
-    "C": "\033[01;36m",
-    "Y": "\033[01;33m",
-    "W": "\033[01;37m",
-}
-
-TEST_INTERVAL = 3
-
 def eternal_alternator(iters, max_iterations=-1):
     cycles = [itertools.cycle(x) for x in iters]
     i = 0
@@ -204,11 +209,6 @@ def eternal_shuffler(iters, max_iterations=-1):
     while i != max_iterations:
         yield random.choice(cycles).next()
         i += 1
-
-TRAINING = 0
-TESTING = 1
-
-SAVE_LOCATION = 'nets/autosave'
 
 class Trainer(BaseClassifier):
     trainers = None
@@ -389,3 +389,37 @@ def categorised_files(_dir, classes):
     random.shuffle(files)
     return {c: [os.path.join(_dir, x) for x in files if x[0] == c]
             for c in classes}
+
+
+class GTKClassifier(BaseClassifier):
+    widget = None
+
+    def run(self, *files):
+        self.pending_files = list(reversed(files))
+        self.load_next_file()
+        self.pipeline.set_state(Gst.State.PLAYING)
+        #self.mainloop.run()
+
+    def load_next_file(self):
+        self.pipeline.set_state(Gst.State.READY)
+        fn = self.pending_files.pop()
+        self.classifier.set_property("forget", True)
+        self.filesrcs[0].set_property('location', fn)
+        self.pipeline.set_state(Gst.State.PLAYING)
+
+    def on_element(self, bus, msg):
+        if self.widget:
+            s = msg.get_structure()
+            if s.get_name() != "classify":
+                return
+            v = s.get_value
+            winner = v('channel 0 winner')
+            scores = tuple(-v('channel 0, output %d' % (j))
+                           for j in range(len(self.classes)))
+            self.widget.notify_results((winner, scores))
+
+    def on_eos(self, bus, msg):
+        if not self.pending_files:
+            self.stop()
+        else:
+            self.load_next_file()

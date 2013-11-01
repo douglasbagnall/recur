@@ -1,142 +1,17 @@
 #!/usr/bin/python
-
 import os, sys
 import random
-
-import gi
-gi.require_version('Gst', '1.0')
-from classify import BaseClassifier, gst_init, Gst
-from gi.repository import Gtk, Gdk
-
+from gtkdisplay import run
+from classify import GTKClassifier, gst_init
 from classify import TMP_CLASSES as CLASSES
 from classify import TMP_HIDDEN_SIZE as HIDDEN_SIZE
 TEST_FILE_LENGTH=60
 TEST_AUDIO_DIR = ("/home/douglas/maori-language-monitoring/"
                    "data/8k-%ss/test" % TEST_FILE_LENGTH)
 
-
-class GTKClassifier(BaseClassifier):
-    widget = None
-    def __init__(self, channels=1):
-        BaseClassifier.__init__(self,
-                                classes=CLASSES,
-                                hsize=HIDDEN_SIZE,
-                                channels=channels,
-                                sinkname='autoaudiosink')
-
-    def run(self, *files):
-        self.pending_files = list(reversed(files))
-        self.load_next_file()
-        self.pipeline.set_state(Gst.State.PLAYING)
-        #self.mainloop.run()
-
-    def load_next_file(self):
-        self.pipeline.set_state(Gst.State.READY)
-        fn = self.pending_files.pop()
-        self.classifier.set_property("forget", True)
-        self.filesrcs[0].set_property('location', fn)
-        self.pipeline.set_state(Gst.State.PLAYING)
-
-    def on_element(self, bus, msg):
-        if self.widget:
-            s = msg.get_structure()
-            if s.get_name() != "classify":
-                return
-            v = s.get_value
-            winner = v('channel 0 winner')
-            scores = tuple(-v('channel 0, output %d' % (j))
-                           for j in range(len(self.classes)))
-            self.widget.notify_results((winner, scores))
-
-    def on_eos(self, bus, msg):
-        if not self.pending_files:
-            self.stop()
-        else:
-            self.load_next_file()
-
-class ClassifierDisplay(Gtk.DrawingArea):
-    results = []
-    def __init__(self, classifier, size):
-        Gtk.DrawingArea.__init__(self)
-        self.size = size
-        self.set_size_request (size, size)
-        self.classifier = classifier
-        self.connect('draw', self.on_draw)
-
-    def notify_results(self, results):
-        self.results.append(results)
-        self.queue_draw()
-
-    def on_draw(self, widget, cr):
-        if not self.results:
-            return
-        cr.save()
-        w = widget.get_allocated_width()
-        h = widget.get_allocated_height()
-        cr.translate (w / 2, h / 2)
-        cr.scale(w * 0.48, h  * 0.48)
-
-        #draw a centre line
-        cr.set_line_width(0.05)
-        cr.set_dash((0.01, 0.02))
-        cr.set_source_rgb(0.8, 0.8, 0.8)
-        cr.move_to(0, -0.5)
-        cr.line_to(0, 0.4)
-        cr.stroke()
-
-        cr.set_dash(())
-        step = 1.0 / len(self.results)
-        i = step
-        for winner, scores in self.results:
-            cr.set_line_width(i * 0.08)
-            i += step
-            if len(scores) == 2:
-                m, e = scores
-                p = m - e
-                cr.set_source_rgb(abs(p), m, e)
-                cr.move_to(p, 0.1)
-                cr.line_to(p, 0)
-
-            elif len(scores) == 3:
-                m, e, n = scores
-                p = m - e
-                cr.set_source_rgb(n, m, e)
-                cr.move_to(p, n - 0.1)
-                cr.line_to(p, n - 0.2)
-
-            cr.stroke()
-        cr.restore()
-        self.results = []
-
-
-def window_stop(window):
-    window.classifier.stop()
-    Gtk.main_quit()
-
-def on_key_press_event(widget, event):
-    keyname = Gdk.keyval_name(event.keyval).lower()
-    ctrl = event.state & Gdk.ModifierType.CONTROL_MASK
-    if keyname == 'q' or (ctrl and keyname == 'w'):
-        window_stop(widget)
-    if keyname == 'n':
-        widget.classifier.load_next_file()
-        print "Key %s (%d) was pressed" % (keyname, event.keyval)
-
-
-def main(argv):
+def main():
     gst_init()
-    window = Gtk.Window()
-    window.set_title ("RNN Classifier")
-    classifier = GTKClassifier()
-    app = ClassifierDisplay(classifier, 300)
-    classifier.widget = app
-    window.add(app)
-    #XXX mucky
-    window.classifier = classifier
-    #print dir(window)
-    window.connect_after('destroy', window_stop)
-    window.connect('key_press_event', on_key_press_event)
-    window.show_all()
+
     if 0:
         d = TEST_AUDIO_DIR
         files = [os.path.join(d, x) for x in os.listdir(d)
@@ -146,8 +21,11 @@ def main(argv):
         files = [os.path.join(d, x) for x in os.listdir(d)
                  if x.endswith('.wav') and x[0] == 'C']
 
+    classifier = GTKClassifier(classes=CLASSES,
+                               hsize=HIDDEN_SIZE,
+                               sinkname='autoaudiosink')
     random.shuffle(files)
-    classifier.run(*files)
-    Gtk.main()
+    run(classifier, files)
 
-main(sys.argv[1:])
+
+main()

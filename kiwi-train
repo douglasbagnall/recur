@@ -1,0 +1,43 @@
+#!/usr/bin/python
+import os, sys
+import random
+import itertools
+import time
+
+from classify import gst_init
+from classify import KIWI_CLASSES as CLASSES
+from classify import KIWI_HIDDEN_SIZE as HIDDEN_SIZE
+from classify import Trainer, lr_steps, categorised_files
+
+NET_LOG_FILE = "kiwi.log"
+
+TRAIN_AUDIO_DIR = "/home/douglas/corpora/kiwi/train/"
+VALIDATE_AUDIO_DIR = "/home/douglas/corpora/kiwi/validate/"
+
+def main(argv):
+    gst_init()
+    if '-q' in argv:
+        argv.remove('-q')
+        quiet = True
+    else:
+        quiet = False
+    if argv:
+        lr = lr_steps(*(float(x) for x in argv))
+
+    else:
+        lr = lr_steps(#1e-5, 5,
+                      3e-6, 10,
+                      1e-6, 20,
+                      3e-7)
+
+    train_data = categorised_files(TRAIN_AUDIO_DIR, CLASSES)
+    test_data = categorised_files(VALIDATE_AUDIO_DIR, CLASSES)
+
+    c = Trainer(hsize=HIDDEN_SIZE,
+                channels=72,
+                classes=CLASSES)
+    c.quiet = quiet
+    c.train(train_data, test_data, iterations=1000,
+            learn_rate=lr, log_file=NET_LOG_FILE)
+
+main(sys.argv[1:])
