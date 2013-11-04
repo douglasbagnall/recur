@@ -9,7 +9,8 @@ TEST_AUDIO_DIR = "/home/douglas/corpora/kiwi/test/"
 
 def main():
     gst_init()
-    classifier = GTKClassifier(classes=CLASSES,
+    classifier = GTKClassifier(mfccs=MFCCS,
+                               classes=CLASSES,
                                hsize=HIDDEN_SIZE,
                                sinkname='autoaudiosink')
 

@@ -20,16 +20,9 @@ G_BEGIN_DECLS
 #define CLASSIFY_RATE 8000
 #define CLASSIFY_BIAS 1
 #define CLASSIFY_BATCH_SIZE 1
-#define CLASSIFY_USE_MFCCS 1
 #define CLASSIFY_VALUE_SIZE 2
 
 #define CLASSIFY_N_FFT_BINS 32
-
-#if CLASSIFY_USE_MFCCS
-#define CLASSIFY_N_FEATURES 16
-#else
-#define CLASSIFY_N_FEATURES CLASSIFY_N_FFT_BINS
-#endif
 
 #define CLASSIFY_MFCC_MIN_FREQ 30
 #define CLASSIFY_MFCC_MAX_FREQ (CLASSIFY_RATE * 0.499)
@@ -90,6 +83,7 @@ struct _GstClassify
   ClassifyChannel *channels;
   int n_channels;
   int n_classes;
+  int mfccs;
   s16 *incoming_queue;
   int incoming_start;
   int incoming_end;

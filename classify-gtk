@@ -21,7 +21,8 @@ def main():
         files = [os.path.join(d, x) for x in os.listdir(d)
                  if x.endswith('.wav') and x[0] == 'C']
 
-    classifier = GTKClassifier(classes=CLASSES,
+    classifier = GTKClassifier(mfccs=MFCCS,
+                               classes=CLASSES,
                                hsize=HIDDEN_SIZE,
                                sinkname='autoaudiosink')
     random.shuffle(files)

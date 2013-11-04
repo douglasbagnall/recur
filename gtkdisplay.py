@@ -4,10 +4,7 @@ import random
 
 import gi
 gi.require_version('Gst', '1.0')
-from classify import GTKClassifier, gst_init
 from gi.repository import Gtk, Gdk
-
-
 
 class ClassifierDisplay(Gtk.DrawingArea):
     results = []

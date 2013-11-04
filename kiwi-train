@@ -5,6 +5,7 @@ import itertools
 import time
 
 from classify import gst_init
+from classify import KIWI_MFCCS as MFCCS
 from classify import KIWI_CLASSES as CLASSES
 from classify import KIWI_HIDDEN_SIZE as HIDDEN_SIZE
 from classify import Trainer, lr_steps, categorised_files
@@ -33,7 +34,8 @@ def main(argv):
     train_data = categorised_files(TRAIN_AUDIO_DIR, CLASSES)
     test_data = categorised_files(VALIDATE_AUDIO_DIR, CLASSES)
 
-    c = Trainer(hsize=HIDDEN_SIZE,
+    c = Trainer(mfccs=MFCCS,
+                hsize=HIDDEN_SIZE,
                 channels=72,
                 classes=CLASSES)
     c.quiet = quiet

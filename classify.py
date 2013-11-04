@@ -14,6 +14,8 @@ TMP_CLASSES = "MEN"  #Maori, English, Noise
 KIWI_CLASSES = "MFN" #Male, Female, None
 TMP_HIDDEN_SIZE = 499
 KIWI_HIDDEN_SIZE = 199
+TMP_MFCCS = 16
+KIWI_MFCCS = 0
 
 DEFAULT_LOG_FILE = "classify.log"
 
@@ -43,7 +45,7 @@ def gst_init():
 
 class BaseClassifier(object):
     pipeline = None
-
+    basename = 'classify'
     def init_pipeline(self):
         self.pipeline = Gst.Pipeline()
         self.bus = self.pipeline.get_bus()
@@ -71,13 +73,14 @@ class BaseClassifier(object):
         self.capsfilter.set_property("caps", caps)
         self.summaries = [[]] * channels
 
-    def build_pipeline(self, classes, hsize, channels, sinkname='fakesink'):
+    def build_pipeline(self, mfccs, hsize, classes, channels, sinkname='fakesink'):
         self.classes = classes
         self.channels = channels
         self.sink = self.make_add_link(sinkname, None)
         self.classifier = self.make_add_link('classify', self.sink)
-        self.classifier.set_property('classes', len(self.classes))
+        self.classifier.set_property('mfccs', mfccs)
         self.classifier.set_property('hidden-size', hsize)
+        self.classifier.set_property('classes', len(self.classes))
 
         self.capsfilter = self.make_add_link('capsfilter', self.classifier)
         self.interleave = self.make_add_link('interleave', self.capsfilter)
@@ -91,11 +94,13 @@ class BaseClassifier(object):
 
         self.set_channels(channels)
 
-    def __init__(self, classes, hsize, channels=1, mainloop=None, sinkname='fakesink'):
+    def __init__(self, mfccs, hsize, classes, channels=1, mainloop=None,
+                 sinkname='fakesink', basename='classify'):
         if mainloop is None:
             mainloop = GObject.MainLoop()
         self.mainloop = mainloop
-        self.build_pipeline(classes, hsize, channels, sinkname=sinkname)
+        self.build_pipeline(mfccs, hsize, classes, channels, sinkname=sinkname)
+        self.basename = basename
 
     def on_eos(self, bus, msg):
         print('on_eos()')
@@ -288,8 +293,8 @@ class Trainer(BaseClassifier):
 
 
     def save_net(self, tag='', dir=SAVE_LOCATION):
-        fn = ("%s/classify-%s-%s.net" %
-              (dir, time.time(), tag))
+        fn = ("%s/%s-%s-%s.net" %
+              (self.basename, dir, time.time(), tag))
         print "saving %s" % fn
         self.classifier.set_property('save-net', fn)
 

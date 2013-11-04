@@ -26,6 +26,7 @@ enum
   PROP_FORGET,
   PROP_LEARN_RATE,
   PROP_HIDDEN_SIZE,
+  PROP_MFCCS,
   PROP_SAVE_NET,
   PROP_PGM_DUMP,
   PROP_LOG_FILE,
@@ -35,6 +36,7 @@ enum
 #define DEFAULT_PROP_PGM_DUMP ""
 #define DEFAULT_PROP_LOG_FILE ""
 #define DEFAULT_PROP_SAVE_NET NULL
+#define DEFAULT_PROP_MFCCS 0
 #define DEFAULT_PROP_CLASSES 2
 #define DEFAULT_PROP_FORGET 0
 #define DEFAULT_HIDDEN_SIZE 199
@@ -45,6 +47,9 @@ enum
 #define MAX_HIDDEN_SIZE 1000000
 #define LEARN_RATE_MIN 0.0
 #define LEARN_RATE_MAX 1.0
+#define MIN_PROP_MFCCS 0
+#define MAX_PROP_MFCCS (CLASSIFY_N_FFT_BINS - 1)
+
 
 /* static_functions */
 /* plugin_init    - registers plugin (once)
@@ -79,9 +84,9 @@ init_channel(ClassifyChannel *c, RecurNN *net, int id, float learn_rate)
   c->net->bptt->learn_rate = learn_rate;
   c->pcm_next = zalloc_aligned_or_die(CLASSIFY_WINDOW_SIZE * sizeof(float));
   c->pcm_now = zalloc_aligned_or_die(CLASSIFY_WINDOW_SIZE * sizeof(float));
-  c->features = zalloc_aligned_or_die(CLASSIFY_N_FEATURES * sizeof(float));
+  c->features = zalloc_aligned_or_die(net->input_size * sizeof(float));
   if (PGM_DUMP_FEATURES){
-    c->mfcc_image = temporal_ppm_alloc(CLASSIFY_N_FEATURES, 300, "mfcc", id,
+    c->mfcc_image = temporal_ppm_alloc(net->input_size, 300, "mfcc", id,
         PGM_DUMP_COLOUR);
   }
   else {
@@ -176,6 +181,13 @@ gst_classify_class_init (GstClassifyClass * klass)
           DEFAULT_PROP_CLASSES,
           G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
+  g_object_class_install_property (gobject_class, PROP_MFCCS,
+      g_param_spec_int("mfccs", "mfccs",
+          "Use this many MFCCs, or zero for fft bins",
+          MIN_PROP_MFCCS, MAX_PROP_MFCCS,
+          DEFAULT_PROP_MFCCS,
+          G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+
   g_object_class_install_property (gobject_class, PROP_FORGET,
       g_param_spec_boolean("forget", "forget",
           "Forget the current hidden layer (all channels)",
@@ -221,8 +233,9 @@ gst_classify_init (GstClassify * self)
 static void
 reset_net_filename(GstClassify *self){
   char s[200];
+  int n_features = self->mfccs ? self->mfccs : CLASSIFY_N_FFT_BINS;
   snprintf(s, sizeof(s), "classify-i%d-h%d-o%d-b%d-%dHz-w%d.net",
-      CLASSIFY_N_FEATURES, self->hidden_size, self->n_classes,
+      n_features, self->hidden_size, self->n_classes,
       CLASSIFY_BIAS, CLASSIFY_RATE, CLASSIFY_WINDOW_SIZE);
   if (self->net_filename){
     free(self->net_filename);
@@ -243,7 +256,8 @@ load_or_create_net(GstClassify *self){
     }
   }
   if (net == NULL){
-    net = rnn_new(CLASSIFY_N_FEATURES, self->hidden_size,
+    int n_features = self->mfccs ? self->mfccs : CLASSIFY_N_FFT_BINS;
+    net = rnn_new(n_features, self->hidden_size,
         self->n_classes, CLASSIFY_RNN_FLAGS, CLASSIFY_RNG_SEED,
         NULL, CLASSIFY_BPTT_DEPTH, self->learn_rate, MOMENTUM, MOMENTUM_WEIGHT,
         CLASSIFY_BATCH_SIZE);
@@ -395,17 +409,6 @@ gst_classify_set_property (GObject * object, guint prop_id, const GValue * value
       maybe_start_logging(self);
       break;
 
-    case PROP_CLASSES:
-      //XXX has no effect if set late.
-      if (self->net == NULL){
-        self->n_classes = g_value_get_int(value);
-      }
-      else {
-        GST_WARNING("it is TOO LATE fto set the number of classes!"
-            " (is %d, requested %d)", self->n_classes, g_value_get_int(value));
-      }
-      break;
-
     case PROP_FORGET:
       if (self->net){
         gboolean bptt_too = g_value_get_boolean(value);
@@ -426,12 +429,31 @@ gst_classify_set_property (GObject * object, guint prop_id, const GValue * value
       }
       break;
 
-    case PROP_HIDDEN_SIZE:
-      self->hidden_size = g_value_get_int(value);
-      if (self->net){
-        GST_WARNING("It is too late to set hidden size");
-      }
+      /*CLASSES, MFCCS, and HIDDEN_SIZE have no effect if set late (after net creation)
+       */
+#define SET_INT_IF_NOT_TOO_LATE(attr, name) do {                        \
+        if (self->net == NULL){                                         \
+          self->attr = g_value_get_int(value);                          \
+        }                                                               \
+        else {                                                          \
+          GST_WARNING("it is TOO LATE to set " name                     \
+              " (is %d, requested %d)", self->attr,                     \
+              g_value_get_int(value));                                  \
+        }} while (0)
+
+    case PROP_MFCCS:
+      SET_INT_IF_NOT_TOO_LATE(mfccs, "number of MFCCs");
       break;
+
+    case PROP_CLASSES:
+      SET_INT_IF_NOT_TOO_LATE(n_classes, "number of classes");
+      break;
+
+    case PROP_HIDDEN_SIZE:
+      SET_INT_IF_NOT_TOO_LATE(hidden_size, "hidden layer size");
+      break;
+
+#undef SET_INT_IF_NOT_TOO_LATE
 
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -464,6 +486,9 @@ gst_classify_get_property (GObject * object, guint prop_id, GValue * value,
     break;
   case PROP_CLASSES:
     g_value_set_int(value, self->n_classes);
+    break;
+  case PROP_MFCCS:
+    g_value_set_int(value, self->mfccs);
     break;
   case PROP_LEARN_RATE:
     g_value_set_float(value, self->learn_rate);
@@ -512,14 +537,18 @@ send_message(GstClassify *self, float mean_err)
 
 
 static inline void
-pcm_to_features(RecurAudioBinner *mf, float *features, float *pcm){
+pcm_to_features(RecurAudioBinner *mf, float *features, float *pcm, int mfccs){
   float *answer;
-#if CLASSIFY_USE_MFCCS
-  answer = recur_extract_mfccs(mf, pcm) + 1;
-#else
-  answer = recur_extract_log_freq_bins(mf, pcm);
-#endif
-  for (int i = 0; i < CLASSIFY_N_FEATURES; i++){
+  int n_features;
+  if (mfccs){
+    answer = recur_extract_mfccs(mf, pcm) + 1;
+    n_features = mfccs;
+  }
+  else {
+    answer = recur_extract_log_freq_bins(mf, pcm);
+    n_features = CLASSIFY_N_FFT_BINS;
+  }
+  for (int i = 0; i < n_features; i++){
     features[i] = answer[i];
   }
 }
@@ -562,7 +591,7 @@ maybe_learn(GstClassify *self){
       }
 
       /*get the features -- after which pcm_now is finished with. */
-      pcm_to_features(self->mfcc_factory, c->features, c->pcm_now);
+      pcm_to_features(self->mfcc_factory, c->features, c->pcm_now, self->mfccs);
       if (c->mfcc_image){
         temporal_ppm_add_row(c->mfcc_image, c->features);
         //temporal_ppm_add_row(c->mfcc_image, c->pcm_now);

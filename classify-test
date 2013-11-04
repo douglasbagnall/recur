@@ -4,6 +4,7 @@ import os, sys
 import random
 
 from classify import Classifier, gst_init
+from classify import TMP_MFCCS as MFCCS
 from classify import TMP_CLASSES as CLASSES
 from classify import TMP_HIDDEN_SIZE as HIDDEN_SIZE
 
@@ -12,7 +13,8 @@ TEST_AUDIO_DIR = ("/home/douglas/maori-language-monitoring/"
                    "data/8k-%ss/test" % TEST_FILE_LENGTH)
 
 def test(_dir=TEST_AUDIO_DIR, quiet=False):
-    c = Classifier(hsize=HIDDEN_SIZE,
+    c = Classifier(mfccs=MFCCS,
+                   hsize=HIDDEN_SIZE,
                    channels=1,
                    classes=CLASSES)
     c.quiet = quiet
