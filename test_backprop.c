@@ -27,17 +27,19 @@
 #define DEFAULT_BPTT_DEPTH 30
 #define DEFAULT_MOMENTUM 0.95
 #define DEFAULT_MOMENTUM_WEIGHT 0.5
+#define DEFAULT_MOMENTUM_SOFT_START 0
 #define DEFAULT_BIAS 1
 #define DEFAULT_RNG_SEED 1
 #define DEFAULT_STOP 0
 #define DEFAULT_BPTT_BATCH_SIZE 1
 #define DEFAULT_VALIDATE_CHARS 0
-#define DEFAULT_VALIDATION_OVERLAP 2
+#define DEFAULT_VALIDATION_OVERLAP 1
 #define DEFAULT_OVERRIDE 0
 #define DEFAULT_DETERMINISTIC_CONFAB 0
 #define DEFAULT_SAVE_NET 1
 #define DEFAULT_LOG_FILE "bptt.log"
 #define DEFAULT_START_CHAR -1
+#define DEFAULT_HIDDEN_SIZE 199
 
 #define BELOW_QUIET_LEVEL(quiet) if (opt_quiet < quiet)
 
@@ -50,9 +52,10 @@
 #define NET_TO_CHAR "#abcdefghijklmnopqrstuvwxyz,'- .\";:!?"
 #define HASH_CHARS "1234567890&@"
 
-#define HIDDEN_SIZE 199
 
-static uint opt_hidden_size = HIDDEN_SIZE;
+static TemporalPPM *input_ppm;
+
+static uint opt_hidden_size = DEFAULT_HIDDEN_SIZE;
 static uint opt_bptt_depth = DEFAULT_BPTT_DEPTH;
 static float opt_learn_rate = DEFAULT_LEARN_RATE;
 static float opt_momentum = DEFAULT_MOMENTUM;
@@ -65,6 +68,7 @@ static char * opt_textfile = DICKENS_SHUFFLED_TEXT;
 static bool opt_bias = DEFAULT_BIAS;
 static bool opt_reload = DEFAULT_RELOAD;
 static float opt_momentum_weight = DEFAULT_MOMENTUM_WEIGHT;
+static float opt_momentum_soft_start = DEFAULT_MOMENTUM_SOFT_START;
 static u64 opt_rng_seed = DEFAULT_RNG_SEED;
 static uint opt_stop = DEFAULT_STOP;
 static int opt_validate_chars = DEFAULT_VALIDATE_CHARS;
@@ -121,6 +125,8 @@ static struct opt_table options[] = {
       &opt_momentum, "momentum"),
   OPT_WITH_ARG("--momentum-weight=<float>", opt_set_floatval, opt_show_floatval,
       &opt_momentum_weight, "momentum weight"),
+  OPT_WITH_ARG("--momentum-soft-start=<float>", opt_set_floatval, opt_show_floatval,
+      &opt_momentum_soft_start, "softness of momentum onset (0 for constant)"),
   OPT_WITHOUT_ARG("-q|--quiet", opt_inc_intval,
       &opt_quiet, "print less (twice for even less)"),
   OPT_WITHOUT_ARG("-v|--verbose", opt_dec_intval,
@@ -376,8 +382,6 @@ long_confab(RecurNN *net, int len, int rows){
   Q_DEBUG(1, "%s", confab);
 }
 
-static TemporalPPM *input_ppm;
-
 void
 epoch(RecurNN *net, RecurNN *confab_net, RecurNN *validate_net,
     Schedule *schedule,
@@ -395,11 +399,20 @@ epoch(RecurNN *net, RecurNN *confab_net, RecurNN *validate_net,
   for (int j = 0; j < vlap; j++){
     vhistory[j] = 0;
   }
-
   int vcounter = 0;
   for(i = start; i < len - 1; i++){
     float e;
     int c;
+
+    if ( opt_momentum_soft_start){
+      float x = opt_momentum_soft_start;
+      net->bptt->momentum = MIN(1.0f - x / (1 + net->generation + 2 * x), opt_momentum);
+      //DEBUG("momentum is %f, generation %d", net->bptt->momentum, net->generation);
+      if (net->bptt->momentum == opt_momentum){
+        opt_momentum_soft_start = 0;
+      }
+    }
+
     sgd_one(net, text[i], text[i + 1], &e, &c);
     correct += c;
 
@@ -424,10 +437,15 @@ epoch(RecurNN *net, RecurNN *confab_net, RecurNN *validate_net,
         }
         vhistory[vcounter] = ventropy;
         ventropy = 0; /*messy*/
+        float vdiv = vlap;
         for (int j = 0; j < vlap; j++){
+          vdiv -= vhistory[j] == 0;
           ventropy += vhistory[j];
         }
-        ventropy /= MIN(vlap, i);
+        ventropy /= vdiv;
+      }
+      else {
+        *vhistory = ventropy;
       }
       BELOW_QUIET_LEVEL(1){
         confabulate(confab_net, confab, CONFAB_SIZE, opt_deterministic_confab);
@@ -459,6 +477,14 @@ epoch(RecurNN *net, RecurNN *confab_net, RecurNN *validate_net,
     if (opt_stop && net->generation >= opt_stop){
       if (opt_filename && opt_save_net){
         rnn_save_net(net, opt_filename);
+      }
+      BELOW_QUIET_LEVEL(2){
+        float ventropy = 0;
+        for (int j = 0; j < vlap; j++){
+          ventropy += vhistory[j];
+        }
+        ventropy /= vlap;
+        DEBUG("final entropy %f", ventropy);
       }
       exit(0);
     }
@@ -500,7 +526,8 @@ load_or_create_net(void){
     u32 flags = opt_bias ? RNN_NET_FLAG_STANDARD : RNN_NET_FLAG_NO_BIAS;
     net = rnn_new(input_size, opt_hidden_size,
         input_size, flags, 1,
-        opt_logfile, opt_bptt_depth, opt_learn_rate, opt_momentum, opt_momentum_weight,
+        opt_logfile, opt_bptt_depth, opt_learn_rate,
+        opt_momentum, opt_momentum_weight,
         opt_bptt_batch_size);
   }
   else if (opt_override){
@@ -541,7 +568,7 @@ main(int argc, char *argv[]){
       NULL);
 
   Schedule schedule;
-  init_schedule(&schedule, 20, 0, 1e-6, 0.5);
+  init_schedule(&schedule, 30, 0, 3e-6, 0.4);
   long len;
   u8* validate_text;
   u8* text = alloc_and_collapse_text(opt_textfile,

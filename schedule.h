@@ -35,8 +35,8 @@ eval_simple(Schedule *s, RecurNN *net, float score){
   }
   s->timeout = s->recent_len;
   bptt->learn_rate = MAX(s->learn_rate_min, bptt->learn_rate * s->learn_rate_mul);
-  DEBUG("recent %g, score %g margin %g;setting learn_rate to %g",
-      s->recent[i], score, s->margin, bptt->learn_rate);
+  DEBUG("recent %g, score %g, momentum %g, generation %d; setting learn_rate to %g",
+      s->recent[i], score, net->bptt->momentum, net->generation, bptt->learn_rate);
 }
 
 static void
