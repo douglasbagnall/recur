@@ -26,6 +26,8 @@ enum
   PROP_FORGET,
   PROP_LEARN_RATE,
   PROP_HIDDEN_SIZE,
+  PROP_MOMENTUM,
+  PROP_MOMENTUM_SOFT_START,
   PROP_MFCCS,
   PROP_SAVE_NET,
   PROP_PGM_DUMP,
@@ -37,6 +39,8 @@ enum
 #define DEFAULT_PROP_LOG_FILE ""
 #define DEFAULT_PROP_SAVE_NET NULL
 #define DEFAULT_PROP_MFCCS 0
+#define DEFAULT_PROP_MOMENTUM 0.95f
+#define DEFAULT_PROP_MOMENTUM_SOFT_START 0.0f
 #define DEFAULT_PROP_CLASSES 2
 #define DEFAULT_PROP_FORGET 0
 #define DEFAULT_HIDDEN_SIZE 199
@@ -47,9 +51,12 @@ enum
 #define MAX_HIDDEN_SIZE 1000000
 #define LEARN_RATE_MIN 0.0
 #define LEARN_RATE_MAX 1.0
+#define MOMENTUM_MIN 0.0
+#define MOMENTUM_MAX 1.0
 #define MIN_PROP_MFCCS 0
 #define MAX_PROP_MFCCS (CLASSIFY_N_FFT_BINS - 1)
-
+#define MOMENTUM_SOFT_START_MAX 1e9
+#define MOMENTUM_SOFT_START_MIN 0
 
 /* static_functions */
 /* plugin_init    - registers plugin (once)
@@ -201,6 +208,20 @@ gst_classify_class_init (GstClassifyClass * klass)
           DEFAULT_LEARN_RATE,
           G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
+  g_object_class_install_property (gobject_class, PROP_MOMENTUM_SOFT_START,
+      g_param_spec_float("momentum-soft-start", "momentum-soft-start",
+          "Ease into momentum over many generations",
+          MOMENTUM_SOFT_START_MIN, MOMENTUM_SOFT_START_MAX,
+          DEFAULT_PROP_MOMENTUM_SOFT_START,
+          G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+
+  g_object_class_install_property (gobject_class, PROP_MOMENTUM,
+      g_param_spec_float("momentum", "momentum",
+          "(eventual) momentum",
+          MOMENTUM_MIN, MOMENTUM_MAX,
+          DEFAULT_PROP_MOMENTUM,
+          G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+
   g_object_class_install_property (gobject_class, PROP_HIDDEN_SIZE,
       g_param_spec_int("hidden-size", "hidden-size",
           "Size of the RNN hidden layer",
@@ -226,6 +247,8 @@ gst_classify_init (GstClassify * self)
   self->pending_logfile = NULL;
   self->learn_rate = DEFAULT_LEARN_RATE;
   self->hidden_size = DEFAULT_HIDDEN_SIZE;
+  self->momentum_soft_start = DEFAULT_PROP_MOMENTUM_SOFT_START;
+  self->momentum = DEFAULT_PROP_MOMENTUM;
   GST_INFO("gst classify init\n");
 }
 
@@ -259,7 +282,7 @@ load_or_create_net(GstClassify *self){
     int n_features = self->mfccs ? self->mfccs : CLASSIFY_N_FFT_BINS;
     net = rnn_new(n_features, self->hidden_size,
         self->n_classes, CLASSIFY_RNN_FLAGS, CLASSIFY_RNG_SEED,
-        NULL, CLASSIFY_BPTT_DEPTH, self->learn_rate, MOMENTUM, MOMENTUM_WEIGHT,
+        NULL, CLASSIFY_BPTT_DEPTH, self->learn_rate, self->momentum, MOMENTUM_WEIGHT,
         CLASSIFY_BATCH_SIZE);
   }
   else {
@@ -429,6 +452,14 @@ gst_classify_set_property (GObject * object, guint prop_id, const GValue * value
       }
       break;
 
+    case PROP_MOMENTUM_SOFT_START:
+      self->momentum_soft_start = g_value_get_float(value);
+      break;
+
+    case PROP_MOMENTUM:
+      self->momentum = g_value_get_float(value);
+      break;
+
       /*CLASSES, MFCCS, and HIDDEN_SIZE have no effect if set late (after net creation)
        */
 #define SET_INT_IF_NOT_TOO_LATE(attr, name) do {                        \
@@ -492,6 +523,12 @@ gst_classify_get_property (GObject * object, guint prop_id, GValue * value,
     break;
   case PROP_LEARN_RATE:
     g_value_set_float(value, self->learn_rate);
+    break;
+  case PROP_MOMENTUM:
+    g_value_set_float(value, self->momentum);
+    break;
+  case PROP_MOMENTUM_SOFT_START:
+    g_value_set_float(value, self->momentum_soft_start);
     break;
   case PROP_HIDDEN_SIZE:
     g_value_set_int(value, self->hidden_size);
@@ -626,6 +663,14 @@ maybe_learn(GstClassify *self){
       if (PERIODIC_PGM_DUMP && net->generation % PERIODIC_PGM_DUMP == 0){
         rnn_multi_pgm_dump(net, "how ihw hod ihd hom ihm");
       }
+      if (self->momentum_soft_start){
+        float x = self->momentum_soft_start;
+        net->bptt->momentum = MIN(1.0f - x / (1 + net->generation + 2 * x), self->momentum);
+        if (net->bptt->momentum == self->momentum){
+          self->momentum_soft_start = 0;
+        }
+      }
+
       bptt_consolidate_many_nets(self->subnets, self->n_channels);
       rnn_condition_net(self->net);
       possibly_save_net(self->net, self->net_filename);

@@ -12,7 +12,6 @@ G_BEGIN_DECLS
 
 #define CLASSIFY_RNG_SEED 11
 #define CLASSIFY_BPTT_DEPTH 30
-#define MOMENTUM 0.95
 #define MOMENTUM_WEIGHT 0.5
 
 #define CLASSIFY_MAX_CHANNELS 200
@@ -97,6 +96,8 @@ struct _GstClassify
 
   int hidden_size;
   float learn_rate;
+  float momentum_soft_start;
+  float momentum;
 };
 
 
