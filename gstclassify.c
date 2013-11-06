@@ -104,7 +104,8 @@ init_channel(ClassifyChannel *c, RecurNN *net, int id, float learn_rate)
 static inline void
 finalise_channel(ClassifyChannel *c)
 {
-  rnn_delete_net(c->net);
+  if (c->net)
+    rnn_delete_net(c->net);
   free(c->pcm_next);
   free(c->pcm_now);
   free(c->features);
@@ -119,8 +120,9 @@ static void
 gst_classify_finalize (GObject * obj){
   GST_DEBUG("in gst_classify_finalize!\n");
   GstClassify *self = GST_CLASSIFY(obj);
-  rnn_save_net(self->net, self->net_filename);
-  recur_audio_binner_delete(self->mfcc_factory);
+  if (self->mfcc_factory){
+    recur_audio_binner_delete(self->mfcc_factory);
+  }
   if (self->channels){
     for (int i = 0; i < self->n_channels; i++){
       finalise_channel(&self->channels[i]);
@@ -131,7 +133,10 @@ gst_classify_finalize (GObject * obj){
     free(self->subnets);
   }
   free(self->incoming_queue);
-  rnn_delete_net(self->net);
+  if (self->net){
+    rnn_save_net(self->net, self->net_filename);
+    rnn_delete_net(self->net);
+  }
 }
 
 static void
@@ -532,6 +537,11 @@ gst_classify_get_property (GObject * object, guint prop_id, GValue * value,
     break;
   case PROP_HIDDEN_SIZE:
     g_value_set_int(value, self->hidden_size);
+    break;
+  case PROP_LOG_FILE:
+    if (self->pending_logfile){
+      g_value_set_string(value, self->pending_logfile);
+    }
     break;
   default:
     G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
