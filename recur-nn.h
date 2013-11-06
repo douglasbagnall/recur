@@ -33,7 +33,7 @@ typedef float v4ss __attribute__ ((vector_size (16))) __attribute__ ((aligned (1
 #define HIDDEN_MEAN_SOFT_TOP 16.0f
 #define INPUT_MEAN_SOFT_TOP 4.0f
 
-#define RNN_INITIAL_WEIGHT_VARIANCE_FACTOR 8.0f
+#define RNN_INITIAL_WEIGHT_VARIANCE_FACTOR 40.0f
 #define WEIGHT_SCALE (1.0f - 1e-6f)
 
 /*RNN_CONDITIONING_INTERVAL should be <= 32, ideally a power of 2 */
@@ -147,7 +147,7 @@ RecurNN * rnn_clone(RecurNN *parent, int flags,
 void rnn_set_log_file(RecurNN *net, const char * log_file, int append_dont_truncate);
 void rnn_fd_dup_log(RecurNN *net, RecurNN* src);
 
-void rnn_randomise_weights(RecurNN *net, float variance);
+void rnn_randomise_weights(RecurNN *net, float variance, int power);
 
 void rnn_delete_net(RecurNN *net);
 

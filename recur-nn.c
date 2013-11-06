@@ -84,7 +84,7 @@ rnn_new(uint input_size, uint hidden_size, uint output_size, int flags,
   if (flags & RNN_NET_FLAG_OWN_WEIGHTS){
     SET_ATTR_SIZE(ih_weights, ih_size);
     SET_ATTR_SIZE(ho_weights, ho_size);
-    rnn_randomise_weights(net, RNN_INITIAL_WEIGHT_VARIANCE_FACTOR / net->h_size);
+    rnn_randomise_weights(net, RNN_INITIAL_WEIGHT_VARIANCE_FACTOR / net->h_size, 3);
   }
 #undef SET_ATTR_SIZE
   MAYBE_DEBUG("allocated %lu floats, used %lu", alloc_bytes / 4, fm - net->mem);
@@ -227,14 +227,23 @@ rnn_clone(RecurNN *parent, int flags,
   return net;
 }
 
+static inline float
+gaussian_power(rand_ctx *rng, float a, int power){
+  for (int i = 0; i < power; i++){
+    a *= cheap_gaussian_noise(rng);
+  }
+  return a;
+}
+
+
 void
-rnn_randomise_weights(RecurNN *net, float variance){
+rnn_randomise_weights(RecurNN *net, float variance, int power){
   int x, y;
   for (y = 0; y < net->i_size; y++){
     /*zero for bias, will be overwritten if inapplicable*/
     net->ih_weights[y * net->h_size] = 0;
     for (x = net->bias; x < net->hidden_size + net->bias; x++){
-      net->ih_weights[y * net->h_size + x] = cheap_gaussian_noise(&net->rng) * variance;
+      net->ih_weights[y * net->h_size + x] = gaussian_power(&net->rng, variance, power);
     }
     for (x = net->hidden_size + net->bias; x < net->h_size; x++){
       net->ih_weights[y * net->h_size + x] = 0;
@@ -242,7 +251,7 @@ rnn_randomise_weights(RecurNN *net, float variance){
   }
   for (y = 0; y < net->h_size; y++){
     for (x = 0; x < net->output_size; x++){
-      net->ho_weights[y * net->o_size + x] = cheap_gaussian_noise(&net->rng) * variance;
+      net->ho_weights[y * net->o_size + x] = gaussian_power(&net->rng, variance, power);
     }
     for (x = net->output_size; x < net->o_size; x++){
       net->ho_weights[y * net->o_size + x] = 0;
