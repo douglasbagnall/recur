@@ -671,7 +671,7 @@ maybe_learn(GstClassify *self){
         }
       }
 
-      bptt_consolidate_many_nets(self->subnets, self->n_channels);
+      bptt_consolidate_many_nets(self->subnets, self->n_channels, 1);
       rnn_condition_net(self->net);
       possibly_save_net(self->net, self->net_filename);
       rnn_log_net(net);

@@ -161,7 +161,7 @@ int rnn_save_net(RecurNN *net, const char *filename);
 void bptt_advance(RecurNN *net);
 void bptt_calculate(RecurNN *net);
 
-void bptt_consolidate_many_nets(RecurNN **nets, int n);
+void bptt_consolidate_many_nets(RecurNN **nets, int n, int nestorov);
 
 void bptt_calc_deltas(RecurNN *net);
 

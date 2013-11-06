@@ -11,9 +11,9 @@ from collections import defaultdict
 from math import log
 
 
-DEFAULT_LOGFILE = "rnnca.log"
+DEFAULT_LOGFILE = "classify.log"
 DEFAULT_KEYS = ('error_sum', 'error', 'hidden_sum', 'depth',
-                'error_gain', 'correct'
+                'error_gain', 'correct', 'momentum'
                )
 
 def seek_start(f, start):

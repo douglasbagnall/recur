@@ -30,11 +30,9 @@ def main(argv):
         lr = lr_steps(*(float(x) for x in argv))
 
     else:
-        lr = lr_steps(#1e-3, 240 // TRAIN_FILE_LENGTH,
-                      #1e-4, 240 // TRAIN_FILE_LENGTH,
-                      1e-5, 360 // TRAIN_FILE_LENGTH,
-                      3e-6, 720 // TRAIN_FILE_LENGTH,
-                      1e-6)
+        lr = lr_steps(3e-6, 360 // TRAIN_FILE_LENGTH,
+                      1e-6, 1920 // TRAIN_FILE_LENGTH,
+                      3e-7)
 
     train_data = categorised_files(TRAIN_AUDIO_DIR, CLASSES)
     test_data = categorised_files(TEST_AUDIO_DIR, CLASSES)
@@ -43,8 +41,12 @@ def main(argv):
                 channels=72,
                 classes=CLASSES)
     c.quiet = quiet
-    c.train(train_data, test_data, iterations=10000 // TRAIN_FILE_LENGTH,
-            learn_rate=lr, log_file=NET_LOG_FILE)
+    c.train(train_data, test_data, iterations=15000 // TRAIN_FILE_LENGTH,
+            learn_rate=lr, log_file=NET_LOG_FILE,
+            properties=(('momentum-soft-start', 4000),
+                        ('momentum', 0.97),
+                        #('mfccs', 0),
+                        ))
 
 
 main(sys.argv[1:])

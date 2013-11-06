@@ -128,7 +128,7 @@ consolidate_and_apply_learning(RecurContext *context){
   for (int j = 0; j < RECUR_N_TRAINERS; j++){
     nets[j] = context->trainers[j].net;
   }
-  bptt_consolidate_many_nets(nets, RECUR_N_TRAINERS);
+  bptt_consolidate_many_nets(nets, RECUR_N_TRAINERS, 0);
 }
 
 void

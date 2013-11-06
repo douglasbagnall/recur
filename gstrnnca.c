@@ -467,7 +467,7 @@ maybe_learn(GstRnnca *self){
         self->frame_prev, self->frame_now);
     train_net(&self->trainers[i], self->frame_prev, self->frame_now);
   }
-  bptt_consolidate_many_nets(self->train_nets, self->n_trainers);
+  bptt_consolidate_many_nets(self->train_nets, self->n_trainers, 1);
   RecurNN *net = self->train_nets[0];
   if (PERIODIC_PGM_DUMP && (net->generation & PERIODIC_PGM_DUMP) == 0){
     rnn_multi_pgm_dump(net, "how ihw");

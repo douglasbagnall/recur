@@ -32,7 +32,7 @@ COLOURS = {
     "W": "\033[01;37m",
 }
 
-TEST_INTERVAL = 3
+TEST_INTERVAL = 2
 
 TRAINING = 0
 TESTING = 1
@@ -219,7 +219,7 @@ class Trainer(BaseClassifier):
     trainers = None
     lr_adjust = 1.0
     def train(self, training_data, testing_data, iterations=100, learn_rate=None,
-              log_file=DEFAULT_LOG_FILE):
+              log_file=DEFAULT_LOG_FILE, properties=()):
         """data is a dictionary mapping class IDs to lists of filenames.
         """
         if isinstance(learn_rate, float):
@@ -238,6 +238,9 @@ class Trainer(BaseClassifier):
         self.testset = [testers.next() for i in range(self.channels)]
         self.test_scores = None
         self.classifier.set_property('log-file', log_file)
+        for k, v in properties:
+            self.classifier.set_property(k, v)
+        self.timestamp = time.time()
         self.next_training_set()
         self.pipeline.set_state(Gst.State.PLAYING)
         self.mainloop.run()
@@ -300,9 +303,12 @@ class Trainer(BaseClassifier):
 
     def next_training_set(self):
         self.targets = []
+        starttime = self.timestamp
+        self.timestamp = time.time()
         if self.learn_rate is not None:
             r = self.learn_rate.next() * self.lr_adjust
-            print "%s/%s learn_rate %s" % (self.counter, self.iterations, r)
+            print ("%s/%s learn_rate %s elapsed %.2f" %
+                   (self.counter, self.iterations, r, self.timestamp - starttime))
             self.classifier.set_property('learn_rate', r)
 
         for fs in self.filesrcs:
