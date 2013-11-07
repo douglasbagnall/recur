@@ -562,24 +562,24 @@ bptt_and_accumulate_error(RecurNN *net, float *ih_delta, float top_error_sum)
       if (inputs[y] != 0.0f){
         float e;
         const float *restrict w_row = weights + y * net->h_size;
-        float *restrict tmp_row = ih_delta + y * net->h_size;
+        float *restrict delta_row = ih_delta + y * net->h_size;
         ASSUME_ALIGNED(w_row);
-        ASSUME_ALIGNED(tmp_row);
+        ASSUME_ALIGNED(delta_row);
 #if VECTOR
         v4ss *restrict vh_error = (v4ss*)h_error;
         v4ss ve = {0, 0, 0, 0};
         v4ss inv = {inputs[y], inputs[y], inputs[y], inputs[y]};
-        v4ss *restrict vtmp = (v4ss*)tmp_row;
+        v4ss *restrict vd = (v4ss*)delta_row;
         v4ss *restrict vw = (v4ss*)w_row;
         for (x = 0; x < vhsize; x++){
-          vtmp[x] += vh_error[x] * inv;
+          vd[x] += vh_error[x] * inv;
           ve += vw[x] * vh_error[x];
         }
         e = ve[0] + ve[1] + ve[2] + ve[3];
 #else
         e = 0.0f;
         for (x = 0; x < net->h_size; x++){
-          tmp_row[x] += h_error[x] * inputs[y];
+          delta_row[x] += h_error[x] * inputs[y];
           e += w_row[x] * h_error[x];
         }
 #endif
