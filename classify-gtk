@@ -3,6 +3,7 @@ import os, sys
 import random
 from gtkdisplay import run
 from classify import GTKClassifier, gst_init
+from classify import TMP_MFCCS as MFCCS
 from classify import TMP_CLASSES as CLASSES
 from classify import TMP_HIDDEN_SIZE as HIDDEN_SIZE
 TEST_FILE_LENGTH=60
@@ -15,7 +16,7 @@ def main():
     if 0:
         d = TEST_AUDIO_DIR
         files = [os.path.join(d, x) for x in os.listdir(d)
-                 if x.endswith('.wav') and x[0] in classifier.classes]
+                 if x.endswith('.wav') and x[0] in CLASSES]
     else:
         d = "/home/douglas/maori-language-monitoring/data/8k-full"
         files = [os.path.join(d, x) for x in os.listdir(d)
