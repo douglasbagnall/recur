@@ -671,7 +671,7 @@ maybe_learn(GstClassify *self){
     if (self->training){
       RecurNN *net = self->subnets[0];
       if (PERIODIC_PGM_DUMP && net->generation % PERIODIC_PGM_DUMP == 0){
-        rnn_multi_pgm_dump(net, "how ihw hod ihd hom ihm");
+        rnn_multi_pgm_dump(net, "how ihw");
       }
       if (self->momentum_soft_start){
         float x = self->momentum_soft_start;
