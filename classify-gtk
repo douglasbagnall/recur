@@ -25,7 +25,7 @@ def main():
     classifier = GTKClassifier(mfccs=MFCCS,
                                classes=CLASSES,
                                hsize=HIDDEN_SIZE,
-                               sinkname='autoaudiosink')
+                               sinkname='autoaudiosink', mic=('--mic' in sys.argv))
     random.shuffle(files)
     run(classifier, files)
 

@@ -73,7 +73,7 @@ class BaseClassifier(object):
         self.capsfilter.set_property("caps", caps)
         self.summaries = [[]] * channels
 
-    def build_pipeline(self, mfccs, hsize, classes, channels, sinkname='fakesink'):
+    def build_pipeline(self, mfccs, hsize, classes, channels, sinkname='fakesink', mic=False):
         self.classes = classes
         self.channels = channels
         self.sink = self.make_add_link(sinkname, None)
@@ -85,21 +85,27 @@ class BaseClassifier(object):
         self.capsfilter = self.make_add_link('capsfilter', self.classifier)
         self.interleave = self.make_add_link('interleave', self.capsfilter)
         self.filesrcs = []
+        self.mic = mic
         for i in range(channels):
             ac = self.make_add_link('audioconvert', self.interleave)
             ar = self.make_add_link('audioresample', ac)
-            wp = self.make_add_link('wavparse', ar)
-            fs = self.make_add_link('filesrc', wp)
+            if mic:
+                fs = self.make_add_link('pulsesrc', ar)
+                fs.set_property('device', 'alsa_input.pci-0000_00_1b.0.analog-stereo')
+
+            else:
+                wp = self.make_add_link('wavparse', ar)
+                fs = self.make_add_link('filesrc', wp)
             self.filesrcs.append(fs)
 
         self.set_channels(channels)
 
     def __init__(self, mfccs, hsize, classes, channels=1, mainloop=None,
-                 sinkname='fakesink', basename='classify'):
+                 sinkname='fakesink', basename='classify', mic=False):
         if mainloop is None:
             mainloop = GObject.MainLoop()
         self.mainloop = mainloop
-        self.build_pipeline(mfccs, hsize, classes, channels, sinkname=sinkname)
+        self.build_pipeline(mfccs, hsize, classes, channels, sinkname=sinkname, mic=mic)
         self.basename = basename
 
     def on_eos(self, bus, msg):
@@ -413,9 +419,11 @@ class GTKClassifier(BaseClassifier):
 
     def load_next_file(self):
         self.pipeline.set_state(Gst.State.READY)
-        fn = self.pending_files.pop()
-        self.classifier.set_property("forget", True)
-        self.filesrcs[0].set_property('location', fn)
+        if not self.mic:
+            fn = self.pending_files.pop()
+            self.classifier.set_property("forget", True)
+            self.filesrcs[0].set_property('location', fn)
+            print fn
         self.pipeline.set_state(Gst.State.PLAYING)
 
     def on_element(self, bus, msg):
