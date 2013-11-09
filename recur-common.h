@@ -90,6 +90,18 @@ zalloc_aligned_or_die(size_t size){
   return mem;
 }
 
+static inline __attribute__((malloc)) void *
+realloc_or_die(void *p, size_t size){
+  DEBUG("p %p size %zu", p, size);
+  void *mem = realloc(p, size);
+  if (mem == NULL){
+    abort();
+  }
+  return mem;
+}
+
+
+
 #define BILLION 1000000000L
 
 #ifndef __clang__

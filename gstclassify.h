@@ -62,6 +62,13 @@ typedef s16 audio_sample;
 typedef struct _GstClassify GstClassify;
 typedef struct _GstClassifyClass GstClassifyClass;
 
+typedef struct _ClassifyClassEvent {
+  int channel;
+  int class;
+  int window_no;
+} ClassifyClassEvent;
+
+
 typedef struct _ClassifyChannel
 {
   RecurNN *net;
@@ -88,9 +95,7 @@ struct _GstClassify
   int incoming_end;
   RecurAudioBinner *mfcc_factory;
   int training;
-  char *target_string;
   char *net_filename;
-  char *pending_logfile;
 
   int queue_size;
 
@@ -98,6 +103,11 @@ struct _GstClassify
   float learn_rate;
   float momentum_soft_start;
   float momentum;
+  ClassifyClassEvent *class_events;
+  int n_class_events;
+  int class_events_index;
+  int window_no;
+  char **pending_properties;
 };
 
 

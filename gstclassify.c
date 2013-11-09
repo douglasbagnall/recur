@@ -32,6 +32,8 @@ enum
   PROP_SAVE_NET,
   PROP_PGM_DUMP,
   PROP_LOG_FILE,
+
+  PROP_LAST
 };
 
 #define DEFAULT_PROP_TARGET ""
@@ -70,7 +72,7 @@ static void gst_classify_set_property(GObject *object, guint prop_id, const GVal
 static void gst_classify_get_property(GObject *object, guint prop_id, GValue *value, GParamSpec *pspec);
 static GstFlowReturn gst_classify_transform_ip(GstBaseTransform *base, GstBuffer *buf);
 static gboolean gst_classify_setup(GstAudioFilter * filter, const GstAudioInfo * info);
-static void maybe_parse_target_string(GstClassify *self);
+static void reset_channel_targets(GstClassify *self);
 static void maybe_start_logging(GstClassify *self);
 
 
@@ -137,6 +139,11 @@ gst_classify_finalize (GObject * obj){
     rnn_save_net(self->net, self->net_filename);
     rnn_delete_net(self->net);
   }
+  for (int i = 0; i < PROP_LAST; i++){
+    if (self->pending_properties[i])
+      free(self->pending_properties[i]);
+  }
+  free(self->pending_properties);
 }
 
 static void
@@ -244,12 +251,14 @@ static void
 gst_classify_init (GstClassify * self)
 {
   self->channels = NULL;
-  self->target_string = NULL;
   self->n_channels = 0;
   self->mfcc_factory = NULL;
   self->incoming_queue = NULL;
   self->net_filename = NULL;
-  self->pending_logfile = NULL;
+  self->pending_properties = calloc(PROP_LAST, sizeof(char*));
+  self->class_events = NULL;
+  self->class_events_index = 0;
+  self->n_class_events = 0;
   self->learn_rate = DEFAULT_LEARN_RATE;
   self->hidden_size = DEFAULT_HIDDEN_SIZE;
   self->momentum_soft_start = DEFAULT_PROP_MOMENTUM_SOFT_START;
@@ -331,32 +340,103 @@ gst_classify_setup(GstAudioFilter *base, const GstAudioInfo *info){
     }
   }
   maybe_start_logging(self);
-  maybe_parse_target_string(self);
+  reset_channel_targets(self);
 
   GST_DEBUG_OBJECT (self,
       "info: %" GST_PTR_FORMAT, info);
   DEBUG("found %d channels", self->n_channels);
+
+  GstStructure *s = gst_structure_new_empty("classify-setup");
+  GstMessage *msg = gst_message_new_element(GST_OBJECT(self), s);
+  gst_element_post_message(GST_ELEMENT(self), msg);
+
   return TRUE;
 }
 
-static inline void
-maybe_parse_target_string(GstClassify *self){
+static int
+cmp_class_event(const void *a, const void *b){
+  const int at = ((const ClassifyClassEvent *)a)->window_no;
+  const int bt = ((const ClassifyClassEvent *)b)->window_no;
+  return at - bt;
+}
+
+/*"complex" target specification.
+  class   := 'c'<int>
+  time    := 't'<float>
+  event   := <class><time>
+  channel := <event>*
+  space   := ' '
+  target_string := <channel><space><channel>;...
+
+  There can be zero or more events per channel (though zero is rather useless
+  for training).
+
+  The number of channels should match self->n_channels.
+ */
+static inline int
+parse_complex_target_string(GstClassify *self, const char *str){
+  char *e;
+  const char *s;
   int i;
-  if (self->target_string == NULL || self->channels == NULL){
-    GST_DEBUG("not parsing NULL target string (%p) channels is %p",
-        self->target_string, self->channels);
-    return;
+  int channel = 0;
+  ClassifyClassEvent *ev;
+  /* the number of 'c's in the string is the number of class events */
+  int n = 0;
+  int nc = 0;
+  for (s = str; *s; s++){
+    n += *s == 'c';
+    nc += *s == ' ';
   }
-  char *s = self->target_string;
-  if (*s == 0){
-    for (i = 0; i < self->n_channels; i++){
-      self->channels[i].current_target = -1;
+  if (self->n_class_events < n){
+    GST_DEBUG("found %d targets, %d channels, prev %d events (%p)", n, nc,
+        self->n_class_events, self->class_events);
+    self->class_events = realloc_or_die(self->class_events,
+        (n + 1) * sizeof(ClassifyClassEvent));
+    self->n_class_events = n;
+    self->class_events_index = 0;
+    GST_DEBUG("events %p, n %d", self->class_events, n);
+  }
+  s = str;
+  for (i = 0; i < n; i++){
+#define ERROR_IF(x) if (x) goto parse_error
+    ev = &self->class_events[i];
+    ev->channel = channel;
+    //GST_DEBUG("i %d s '%s' ev %p", i, s, ev);
+    ERROR_IF(*s != 'c');
+    s++;
+    ev->class = strtol(s, &e, 10);
+    ERROR_IF(s == e || *e != 't');    /*no digits at all, no comma, or out of range */
+    ERROR_IF(ev->class < 0 || ev->class >= self->n_classes);
+    s = e + 1;
+    float time = strtod(s, &e);
+    ev->window_no = time * CLASSIFY_RATE / CLASSIFY_HALF_WINDOW + 0.5;
+    ERROR_IF(s == e || ev->window_no < 0);
+
+    s = e;
+    if (*s == ' '){
+      channel++;
+      s++;
     }
-    self->training = 0;
-    goto cleanup;
+    GST_DEBUG("event: channel %d target %d window %d starting %.2f (request %.2f)",
+        ev->channel, ev->class, ev->window_no,
+        (double)ev->window_no * CLASSIFY_HALF_WINDOW / CLASSIFY_RATE, time);
+#undef ERROR_IF
   }
+  qsort(self->class_events, n, sizeof(ClassifyClassEvent), cmp_class_event);
+  self->class_events_index = 0;
+  return 0;
+ parse_error:
+  GST_WARNING("Can't parse '%s' into %d events for %d channels: "
+      "stopping after %d events (%d chars)",
+      s, n, self->n_channels, i, s - str);
+  return -1;
+}
+
+static inline int
+parse_simple_target_string(GstClassify *self, const char *s){
   char *e;
   long x;
+  int i;
   for (i = 0; i < self->n_channels; i++){
     x = strtol(s, &e, 10);
     GST_DEBUG("channel %d got %ld s is %s, %p  e is %p", i, x, s, s, e);
@@ -371,27 +451,80 @@ maybe_parse_target_string(GstClassify *self){
   }
   GST_DEBUG("target %d", self->channels[0].current_target);
   self->training = 1;
-  goto cleanup;
+  return 0;
  parse_error:
-  GST_DEBUG("Can't parse '%s' into %d channels: stopping after %d",
-      self->target_string, self->n_channels, i);
- cleanup:
-  free(self->target_string);
-  self->target_string = NULL;
-  return;
+  GST_WARNING("Can't parse '%s' into %d channels: stopping after %d",
+      s, self->n_channels, i);
+  return 1;
+}
+
+static void
+reset_channel_targets(GstClassify *self){
+  int i;
+  for (i = 0; i < self->n_channels; i++){
+    self->channels[i].current_target = -1;
+  }
+  self->training = 0;
+}
+
+static inline void
+free_pending_property(GstClassify *self, uint prop){
+  free(self->pending_properties[prop]);
+  self->pending_properties[prop] = NULL;
+}
+
+static inline void
+set_pending_property(GstClassify *self, uint prop, const GValue *value)
+{
+  if (self->pending_properties[prop]){
+    free(self->pending_properties[prop]);
+  }
+  self->pending_properties[prop] = g_value_dup_string(value);
+}
+
+
+static void
+maybe_parse_target_string(GstClassify *self){
+  char *s = self->pending_properties[PROP_TARGET];
+  if (s == NULL || self->channels == NULL){
+    GST_DEBUG("not parsing target string (%p); channels is %p",
+        s, self->channels);
+     return;
+   }
+  GST_DEBUG("parsing target '%s'", s);
+  if (s == NULL || self->channels == NULL){
+    GST_DEBUG("not parsing NULL target string (%p) channels is %p",
+        s, self->channels);
+  }
+  else if (*s == 0){
+    reset_channel_targets(self);
+  }
+  else {
+    int ret;
+    if (*s == 'c'){
+      ret = parse_complex_target_string(self, s);
+    }
+    else {
+      ret = parse_simple_target_string(self, s);
+    }
+    self->training = (ret == 0);
+  }
+  free_pending_property(self, PROP_TARGET);
+  self->window_no = 0;
 }
 
 static void
 maybe_start_logging(GstClassify *self){
-  if (self->pending_logfile && self->subnets){
-    if (self->pending_logfile[0] == 0){
+  char *pending_logfile = self->pending_properties[PROP_LOG_FILE];
+  GST_DEBUG("pending log '%s'", pending_logfile);
+  if (pending_logfile && self->subnets){
+    if (pending_logfile[0] == 0){
       rnn_set_log_file(self->subnets[0], NULL, 0);
     }
     else {
-      rnn_set_log_file(self->subnets[0], self->pending_logfile, 1);
+      rnn_set_log_file(self->subnets[0], pending_logfile, 1);
     }
-    free(self->pending_logfile);
-    self->pending_logfile = NULL;
+    free_pending_property(self, PROP_LOG_FILE);
   }
 }
 
@@ -401,15 +534,12 @@ gst_classify_set_property (GObject * object, guint prop_id, const GValue * value
     GParamSpec * pspec)
 {
   GstClassify *self = GST_CLASSIFY (object);
-  GST_DEBUG("gst_classify_set_property\n");
+  GST_DEBUG("gst_classify_set_property with prop_id %d\n", prop_id);
   if (value){
     const char *strvalue;
     switch (prop_id) {
     case PROP_TARGET:
-      if (self->target_string){
-        free(self->target_string);
-      }
-      self->target_string = g_value_dup_string(value);
+      set_pending_property(self, prop_id, value);
       maybe_parse_target_string(self);
       break;
 
@@ -430,15 +560,12 @@ gst_classify_set_property (GObject * object, guint prop_id, const GValue * value
 
     case PROP_LOG_FILE:
       /*defer setting the actual log file, in case the nets aren't ready yet*/
-      if (self->pending_logfile){
-        free(self->pending_logfile);
-      }
-      self->pending_logfile = g_value_dup_string(value);
+      set_pending_property(self, prop_id, value);
       maybe_start_logging(self);
       break;
 
     case PROP_FORGET:
-      if (self->net){
+      if (self->net && self->channels){
         gboolean bptt_too = g_value_get_boolean(value);
         rnn_forget_history(self->net, bptt_too);
         for (int i = 0; i < self->n_channels; i++){
@@ -626,6 +753,19 @@ maybe_learn(GstClassify *self){
     float err_sum = 0.0f;
     float winners = 0.0f;
     s16 *buffer_i = self->incoming_queue + self->incoming_start;
+    while(self->class_events_index < self->n_class_events){
+      ClassifyClassEvent *ev = &self->class_events[self->class_events_index];
+      if (ev->window_no > self->window_no){
+        break;
+      }
+      GST_DEBUG("dealing with event %d/%d", self->class_events_index,
+          self->n_class_events);
+
+      self->channels[ev->channel].current_target = ev->class;
+      GST_DEBUG("setting channel %d target to %d at window %d (%d)",
+          ev->channel, ev->class, self->window_no, ev->window_no);
+      self->class_events_index++;
+    }
 
     for (j = 0; j < self->n_channels; j++){
       /*load first half of pcm_next, second part of pcm_now.*/
@@ -694,6 +834,7 @@ maybe_learn(GstClassify *self){
     self->incoming_start += chunk_size;
     self->incoming_start %= self->queue_size;
     len -= chunk_size;
+    self->window_no++;
   }
 }
 

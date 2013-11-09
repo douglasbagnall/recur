@@ -4,7 +4,7 @@ import random
 import itertools
 import time
 
-from classify import gst_init
+from classify import gst_init, TRAINING, TESTING
 from classify import KIWI_MFCCS as MFCCS
 from classify import KIWI_CLASSES as CLASSES
 from classify import KIWI_HIDDEN_SIZE as HIDDEN_SIZE
@@ -15,13 +15,70 @@ NET_LOG_FILE = "kiwi.log"
 TRAIN_AUDIO_DIR = "/home/douglas/corpora/kiwi/train/"
 VALIDATE_AUDIO_DIR = "/home/douglas/corpora/kiwi/validate/"
 
+KIWI_TIMING_DATA = '/home/douglas/corpora/kiwi/times.txt'
+
+QUIET = False
+
+class KiwiTrainer(Trainer):
+    def next_training_set(self):
+        targets = []
+        self.targets = []
+        starttime = self.timestamp
+        self.timestamp = time.time()
+        if self.learn_rate is not None:
+            r = self.learn_rate.next() * self.lr_adjust
+            print ("%s/%s learn_rate %s elapsed %.2f" %
+                   (self.counter, self.iterations, r, self.timestamp - starttime))
+            self.classifier.set_property('learn_rate', r)
+
+        for fs in self.filesrcs:
+            c, fn = self.trainers.next()
+            timings = self.timings[fn]
+            self.targets.append(c)
+            targets.extend('c%dt%.2f' % x for x in timings)
+            targets.append(' ')
+            fs.set_property('location', fn)
+            if not self.quiet:
+                print c, fn
+
+        target_string = ''.join(targets)
+        #self.classifier.set_property('forget', 0)
+        self.classifier.set_property('target', target_string)
+        self.mode = TRAINING
+
+
+def load_timings(fn, default='N'):
+    f = open(fn)
+    timings = {}
+    default_i = CLASSES.index(default)
+    for line in f:
+        d = line.split()
+        wavname = os.path.basename(d[0])
+        klass = wavname[0]
+        events = [(default_i, 0)]
+        if klass != default and len(d) > 1:
+            klass_i = CLASSES.index(klass)
+            for i, t in enumerate(d[1:]):
+                if i & 1:
+                    events.append((default_i, float(t)))
+                else:
+                    events.append((klass_i, float(t)))
+            #don't duplicate numbers
+            if events[1][1] == 0:
+                del events[0]
+        timings[d[0]] = events
+    if not QUIET:
+        for k, v in timings.items():
+            if k[0] != default:
+                print k, v
+    return timings
+
 def main(argv):
+    global QUIET
     gst_init()
     if '-q' in argv:
         argv.remove('-q')
-        quiet = True
-    else:
-        quiet = False
+        QUIET = True
     if argv:
         lr = lr_steps(*(float(x) for x in argv))
 
@@ -34,11 +91,13 @@ def main(argv):
     train_data = categorised_files(TRAIN_AUDIO_DIR, CLASSES)
     test_data = categorised_files(VALIDATE_AUDIO_DIR, CLASSES)
 
-    c = Trainer(mfccs=MFCCS,
+    c = KiwiTrainer(mfccs=MFCCS,
                 hsize=HIDDEN_SIZE,
                 channels=72,
                 classes=CLASSES)
-    c.quiet = quiet
+    c.quiet = QUIET
+    c.timings = load_timings(KIWI_TIMING_DATA)
+
     c.train(train_data, test_data, iterations=1000,
             learn_rate=lr, log_file=NET_LOG_FILE)
 
