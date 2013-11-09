@@ -310,13 +310,6 @@ static gboolean
 gst_classify_setup(GstAudioFilter *base, const GstAudioInfo *info){
   GST_INFO("gst_classify_setup\n");
   GstClassify *self = GST_CLASSIFY(base);
-  //self->info = info;
-  self->n_channels = info->channels;
-  if (self->incoming_queue == NULL){
-    self->queue_size = info->channels * CLASSIFY_QUEUE_PER_CHANNEL;
-    self->incoming_queue = malloc_aligned_or_die(self->queue_size * sizeof(s16));
-  }
-
   if (self->mfcc_factory == NULL){
     self->mfcc_factory = recur_audio_binner_new(CLASSIFY_WINDOW_SIZE,
         RECUR_WINDOW_HANN,
@@ -331,20 +324,31 @@ gst_classify_setup(GstAudioFilter *base, const GstAudioInfo *info){
   if (self->net == NULL){
     self->net = load_or_create_net(self);
   }
-  if (self->channels == NULL){
+
+  if (self->n_channels != info->channels){
+    DEBUG("given %d channels, previous %d", info->channels, self->n_channels);
+    if (self->incoming_queue){
+      free(self->incoming_queue);
+    }
+    self->n_channels = info->channels;
+    self->queue_size = info->channels * CLASSIFY_QUEUE_PER_CHANNEL;
+    self->incoming_queue = malloc_aligned_or_die(self->queue_size * sizeof(s16));
+    if (self->channels){
+      free(self->channels);
+    }
     self->channels = malloc_aligned_or_die(self->n_channels * sizeof(ClassifyChannel));
+    if (self->subnets){
+      free(self->subnets);
+    }
     self->subnets = malloc_aligned_or_die(self->n_channels * sizeof(RecurNN *));
     for (int i = 0; i < self->n_channels; i++){
       init_channel(&self->channels[i], self->net, i, self->learn_rate);
       self->subnets[i] = self->channels[i].net;
     }
   }
+
   maybe_start_logging(self);
   reset_channel_targets(self);
-
-  GST_DEBUG_OBJECT (self,
-      "info: %" GST_PTR_FORMAT, info);
-  DEBUG("found %d channels", self->n_channels);
 
   GstStructure *s = gst_structure_new_empty("classify-setup");
   GstMessage *msg = gst_message_new_element(GST_OBJECT(self), s);
