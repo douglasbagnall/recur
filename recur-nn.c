@@ -84,7 +84,7 @@ rnn_new(uint input_size, uint hidden_size, uint output_size, int flags,
   if (flags & RNN_NET_FLAG_OWN_WEIGHTS){
     SET_ATTR_SIZE(ih_weights, ih_size);
     SET_ATTR_SIZE(ho_weights, ho_size);
-    rnn_randomise_weights(net, RNN_INITIAL_WEIGHT_VARIANCE_FACTOR / net->h_size, 3);
+    rnn_randomise_weights(net, RNN_INITIAL_WEIGHT_VARIANCE_FACTOR / net->h_size, 1);
   }
 #undef SET_ATTR_SIZE
   MAYBE_DEBUG("allocated %lu floats, used %lu", alloc_bytes / 4, fm - net->mem);
