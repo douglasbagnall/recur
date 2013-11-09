@@ -72,7 +72,7 @@ static void gst_classify_set_property(GObject *object, guint prop_id, const GVal
 static void gst_classify_get_property(GObject *object, guint prop_id, GValue *value, GParamSpec *pspec);
 static GstFlowReturn gst_classify_transform_ip(GstBaseTransform *base, GstBuffer *buf);
 static gboolean gst_classify_setup(GstAudioFilter * filter, const GstAudioInfo * info);
-static void reset_channel_targets(GstClassify *self);
+static void maybe_parse_target_string(GstClassify *self);
 static void maybe_start_logging(GstClassify *self);
 
 
@@ -346,9 +346,8 @@ gst_classify_setup(GstAudioFilter *base, const GstAudioInfo *info){
       self->subnets[i] = self->channels[i].net;
     }
   }
-
   maybe_start_logging(self);
-  reset_channel_targets(self);
+  maybe_parse_target_string(self);
 
   GstStructure *s = gst_structure_new_empty("classify-setup");
   GstMessage *msg = gst_message_new_element(GST_OBJECT(self), s);
@@ -454,7 +453,6 @@ parse_simple_target_string(GstClassify *self, const char *s){
     }
   }
   GST_DEBUG("target %d", self->channels[0].current_target);
-  self->training = 1;
   return 0;
  parse_error:
   GST_WARNING("Can't parse '%s' into %d channels: stopping after %d",
@@ -462,7 +460,7 @@ parse_simple_target_string(GstClassify *self, const char *s){
   return 1;
 }
 
-static void
+static inline void
 reset_channel_targets(GstClassify *self){
   int i;
   for (i = 0; i < self->n_channels; i++){
