@@ -42,11 +42,13 @@ def main(argv):
                 channels=72,
                 classes=CLASSES)
     c.quiet = quiet
-    c.train(train_data, test_data, iterations=15000 // TRAIN_FILE_LENGTH,
-            learn_rate=lr, log_file=NET_LOG_FILE,
-            properties=(('momentum-soft-start', 4000),
-                        ('momentum', 0.95),
-                        ))
-
+    try:
+        c.train(train_data, test_data, iterations=15000 // TRAIN_FILE_LENGTH,
+                learn_rate=lr, log_file=NET_LOG_FILE,
+                properties=(('momentum-soft-start', 4000),
+                            ('momentum', 0.95),
+                            ))
+    finally:
+        c.classifier.set_property('save-net', '')
 
 main(sys.argv[1:])
