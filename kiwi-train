@@ -36,12 +36,11 @@ class KiwiTrainer(Trainer):
             timings = self.timings[fn]
             self.targets.append(c)
             targets.extend('c%dt%.2f' % x for x in timings)
-            targets.append(' ')
             fs.set_property('location', fn)
-            if not self.quiet:
-                print c, fn
+            if not self.quiet :
+                print c, fn, timings
 
-        target_string = ''.join(targets)
+        target_string = ' '.join(targets) + ' '
         #self.classifier.set_property('forget', 0)
         self.classifier.set_property('target', target_string)
         self.mode = TRAINING

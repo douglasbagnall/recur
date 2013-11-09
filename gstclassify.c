@@ -481,7 +481,9 @@ set_pending_property(GstClassify *self, uint prop, const GValue *value)
   if (self->pending_properties[prop]){
     free(self->pending_properties[prop]);
   }
-  self->pending_properties[prop] = g_value_dup_string(value);
+  char *s = g_value_dup_string(value);
+  self->pending_properties[prop] = s;
+  GST_DEBUG("pending property %d is '%s'", prop, s);
 }
 
 
@@ -517,14 +519,14 @@ maybe_parse_target_string(GstClassify *self){
 
 static void
 maybe_start_logging(GstClassify *self){
-  char *pending_logfile = self->pending_properties[PROP_LOG_FILE];
-  GST_DEBUG("pending log '%s'", pending_logfile);
-  if (pending_logfile && self->subnets){
-    if (pending_logfile[0] == 0){
+  const char *s = self->pending_properties[PROP_LOG_FILE];
+  GST_DEBUG("pending log '%s'; subnets is %p", s, self->subnets);
+  if (s && self->subnets){
+    if (s[0] == 0){
       rnn_set_log_file(self->subnets[0], NULL, 0);
     }
     else {
-      rnn_set_log_file(self->subnets[0], pending_logfile, 1);
+      rnn_set_log_file(self->subnets[0], s, 1);
     }
     free_pending_property(self, PROP_LOG_FILE);
   }
