@@ -10,6 +10,8 @@ test_*
 /test-images/generated
 /test-images/output
 /test-images/dickens
+/test-images/*.txt
+!/test-images/erewhon.txt
 /test-video
 /test-audio
 *.p[bgp]m
