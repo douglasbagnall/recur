@@ -17,8 +17,6 @@
   "-revisited-sans-gutenberg.txt"
 
 #define CONFAB_SIZE 80
-#define LEARN_RATE_DECAY 0.96
-#define MIN_LEARN_RATE 1e-6
 
 #define DEFAULT_PERIODIC_PGM_DUMP 0
 #define DEFAULT_TEMPORAL_PGM_DUMP 0
@@ -468,11 +466,6 @@ epoch(RecurNN *net, RecurNN *confab_net, RecurNN *validate_net,
         rnn_multi_pgm_dump(net, "ihw how");
       }
       schedule->eval(schedule, net, ventropy);
-
-      if ((k & 1023) == 1023){
-        net->bptt->learn_rate = MAX(MIN_LEARN_RATE,
-            net->bptt->learn_rate * LEARN_RATE_DECAY);
-      }
     }
     if (opt_stop && net->generation >= opt_stop){
       if (opt_filename && opt_save_net){
