@@ -398,6 +398,7 @@ epoch(RecurNN *net, RecurNN *confab_net, RecurNN *validate_net,
     vhistory[j] = 0;
   }
   int vcounter = 0;
+  float ventropy = 0;
   for(i = start; i < len - 1; i++){
     float e;
     int c;
@@ -427,23 +428,25 @@ epoch(RecurNN *net, RecurNN *confab_net, RecurNN *validate_net,
     if ((net->generation & 1023) == 0){
       int k = net->generation >> 10;
       entropy /= -1024.0f;
-      float ventropy = validate(validate_net, vtext + vlen * vcounter, vlen);
-      if (vlap > 1){
-        vcounter ++;
-        if (vcounter == vlap){
-          vcounter = 0;
+      if (vlen){
+        ventropy = validate(validate_net, vtext + vlen * vcounter, vlen);
+        if (vlap > 1){
+          vcounter ++;
+          if (vcounter == vlap){
+            vcounter = 0;
+          }
+          vhistory[vcounter] = ventropy;
+          ventropy = 0; /*messy*/
+          float vdiv = vlap;
+          for (int j = 0; j < vlap; j++){
+            vdiv -= vhistory[j] == 0;
+            ventropy += vhistory[j];
+          }
+          ventropy /= vdiv;
         }
-        vhistory[vcounter] = ventropy;
-        ventropy = 0; /*messy*/
-        float vdiv = vlap;
-        for (int j = 0; j < vlap; j++){
-          vdiv -= vhistory[j] == 0;
-          ventropy += vhistory[j];
+        else {
+          *vhistory = ventropy;
         }
-        ventropy /= vdiv;
-      }
-      else {
-        *vhistory = ventropy;
       }
       BELOW_QUIET_LEVEL(1){
         confabulate(confab_net, confab, CONFAB_SIZE, opt_deterministic_confab);
