@@ -3,6 +3,7 @@ import os, sys
 import random
 from gtkdisplay import run
 from classify import GTKClassifier, gst_init
+from classify import KIWI_MFCCS as MFCCS
 from classify import KIWI_CLASSES as CLASSES
 from classify import KIWI_HIDDEN_SIZE as HIDDEN_SIZE
 TEST_AUDIO_DIR = "/home/douglas/corpora/kiwi/test/"
