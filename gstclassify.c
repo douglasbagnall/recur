@@ -191,7 +191,7 @@ gst_classify_class_init (GstClassifyClass * klass)
       g_param_spec_string("log-file", "log-file",
           "Log to this file (empty for none)",
           DEFAULT_PROP_LOG_FILE,
-          G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+          G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class, PROP_CLASSES,
       g_param_spec_int("classes", "classes",
@@ -664,11 +664,6 @@ gst_classify_get_property (GObject * object, guint prop_id, GValue * value,
     break;
   case PROP_HIDDEN_SIZE:
     g_value_set_int(value, self->hidden_size);
-    break;
-  case PROP_LOG_FILE:
-    if (self->pending_logfile){
-      g_value_set_string(value, self->pending_logfile);
-    }
     break;
   default:
     G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
