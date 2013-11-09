@@ -352,42 +352,41 @@ class Trainer(BaseClassifier):
 
     def on_element(self, bus, msg):
         total = 0
-        if self.mode == TESTING:
-            self.test_n += 1
-            s = msg.get_structure()
-            if s.get_name() != "classify":
-                return
-            v = s.get_value
-            #print self.test_targets
-            for i, t in enumerate(self.test_targets):
-                winner = v('channel %d winner' % i)
-                ok = winner == t
-                self.test_scores[i] += ok
-                total += ok
-            if not self.quiet:
-                score = total / float(self.channels)
-                colour = COLOURS['PRRRRYYGGC'[int(score * 10)]]
-                print "%s%s%s %s/%s" % (colour, "=" * total, COLOURS['Z'],
-                                        total, self.channels)
+        s = msg.get_structure()
+        name = s.get_name()
+        if name == 'classify-setup':
+            print "got message", name
+        elif name == 'classify':
+            if self.mode == TESTING:
+                self.test_n += 1
+                v = s.get_value
+                #print self.test_targets
+                for i, t in enumerate(self.test_targets):
+                    winner = v('channel %d winner' % i)
+                    ok = winner == t
+                    self.test_scores[i] += ok
+                    total += ok
+                if not self.quiet:
+                    score = total / float(self.channels)
+                    colour = COLOURS['PRRRRYYGGC'[int(score * 10)]]
+                    print "%s%s%s %s/%s" % (colour, "=" * total, COLOURS['Z'],
+                                            total, self.channels)
 
-        elif self.quiet:
-            return
-        else:
-            s = msg.get_structure()
-            if s.get_name() != "classify":
+            elif self.quiet:
                 return
-            v = s.get_value
-            error = v('error')
-            print error
-            fmt = "channel %d %s %s %s " + ("%.2f " * len(self.classes))
-            for i in range(self.channels):
-                winner = v('channel %d winner' % i)
-                scores = tuple(v('channel %d, output %d' % (i, j))
-                               for j in range(len(self.classes)))
-                wc = self.classes[winner]
-                tc = self.targets[i]
-                ok = ("\033[01;32m==\033[00m" if wc == tc else "\033[01;31m!=\033[00m")
-                print (fmt % ((i, wc, ok, tc) + scores))
+            else:
+                v = s.get_value
+                error = v('error')
+                print error
+                fmt = "channel %d %s %s %s " + ("%.2f " * len(self.classes))
+                for i in range(self.channels):
+                    winner = v('channel %d winner' % i)
+                    scores = tuple(v('channel %d, output %d' % (i, j))
+                                   for j in range(len(self.classes)))
+                    wc = self.classes[winner]
+                    tc = self.targets[i]
+                    ok = ("\033[01;32m==\033[00m" if wc == tc else "\033[01;31m!=\033[00m")
+                    print (fmt % ((i, wc, ok, tc) + scores))
 
 
 def lr_steps(*args):
