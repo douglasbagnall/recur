@@ -108,6 +108,7 @@ struct _GstClassify
   int class_events_index;
   int window_no;
   char **pending_properties;
+  int log_class_numbers;
 };
 
 

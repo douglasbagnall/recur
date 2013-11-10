@@ -92,13 +92,14 @@ def main(argv):
     test_data = categorised_files(VALIDATE_AUDIO_DIR, CLASSES)
 
     c = KiwiTrainer(mfccs=MFCCS,
-                hsize=HIDDEN_SIZE,
-                channels=72,
-                classes=CLASSES)
+                    hsize=HIDDEN_SIZE,
+                    channels=72,
+                    classes=CLASSES)
     c.quiet = QUIET
     c.timings = load_timings(KIWI_TIMING_DATA)
 
     c.train(train_data, test_data, iterations=1000,
-            learn_rate=lr, log_file=NET_LOG_FILE)
+            learn_rate=lr, log_file=NET_LOG_FILE,
+            properties=(('log-class-numbers', 1),))
 
 main(sys.argv[1:])

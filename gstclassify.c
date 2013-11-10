@@ -32,6 +32,7 @@ enum
   PROP_SAVE_NET,
   PROP_PGM_DUMP,
   PROP_LOG_FILE,
+  PROP_LOG_CLASS_NUMBERS,
 
   PROP_LAST
 };
@@ -40,6 +41,7 @@ enum
 #define DEFAULT_PROP_PGM_DUMP ""
 #define DEFAULT_PROP_LOG_FILE ""
 #define DEFAULT_PROP_SAVE_NET NULL
+#define DEFAULT_PROP_LOG_CLASS_NUMBERS 0
 #define DEFAULT_PROP_MFCCS 0
 #define DEFAULT_PROP_MOMENTUM 0.95f
 #define DEFAULT_PROP_MOMENTUM_SOFT_START 0.0f
@@ -211,6 +213,12 @@ gst_classify_class_init (GstClassifyClass * klass)
       g_param_spec_boolean("forget", "forget",
           "Forget the current hidden layer (all channels)",
           DEFAULT_PROP_FORGET,
+          G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
+
+  g_object_class_install_property (gobject_class, PROP_LOG_CLASS_NUMBERS,
+      g_param_spec_boolean("log-class-numbers", "log-class-numbers",
+          "Log counts of each class in training",
+          DEFAULT_PROP_LOG_CLASS_NUMBERS,
           G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class, PROP_LEARN_RATE,
@@ -578,6 +586,10 @@ gst_classify_set_property (GObject * object, guint prop_id, const GValue * value
       }
       break;
 
+    case PROP_LOG_CLASS_NUMBERS:
+      self->log_class_numbers = g_value_get_boolean(value);
+      break;
+
     case PROP_LEARN_RATE:
       self->learn_rate = g_value_get_float(value);
       if (self->net){
@@ -747,10 +759,15 @@ maybe_learn(GstClassify *self){
     len += self->queue_size;
   }
   int chunk_size = CLASSIFY_HALF_WINDOW * self->n_channels;
-
   while (len >= chunk_size){
     float err_sum = 0.0f;
     float winners = 0.0f;
+    int class_counts[self->n_classes];
+    if (self->log_class_numbers){
+      for (i = 0; i < self->n_classes; i++){
+        class_counts[i] = 0;
+      }
+    }
     s16 *buffer_i = self->incoming_queue + self->incoming_start;
     while(self->class_events_index < self->n_class_events){
       ClassifyClassEvent *ev = &self->class_events[self->class_events_index];
@@ -770,6 +787,9 @@ maybe_learn(GstClassify *self){
       /*load first half of pcm_next, second part of pcm_now.*/
       /*second part of pcm_next retains previous data */
       ClassifyChannel *c = &self->channels[j];
+      if (self->log_class_numbers){
+        class_counts[c->current_target]++;
+      }
       RecurNN *net = c->net;
       for(i = 0, k = j; i < CLASSIFY_HALF_WINDOW; i++, k += self->n_channels){
         c->pcm_next[i] = buffer_i[k];
@@ -824,6 +844,13 @@ maybe_learn(GstClassify *self){
       rnn_condition_net(self->net);
       possibly_save_net(self->net, self->net_filename);
       rnn_log_net(net);
+      if (self->log_class_numbers){
+        for (i = 0; i < self->n_classes; i++){
+          char s[20];
+          snprintf(s, sizeof(s), "class-%d", i);
+          bptt_log_int(net, s, class_counts[i]);
+        }
+      }
       bptt_log_float(net, "error", err_sum / self->n_channels);
       bptt_log_float(net, "correct", winners / self->n_channels);
       self->net->generation = net->generation;
