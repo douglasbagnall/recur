@@ -756,6 +756,30 @@ pcm_to_features(RecurAudioBinner *mf, float *features, float *pcm, int mfccs){
   }
 }
 
+static inline ClassifyChannel *
+prepare_channel_features(GstClassify *self, s16 *buffer_i, int j){
+  /*load first half of pcm_next, second part of pcm_now.*/
+  /*second part of pcm_next retains previous data */
+  int i, k;
+  int half_window = self->window_size / 2;
+  ClassifyChannel *c = &self->channels[j];
+  for(i = 0, k = j; i < half_window; i++, k += self->n_channels){
+    c->pcm_next[i] = buffer_i[k];
+    c->pcm_now[half_window + i] = buffer_i[k];
+  }
+  /*get the features -- after which pcm_now is finished with. */
+  pcm_to_features(self->mfcc_factory, c->features, c->pcm_now, self->mfccs);
+  if (c->mfcc_image){
+    temporal_ppm_add_row(c->mfcc_image, c->features);
+  }
+
+  float *tmp;
+  tmp = c->pcm_next;
+  c->pcm_next = c->pcm_now;
+  c->pcm_now = tmp;
+  return c;
+}
+
 static inline float
 train_channel(ClassifyChannel *c){
   RecurNN *net = c->net;
@@ -768,68 +792,64 @@ train_channel(ClassifyChannel *c){
   return net->bptt->o_error[c->current_target];
 }
 
-static inline void
-maybe_learn(GstClassify *self){
-  int i, j, k;
-  int len = self->incoming_end - self->incoming_start;
-  if (len < 0){ //XXX or less than or equal?
-    len += self->queue_size;
-  }
+static inline s16 *
+prepare_next_chunk(GstClassify *self){
+  /*change the target classes of channels where necessary*/
   int half_window = self->window_size / 2;
   int chunk_size = half_window * self->n_channels;
-  while (len >= chunk_size){
+  int len = self->incoming_end - self->incoming_start;
+  if (len < 0){
+    len += self->queue_size;
+  }
+  GST_DEBUG("start %d end %d len %d chunk %d queue_size %d", self->incoming_start,
+      self->incoming_end, len, chunk_size, self->queue_size);
+  if (len < chunk_size){
+    GST_DEBUG("returning NULL");
+    return NULL;
+  }
+  self->incoming_start += chunk_size;
+  if (self->incoming_start >= self->queue_size){
+    self->incoming_start -= self->queue_size;
+  }
+
+  while(self->class_events_index < self->n_class_events){
+    ClassifyClassEvent *ev = &self->class_events[self->class_events_index];
+    if (ev->window_no > self->window_no){
+      break;
+    }
+    self->channels[ev->channel].current_target = ev->class;
+    GST_DEBUG("event %d/%d: channel %d target -> %d at window  %d (%d)",
+        self->class_events_index, self->n_class_events,
+        ev->channel, ev->class, self->window_no, ev->window_no);
+    self->class_events_index++;
+  }
+
+  self->window_no++;
+  GST_DEBUG("returning %p", self->incoming_queue + self->incoming_start);
+
+  return self->incoming_queue + self->incoming_start;
+}
+
+static inline void
+maybe_learn(GstClassify *self){
+  int i, j;
+  s16 *buffer;
+  while ((buffer = prepare_next_chunk(self))){
     float err_sum = 0.0f;
     float winners = 0.0f;
     int class_counts[self->n_classes];
-    if (self->log_class_numbers){
-      for (i = 0; i < self->n_classes; i++){
-        class_counts[i] = 0;
-      }
+    for (i = 0; i < self->n_classes; i++){
+      class_counts[i] = 0;
     }
-    s16 *buffer_i = self->incoming_queue + self->incoming_start;
-    while(self->class_events_index < self->n_class_events){
-      ClassifyClassEvent *ev = &self->class_events[self->class_events_index];
-      if (ev->window_no > self->window_no){
-        break;
-      }
-      GST_DEBUG("dealing with event %d/%d", self->class_events_index,
-          self->n_class_events);
-
-      self->channels[ev->channel].current_target = ev->class;
-      GST_DEBUG("setting channel %d target to %d at window %d (%d)",
-          ev->channel, ev->class, self->window_no, ev->window_no);
-      self->class_events_index++;
-    }
-
     for (j = 0; j < self->n_channels; j++){
-      /*load first half of pcm_next, second part of pcm_now.*/
-      /*second part of pcm_next retains previous data */
-      ClassifyChannel *c = &self->channels[j];
-      if (self->log_class_numbers){
-        class_counts[c->current_target]++;
-      }
-      for(i = 0, k = j; i < half_window; i++, k += self->n_channels){
-        c->pcm_next[i] = buffer_i[k];
-        c->pcm_now[half_window + i] = buffer_i[k];
-      }
-
-      /*get the features -- after which pcm_now is finished with. */
-      pcm_to_features(self->mfcc_factory, c->features, c->pcm_now, self->mfccs);
-      if (c->mfcc_image){
-        temporal_ppm_add_row(c->mfcc_image, c->features);
-        //temporal_ppm_add_row(c->mfcc_image, c->pcm_now);
-      }
-
+      ClassifyChannel *c = prepare_channel_features(self, buffer, j);
       err_sum += train_channel(c);
       winners += c->current_winner == c->current_target;
-
-      float *tmp;
-      tmp = c->pcm_next;
-      c->pcm_next = c->pcm_now;
-      c->pcm_now = tmp;
+      class_counts[c->current_target]++;
     }
 
     RecurNN *net = self->subnets[0];
+    /*XXX periodic_pgm_dump and image string should be gst properties */
     if (PERIODIC_PGM_DUMP && net->generation % PERIODIC_PGM_DUMP == 0){
       rnn_multi_pgm_dump(net, "how ihw");
     }
@@ -855,82 +875,31 @@ maybe_learn(GstClassify *self){
     bptt_log_float(net, "error", err_sum / self->n_channels);
     bptt_log_float(net, "correct", winners / self->n_channels);
     self->net->generation = net->generation;
-
     send_message(self, err_sum / self->n_channels);
-
-    self->incoming_start += chunk_size;
-    self->incoming_start %= self->queue_size;
-    len -= chunk_size;
-    self->window_no++;
   }
 }
-
 
 static inline void
 emit_opinions(GstClassify *self){
-  int i, j, k;
-  int len = self->incoming_end - self->incoming_start;
-  if (len < 0){ //XXX or less than or equal?
-    len += self->queue_size;
-  }
-  int half_window = self->window_size / 2;
-  int chunk_size = half_window * self->n_channels;
-  while (len >= chunk_size){
+  int j;
+  s16 *buffer;
+  for (buffer = prepare_next_chunk(self); buffer;
+       buffer = prepare_next_chunk(self)){
     float err_sum = 0.0f;
-    s16 *buffer_i = self->incoming_queue + self->incoming_start;
-    while(self->class_events_index < self->n_class_events){
-      ClassifyClassEvent *ev = &self->class_events[self->class_events_index];
-      if (ev->window_no > self->window_no){
-        break;
-      }
-      GST_DEBUG("dealing with event %d/%d", self->class_events_index,
-          self->n_class_events);
-
-      self->channels[ev->channel].current_target = ev->class;
-      GST_DEBUG("setting channel %d target to %d at window %d (%d)",
-          ev->channel, ev->class, self->window_no, ev->window_no);
-      self->class_events_index++;
-    }
-
     for (j = 0; j < self->n_channels; j++){
-      /*load first half of pcm_next, second part of pcm_now.*/
-      /*second part of pcm_next retains previous data */
-      ClassifyChannel *c = &self->channels[j];
+      ClassifyChannel *c = prepare_channel_features(self, buffer, j);
       RecurNN *net = c->net;
-      for(i = 0, k = j; i < half_window; i++, k += self->n_channels){
-        c->pcm_next[i] = buffer_i[k];
-        c->pcm_now[half_window + i] = buffer_i[k];
-      }
-
-      /*get the features -- after which pcm_now is finished with. */
-      pcm_to_features(self->mfcc_factory, c->features, c->pcm_now, self->mfccs);
-      if (c->mfcc_image){
-        temporal_ppm_add_row(c->mfcc_image, c->features);
-        //temporal_ppm_add_row(c->mfcc_image, c->pcm_now);
-      }
-      float *answer;
-
-      int valid_target = c->current_target >= 0 && c->current_target < self->n_classes;
-      answer = rnn_opinion(net, c->features);
+      float *answer = rnn_opinion(net, c->features);
       c->current_winner = softmax_best_guess(net->bptt->o_error, answer,
           net->output_size);
+      int valid_target = c->current_target >= 0 && c->current_target < self->n_classes;
       if (valid_target){
         err_sum += net->bptt->o_error[c->current_target];
       }
-      float *tmp;
-      tmp = c->pcm_next;
-      c->pcm_next = c->pcm_now;
-      c->pcm_now = tmp;
     }
-
     send_message(self, err_sum / self->n_channels);
-    self->incoming_start += chunk_size;
-    self->incoming_start %= self->queue_size;
-    len -= chunk_size;
-    self->window_no++;
   }
 }
-
 
 
 static GstFlowReturn
