@@ -6,6 +6,7 @@ from classify import GTKClassifier, gst_init
 from classify import KIWI_MFCCS as MFCCS
 from classify import KIWI_CLASSES as CLASSES
 from classify import KIWI_HIDDEN_SIZE as HIDDEN_SIZE
+from classify import KIWI_WINDOW_SIZE as WINDOW_SIZE
 TEST_AUDIO_DIR = "/home/douglas/corpora/kiwi/test/"
 
 def main():
@@ -13,6 +14,7 @@ def main():
     classifier = GTKClassifier(mfccs=MFCCS,
                                classes=CLASSES,
                                hsize=HIDDEN_SIZE,
+                               window_size=WINDOW_SIZE,
                                sinkname='autoaudiosink')
 
     d = TEST_AUDIO_DIR

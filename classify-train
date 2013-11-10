@@ -8,6 +8,7 @@ from classify import gst_init
 from classify import TMP_MFCCS as MFCCS
 from classify import TMP_CLASSES as CLASSES
 from classify import TMP_HIDDEN_SIZE as HIDDEN_SIZE
+from classify import TMP_WINDOW_SIZE as WINDOW_SIZE
 from classify import Trainer, lr_steps, categorised_files
 
 TRAIN_FILE_LENGTH=5
@@ -40,7 +41,8 @@ def main(argv):
 
     c = Trainer(mfccs=MFCCS, hsize=HIDDEN_SIZE,
                 channels=72,
-                classes=CLASSES)
+                classes=CLASSES,
+                window_size=WINDOW_SIZE)
     c.quiet = quiet
     try:
         c.train(train_data, test_data, iterations=15000 // TRAIN_FILE_LENGTH,

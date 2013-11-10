@@ -6,6 +6,8 @@ from classify import GTKClassifier, gst_init
 from classify import TMP_MFCCS as MFCCS
 from classify import TMP_CLASSES as CLASSES
 from classify import TMP_HIDDEN_SIZE as HIDDEN_SIZE
+from classify import TMP_WINDOW_SIZE as WINDOW_SIZE
+
 TEST_FILE_LENGTH=60
 TEST_AUDIO_DIR = ("/home/douglas/maori-language-monitoring/"
                    "data/8k-%ss/test" % TEST_FILE_LENGTH)
@@ -25,7 +27,8 @@ def main():
     classifier = GTKClassifier(mfccs=MFCCS,
                                classes=CLASSES,
                                hsize=HIDDEN_SIZE,
-                               sinkname='autoaudiosink', mic=('--mic' in sys.argv))
+                               sinkname='autoaudiosink', mic=('--mic' in sys.argv),
+                               window_size=WINDOW_SIZE)
     random.shuffle(files)
     run(classifier, files)
 

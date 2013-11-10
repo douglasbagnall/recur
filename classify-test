@@ -7,6 +7,7 @@ from classify import Classifier, gst_init
 from classify import TMP_MFCCS as MFCCS
 from classify import TMP_CLASSES as CLASSES
 from classify import TMP_HIDDEN_SIZE as HIDDEN_SIZE
+from classify import TMP_WINDOW_SIZE as WINDOW_SIZE
 
 TEST_FILE_LENGTH=60
 TEST_AUDIO_DIR = ("/home/douglas/maori-language-monitoring/"
@@ -16,7 +17,8 @@ def test(_dir=TEST_AUDIO_DIR, quiet=False):
     c = Classifier(mfccs=MFCCS,
                    hsize=HIDDEN_SIZE,
                    channels=1,
-                   classes=CLASSES)
+                   classes=CLASSES,
+                   window_size=WINDOW_SIZE)
     c.quiet = quiet
     files = [os.path.join(_dir, x) for x in os.listdir(_dir) if x.endswith('.wav')
              and x[0] in c.classes]

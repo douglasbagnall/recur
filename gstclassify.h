@@ -43,10 +43,7 @@ typedef s16 audio_sample;
 #define PERIODIC_PGM_DUMP 511
 #define PGM_DUMP_FEATURES 0
 
-#define CLASSIFY_WINDOW_SIZE 256
-#define CLASSIFY_HALF_WINDOW (CLASSIFY_WINDOW_SIZE / 2)
-
-#define CLASSIFY_QUEUE_PER_CHANNEL (30 * CLASSIFY_WINDOW_SIZE)
+#define CLASSIFY_QUEUE_FACTOR 30
 
 #define GST_TYPE_CLASSIFY (gst_classify_get_type())
 #define GST_CLASSIFY(obj) \
@@ -109,6 +106,7 @@ struct _GstClassify
   int window_no;
   char **pending_properties;
   int log_class_numbers;
+  int window_size;
 };
 
 

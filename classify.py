@@ -16,6 +16,8 @@ TMP_HIDDEN_SIZE = 499
 KIWI_HIDDEN_SIZE = 199
 TMP_MFCCS = 16
 KIWI_MFCCS = 0
+KIWI_WINDOW_SIZE = 512
+TMP_WINDOW_SIZE = 256
 
 DEFAULT_LOG_FILE = "classify.log"
 
@@ -101,11 +103,13 @@ class BaseClassifier(object):
         self.set_channels(channels)
 
     def __init__(self, mfccs, hsize, classes, channels=1, mainloop=None,
-                 sinkname='fakesink', basename='classify', mic=False):
+                 sinkname='fakesink', basename='classify', mic=False, window_size=None):
         if mainloop is None:
             mainloop = GObject.MainLoop()
         self.mainloop = mainloop
         self.build_pipeline(mfccs, hsize, classes, channels, sinkname=sinkname, mic=mic)
+        if window_size is not None:
+            self.classifier.set_property('window-size', window_size)
         self.basename = basename
 
     def on_eos(self, bus, msg):
