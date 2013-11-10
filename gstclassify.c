@@ -875,7 +875,6 @@ maybe_learn(GstClassify *self){
     bptt_log_float(net, "error", err_sum / self->n_channels);
     bptt_log_float(net, "correct", winners / self->n_channels);
     self->net->generation = net->generation;
-    send_message(self, err_sum / self->n_channels);
   }
 }
 
