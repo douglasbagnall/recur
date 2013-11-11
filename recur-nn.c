@@ -12,7 +12,6 @@ new_bptt(RecurNN *net, int depth, float learn_rate, float momentum,
   bptt->momentum_weight = momentum_weight;
   batch_size = MAX(1, batch_size);
   bptt->batch_size = batch_size;
-  bptt->unprincipled_depth_boost = 1.1;
   size_t vlen = net->i_size * 2 + net->h_size * 0 + net->o_size * 1;
   vlen += 2 * (net->ih_size + net->ho_size);
   vlen += depth * net->i_size;
@@ -584,7 +583,7 @@ bptt_and_accumulate_error(RecurNN *net, float *ih_delta, float top_error_sum)
           e += w_row[x] * h_error[x];
         }
 #endif
-        i_error[y] = e * bptt->unprincipled_depth_boost;
+        i_error[y] = e;
         error_sum += e * e;
       }
       else {
