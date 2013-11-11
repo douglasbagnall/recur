@@ -18,6 +18,8 @@ TMP_MFCCS = 16
 KIWI_MFCCS = 0
 KIWI_WINDOW_SIZE = 512
 TMP_WINDOW_SIZE = 256
+KIWI_BASENAME = 'kiwi'
+TMP_BASENAME = 'classify'
 
 DEFAULT_LOG_FILE = "classify.log"
 
@@ -307,7 +309,7 @@ class Trainer(BaseClassifier):
 
     def save_net(self, tag='', dir=SAVE_LOCATION):
         fn = ("%s/%s-%s-%s.net" %
-              (self.basename, dir, time.time(), tag))
+              (dir, self.basename, time.time(), tag))
         print "saving %s" % fn
         self.classifier.set_property('save-net', fn)
 

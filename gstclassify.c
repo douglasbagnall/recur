@@ -34,6 +34,7 @@ enum
   PROP_LOG_FILE,
   PROP_LOG_CLASS_NUMBERS,
   PROP_WINDOW_SIZE,
+  PROP_BASENAME,
 
   PROP_LAST
 };
@@ -41,6 +42,7 @@ enum
 #define DEFAULT_PROP_TARGET ""
 #define DEFAULT_PROP_PGM_DUMP ""
 #define DEFAULT_PROP_LOG_FILE ""
+#define DEFAULT_BASENAME "classify"
 #define DEFAULT_PROP_SAVE_NET NULL
 #define DEFAULT_PROP_LOG_CLASS_NUMBERS 0
 #define DEFAULT_PROP_MFCCS 0
@@ -199,6 +201,12 @@ gst_classify_class_init (GstClassifyClass * klass)
           DEFAULT_PROP_LOG_FILE,
           G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
+  g_object_class_install_property (gobject_class, PROP_BASENAME,
+      g_param_spec_string("basename", "basename",
+          "Base net file names on this root",
+          DEFAULT_BASENAME,
+          G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
+
   g_object_class_install_property (gobject_class, PROP_CLASSES,
       g_param_spec_int("classes", "classes",
           "Use this many classes",
@@ -283,6 +291,7 @@ gst_classify_init (GstClassify * self)
   self->window_size = DEFAULT_WINDOW_SIZE;
   self->momentum_soft_start = DEFAULT_PROP_MOMENTUM_SOFT_START;
   self->momentum = DEFAULT_PROP_MOMENTUM;
+  self->basename = strdup(DEFAULT_BASENAME);
   GST_INFO("gst classify init\n");
 }
 
@@ -291,8 +300,8 @@ static void
 reset_net_filename(GstClassify *self){
   char s[200];
   int n_features = self->mfccs ? self->mfccs : CLASSIFY_N_FFT_BINS;
-  snprintf(s, sizeof(s), "classify-i%d-h%d-o%d-b%d-%dHz-w%d.net",
-      n_features, self->hidden_size, self->n_classes,
+  snprintf(s, sizeof(s), "%s-i%d-h%d-o%d-b%d-%dHz-w%d.net",
+      self->basename, n_features, self->hidden_size, self->n_classes,
       CLASSIFY_BIAS, CLASSIFY_RATE, self->window_size);
   if (self->net_filename){
     free(self->net_filename);
@@ -572,6 +581,11 @@ gst_classify_set_property (GObject * object, guint prop_id, const GValue * value
     case PROP_PGM_DUMP:
       strvalue = g_value_get_string(value);
       rnn_multi_pgm_dump(self->net, strvalue);
+      break;
+
+    case PROP_BASENAME:
+      free(self->basename);
+      self->basename = g_value_dup_string(value);
       break;
 
     case PROP_SAVE_NET:

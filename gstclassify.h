@@ -93,7 +93,7 @@ struct _GstClassify
   RecurAudioBinner *mfcc_factory;
   int training;
   char *net_filename;
-
+  char *basename;
   int queue_size;
 
   int hidden_size;

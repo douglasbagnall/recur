@@ -9,6 +9,7 @@ from classify import KIWI_MFCCS as MFCCS
 from classify import KIWI_CLASSES as CLASSES
 from classify import KIWI_HIDDEN_SIZE as HIDDEN_SIZE
 from classify import KIWI_WINDOW_SIZE as WINDOW_SIZE
+from classify import KIWI_BASENAME as BASENAME
 from classify import Trainer, lr_steps, categorised_files
 
 NET_LOG_FILE = "kiwi.log"
@@ -97,6 +98,7 @@ def main(argv):
                     channels=72,
                     classes=CLASSES,
                     window_size=WINDOW_SIZE)
+    c.classifier.set_property('basename', BASENAME)
     c.quiet = QUIET
     c.timings = load_timings(KIWI_TIMING_DATA)
 
