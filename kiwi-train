@@ -10,6 +10,7 @@ from classify import KIWI_CLASSES as CLASSES
 from classify import KIWI_HIDDEN_SIZE as HIDDEN_SIZE
 from classify import KIWI_WINDOW_SIZE as WINDOW_SIZE
 from classify import KIWI_BASENAME as BASENAME
+from classify import COLOURS
 from classify import Trainer, lr_steps, categorised_files
 
 NET_LOG_FILE = "kiwi.log"
@@ -44,9 +45,67 @@ class KiwiTrainer(Trainer):
                 print c, fn, timings
 
         target_string = ''.join(targets) + ' '
-        #self.classifier.set_property('forget', 0)
         self.classifier.set_property('target', target_string)
         self.mode = TRAINING
+
+    def test_set(self):
+        self.test_scores = [0] * len(self.classes)
+        self.test_runs = [0] * len(self.classes)
+        self.classifier.set_property('forget', 0)
+        self.next_training_set()
+        self.classifier.set_property('training', 0)
+        self.mode = TESTING
+        self.test_n = 0
+
+    def on_element(self, bus, msg):
+        total = 0
+        s = msg.get_structure()
+        name = s.get_name()
+        if name == 'classify-setup':
+            print "got message", name
+        elif name == 'classify' and self.mode == TESTING:
+            self.test_n += self.channels
+            v = s.get_value
+            for i in range(self.channels):
+                #winner = v('channel %d winner' % i)
+                target = v('channel %d target' % i)
+                correct = v('channel %d correct' % i)
+                self.test_scores[target] += correct
+                self.test_runs[target] += 1
+                total += correct
+                #print target
+
+    def evaluate_test(self):
+        #print self.test_scores
+        colours = [COLOURS[x] for x in 'PPrRYYGGgCC']
+        output = []
+        rightness = 0
+        winners = 0
+        good_enough = 10 / len(self.classes)
+        results = zip(self.classes, self.test_scores, self.test_runs)
+        for c, s, r in results:
+            x = float(s) / r
+            i = int(x * 9.99)
+            output.append(colours[i])
+            output.append(c)
+            output.append(' %.2f%s %d/%d ' % (x, COLOURS['Z'], s, r))
+            rightness += x
+            winners += i > good_enough
+        rightness /= len(self.classes)
+        winners /= float(len(self.classes))
+        output += (" %s%.2f%s %.2f%s" %
+                   (colours[int(rightness * 9.99)], rightness,
+                    colours[int(winners * 9.99)], winners,
+                    COLOURS['Z']))
+        print ''.join(output)
+        if winners > 0.9:
+            self.save_net(tag='goodness-%d-%d' %
+                          (int(rightness * 100), int(winners * 100)))
+        if rightness > 0.75:
+            self.lr_adjust = 0.1 / (rightness - 0.65)
+        else:
+            self.lr_adjust = 1.0
+
 
 
 def load_timings(fn, default='N'):
@@ -57,6 +116,8 @@ def load_timings(fn, default='N'):
         d = line.split()
         wavname = os.path.basename(d[0])
         klass = wavname[0]
+        if klass not in CLASSES:
+            continue
         events = [(default_i, 0)]
         if klass != default and len(d) > 1:
             klass_i = CLASSES.index(klass)
@@ -85,10 +146,12 @@ def main(argv):
         lr = lr_steps(*(float(x) for x in argv))
 
     else:
-        lr = lr_steps(#1e-5, 5,
-                      3e-6, 10,
-                      1e-6, 20,
-                      3e-7)
+        lr = lr_steps(1e-5, 2,
+                      3e-6, 6,
+                      1e-6, 18,
+                      3e-7, 54,
+                      1e-7, 162,
+                      3e-8)
 
     train_data = categorised_files(TRAIN_AUDIO_DIR, CLASSES)
     test_data = categorised_files(VALIDATE_AUDIO_DIR, CLASSES)
@@ -101,9 +164,11 @@ def main(argv):
     c.classifier.set_property('basename', BASENAME)
     c.quiet = QUIET
     c.timings = load_timings(KIWI_TIMING_DATA)
-
     c.train(train_data, test_data, iterations=1000,
             learn_rate=lr, log_file=NET_LOG_FILE,
-            properties=(('log-class-numbers', 1),))
+            properties=(('log-class-numbers', 1),
+                        ('momentum-soft-start', 5000),
+                        ('momentum', 0.95),
+                        ))
 
 main(sys.argv[1:])

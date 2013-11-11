@@ -33,6 +33,7 @@ enum
   PROP_PGM_DUMP,
   PROP_LOG_FILE,
   PROP_LOG_CLASS_NUMBERS,
+  PROP_TRAINING,
   PROP_WINDOW_SIZE,
   PROP_BASENAME,
 
@@ -45,6 +46,7 @@ enum
 #define DEFAULT_BASENAME "classify"
 #define DEFAULT_PROP_SAVE_NET NULL
 #define DEFAULT_PROP_LOG_CLASS_NUMBERS 0
+#define DEFAULT_PROP_TRAINING 0
 #define DEFAULT_PROP_MFCCS 0
 #define DEFAULT_PROP_MOMENTUM 0.95f
 #define DEFAULT_PROP_MOMENTUM_SOFT_START 0.0f
@@ -231,6 +233,12 @@ gst_classify_class_init (GstClassifyClass * klass)
       g_param_spec_boolean("log-class-numbers", "log-class-numbers",
           "Log counts of each class in training",
           DEFAULT_PROP_LOG_CLASS_NUMBERS,
+          G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
+
+  g_object_class_install_property (gobject_class, PROP_TRAINING,
+      g_param_spec_boolean("training", "training",
+          "Switch training on or off (if targets are valid)",
+          DEFAULT_PROP_TRAINING,
           G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class, PROP_LEARN_RATE,
@@ -494,6 +502,7 @@ parse_simple_target_string(GstClassify *self, const char *s){
 static inline void
 reset_channel_targets(GstClassify *self){
   int i;
+  /*out of bounds [0, n_channels - 1) signals no target */
   for (i = 0; i < self->n_channels; i++){
     self->channels[i].current_target = -1;
   }
@@ -563,6 +572,28 @@ maybe_start_logging(GstClassify *self){
   }
 }
 
+/*maybe_set_training sets self->training to the requested boolean value UNLESS
+  true is requested while the targets are invalid. It returns the actually set
+  value.
+*/
+
+static int
+maybe_set_training(GstClassify *self, int t){
+  if (t){
+    for (int i = 0; i < self->n_channels; i++){
+      ClassifyChannel *c = &self->channels[i];
+      if (c->current_target < 0 ||
+          c->current_target >= self->n_classes){
+        GST_DEBUG("asked for training mode, but target %d is bad (%d)",
+            i, c->current_target);
+        return 0;
+      }
+    }
+  }
+  GST_DEBUG("Setting training to %d", t);
+  self->training = t;
+  return t;
+}
 
 static void
 gst_classify_set_property (GObject * object, guint prop_id, const GValue * value,
@@ -616,6 +647,10 @@ gst_classify_set_property (GObject * object, guint prop_id, const GValue * value
 
     case PROP_LOG_CLASS_NUMBERS:
       self->log_class_numbers = g_value_get_boolean(value);
+      break;
+
+    case PROP_TRAINING:
+      maybe_set_training(self, g_value_get_boolean(value));
       break;
 
     case PROP_LEARN_RATE:
@@ -740,13 +775,21 @@ send_message(GstClassify *self, float mean_err)
       NULL);
   for (int i = 0; i < self->n_channels; i++){
     char key[50];
-    RecurNN *net = self->channels[i].net;
+    ClassifyChannel *c = &self->channels[i];
+    RecurNN *net = c->net;
     for (int j = 0; j < net->output_size; j++){
       snprintf(key, sizeof(key), "channel %d, output %d", i, j);
       gst_structure_set(s, key, G_TYPE_FLOAT, net->bptt->o_error[j], NULL);
     }
+    if (c->current_target >= 0 &&
+        c->current_target < self->n_classes){
+      snprintf(key, sizeof(key), "channel %d correct", i);
+      gst_structure_set(s, key, G_TYPE_INT, c->current_winner == c->current_target, NULL);
+      snprintf(key, sizeof(key), "channel %d target", i);
+      gst_structure_set(s, key, G_TYPE_INT, c->current_target, NULL);
+    }
     snprintf(key, sizeof(key), "channel %d winner", i);
-    gst_structure_set(s, key, G_TYPE_INT, self->channels[i].current_winner, NULL);
+    gst_structure_set(s, key, G_TYPE_INT, c->current_winner, NULL);
   }
   msg = gst_message_new_element(GST_OBJECT(self), s);
   gst_element_post_message(GST_ELEMENT(self), msg);
