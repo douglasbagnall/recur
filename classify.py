@@ -11,11 +11,12 @@ gi.require_version('Gst', '1.0')
 from gi.repository import Gst, GObject
 
 TMP_CLASSES = "MEN"  #Maori, English, Noise
-KIWI_CLASSES = "MFN" #Male, Female, None
+#KIWI_CLASSES = "MFN" #Male, Female, None
+KIWI_CLASSES = "MN"
 TMP_HIDDEN_SIZE = 499
-KIWI_HIDDEN_SIZE = 199
+KIWI_HIDDEN_SIZE = 499
 TMP_MFCCS = 16
-KIWI_MFCCS = 0
+KIWI_MFCCS = 12
 KIWI_WINDOW_SIZE = 512
 TMP_WINDOW_SIZE = 256
 KIWI_BASENAME = 'kiwi'

@@ -19,7 +19,7 @@ def main():
 
     d = TEST_AUDIO_DIR
     files = [os.path.join(d, x) for x in os.listdir(d)
-             if x.endswith('.wav') and x[0] in classifier.classes[:2]]
+             if x.endswith('.wav') and x[0] in classifier.classes[:-1]]
 
     random.shuffle(files)
     run(classifier, files)
