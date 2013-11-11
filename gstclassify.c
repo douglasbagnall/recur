@@ -334,7 +334,7 @@ load_or_create_net(GstClassify *self){
     net = rnn_new(n_features, self->hidden_size,
         self->n_classes, CLASSIFY_RNN_FLAGS, CLASSIFY_RNG_SEED,
         NULL, CLASSIFY_BPTT_DEPTH, self->learn_rate, self->momentum, MOMENTUM_WEIGHT,
-        CLASSIFY_BATCH_SIZE);
+        CLASSIFY_BATCH_SIZE, 0);
   }
   else {
     rnn_set_log_file(net, NULL, 0);

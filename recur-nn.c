@@ -43,7 +43,7 @@ new_bptt(RecurNN *net, int depth, float learn_rate, float momentum,
 RecurNN *
 rnn_new(uint input_size, uint hidden_size, uint output_size, int flags,
     u64 rng_seed, const char *log_file, int bptt_depth, float learn_rate,
-    float momentum, float momentum_weight, int batch_size){
+    float momentum, float momentum_weight, int batch_size, int weight_shape){
   RecurNN *net = calloc(1, sizeof(RecurNN));
   int bias = !! (flags & RNN_NET_FLAG_BIAS);
   float *fm;
@@ -84,7 +84,10 @@ rnn_new(uint input_size, uint hidden_size, uint output_size, int flags,
   if (flags & RNN_NET_FLAG_OWN_WEIGHTS){
     SET_ATTR_SIZE(ih_weights, ih_size);
     SET_ATTR_SIZE(ho_weights, ho_size);
-    rnn_randomise_weights(net, RNN_INITIAL_WEIGHT_VARIANCE_FACTOR / net->h_size, 1);
+    if (weight_shape >= 0){
+      rnn_randomise_weights(net, RNN_INITIAL_WEIGHT_VARIANCE_FACTOR / net->h_size,
+          weight_shape);
+    }
   }
 #undef SET_ATTR_SIZE
   MAYBE_DEBUG("allocated %lu floats, used %lu", alloc_bytes / 4, fm - net->mem);
@@ -213,7 +216,7 @@ rnn_clone(RecurNN *parent, int flags,
 
   net = rnn_new(parent->input_size, parent->hidden_size, parent->output_size,
       flags, rng_seed, log_file, bptt_depth, learn_rate, momentum,
-      momentum_weight, batch_size);
+      momentum_weight, batch_size, -1);
 
   if (flags & RNN_NET_FLAG_OWN_WEIGHTS){
     memcpy(net->ih_weights, parent->ih_weights, net->ih_size * sizeof(float));
@@ -237,13 +240,18 @@ gaussian_power(rand_ctx *rng, float a, int power){
 
 
 void
-rnn_randomise_weights(RecurNN *net, float variance, int power){
+rnn_randomise_weights(RecurNN *net, float variance, int shape){
   int x, y;
+  /*higher shape indicates greater kurtosis. shape 0 means automatically
+    determine shape (crudely).*/
+  if (shape == 0){
+    shape = net->h_size / 500;
+  }
   for (y = 0; y < net->i_size; y++){
     /*zero for bias, will be overwritten if inapplicable*/
     net->ih_weights[y * net->h_size] = 0;
     for (x = net->bias; x < net->hidden_size + net->bias; x++){
-      net->ih_weights[y * net->h_size + x] = gaussian_power(&net->rng, variance, power);
+      net->ih_weights[y * net->h_size + x] = gaussian_power(&net->rng, variance, shape);
     }
     for (x = net->hidden_size + net->bias; x < net->h_size; x++){
       net->ih_weights[y * net->h_size + x] = 0;
@@ -251,7 +259,7 @@ rnn_randomise_weights(RecurNN *net, float variance, int power){
   }
   for (y = 0; y < net->h_size; y++){
     for (x = 0; x < net->output_size; x++){
-      net->ho_weights[y * net->o_size + x] = gaussian_power(&net->rng, variance, power);
+      net->ho_weights[y * net->o_size + x] = gaussian_power(&net->rng, variance, shape);
     }
     for (x = net->output_size; x < net->o_size; x++){
       net->ho_weights[y * net->o_size + x] = 0;

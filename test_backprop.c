@@ -21,7 +21,7 @@
 #define DEFAULT_PERIODIC_PGM_DUMP 0
 #define DEFAULT_TEMPORAL_PGM_DUMP 0
 #define DEFAULT_RELOAD 0
-#define DEFAULT_LEARN_RATE 0.0003
+#define DEFAULT_LEARN_RATE 0.001
 #define DEFAULT_BPTT_DEPTH 30
 #define DEFAULT_MOMENTUM 0.95
 #define DEFAULT_MOMENTUM_WEIGHT 0.5
@@ -524,7 +524,7 @@ load_or_create_net(void){
         input_size, flags, 1,
         opt_logfile, opt_bptt_depth, opt_learn_rate,
         opt_momentum, opt_momentum_weight,
-        opt_bptt_batch_size);
+        opt_bptt_batch_size, 1);
   }
   else if (opt_override){
     RecurNNBPTT *bptt = net->bptt;

@@ -257,7 +257,7 @@ load_or_create_net(GstRnnca *self){
     net = rnn_new(RNNCA_N_FEATURES, self->hidden_size, 3,
         RNNCA_RNN_FLAGS, RNNCA_RNG_SEED,
         NULL, RNNCA_BPTT_DEPTH, self->learn_rate, MOMENTUM, MOMENTUM_WEIGHT,
-        RNNCA_BATCH_SIZE);
+        RNNCA_BATCH_SIZE, 0);
   }
   else {
     rnn_set_log_file(net, NULL, 0);
