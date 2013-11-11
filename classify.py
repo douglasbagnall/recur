@@ -231,7 +231,7 @@ def eternal_shuffler(iters, max_iterations=-1):
 class Trainer(BaseClassifier):
     trainers = None
     lr_adjust = 1.0
-    def train(self, training_data, testing_data, iterations=100, learn_rate=None,
+    def train(self, trainers, testers, iterations=100, learn_rate=None,
               log_file=DEFAULT_LOG_FILE, properties=()):
         """data is a dictionary mapping class IDs to lists of filenames.
         """
@@ -241,11 +241,6 @@ class Trainer(BaseClassifier):
             self.learn_rate = learn_rate
         self.counter = 0
         self.iterations = iterations
-        trainers = []
-        testers = []
-        for k in self.classes:
-            trainers.append([(k, x) for x in training_data[k]])
-            testers.append([(k, x) for x in testing_data[k]])
         self.trainers = eternal_shuffler(trainers)
         testers = eternal_alternator(testers)
         self.testset = [testers.next() for i in range(self.channels)]

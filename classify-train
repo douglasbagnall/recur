@@ -38,6 +38,11 @@ def main(argv):
 
     train_data = categorised_files(TRAIN_AUDIO_DIR, CLASSES)
     test_data = categorised_files(TEST_AUDIO_DIR, CLASSES)
+    trainers = []
+    testers = []
+    for k in self.classes:
+        trainers.append([(k, x) for x in train_data[k]])
+        testers.append([(k, x) for x in test_data[k]])
 
     c = Trainer(mfccs=MFCCS, hsize=HIDDEN_SIZE,
                 channels=72,
@@ -45,7 +50,7 @@ def main(argv):
                 window_size=WINDOW_SIZE)
     c.quiet = quiet
     try:
-        c.train(train_data, test_data, iterations=15000 // TRAIN_FILE_LENGTH,
+        c.train(trainers, testers, iterations=15000 // TRAIN_FILE_LENGTH,
                 learn_rate=lr, log_file=NET_LOG_FILE,
                 properties=(('momentum-soft-start', 4000),
                             ('momentum', 0.95),
