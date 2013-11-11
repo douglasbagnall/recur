@@ -480,7 +480,8 @@ epoch(RecurNN *net, RecurNN *confab_net, RecurNN *validate_net,
           ventropy += vhistory[j];
         }
         ventropy /= vlap;
-        DEBUG("final entropy %f", ventropy);
+        DEBUG("final entropy %.3f; learn rate %.2g; momentum %.2g",
+            ventropy, net->bptt->learn_rate, net->bptt->momentum);
       }
       exit(0);
     }
@@ -564,7 +565,7 @@ main(int argc, char *argv[]){
       NULL);
 
   Schedule schedule;
-  init_schedule(&schedule, 30, 0, 3e-6, 0.4);
+  init_schedule(&schedule, 40, 0, 3e-6, 0.4);
   long len;
   u8* validate_text;
   u8* text = alloc_and_collapse_text(opt_textfile,
