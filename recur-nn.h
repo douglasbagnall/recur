@@ -130,6 +130,7 @@ struct _RecurNNBPTT {
   float momentum;
   float momentum_weight;
   int batch_size;
+  float unprincipled_depth_boost;
 };
 
 #define ALIGNED_SIZEOF(x)  ((sizeof(x) + 15UL) & ~15UL)
