@@ -72,7 +72,12 @@ def on_key_press_event(widget, event):
         window_stop(widget)
     if keyname == 'n':
         widget.classifier.load_next_file()
-        print "Key %s (%d) was pressed" % (keyname, event.keyval)
+    if keyname == 'right':
+        widget.classifier.seek_relative(5)
+    if keyname == 'left':
+        widget.classifier.seek_relative(-5)
+
+    #print "Key %s (%d) was pressed" % (keyname, event.keyval)
 
 
 def run(classifier, files):

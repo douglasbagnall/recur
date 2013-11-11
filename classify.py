@@ -425,3 +425,10 @@ class GTKClassifier(BaseClassifier):
             self.stop()
         else:
             self.load_next_file()
+
+    def seek_relative(self, secs):
+        p = self.pipeline
+        now = p.query_position(Gst.Format.TIME)[1]
+        print now
+        then = max(0, now + secs * (10 ** 9))
+        p.seek_simple(Gst.Format.TIME, 0, then)
