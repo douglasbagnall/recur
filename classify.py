@@ -50,7 +50,6 @@ def gst_init():
 
 class BaseClassifier(object):
     pipeline = None
-    basename = 'classify'
     def init_pipeline(self):
         self.pipeline = Gst.Pipeline()
         self.bus = self.pipeline.get_bus()
@@ -114,6 +113,8 @@ class BaseClassifier(object):
         if window_size is not None:
             self.classifier.set_property('window-size', window_size)
         self.basename = basename
+        self.classifier.set_property('basename', basename)
+
 
     def on_eos(self, bus, msg):
         print('on_eos()')
@@ -180,7 +181,8 @@ class Classifier(BaseClassifier):
         self.all_results.append(r)
         return r
 
-    def report(self, winchar, mean_scores, votes, fn):
+    def report(self):
+        winchar, mean_scores, votes, fn = self.collate_results()
         if self.quiet:
             return
         target = os.path.basename(fn)[0]
@@ -203,8 +205,7 @@ class Classifier(BaseClassifier):
 
     def on_eos(self, bus, msg):
         self.pipeline.set_state(Gst.State.READY)
-        r = self.collate_results()
-        self.report(*r)
+        self.report()
         if not self.pending_files:
             self.stop()
         else:
@@ -347,7 +348,7 @@ class Trainer(BaseClassifier):
                 self.next_training_set()
             else:
                 self.test_set()
-        self.pipeline.set_state(Gst.State.PLAYING)
+                self.pipeline.set_state(Gst.State.PLAYING)
 
     def on_error(self, bus, msg):
         print('Error:', msg.parse_error())
@@ -416,6 +417,10 @@ class GTKClassifier(BaseClassifier):
                 return
             v = s.get_value
             winner = v('channel 0 winner')
+            #correct = v('channel 0 correct')
+            #target = v('channel 0 target')
+            #print correct, winner, target, winner == target
+            #print s.to_string()
             scores = tuple(-v('channel 0, output %d' % (j))
                            for j in range(len(self.classes)))
             self.widget.notify_results((winner, scores))
@@ -429,6 +434,6 @@ class GTKClassifier(BaseClassifier):
     def seek_relative(self, secs):
         p = self.pipeline
         now = p.query_position(Gst.Format.TIME)[1]
-        print now
+        print "%.1f" % (now * 1e-9)
         then = max(0, now + secs * (10 ** 9))
         p.seek_simple(Gst.Format.TIME, 0, then)

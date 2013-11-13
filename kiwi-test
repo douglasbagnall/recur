@@ -1,0 +1,201 @@
+#!/usr/bin/python
+import os, sys
+import random
+import itertools
+import time
+
+from classify import gst_init, TRAINING, TESTING, Gst
+from classify import KIWI_MFCCS as MFCCS
+from classify import KIWI_CLASSES as CLASSES
+from classify import KIWI_HIDDEN_SIZE as HIDDEN_SIZE
+from classify import KIWI_WINDOW_SIZE as WINDOW_SIZE
+from classify import KIWI_BASENAME as BASENAME
+from classify import COLOURS
+from classify import BaseClassifier
+
+TEST_AUDIO_DIR = "/home/douglas/corpora/kiwi/test/"
+KIWI_TIMING_DATA = '/home/douglas/corpora/kiwi/times.txt'
+
+QUIET = False
+
+class KiwiClassifier(BaseClassifier):
+    pending_files = []
+    quiet = False
+    def classify_files_with_timings(self, files, timings):
+        self.all_results = []
+        self.class_results = [[0,0] for x in self.classes]
+        self.pending_files = list(reversed(files))
+        self.pending_timings = list(reversed(timings))
+        self.classifier.set_property('mode', -1)
+        self.load_next_file()
+        self.mainloop.run()
+        return self.all_results
+
+    def load_next_file(self):
+        self.pipeline.set_state(Gst.State.READY)
+        fn = self.pending_files.pop()
+        timings = self.pending_timings.pop()
+        targets = ''.join('c%dt%.2f' % x for x in timings)
+        self.current_file = fn
+        self.classifier.set_property("forget", 0)
+        self.filesrcs[0].set_property('location', fn)
+        self.classifier.set_property('target', targets)
+        self.file_results = []
+        self.file_class_results = [[0,0] for x in self.classes]
+        self.pipeline.set_state(Gst.State.PLAYING)
+
+
+    def on_element(self, bus, msg):
+        s = msg.get_structure()
+        if s.get_name() != "classify":
+            return
+        v = s.get_value
+        correct = v('channel 0 correct')
+        winner = v('channel 0 winner')
+        target = v('channel 0 target')
+        #print correct, winner, target, winner == target, s.to_string()
+        self.file_class_results[target][correct] += 1
+        self.class_results[target][correct] += 1
+        self.file_results.append((target, correct))
+
+    def report(self):
+        self.pipeline.set_state(Gst.State.READY)
+        step = len(self.file_results) / 100.0
+        next_stop = 0
+        out = []
+        i = 0
+        #classes = self.classes
+        classes = 'K-'
+        colours = [COLOURS[x] for x in 'PPrrRRYYGgCC']
+        for target, correct in self.file_results:
+            if i >= next_stop:
+                if i:
+                    s = sum(current_targets)
+                    m = max(current_targets)
+                    if m > s * 0.9:
+                        c = classes[current_targets.index(m)]
+                    else:
+                        c = '~'
+                    colour = colours[int(current_correct * 10.01 / s)]
+                    #colour = COLOURS['PRrYgGC'[sum(current_correct > s * x for x in
+                    #                              (0.1, 0.25, 0.5, 0.66,
+                    #                               0.77, 0.88, 0.99)]]]
+                    out.append('%s%s' % (colour, c))
+                next_stop += step
+                current_correct = 0
+                current_targets = [0] * len(self.classes)
+            t, c = self.file_results[i]
+            current_correct += c
+            current_targets[t] += 1
+            i += 1
+        out.extend((COLOURS['Z'],))
+
+        i = 0
+        grand_total = 0
+        total_right = 0
+        for wrong, right in self.file_class_results:
+            total = wrong + right
+            if  total:
+                s = "%s: %d/%d (%.2g)" % (classes[i], right, total, float(right) / total)
+                n = int(right * 60.0 / total)
+                c = colours[right * 10 / total]
+                out.append("\n%-20s %s%s%s%s" %
+                           (s, c, '=' * n,
+                            COLOURS['Z'], '.' * (60 - n)))
+
+            else:
+                out.append("\n%s: %s / 0" % (classes[i], right))
+
+            i += 1
+            grand_total += total
+            total_right += right
+
+
+        print '\nfile://%s%s%s' % (colours[total_right * 10 / grand_total],
+                                 self.current_file, COLOURS['Z'])
+
+        print ''.join(out)
+        #print self.file_class_results
+        self.pipeline.set_state(Gst.State.PLAYING)
+
+
+    def on_eos(self, bus, msg):
+        self.report()
+        if not self.pending_files:
+            i = 0
+            gt = 0
+            for wrong, right in self.class_results:
+                t = wrong + right
+                gt += t
+                print "%s: %s/%s  %.2f" % (self.classes[i], right, t,
+                                           float(right) / t)
+                i += 1
+            print "%s windows == %.2f minutes" % (gt,
+                                                  gt * WINDOW_SIZE / (2.0 * 60 * 8000))
+            self.stop()
+        else:
+            self.load_next_file()
+
+    def on_error(self, bus, msg):
+        pass
+
+def load_timings(fn, default='N'):
+    f = open(fn)
+    timings = {}
+    default_i = CLASSES.index(default)
+    for line in f:
+        d = line.split()
+        wavname = os.path.basename(d[0])
+        klass = wavname[0]
+        if klass not in CLASSES:
+            continue
+        events = [(default_i, 0)]
+        if klass != default and len(d) > 1:
+            klass_i = CLASSES.index(klass)
+            for i, t in enumerate(d[1:]):
+                if i & 1:
+                    events.append((default_i, float(t)))
+                else:
+                    events.append((klass_i, float(t)))
+            #don't duplicate numbers
+            if events[1][1] == 0:
+                del events[0]
+        timings[d[0]] = events
+    if not QUIET:
+        for k, v in timings.items():
+            if k[0] != default:
+                print k, v
+    return timings
+
+def load_files_and_timings(d, classes):
+    all_timings = load_timings(KIWI_TIMING_DATA)
+    #print all_timings
+    basefiles = [x for x in os.listdir(d)
+                 if x.endswith('.wav') and x[0] in classes]
+    files = [os.path.join(d, x) for x in basefiles]
+    timings = [all_timings[x] for x in files]
+    return files, timings
+
+def main(argv):
+    global QUIET
+    gst_init()
+    if '-q' in argv:
+        argv.remove('-q')
+        QUIET = True
+
+    c = KiwiClassifier(mfccs=MFCCS,
+                       hsize=HIDDEN_SIZE,
+                       channels=1,
+                       classes=CLASSES,
+                       window_size=WINDOW_SIZE,
+                       basename=BASENAME)
+    c.quiet = QUIET
+    if argv:
+        files = argv
+        timings = [load_timings(KIWI_TIMING_DATA)[x] for x in files]
+    else:
+        files, timings = load_files_and_timings(TEST_AUDIO_DIR, CLASSES)
+        #files, timings = load_files_and_timings(TEST_AUDIO_DIR, 'M')
+    c.classify_files_with_timings(files, timings)
+
+main(sys.argv[1:])
