@@ -9,7 +9,7 @@ from classify import KIWI_HIDDEN_SIZE as HIDDEN_SIZE
 from classify import KIWI_WINDOW_SIZE as WINDOW_SIZE
 TEST_AUDIO_DIR = "/home/douglas/corpora/kiwi/test/"
 
-def main():
+def main(files):
     gst_init()
     classifier = GTKClassifier(mfccs=MFCCS,
                                classes=CLASSES,
@@ -17,12 +17,13 @@ def main():
                                window_size=WINDOW_SIZE,
                                sinkname='autoaudiosink')
 
-    d = TEST_AUDIO_DIR
-    files = [os.path.join(d, x) for x in os.listdir(d)
-             if x.endswith('.wav') and x[0] in classifier.classes[:-1]]
+    if not files:
+        d = TEST_AUDIO_DIR
+        files = [os.path.join(d, x) for x in os.listdir(d)
+                 if x.endswith('.wav') and x[0] in classifier.classes[:-1]]
+        random.shuffle(files)
 
-    random.shuffle(files)
     run(classifier, files)
 
 
-main()
+main(sys.argv[1:])
