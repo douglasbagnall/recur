@@ -53,7 +53,7 @@ class KiwiTrainer(Trainer):
         self.test_runs = [0] * len(self.classes)
         self.classifier.set_property('forget', 0)
         self.next_training_set()
-        self.classifier.set_property('training', 0)
+        self.classifier.set_property('mode', 0)
         self.mode = TESTING
         self.test_n = 0
 

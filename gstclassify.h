@@ -91,7 +91,7 @@ struct _GstClassify
   int incoming_start;
   int incoming_end;
   RecurAudioBinner *mfcc_factory;
-  int training;
+  int mode;
   char *net_filename;
   char *basename;
   int queue_size;

@@ -18,6 +18,16 @@ enum
   LAST_SIGNAL
 };
 
+/* CLASSIFY_MODE will switch to TRAINING_MODE when valid targets are given.
+   STICKY_CLASSIFY_MODE won't.
+*/
+enum
+{
+  STICKY_CLASSIFY_MODE = -1,
+  CLASSIFY_MODE,
+  TRAINING_MODE
+};
+
 enum
 {
   PROP_0,
@@ -33,7 +43,7 @@ enum
   PROP_PGM_DUMP,
   PROP_LOG_FILE,
   PROP_LOG_CLASS_NUMBERS,
-  PROP_TRAINING,
+  PROP_MODE,
   PROP_WINDOW_SIZE,
   PROP_BASENAME,
 
@@ -46,7 +56,7 @@ enum
 #define DEFAULT_BASENAME "classify"
 #define DEFAULT_PROP_SAVE_NET NULL
 #define DEFAULT_PROP_LOG_CLASS_NUMBERS 0
-#define DEFAULT_PROP_TRAINING 0
+#define DEFAULT_PROP_MODE 0
 #define DEFAULT_PROP_MFCCS 0
 #define DEFAULT_PROP_MOMENTUM 0.95f
 #define DEFAULT_PROP_MOMENTUM_SOFT_START 0.0f
@@ -235,10 +245,11 @@ gst_classify_class_init (GstClassifyClass * klass)
           DEFAULT_PROP_LOG_CLASS_NUMBERS,
           G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
-  g_object_class_install_property (gobject_class, PROP_TRAINING,
-      g_param_spec_boolean("training", "training",
-          "Switch training on or off (if targets are valid)",
-          DEFAULT_PROP_TRAINING,
+  g_object_class_install_property (gobject_class, PROP_MODE,
+      g_param_spec_int("mode", "mode",
+          "toggle training: 0 - no training, 1 training, -1 sticky no training",
+          STICKY_CLASSIFY_MODE, TRAINING_MODE,
+          DEFAULT_PROP_MODE,
           G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class, PROP_LEARN_RATE,
@@ -432,11 +443,11 @@ parse_complex_target_string(GstClassify *self, const char *str){
     GST_DEBUG("found %d targets, %d channels, prev %d events (%p)", n, nc,
         self->n_class_events, self->class_events);
     self->class_events = realloc_or_die(self->class_events,
-        (n + 1) * sizeof(ClassifyClassEvent));
-    self->n_class_events = n;
-    self->class_events_index = 0;
-    GST_DEBUG("events %p, n %d", self->class_events, n);
+        (n + 2) * sizeof(ClassifyClassEvent));
   }
+  self->n_class_events = n;
+  self->class_events_index = 0;
+  GST_DEBUG("events %p, n %d", self->class_events, n);
   s = str;
   float time_to_window_no = CLASSIFY_RATE * 2.0f / self->window_size + 0.5;
   for (i = 0; i < n; i++){
@@ -506,7 +517,9 @@ reset_channel_targets(GstClassify *self){
   for (i = 0; i < self->n_channels; i++){
     self->channels[i].current_target = -1;
   }
-  self->training = 0;
+  if (self->mode == TRAINING_MODE){
+    self->mode = CLASSIFY_MODE;
+  }
 }
 
 static inline void
@@ -551,7 +564,9 @@ maybe_parse_target_string(GstClassify *self){
     else {
       ret = parse_simple_target_string(self, s);
     }
-    self->training = (ret == 0);
+    if (self->mode != STICKY_CLASSIFY_MODE){
+      self->mode = (ret == 0) ? TRAINING_MODE : CLASSIFY_MODE;
+    }
   }
   free_pending_property(self, PROP_TARGET);
   self->window_no = 0;
@@ -572,26 +587,30 @@ maybe_start_logging(GstClassify *self){
   }
 }
 
-/*maybe_set_training sets self->training to the requested boolean value UNLESS
-  true is requested while the targets are invalid. It returns the actually set
-  value.
+/*maybe_set_mode sets self->mode to the requested boolean value UNLESS true is
+  requested while the targets are invalid. It returns the actually set value.
 */
 
 static int
-maybe_set_training(GstClassify *self, int t){
-  if (t){
+maybe_set_mode(GstClassify *self, int t){
+  if (t == TRAINING_MODE){
     for (int i = 0; i < self->n_channels; i++){
       ClassifyChannel *c = &self->channels[i];
       if (c->current_target < 0 ||
           c->current_target >= self->n_classes){
         GST_DEBUG("asked for training mode, but target %d is bad (%d)",
             i, c->current_target);
-        return 0;
+        t = CLASSIFY_MODE;
+        break;
       }
     }
   }
-  GST_DEBUG("Setting training to %d", t);
-  self->training = t;
+  else if (t != CLASSIFY_MODE && t != STICKY_CLASSIFY_MODE){
+    GST_WARNING("asked for invalid mode %d, using CLASSIFY_MODE instead", t);
+    t = CLASSIFY_MODE;
+  }
+  GST_DEBUG("Setting mode to %d", t);
+  self->mode = t;
   return t;
 }
 
@@ -649,8 +668,8 @@ gst_classify_set_property (GObject * object, guint prop_id, const GValue * value
       self->log_class_numbers = g_value_get_boolean(value);
       break;
 
-    case PROP_TRAINING:
-      maybe_set_training(self, g_value_get_boolean(value));
+    case PROP_MODE:
+      maybe_set_mode(self, g_value_get_int(value));
       break;
 
     case PROP_LEARN_RATE:
@@ -965,7 +984,7 @@ gst_classify_transform_ip (GstBaseTransform * base, GstBuffer *buf)
   GstFlowReturn ret = GST_FLOW_OK;
   queue_audio_segment(buf, self->incoming_queue, self->queue_size,
       &self->incoming_start, &self->incoming_end);
-  if (self->training){
+  if (self->mode == TRAINING_MODE){
     maybe_learn(self);
   }
   else {
