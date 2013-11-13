@@ -146,12 +146,13 @@ def main(argv):
         lr = lr_steps(*(float(x) for x in argv))
 
     else:
-        lr = lr_steps(1e-5, 2,
-                      3e-6, 6,
-                      1e-6, 18,
-                      3e-7, 54,
-                      1e-7, 162,
-                      3e-8)
+        lr = lr_steps(#3e-5, 2,
+                      1e-5, 6,
+                      3e-6, 18,
+                      1e-6, 54,
+                      3e-7, 108,
+                      1e-7)
+
 
     train_data = categorised_files(TRAIN_AUDIO_DIR, CLASSES)
     test_data = categorised_files(VALIDATE_AUDIO_DIR, CLASSES)
@@ -160,8 +161,8 @@ def main(argv):
                     hsize=HIDDEN_SIZE,
                     channels=72,
                     classes=CLASSES,
-                    window_size=WINDOW_SIZE)
-    c.classifier.set_property('basename', BASENAME)
+                    window_size=WINDOW_SIZE,
+                    basename=BASENAME)
     c.quiet = QUIET
     c.timings = load_timings(KIWI_TIMING_DATA)
 
