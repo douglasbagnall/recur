@@ -1,7 +1,5 @@
 all::
 
-BASENAME = recur
-
 GDB_ALWAYS_FLAGS = -ggdb -O3
 WARNINGS = -Wall -Wextra -Wno-unused-parameter -Wno-missing-field-initializers -ftree-vectorizer-verbose=0 -fno-inline
 # -Wunsafe-loop-optimizations  -ftree-vectorizer-verbose=2  -fno-inline
@@ -30,10 +28,6 @@ INC_DIR = /usr/include
 ALL_CFLAGS = -march=native -pthread $(VECTOR_FLAGS) $(WARNINGS) -pipe  -D_GNU_SOURCE -std=gnu1x $(INCLUDES) $(ARCH_CFLAGS) $(CFLAGS) $(GDB_ALWAYS_FLAGS) -ffast-math -funsafe-loop-optimizations $(CLANG_FLAGS) -std=gnu11
 ALL_LDFLAGS = $(LDFLAGS)
 
-$(BASENAME)_SRC = gst$(BASENAME).c
-
-export GST_DEBUG = $(BASENAME):4
-
 GST_INCLUDES =  -isystem $(INC_DIR)/gstreamer-$(GST_VERSION)\
 	 -isystem $(INC_DIR)/glib-2.0\
 	 -isystem $(LIB_ARCH_DIR)/glib-2.0/include\
@@ -59,7 +53,7 @@ GTK_LINKS =  -lgtk-3 -lgdk-3
 
 OPT_OBJECTS = ccan/opt/opt.o ccan/opt/parse.o ccan/opt/helpers.o ccan/opt/usage.o
 
-SOURCES =  gst$(BASENAME)_manager.c gst$(BASENAME)_audio.c gst$(BASENAME)_video.c \
+SOURCES =  gstrecur_manager.c gstrecur_audio.c gstrecur_video.c \
 	recur-context.c rescale.c recur-nn.c recur-nn-io.c context-recurse.c mfcc.c
 OBJECTS := $(patsubst %.c,%.o,$(SOURCES))
 #PLUGINS := $(patsubst %.c,lib%.so,$(SOURCES))
