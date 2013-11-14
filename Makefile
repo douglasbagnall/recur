@@ -21,7 +21,7 @@ INC_DIR = /usr/include
 #CC = nccgen -ncgcc -ncld -ncfabs
 #CC = /usr/bin/clang
 #CC = /usr/local/bin/clang
-#CC = /usr/local/bin/clang  -Weverything -Wno-documentation -Wno-system-headers -Wno-sign-conversion -Wno-conversion -Wno-gnu -Wno-variadic-macros -Wno-vla
+#CC = /usr/local/bin/clang  -Weverything -Wno-documentation -Wno-system-headers -Wno-sign-conversion -Wno-conversion -Wno-gnu -Wno-variadic-macros -Wno-vla -Wno-disabled-macro-expansion
 #CLANG_FLAGS = -fslp-vectorize-aggressive
 #CLANG_FLAGS =  -fplugin=/usr/lib/gcc/x86_64-linux-gnu/4.7/plugin/dragonegg.so
 
@@ -56,7 +56,6 @@ OPT_OBJECTS = ccan/opt/opt.o ccan/opt/parse.o ccan/opt/helpers.o ccan/opt/usage.
 SOURCES =  gstrecur_manager.c gstrecur_audio.c gstrecur_video.c \
 	recur-context.c rescale.c recur-nn.c recur-nn-io.c context-recurse.c mfcc.c
 OBJECTS := $(patsubst %.c,%.o,$(SOURCES))
-#PLUGINS := $(patsubst %.c,lib%.so,$(SOURCES))
 
 images nets:
 	mkdir -p $@
