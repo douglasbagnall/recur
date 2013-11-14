@@ -286,7 +286,6 @@ set_info (GstVideoFilter *filter,
 {
   GstRnnca *self = GST_RNNCA (filter);
   int i;
-  self->video_info = *in_info;
   if (self->frame_prev == NULL){
     self->frame_prev = malloc_aligned_or_die(sizeof(RnncaFrame));
     self->frame_now = malloc_aligned_or_die(sizeof(RnncaFrame));

@@ -51,7 +51,6 @@ typedef struct _GstRnncaClass GstRnncaClass;
 struct _GstRnnca
 {
   GstVideoFilter videofilter;
-  GstVideoInfo video_info;
   RecurNN *net;
   int current_frame;
   float learn_rate;
