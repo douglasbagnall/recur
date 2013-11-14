@@ -87,7 +87,6 @@ static gboolean
 gst_recur_audio_setup(GstAudioFilter * base, const GstAudioInfo * info){
   GST_INFO("gst audio setup\n");
   GstRecurAudio *self = GST_RECUR_AUDIO(base);
-  self->context->audio_info = *info;
   GST_DEBUG_OBJECT (self,
       "info: %" GST_PTR_FORMAT, info);
   return TRUE;

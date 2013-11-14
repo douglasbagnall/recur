@@ -119,7 +119,6 @@ struct _RecurFrame {
 
 struct _RecurContext {
   GstVideoInfo video_info;
-  GstAudioInfo audio_info;
   GQueue audio_queue;
   RecurAudioBinner *audio_binner;
   RecurNN *net;
