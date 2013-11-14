@@ -79,7 +79,7 @@ static GstStaticPadTemplate sink_factory = GST_STATIC_PAD_TEMPLATE ("sink",
     );
 
 #define gst_rnnca_parent_class parent_class
-G_DEFINE_TYPE (GstRnnca, gst_rnnca, GST_TYPE_VIDEO_FILTER);
+G_DEFINE_TYPE (GstRnnca, gst_rnnca, GST_TYPE_VIDEO_FILTER)
 
 /* Clean up */
 static void
@@ -198,7 +198,7 @@ reset_net_filename(GstRnnca *self){
   self->net_filename = strdup(s);
 }
 
-UNUSED static int
+static int
 compare_trainers(const void *a, const void *b){
   const RnncaTrainer *at = (RnncaTrainer *)a;
   const RnncaTrainer *bt = (RnncaTrainer *)b;
@@ -292,7 +292,7 @@ set_info (GstVideoFilter *filter,
     self->frame_now = malloc_aligned_or_die(sizeof(RnncaFrame));
     self->play_frame = malloc_aligned_or_die(sizeof(RnncaFrame));
     size_t size = RNNCA_WIDTH * RNNCA_HEIGHT;
-    void *mem = zalloc_aligned_or_die(size * 3);
+    u8 *mem = zalloc_aligned_or_die(size * 3);
     self->frame_prev->Y  = mem;
     self->frame_prev->Cb = mem + size;
     self->frame_prev->Cr = mem + size * 2;
@@ -408,8 +408,8 @@ remember_frame(GstRnnca *self, GstVideoFrame *frame){
 
 static inline void
 fill_net_inputs(RecurNN *net, RnncaFrame *frame, int cx, int cy){
-  int x, y, i, offset, iy, ix;
-  i = 0;
+  int y, offset, iy, ix;
+  int i = 0, x = 0;
   for (iy = -1; iy <= 1; iy++){
     y = cy + iy;
     if (y < 0){
@@ -449,12 +449,12 @@ train_net(RnncaTrainer *t, RnncaFrame *prev,  RnncaFrame *now){
   for (i = 0; i < 3; i++){
     GST_LOG("now %p prev %p Y %p/%p plane_size %d, offset %d",
         now, prev, now->Y, prev->Y, plane_size, offset);
-    float t = BYTE_TO_UNIT(now->Y[offset + plane_size * i]);
+    float target = BYTE_TO_UNIT(now->Y[offset + plane_size * i]);
     float a = answer[i];
     float slope = a * (1.0f - a);
-    net->bptt->o_error[i] = slope * (t - a);
-    GST_DEBUG("t %.2g a %.2g diff %.2g slope %.2g",
-        t, a, t - a, slope);
+    net->bptt->o_error[i] = slope * (target - a);
+    GST_DEBUG("target %.2g a %.2g diff %.2g slope %.2g",
+        target, a, target - a, slope);
   }
   bptt_calc_deltas(net);
 }
@@ -537,4 +537,4 @@ GST_PLUGIN_DEFINE (GST_VERSION_MAJOR,
     GST_VERSION_MINOR,
     rnnca,
     "Rnn cellular automata",
-    plugin_init, VERSION, GST_LICENSE, GST_PACKAGE_NAME, GST_PACKAGE_ORIGIN);
+    plugin_init, VERSION, GST_LICENSE, GST_PACKAGE_NAME, GST_PACKAGE_ORIGIN)

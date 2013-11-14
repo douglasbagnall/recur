@@ -140,9 +140,11 @@ recur_read_timer(struct timespec *start_time)
 #define MIN(a, b)  (((a) < (b)) ? (a) : (b))
 #endif
 
+#if 0
 static void __attribute__((noinline)) UNUSED
 BP(void) { asm (""); }
 
 #define CBP(x) do { if (x) BP(); } while(0)
+#endif
 
 #endif

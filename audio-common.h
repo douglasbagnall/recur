@@ -10,7 +10,7 @@ queue_audio_segment(GstBuffer *buffer, s16 *const queue, const int queue_size,
     int *start, int *end)
 {
   GstMapInfo map;
-  gst_buffer_map(buffer, &map, 0);
+  gst_buffer_map(buffer, &map, GST_MAP_READ);
   int len = map.size / sizeof(s16);
 
   int lag = *end - *start;

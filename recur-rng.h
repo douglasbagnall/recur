@@ -32,7 +32,7 @@ rand64(rand_ctx *x)
 }
 
 
-static UNUSED void
+static inline void
 init_rand64(rand_ctx *x, u64 seed)
 {
   int i;
@@ -43,7 +43,7 @@ init_rand64(rand_ctx *x, u64 seed)
   }
 }
 
-static UNUSED void
+static inline void
 init_rand64_maybe_randomly(rand_ctx *ctx, u64 seed)
 {
   if (seed == RECUR_RNG_RANDOM_SEED){

@@ -58,7 +58,7 @@ static GstStaticPadTemplate sink_factory = GST_STATIC_PAD_TEMPLATE ("sink",
     );
 
 #define gst_recur_video_parent_class parent_class
-G_DEFINE_TYPE (GstRecurVideo, gst_recur_video, GST_TYPE_VIDEO_FILTER);
+G_DEFINE_TYPE (GstRecurVideo, gst_recur_video, GST_TYPE_VIDEO_FILTER)
 
 /* Clean up */
 static void

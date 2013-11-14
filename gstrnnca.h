@@ -57,17 +57,17 @@ struct _GstRnnca
   float learn_rate;
   int osdebug;
   int playing;
-  int training;
   RnncaFrame *frame_prev;
   RnncaFrame *frame_now;
   RnncaFrame *play_frame;
   RecurNN **constructors;
   RnncaTrainer *trainers;
   RecurNN **train_nets;
-  int n_trainers;
   char *net_filename;
+  int n_trainers;
   int hidden_size;
   char *pending_logfile;
+  int training;
 };
 
 struct _GstRnncaClass

@@ -225,8 +225,8 @@ typedef struct _TemporalPPM {
   int height;
   int y;
   int id;
-  int counter;
   char *basename;
+  int counter;
   int mode;
 } TemporalPPM;
 

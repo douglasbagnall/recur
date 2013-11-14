@@ -86,15 +86,14 @@ struct _GstClassify
   ClassifyChannel *channels;
   int n_channels;
   int n_classes;
-  int mfccs;
   s16 *incoming_queue;
   int incoming_start;
   int incoming_end;
   RecurAudioBinner *mfcc_factory;
-  int mode;
   char *net_filename;
   char *basename;
   int queue_size;
+  int mfccs;
 
   int hidden_size;
   float learn_rate;
@@ -103,10 +102,11 @@ struct _GstClassify
   ClassifyClassEvent *class_events;
   int n_class_events;
   int class_events_index;
-  int window_no;
   char **pending_properties;
   int log_class_numbers;
   int window_size;
+  int window_no;
+  int mode;
 };
 
 

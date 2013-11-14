@@ -97,7 +97,7 @@ static void maybe_start_logging(GstClassify *self);
 
 
 #define gst_classify_parent_class parent_class
-G_DEFINE_TYPE (GstClassify, gst_classify, GST_TYPE_AUDIO_FILTER);
+G_DEFINE_TYPE (GstClassify, gst_classify, GST_TYPE_AUDIO_FILTER)
 
 #define CLASSIFY_CAPS_STRING "audio/x-raw, format = (string) " QUOTE(CLASSIFY_FORMAT) \
       ", rate = (int) " QUOTE(CLASSIFY_RATE) \
@@ -931,8 +931,9 @@ maybe_learn(GstClassify *self){
     }
     if (self->momentum_soft_start){
       float x = self->momentum_soft_start;
-      net->bptt->momentum = MIN(1.0f - x / (1 + net->generation + 2 * x), self->momentum);
-      if (net->bptt->momentum == self->momentum){
+      net->bptt->momentum = 1.0f - x / (1 + net->generation + 2 * x);
+      if (net->bptt->momentum >= self->momentum){
+        net->bptt->momentum = self->momentum;
         self->momentum_soft_start = 0;
       }
     }
@@ -1007,4 +1008,4 @@ GST_PLUGIN_DEFINE (GST_VERSION_MAJOR,
     GST_VERSION_MINOR,
     classify,
     "Classify audio streams",
-    plugin_init, VERSION, GST_LICENSE, GST_PACKAGE_NAME, GST_PACKAGE_ORIGIN);
+    plugin_init, VERSION, GST_LICENSE, GST_PACKAGE_NAME, GST_PACKAGE_ORIGIN)

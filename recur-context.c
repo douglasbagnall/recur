@@ -104,7 +104,7 @@ consume_audio_samples(GQueue *queue, float *destination,
     int a_samples = NS_TO_SAMPLES(a_end - a_start);
     int a_samples2 = b->offset_end - b->offset;
     GST_LOG("audio samples from time %d;  from metadata %d", a_samples, a_samples2);
-    gst_buffer_map(b, &map, 0);
+    gst_buffer_map(b, &map, GST_MAP_READ);
     audio_sample *audio = (audio_sample *)map.data;
     int j = a_samples - 1;
     if (a_end > end_time){

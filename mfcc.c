@@ -7,7 +7,7 @@
 
 #define POWER(x) (x.r * x.r + x.i * x.i)
 
-float *
+static float *
 recur_bin_complex(RecurAudioBinner *ab, GstFFTF32Complex *f)
 {
   int i, j;
@@ -54,7 +54,7 @@ recur_bin_complex(RecurAudioBinner *ab, GstFFTF32Complex *f)
 /* Apply the cached window function, returning the actually used destination.
 */
 
-const float *
+static const float *
 recur_apply_window(RecurAudioBinner *ab, const float *src, float *dest)
 {
   int i;

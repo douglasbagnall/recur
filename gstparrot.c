@@ -60,7 +60,7 @@ static void maybe_start_logging(GstParrot *self);
 
 
 #define gst_parrot_parent_class parent_class
-G_DEFINE_TYPE (GstParrot, gst_parrot, GST_TYPE_AUDIO_FILTER);
+G_DEFINE_TYPE (GstParrot, gst_parrot, GST_TYPE_AUDIO_FILTER)
 
 #define PARROT_CAPS_STRING "audio/x-raw, format = (string) " QUOTE(PARROT_FORMAT) \
   ", rate = (int) " QUOTE(PARROT_RATE)                                  \
@@ -667,4 +667,4 @@ GST_PLUGIN_DEFINE (GST_VERSION_MAJOR,
     GST_VERSION_MINOR,
     parrot,
     "Parrot audio streams",
-    plugin_init, VERSION, GST_LICENSE, GST_PACKAGE_NAME, GST_PACKAGE_ORIGIN);
+    plugin_init, VERSION, GST_LICENSE, GST_PACKAGE_NAME, GST_PACKAGE_ORIGIN)

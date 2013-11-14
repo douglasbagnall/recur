@@ -104,21 +104,20 @@ fill_from_planar_u8(GstVideoFrame *frame, const u8 *restrict src,
     int d_width = GST_VIDEO_FRAME_COMP_WIDTH(frame, i);
     int d_height = GST_VIDEO_FRAME_COMP_HEIGHT(frame, i);
     u8 *plane = GST_VIDEO_FRAME_COMP_DATA(frame, i);
-    int i = 0;
+    int h = 0;
     int j = 0;
     int k = 0;
     stretch_row(src, plane, s_width, d_width);
     u8 *current_row = plane;
-    for (; i < d_height; i++, j+= s_height){
+    for (; h < d_height; h++, j+= s_height){
       if (j > d_height){
         j -= d_height;
         k++;
-        current_row = plane + i * stride;
+        current_row = plane + h * stride;
         stretch_row(src + k * s_width, current_row, s_width, d_width);
-
       }
       else {
-        memcpy(plane + i * stride, current_row, d_width);
+        memcpy(plane + h * stride, current_row, d_width);
       }
     }
     src += s_width * s_height;

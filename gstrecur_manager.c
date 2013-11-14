@@ -43,7 +43,7 @@ enum
 #define DEFAULT_PROP_OSDEBUG FALSE
 
 #define gst_recur_manager_parent_class parent_class
-G_DEFINE_TYPE (GstRecurManager, gst_recur_manager, GST_TYPE_BIN);
+G_DEFINE_TYPE (GstRecurManager, gst_recur_manager, GST_TYPE_BIN)
 
 /* Clean up */
 static void
@@ -169,4 +169,4 @@ GST_PLUGIN_DEFINE (GST_VERSION_MAJOR,
     GST_VERSION_MINOR,
     recur,
     "Add recur_managers to manager streams",
-    plugin_init, VERSION, GST_LICENSE, GST_PACKAGE_NAME, GST_PACKAGE_ORIGIN);
+    plugin_init, VERSION, GST_LICENSE, GST_PACKAGE_NAME, GST_PACKAGE_ORIGIN)

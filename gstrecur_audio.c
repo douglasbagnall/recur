@@ -36,7 +36,7 @@ static GstFlowReturn gst_recur_audio_transform(GstBaseTransform *base, GstBuffer
 static gboolean gst_recur_audio_setup(GstAudioFilter * filter, const GstAudioInfo * info);
 
 #define gst_recur_audio_parent_class parent_class
-G_DEFINE_TYPE (GstRecurAudio, gst_recur_audio, GST_TYPE_AUDIO_FILTER);
+G_DEFINE_TYPE (GstRecurAudio, gst_recur_audio, GST_TYPE_AUDIO_FILTER)
 
 /* Clean up */
 static void

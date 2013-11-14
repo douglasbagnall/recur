@@ -123,19 +123,19 @@ struct _RecurContext {
   GQueue audio_queue;
   RecurAudioBinner *audio_binner;
   RecurNN *net;
-  int current_frame;
   RecurFrame *frame_queue;
+  int current_frame;
   int video_lag;
+  u8 *planes;
+  RecurNN *constructors[RECUR_N_CONSTRUCTORS];
   int fq_tail;
   int fq_head;
-  float learn_rate;
-  RecurNN *constructors[RECUR_N_CONSTRUCTORS];
   RecurTrainer trainers[RECUR_N_TRAINERS];
+  float learn_rate;
   float seed[RECUR_N_VIDEO_FEATURES];
   float current_audio [RECUR_N_MFCCS];
   float audio_volume;
   int osdebug;
-  u8 *planes;
 };
 
 

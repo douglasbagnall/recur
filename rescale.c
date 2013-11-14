@@ -155,7 +155,7 @@ recur_exact_downscale(const u8 *restrict src, const int s_width,
 static inline void
 skipping_sum_row(const u8 *restrict src8, u64 *dest64, int len8){
   int i;
-  u64 *src64 = (u64 *)src8; /*XXX wil this work unaligned?*/
+  u64 *src64 = (u64 *)src8; /*XXX wil this work unaligned? XXX clang says no.*/
   int len64 = len8 / sizeof(u64);
 
   for (i = 0; i < len64; i++){
