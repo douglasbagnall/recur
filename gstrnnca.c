@@ -418,7 +418,7 @@ fill_net_inputs(RecurNN *net, RnncaFrame *frame, int cx, int cy){
     else if (y >= RNNCA_HEIGHT){
       y -= RNNCA_HEIGHT;
     }
-    for (ix = -1; x <= 1; x++){
+    for (ix = -1; ix <= 1; ix++){
       x = cx + ix;
       if (x < 0){
         x += RNNCA_WIDTH;
