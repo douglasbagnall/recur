@@ -11,7 +11,7 @@ from classify import KIWI_HIDDEN_SIZE as HIDDEN_SIZE
 from classify import KIWI_WINDOW_SIZE as WINDOW_SIZE
 from classify import KIWI_BASENAME as BASENAME
 from classify import COLOURS
-from classify import Trainer, lr_steps, categorised_files
+from classify import Trainer, lr_steps, categorised_files, load_timings
 
 NET_LOG_FILE = "kiwi.log"
 
@@ -107,35 +107,6 @@ class KiwiTrainer(Trainer):
             self.lr_adjust = 1.0
 
 
-
-def load_timings(fn, default='N'):
-    f = open(fn)
-    timings = {}
-    default_i = CLASSES.index(default)
-    for line in f:
-        d = line.split()
-        wavname = os.path.basename(d[0])
-        klass = wavname[0]
-        if klass not in CLASSES:
-            continue
-        events = [(default_i, 0)]
-        if klass != default and len(d) > 1:
-            klass_i = CLASSES.index(klass)
-            for i, t in enumerate(d[1:]):
-                if i & 1:
-                    events.append((default_i, float(t)))
-                else:
-                    events.append((klass_i, float(t)))
-            #don't duplicate numbers
-            if events[1][1] == 0:
-                del events[0]
-        timings[d[0]] = events
-    if not QUIET:
-        for k, v in timings.items():
-            if k[0] != default:
-                print k, v
-    return timings
-
 def main(argv):
     global QUIET
     gst_init()
@@ -164,7 +135,9 @@ def main(argv):
                     window_size=WINDOW_SIZE,
                     basename=BASENAME)
     c.quiet = QUIET
-    c.timings = load_timings(KIWI_TIMING_DATA)
+    c.timings = [load_timings(KIWI_TIMING_DATA, CLASSES, CLASSES[-1], QUIET)[x]
+                 for x in files]
+
 
     trainers = []
     testers = []

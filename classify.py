@@ -437,3 +437,32 @@ class GTKClassifier(BaseClassifier):
         print "%.1f" % (now * 1e-9)
         then = max(0, now + secs * (10 ** 9))
         p.seek_simple(Gst.Format.TIME, 0, then)
+
+
+def load_timings(fn, classes, default, quiet=True):
+    f = open(fn)
+    timings = {}
+    default_i = classes.index(default)
+    for line in f:
+        d = line.split()
+        wavname = os.path.basename(d[0])
+        klass = wavname[0]
+        if klass not in classes:
+            continue
+        events = [(default_i, 0)]
+        if klass != default and len(d) > 1:
+            klass_i = classes.index(klass)
+            for i, t in enumerate(d[1:]):
+                if i & 1:
+                    events.append((default_i, float(t)))
+                else:
+                    events.append((klass_i, float(t)))
+            #don't duplicate numbers
+            if events[1][1] == 0:
+                del events[0]
+        timings[d[0]] = events
+    if not quiet:
+        for k, v in timings.items():
+            if k[0] != default:
+                print k, v
+    return timings

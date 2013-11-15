@@ -11,7 +11,7 @@ from classify import KIWI_HIDDEN_SIZE as HIDDEN_SIZE
 from classify import KIWI_WINDOW_SIZE as WINDOW_SIZE
 from classify import KIWI_BASENAME as BASENAME
 from classify import COLOURS
-from classify import BaseClassifier
+from classify import BaseClassifier, load_timings
 
 TEST_AUDIO_DIR = "/home/douglas/corpora/kiwi/test/"
 KIWI_TIMING_DATA = '/home/douglas/corpora/kiwi/times.txt'
@@ -139,36 +139,8 @@ class KiwiClassifier(BaseClassifier):
     def on_error(self, bus, msg):
         pass
 
-def load_timings(fn, default='N'):
-    f = open(fn)
-    timings = {}
-    default_i = CLASSES.index(default)
-    for line in f:
-        d = line.split()
-        wavname = os.path.basename(d[0])
-        klass = wavname[0]
-        if klass not in CLASSES:
-            continue
-        events = [(default_i, 0)]
-        if klass != default and len(d) > 1:
-            klass_i = CLASSES.index(klass)
-            for i, t in enumerate(d[1:]):
-                if i & 1:
-                    events.append((default_i, float(t)))
-                else:
-                    events.append((klass_i, float(t)))
-            #don't duplicate numbers
-            if events[1][1] == 0:
-                del events[0]
-        timings[d[0]] = events
-    if not QUIET:
-        for k, v in timings.items():
-            if k[0] != default:
-                print k, v
-    return timings
-
 def load_files_and_timings(d, classes):
-    all_timings = load_timings(KIWI_TIMING_DATA)
+    all_timings = load_timings(KIWI_TIMING_DATA, classes, classes[-1], QUIET)
     #print all_timings
     basefiles = [x for x in os.listdir(d)
                  if x.endswith('.wav') and x[0] in classes]
@@ -192,7 +164,8 @@ def main(argv):
     c.quiet = QUIET
     if argv:
         files = argv
-        timings = [load_timings(KIWI_TIMING_DATA)[x] for x in files]
+        all_timings = load_timings(KIWI_TIMING_DATA, CLASSES, CLASSES[-1], True)
+        timings = [all_timings[x] for x in files]
     else:
         files, timings = load_files_and_timings(TEST_AUDIO_DIR, CLASSES)
         #files, timings = load_files_and_timings(TEST_AUDIO_DIR, 'M')
