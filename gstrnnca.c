@@ -408,9 +408,10 @@ remember_frame(GstRnnca *self, GstVideoFrame *frame){
 
 
 static inline void
-fill_net_inputs(RecurNN *net, RnncaFrame *frame, int cx, int cy){
+fill_net_inputs(RecurNN *net, RnncaFrame *frame, int cx, int cy, float noise){
   int y, offset, iy, ix;
   int i = 0, x = 0;
+  //GST_DEBUG("frame is %p, cx %d, cy %d", frame, cx, cy);
   for (iy = -1; iy <= 1; iy++){
     y = cy + iy;
     if (y < 0){
@@ -428,10 +429,15 @@ fill_net_inputs(RecurNN *net, RnncaFrame *frame, int cx, int cy){
         x -= RNNCA_WIDTH;
       }
       offset = y * RNNCA_WIDTH + x;
-      //GST_DEBUG("frame is %p, x %d, y %d, offset %d", frame, x, y, offset);
-      net->input_layer[i] = BYTE_TO_UNIT(frame->Y[offset]);
-      net->input_layer[i + 1] = BYTE_TO_UNIT(frame->Cb[offset]);
-      net->input_layer[i + 2] = BYTE_TO_UNIT(frame->Cr[offset]);
+      //GST_DEBUG("cx %d cy %d x %d, y %d, offset %d", cx, cy, x, y, offset);
+      net->real_inputs[i] = BYTE_TO_UNIT(frame->Y[offset]);
+      net->real_inputs[i + 1] = BYTE_TO_UNIT(frame->Cb[offset]);
+      net->real_inputs[i + 2] = BYTE_TO_UNIT(frame->Cr[offset]);
+      if (noise){
+        net->real_inputs[i] += cheap_gaussian_noise(&net->rng) * noise;
+        net->real_inputs[i + 1] += cheap_gaussian_noise(&net->rng) * noise;
+        net->real_inputs[i + 2] += cheap_gaussian_noise(&net->rng) * noise;
+      }
       i += 3;
     }
   }
