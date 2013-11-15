@@ -286,6 +286,19 @@ set_info (GstVideoFilter *filter,
 {
   GstRnnca *self = GST_RNNCA (filter);
   int i;
+  if (self->net == NULL){
+    self->net = load_or_create_net(self);
+  }
+  if (self->constructors == NULL){
+    int n = RNNCA_WIDTH * RNNCA_HEIGHT;
+    self->constructors = malloc_aligned_or_die(n * sizeof(RecurNN *));
+    for (i = 0; i < n; i++){
+      u32 flags = self->net->flags & ~(RNN_NET_FLAG_OWN_WEIGHTS | RNN_NET_FLAG_OWN_BPTT);
+      RecurNN *clone = rnn_clone(self->net, flags, RECUR_RNG_SUBSEED, NULL);
+      self->constructors[i] = clone;
+    }
+  }
+
   if (self->frame_prev == NULL){
     self->frame_prev = malloc_aligned_or_die(sizeof(RnncaFrame));
     self->frame_now = malloc_aligned_or_die(sizeof(RnncaFrame));
@@ -299,22 +312,11 @@ set_info (GstVideoFilter *filter,
     self->frame_now->Y  = mem;
     self->frame_now->Cb = mem + size;
     self->frame_now->Cr = mem + size * 2;
-    mem = zalloc_aligned_or_die(size * 3);
+    mem = malloc_aligned_or_die(size * 3);
+    randomise_mem(&self->net->rng, mem, size * 3);
     self->play_frame->Y  = mem;
     self->play_frame->Cb = mem + size;
     self->play_frame->Cr = mem + size * 2;
-  }
-  if (self->net == NULL){
-    self->net = load_or_create_net(self);
-  }
-  if (self->constructors == NULL){
-    int n = RNNCA_WIDTH * RNNCA_HEIGHT;
-    self->constructors = malloc_aligned_or_die(n * sizeof(RecurNN *));
-    for (i = 0; i < n; i++){
-      u32 flags = self->net->flags & ~(RNN_NET_FLAG_OWN_WEIGHTS | RNN_NET_FLAG_OWN_BPTT);
-      RecurNN *clone = rnn_clone(self->net, flags, RECUR_RNG_SUBSEED, NULL);
-      self->constructors[i] = clone;
-    }
   }
   if (self->trainers == NULL){
     construct_trainers(self, RNNCA_N_TRAINERS);
