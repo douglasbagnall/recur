@@ -127,8 +127,11 @@ class KiwiClassifier(BaseClassifier):
             for wrong, right in self.class_results:
                 t = wrong + right
                 gt += t
-                print "%s: %s/%s  %.2f" % (self.classes[i], right, t,
-                                           float(right) / t)
+                if t:
+                    print "%s: %s/%s  %.2f" % (self.classes[i], right, t,
+                                               float(right) / t)
+                else:
+                    print "%s: %s/%s  ---" % (self.classes[i], right, t)
                 i += 1
             print "%s windows == %.2f minutes" % (gt,
                                                   gt * WINDOW_SIZE / (2.0 * 60 * 8000))
