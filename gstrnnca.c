@@ -447,7 +447,17 @@ static inline void
 train_net(RnncaTrainer *t, RnncaFrame *prev,  RnncaFrame *now){
   int i, offset, plane_size;
   RecurNN *net = t->net;
-  fill_net_inputs(net, prev, t->x, t->y);
+  fill_net_inputs(net, prev, t->x, t->y, 0);
+
+  float *il = net->real_inputs;
+  GST_LOG("inputs %.2g %.2g %.2g  %.2g %.2g %.2g  %.2g %.2g %.2g   "
+      "%.2g %.2g %.2g  %.2g %.2g %.2g  %.2g %.2g %.2g   "
+      "%.2g %.2g %.2g  %.2g %.2g %.2g  %.2g %.2g %.2g   ",
+      il[0], il[1], il[2], il[3], il[4], il[5], il[6], il[7], il[8],
+      il[9], il[10], il[11], il[12], il[13], il[14], il[15], il[16], il[17],
+      il[18], il[19], il[20], il[21], il[22], il[23], il[24], il[25], il[26]
+  );
+
   float *answer = rnn_opinion(net, NULL);
   fast_sigmoid_array(answer, answer, 3);
   offset = t->y * RNNCA_WIDTH + t->x;
@@ -460,7 +470,7 @@ train_net(RnncaTrainer *t, RnncaFrame *prev,  RnncaFrame *now){
     float a = answer[i];
     float slope = a * (1.0f - a);
     net->bptt->o_error[i] = slope * (target - a);
-    GST_DEBUG("target %.2g a %.2g diff %.2g slope %.2g",
+    GST_LOG("target %.2g a %.2g diff %.2g slope %.2g",
         target, a, target - a, slope);
   }
   bptt_calc_deltas(net);
@@ -493,9 +503,11 @@ fill_frame(GstRnnca *self, GstVideoFrame *frame){
   for (y = 0; y < RNNCA_HEIGHT; y++){
     for (x = 0; x < RNNCA_WIDTH; x++){
       RecurNN *net = self->constructors[y * RNNCA_WIDTH + x];
-      fill_net_inputs(net, self->play_frame, x, y);
+      fill_net_inputs(net, self->play_frame, x, y, 0);
       float *answer = rnn_opinion(net, NULL);
       fast_sigmoid_array(answer, answer, 3);
+      GST_LOG("answer gen %d, x %d y %d, %.2g %.2g %.2g",
+          net->generation, x, y, answer[0], answer[1], answer[2]);
     }
   }
   for (y = 0; y < RNNCA_HEIGHT; y++){
