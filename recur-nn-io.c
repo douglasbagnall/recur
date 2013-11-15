@@ -4,6 +4,8 @@
 #include <unistd.h>
 #include <errno.h>
 
+const char *FORMAT_VERSION = "save_format_version";
+
 int
 rnn_save_net(RecurNN *net, const char *filename){
   MAYBE_DEBUG("saving net at generation %d", net->generation);
@@ -18,6 +20,10 @@ rnn_save_net(RecurNN *net, const char *filename){
   ret = cdb_make_start(&cdbm, fd);
   if (ret)
     goto error;
+
+  /*save a version number*/
+  const int version = 2;
+  cdb_make_add(&cdbm, FORMAT_VERSION, strlen(FORMAT_VERSION), &version, sizeof(version));
 
 #define SAVE_SCALAR(obj, attr) do {                                     \
     ret = cdb_make_add(&cdbm, QUOTE(attr), strlen(QUOTE(attr)),         \
@@ -57,11 +63,12 @@ rnn_save_net(RecurNN *net, const char *filename){
   SAVE_ARRAY(net, ho_weights, net->ho_size);
 
   SAVE_SCALAR(net->bptt, depth);
-  SAVE_SCALAR(net->bptt, batch_size);
   SAVE_SCALAR(net->bptt, index);
   SAVE_SCALAR(net->bptt, learn_rate);
+  SAVE_SCALAR(net->bptt, ho_scale);   /*version 2 and above*/
   SAVE_SCALAR(net->bptt, momentum);
   SAVE_SCALAR(net->bptt, momentum_weight);
+  SAVE_SCALAR(net->bptt, batch_size);
   SAVE_ARRAY(net->bptt, i_error, net->i_size);
   SAVE_ARRAY(net->bptt, h_error, net->h_size);
   SAVE_ARRAY(net->bptt, o_error, net->o_size);
@@ -96,6 +103,14 @@ rnn_load_net(const char *filename){
 
   fd = open(filename, O_RDONLY);
 
+  int version = 0;
+  if (cdb_seek(fd, FORMAT_VERSION, strlen(FORMAT_VERSION), &vlen) >= 0){
+    if (vlen == sizeof(version)){
+      cdb_bread(fd, &version, vlen);
+    }
+  }
+
+
 #define READ_SCALAR(obj, attr) do { ret = cdb_seek(fd, QUOTE(attr),     \
         strlen(QUOTE(attr)), &vlen);                                    \
     if (ret < 1){ DEBUG("error %d loading '%s'", ret, QUOTE(attr));     \
@@ -128,6 +143,9 @@ rnn_load_net(const char *filename){
   READ_SCALAR(tmpbptt, index);
   READ_SCALAR(tmpbptt, momentum);
   READ_SCALAR(tmpbptt, momentum_weight);
+  if (version >= 2){
+    READ_SCALAR(tmpbptt, ho_scale);
+  }
 
 #undef READ_SCALAR
 
@@ -168,6 +186,9 @@ rnn_load_net(const char *filename){
   CHECK_SCALAR(net->bptt, tmpbptt, depth);
   CHECK_SCALAR(net->bptt, tmpbptt, batch_size);
   CHECK_SCALAR(net->bptt, tmpbptt, index);
+  if (version >= 2){
+    CHECK_SCALAR(net->bptt, tmpbptt, ho_scale);
+  }
 #undef CHECK_SCALAR
 
   /* so presumably all the arrays are all allocate and the right size. */
