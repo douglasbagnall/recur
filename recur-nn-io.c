@@ -110,7 +110,6 @@ rnn_load_net(const char *filename){
     }
   }
 
-
 #define READ_SCALAR(obj, attr) do { ret = cdb_seek(fd, QUOTE(attr),     \
         strlen(QUOTE(attr)), &vlen);                                    \
     if (ret < 1){ DEBUG("error %d loading '%s'", ret, QUOTE(attr));     \
@@ -186,7 +185,11 @@ rnn_load_net(const char *filename){
   CHECK_SCALAR(net->bptt, tmpbptt, depth);
   CHECK_SCALAR(net->bptt, tmpbptt, batch_size);
   CHECK_SCALAR(net->bptt, tmpbptt, index);
-  if (version >= 2){
+  if (version == 0){
+    /*ho_scale wasn't originally saved. But it was always set as follows. */
+    net->bptt->ho_scale = ((float)tmpnet.output_size) / tmpnet.hidden_size;
+  }
+  else if (version >= 2){
     CHECK_SCALAR(net->bptt, tmpbptt, ho_scale);
   }
 #undef CHECK_SCALAR
