@@ -40,9 +40,10 @@ const int RNNCA_YUV_OFFSETS[] = {
 };
 
 const int RNNCA_Y_ONLY_OFFSETS[] = {
-            0, -2,
-  -2,  0,            2,  0,
-            0,  2
+       -1, -2,  1, -2,
+  -2, -1,            2, -1,
+  -2,  1,            2,  1,
+       -1,  2,  1,  2
 };
 
 const int RNNCA_YUV_LEN = sizeof(RNNCA_YUV_OFFSETS) / sizeof(RNNCA_YUV_OFFSETS[0]);
