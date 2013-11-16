@@ -197,7 +197,7 @@ VALGRIND = valgrind --tool=memcheck --log-file=valgrind.log --trace-children=yes
 test-rnnca: libgstrnnca.so
 	$(RNNCA_DEBUG)	$(GDB) 	gst-launch-1.0  \
 	  --gst-plugin-path=$(CURDIR) \
-	$(VID_FILE_SRC_LAGOS) ! rnnca log-file=rnnca.log training=1 playing=1 \
+	$(VID_FILE_SRC_3) ! rnnca log-file=rnnca.log training=1 playing=1 learn-rate=3e-3 \
 	! videoconvert ! xvimagesink force-aspect-ratio=false
 
 train-rnnca: libgstrnnca.so
