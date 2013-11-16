@@ -35,13 +35,13 @@ G_BEGIN_DECLS
 #define PERIODIC_SHUFFLE_TRAINERS 3
 #define PGM_DUMP_CHANGED_MASK 0
 
-const int RNNCA_YUV_OFFSETS[] = {
+const int RNNCA_Y_ONLY_OFFSETS[] = {
   -1, -1,   0, -1,   1, -1,
   -1,  0,            1,  0,
   -1,  1,   0,  1,   1,  1
 };
 
-const int RNNCA_Y_ONLY_OFFSETS[] = {
+const int RNNCA_YUV_OFFSETS[] = {
        -1, -2,  1, -2,
   -2, -1,            2, -1,
   -2,  1,            2,  1,
