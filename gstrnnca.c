@@ -41,7 +41,8 @@ enum
 #define DEFAULT_PROP_PLAYING 1
 #define DEFAULT_PROP_TRAINING 1
 #define DEFAULT_HIDDEN_SIZE (56 - RNNCA_BIAS)
-#define DEFAULT_LEARN_RATE 3e-5
+#define DEFAULT_PROP_LEARN_RATE 1
+#define DEFAULT_LEARN_RATE 3e-4
 #define MIN_HIDDEN_SIZE 1
 #define MAX_HIDDEN_SIZE 1000000
 #define LEARN_RATE_MIN 0.0
@@ -186,7 +187,7 @@ gst_rnnca_init (GstRnnca * self)
   self->training = 1;
   self->playing = 1;
   self->hidden_size = DEFAULT_HIDDEN_SIZE;
-  self->learn_rate = DEFAULT_LEARN_RATE;
+  self->learn_rate = DEFAULT_PROP_LEARN_RATE;
   GST_INFO("gst rnnca init\n");
 }
 
@@ -270,13 +271,20 @@ load_or_create_net(GstRnnca *self){
   reset_net_filename(self);
   RecurNN *net = TRY_RELOAD ? rnn_load_net(self->net_filename) : NULL;
   if (net == NULL){
+    float learn_rate = DEFAULT_LEARN_RATE;
+    if (self->learn_rate != DEFAULT_PROP_LEARN_RATE){
+      learn_rate = self->learn_rate;
+    }
     net = rnn_new(RNNCA_N_FEATURES, self->hidden_size, 3,
         RNNCA_RNN_FLAGS, RNNCA_RNG_SEED,
-        NULL, RNNCA_BPTT_DEPTH, self->learn_rate, MOMENTUM, MOMENTUM_WEIGHT,
+        NULL, RNNCA_BPTT_DEPTH, learn_rate, MOMENTUM, MOMENTUM_WEIGHT,
         RNNCA_BATCH_SIZE, 0);
   }
   else {
     rnn_set_log_file(net, NULL, 0);
+    if (self->learn_rate != DEFAULT_PROP_LEARN_RATE){
+      net->bptt->learn_rate = self->learn_rate;
+    }
   }
   return net;
 }
