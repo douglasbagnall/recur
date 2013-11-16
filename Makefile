@@ -198,7 +198,7 @@ test-rnnca: libgstrnnca.so
 	$(RNNCA_DEBUG)	$(GDB) 	gst-launch-1.0  \
 	  --gst-plugin-path=$(CURDIR) \
 	$(VID_FILE_SRC_3) ! rnnca log-file=rnnca.log training=1 playing=1 learn-rate=3e-3 \
-	! videoconvert ! xvimagesink force-aspect-ratio=false
+	! videoconvert ! autovideosink
 
 train-rnnca: libgstrnnca.so
 	$(RNNCA_DEBUG)	$(GDB) 	gst-launch-1.0  \
@@ -209,7 +209,7 @@ play-rnnca: libgstrnnca.so
 	$(RNNCA_DEBUG)	$(GDB) 	gst-launch-1.0  \
 	  --gst-plugin-path=$(CURDIR) \
 	$(VID_FILE_SRC_LAGOS) ! rnnca training=0 playing=1 \
-	! videoconvert ! xvimagesink force-aspect-ratio=false
+	! videoconvert ! autovideosink
 
 
 TEST_PIPELINE_CORE = gst-launch-1.0  \
