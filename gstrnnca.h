@@ -9,7 +9,6 @@
 G_BEGIN_DECLS
 
 #define TRY_RELOAD 1
-#define RNNCA_N_FEATURES (3 * 9 + 2)
 #define RNNCA_BIAS 1
 #define RNNCA_N_TRAINERS 70
 #define RNNCA_WIDTH 128
@@ -32,6 +31,23 @@ G_BEGIN_DECLS
 
 #define PERIODIC_SHUFFLE_TRAINERS 3
 #define PGM_DUMP_CHANGED_MASK 0
+
+const int RNNCA_YUV_OFFSETS[] = {
+  -1, -1,   0, -1,   1, -1,
+  -1,  0,            1,  0,
+  -1,  1,   0,  1,   1,  1
+};
+
+const int RNNCA_Y_ONLY_OFFSETS[] = {
+            0, -2,
+  -2,  0,            2,  0,
+            0,  2
+};
+
+const int RNNCA_YUV_LEN = sizeof(RNNCA_YUV_OFFSETS) / sizeof(RNNCA_YUV_OFFSETS[0]);
+const int RNNCA_Y_ONLY_LEN = sizeof(RNNCA_Y_ONLY_OFFSETS) / sizeof(RNNCA_Y_ONLY_OFFSETS[0]);
+
+#define RNNCA_N_FEATURES (((RNNCA_YUV_LEN * 3 + RNNCA_Y_ONLY_LEN) >> 1) + 2)
 
 typedef struct _RnncaFrame {
   u8 *Y;

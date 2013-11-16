@@ -193,9 +193,9 @@ gst_rnnca_init (GstRnnca * self)
 static void
 reset_net_filename(GstRnnca *self){
   char s[200];
-  snprintf(s, sizeof(s), "rnnca-i%d-h%d-o%d-b%d.net",
+  snprintf(s, sizeof(s), "rnnca-i%d-h%d-o%d-b%d-yuv%d-y%d-x%d.net",
       RNNCA_N_FEATURES, self->hidden_size, 3,
-      RNNCA_BIAS);
+      RNNCA_BIAS, RNNCA_YUV_LEN, RNNCA_Y_ONLY_LEN, 2);
   if (self->net_filename){
     free(self->net_filename);
   }
@@ -422,40 +422,62 @@ remember_frame(GstRnnca *self, GstVideoFrame *frame){
 #define BYTE_TO_BALANCED_UNIT(x) (((x) * (1.0f / 127.5f)) - 127.5f)
 #define UNIT_TO_BYTE(x) ((x) * (255.9f))
 
-
 static inline void
 fill_net_inputs(RecurNN *net, RnncaFrame *frame, int cx, int cy, float noise){
-  int y, offset, iy, ix;
+  int y, offset, iy, ix, j;
   int i = 0, x = 0;
   //GST_DEBUG("frame is %p, cx %d, cy %d", frame, cx, cy);
-  for (iy = -1; iy <= 1; iy++){
+  for (j = 0; j < RNNCA_YUV_LEN; j+= 2){
+    ix = RNNCA_YUV_OFFSETS[j];
+    iy = RNNCA_YUV_OFFSETS[j + 1];
     y = cy + iy;
+    x = cx + ix;
     if (y < 0){
       y += RNNCA_HEIGHT;
     }
     else if (y >= RNNCA_HEIGHT){
       y -= RNNCA_HEIGHT;
     }
-    for (ix = -1; ix <= 1; ix++){
-      x = cx + ix;
-      if (x < 0){
-        x += RNNCA_WIDTH;
-      }
-      else if (x >= RNNCA_WIDTH){
-        x -= RNNCA_WIDTH;
-      }
-      offset = y * RNNCA_WIDTH + x;
-      //GST_DEBUG("cx %d cy %d x %d, y %d, offset %d", cx, cy, x, y, offset);
-      net->real_inputs[i] = BYTE_TO_UNIT(frame->Y[offset]);
-      net->real_inputs[i + 1] = BYTE_TO_UNIT(frame->Cb[offset]);
-      net->real_inputs[i + 2] = BYTE_TO_UNIT(frame->Cr[offset]);
-      if (noise){
-        net->real_inputs[i] += cheap_gaussian_noise(&net->rng) * noise;
-        net->real_inputs[i + 1] += cheap_gaussian_noise(&net->rng) * noise;
-        net->real_inputs[i + 2] += cheap_gaussian_noise(&net->rng) * noise;
-      }
-      i += 3;
+    if (x < 0){
+      x += RNNCA_WIDTH;
     }
+    else if (x >= RNNCA_WIDTH){
+      x -= RNNCA_WIDTH;
+    }
+    offset = y * RNNCA_WIDTH + x;
+    net->real_inputs[i] = BYTE_TO_UNIT(frame->Y[offset]);
+    net->real_inputs[i + 1] = BYTE_TO_UNIT(frame->Cb[offset]);
+    net->real_inputs[i + 2] = BYTE_TO_UNIT(frame->Cr[offset]);
+    if (noise){
+      net->real_inputs[i] += cheap_gaussian_noise(&net->rng) * noise;
+      net->real_inputs[i + 1] += cheap_gaussian_noise(&net->rng) * noise;
+      net->real_inputs[i + 2] += cheap_gaussian_noise(&net->rng) * noise;
+    }
+    i += 3;
+  }
+  for (j = 0; j < RNNCA_Y_ONLY_LEN; j+= 2){
+    ix = RNNCA_YUV_OFFSETS[j];
+    iy = RNNCA_YUV_OFFSETS[j + 1];
+    y = cy + iy;
+    x = cx + ix;
+    if (y < 0){
+      y += RNNCA_HEIGHT;
+    }
+    else if (y >= RNNCA_HEIGHT){
+      y -= RNNCA_HEIGHT;
+    }
+    if (x < 0){
+      x += RNNCA_WIDTH;
+    }
+    else if (x >= RNNCA_WIDTH){
+      x -= RNNCA_WIDTH;
+    }
+    offset = y * RNNCA_WIDTH + x;
+    net->real_inputs[i] = BYTE_TO_UNIT(frame->Y[offset]);
+    if (noise){
+      net->real_inputs[i] += cheap_gaussian_noise(&net->rng) * noise;
+    }
+    i++;
   }
   net->real_inputs[i] = abs(cx - RNNCA_WIDTH) * 1.0 / RNNCA_WIDTH;
   net->real_inputs[i + 1] = abs(cy - RNNCA_HEIGHT) * 1.0 / RNNCA_HEIGHT;
