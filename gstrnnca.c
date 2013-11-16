@@ -92,6 +92,9 @@ gst_rnnca_finalize (GObject * obj){
     free(self->frame_now);
     free(self->frame_prev);
   }
+  if (self->training_map){
+    free(self->training_map);
+  }
 }
 
 static void
@@ -179,6 +182,7 @@ gst_rnnca_init (GstRnnca * self)
   self->play_frame = NULL;
   self->constructors = NULL;
   self->trainers = NULL;
+  self->training_map = NULL;
   self->training = 1;
   self->playing = 1;
   self->hidden_size = DEFAULT_HIDDEN_SIZE;
@@ -205,6 +209,28 @@ compare_trainers(const void *a, const void *b){
   return (at->y * RNNCA_WIDTH + at->x) - (bt->y * RNNCA_WIDTH + bt->x);
 }
 
+const int TRAINER_MARGIN = 2;
+
+static int
+randomly_place_trainer(RnncaTrainer *t, rand_ctx *rng, u8 *mask){
+  int i;
+  const int w = RNNCA_WIDTH;
+  const int h = RNNCA_HEIGHT;
+  for (i = 0; i < 20; i++){
+    int x = TRAINER_MARGIN + rand_small_int(rng, w - 2 * TRAINER_MARGIN);
+    int y = TRAINER_MARGIN + rand_small_int(rng, h - 2 * TRAINER_MARGIN);
+    if (! mask[y * w + x]){
+      mask[y * w + x] = 255;
+      t->x = x;
+      t->y = y;
+      return 0;
+    }
+  }
+  GST_WARNING("could not place trainer after %d goes. this should not be!", i);
+  pgm_dump(mask, w, h, IMAGE_DIR "mask-broken.pgm");
+  return 1;
+}
+
 static void
 construct_trainers(GstRnnca *self, int n_requested)
 {
@@ -213,26 +239,17 @@ construct_trainers(GstRnnca *self, int n_requested)
   u32 flags = self->net->flags & ~RNN_NET_FLAG_OWN_WEIGHTS;
   const int w = RNNCA_WIDTH;
   const int h = RNNCA_HEIGHT;
-  const int radius = 1;
-  const int margin = radius + 1;
   u8* mask = zalloc_aligned_or_die(w * h);
+  self->training_map = mask;
   self->trainers = malloc_aligned_or_die(n_requested * sizeof(RnncaTrainer));
   self->train_nets = malloc_aligned_or_die(n_requested * sizeof(RecurNN*));
-  for (j = 0, i = 0; i < n_requested * 10; i++) {
-    int x = margin + rand_small_int(&net->rng, w - 2 * margin);
-    int y = margin + rand_small_int(&net->rng, h - 2 * margin);
-    if (! mask[y * w + x]){
-      for (int my = y - radius; my <= y + radius; my++){
-        for (int mx = x - radius; mx <= x + radius; mx++){
-          mask[my * w + mx] = MIN(255, 80 + j);
-        }
-      }
-      self->trainers[j].x = x;
-      self->trainers[j].y = y;
+  for (j = 0, i = 0; i < n_requested * 2; i++) {
+    RnncaTrainer *t = &self->trainers[j];
+    if(!randomly_place_trainer(t, &net->rng, mask)){
       RecurNN *clone = rnn_clone(net, flags, RECUR_RNG_SUBSEED, NULL);
       self->trainers[j].net = clone;
       self->train_nets[j] = clone;
-      GST_DEBUG("net %d is %p", j, clone);
+      GST_LOG("net %d is %p", j, clone);
       j++;
       if (j == n_requested){
         goto done;
@@ -244,7 +261,6 @@ construct_trainers(GstRnnca *self, int n_requested)
   qsort(self->trainers, j, sizeof(RnncaTrainer), compare_trainers);
   self->n_trainers = j;
   pgm_dump(mask, w, h, IMAGE_DIR "mask.pgm");
-  free(mask);
 }
 
 
@@ -496,6 +512,20 @@ maybe_learn(GstRnnca *self){
   rnn_condition_net(self->net);
   if (PERIODIC_SAVE_NET && (self->net->generation & PERIODIC_SAVE_NET) == 0){
     rnn_save_net(self->net, self->net_filename);
+  }
+  if (PERIODIC_SHUFFLE_TRAINERS &&
+      (net->generation & PERIODIC_SHUFFLE_TRAINERS) == 0){
+    i = rand_small_int(&net->rng, self->n_trainers);
+    RnncaTrainer *t = &self->trainers[i];
+    self->training_map[t->y * RNNCA_WIDTH + t->x] = 0;
+    randomly_place_trainer(t, &net->rng, self->training_map);
+#if PGM_DUMP_CHANGED_MASK
+    char name[50 + sizeof(IMAGE_DIR)];
+    snprintf(name, sizeof(name), "%smask-%u.pgm", IMAGE_DIR, net->generation);
+    pgm_dump(self->training_map, RNNCA_WIDTH, RNNCA_HEIGHT, name);
+    /*XXX maybe keep in sorted order ?*/
+    GST_DEBUG("shifted trainer %d to %d,%d, map %s", i, t->x, t->y, name);
+#endif
   }
 }
 

@@ -30,6 +30,8 @@ G_BEGIN_DECLS
 #define PERIODIC_PGM_DUMP 511
 #define PERIODIC_SAVE_NET 255
 
+#define PERIODIC_SHUFFLE_TRAINERS 3
+#define PGM_DUMP_CHANGED_MASK 0
 
 typedef struct _RnncaFrame {
   u8 *Y;
@@ -67,6 +69,7 @@ struct _GstRnnca
   int hidden_size;
   char *pending_logfile;
   int training;
+  u8 *training_map;
 };
 
 struct _GstRnncaClass
