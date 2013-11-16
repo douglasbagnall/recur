@@ -9,7 +9,7 @@
 G_BEGIN_DECLS
 
 #define TRY_RELOAD 1
-#define RNNCA_N_FEATURES (3 * 9)
+#define RNNCA_N_FEATURES (3 * 9 + 2)
 #define RNNCA_BIAS 1
 #define RNNCA_N_TRAINERS 70
 #define RNNCA_WIDTH 64

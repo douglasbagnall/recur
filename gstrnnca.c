@@ -441,6 +441,8 @@ fill_net_inputs(RecurNN *net, RnncaFrame *frame, int cx, int cy, float noise){
       i += 3;
     }
   }
+  net->real_inputs[i] = abs(cx - RNNCA_WIDTH) * 1.0 / RNNCA_WIDTH;
+  net->real_inputs[i + 1] = abs(cy - RNNCA_HEIGHT) * 1.0 / RNNCA_HEIGHT;
 }
 
 static inline void
