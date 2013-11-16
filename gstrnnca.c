@@ -40,8 +40,8 @@ enum
 #define DEFAULT_PROP_SAVE_NET NULL
 #define DEFAULT_PROP_PLAYING 1
 #define DEFAULT_PROP_TRAINING 1
-#define DEFAULT_HIDDEN_SIZE 99
-#define DEFAULT_LEARN_RATE 0.0003
+#define DEFAULT_HIDDEN_SIZE 49
+#define DEFAULT_LEARN_RATE 1e-3
 #define MIN_HIDDEN_SIZE 1
 #define MAX_HIDDEN_SIZE 1000000
 #define LEARN_RATE_MIN 0.0
@@ -486,7 +486,7 @@ maybe_learn(GstRnnca *self){
         self->frame_prev, self->frame_now);
     train_net(&self->trainers[i], self->frame_prev, self->frame_now);
   }
-  bptt_consolidate_many_nets(self->train_nets, self->n_trainers, 1);
+  bptt_consolidate_many_nets(self->train_nets, self->n_trainers, 0);
   RecurNN *net = self->train_nets[0];
   if (PERIODIC_PGM_DUMP && (net->generation & PERIODIC_PGM_DUMP) == 0){
     rnn_multi_pgm_dump(net, "how ihw");
