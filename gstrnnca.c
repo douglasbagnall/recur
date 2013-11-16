@@ -140,25 +140,25 @@ gst_rnnca_class_init (GstRnncaClass * g_class)
       g_param_spec_string("log-file", "log-file",
           "Log to this file (empty for none)",
           DEFAULT_PROP_LOG_FILE,
-          G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
-
+          G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
+  /*XXX make these readwrite*/
   g_object_class_install_property (gobject_class, PROP_PLAYING,
       g_param_spec_boolean("playing", "playing",
           "Construct imaginary video",
           DEFAULT_PROP_PLAYING,
-          G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+          G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class, PROP_TRAINING,
       g_param_spec_boolean("training", "training",
           "Learn from incoming video",
           DEFAULT_PROP_TRAINING,
-          G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+          G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class, PROP_LEARN_RATE,
       g_param_spec_float("learn-rate", "learn-rate",
           "Learning rate for the RNN",
           LEARN_RATE_MIN, LEARN_RATE_MAX,
-          DEFAULT_LEARN_RATE,
+          DEFAULT_PROP_LEARN_RATE,
           G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class, PROP_HIDDEN_SIZE,
@@ -166,7 +166,7 @@ gst_rnnca_class_init (GstRnncaClass * g_class)
           "Size of the RNN hidden layer",
           MIN_HIDDEN_SIZE, MAX_HIDDEN_SIZE,
           DEFAULT_HIDDEN_SIZE,
-          G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+          G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
   vf_class->transform_frame_ip = GST_DEBUG_FUNCPTR (gst_rnnca_transform_frame_ip);
   vf_class->set_info = GST_DEBUG_FUNCPTR (set_info);
@@ -377,6 +377,10 @@ gst_rnnca_set_property (GObject * object, guint prop_id, const GValue * value,
       self->training = g_value_get_boolean(value);
       break;
 
+    case PROP_LEARN_RATE:
+      self->learn_rate = g_value_get_float(value);
+      break;
+
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
       break;
@@ -388,12 +392,15 @@ static void
 gst_rnnca_get_property (GObject * object, guint prop_id, GValue * value,
     GParamSpec * pspec)
 {
-  //GstRnnca *self = GST_RNNCA (object);
+  GstRnnca *self = GST_RNNCA (object);
 
   switch (prop_id) {
-    default:
-      G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
-      break;
+  case PROP_LEARN_RATE:
+    g_value_set_float(value, self->learn_rate);
+    break;
+  default:
+    G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
+    break;
   }
 }
 

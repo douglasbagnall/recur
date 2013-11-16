@@ -767,6 +767,9 @@ gst_classify_get_property (GObject * object, guint prop_id, GValue * value,
   case PROP_HIDDEN_SIZE:
     g_value_set_int(value, self->hidden_size);
     break;
+  case PROP_WINDOW_SIZE:
+    g_value_set_int(value, self->window_size);
+    break;
   default:
     G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
     break;
