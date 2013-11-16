@@ -447,6 +447,7 @@ fill_net_inputs(RecurNN *net, RnncaFrame *frame, int cx, int cy, float noise){
     iy = RNNCA_YUV_OFFSETS[j + 1];
     y = cy + iy;
     x = cx + ix;
+#if RNNCA_TORUS
     if (y < 0){
       y += RNNCA_HEIGHT;
     }
@@ -459,6 +460,11 @@ fill_net_inputs(RecurNN *net, RnncaFrame *frame, int cx, int cy, float noise){
     else if (x >= RNNCA_WIDTH){
       x -= RNNCA_WIDTH;
     }
+#else
+    y = MAX(0, MIN(RNNCA_HEIGHT - 1, y));
+    x = MAX(0, MIN(RNNCA_WIDTH - 1, x));
+#endif
+
     offset = y * RNNCA_WIDTH + x;
     net->real_inputs[i] = BYTE_TO_UNIT(frame->Y[offset]);
     net->real_inputs[i + 1] = BYTE_TO_UNIT(frame->Cb[offset]);
@@ -475,6 +481,7 @@ fill_net_inputs(RecurNN *net, RnncaFrame *frame, int cx, int cy, float noise){
     iy = RNNCA_YUV_OFFSETS[j + 1];
     y = cy + iy;
     x = cx + ix;
+#if RNNCA_TORUS
     if (y < 0){
       y += RNNCA_HEIGHT;
     }
@@ -487,6 +494,10 @@ fill_net_inputs(RecurNN *net, RnncaFrame *frame, int cx, int cy, float noise){
     else if (x >= RNNCA_WIDTH){
       x -= RNNCA_WIDTH;
     }
+#else
+    y = MAX(0, MIN(RNNCA_HEIGHT - 1, y));
+    x = MAX(0, MIN(RNNCA_WIDTH - 1, x));
+#endif
     offset = y * RNNCA_WIDTH + x;
     net->real_inputs[i] = BYTE_TO_UNIT(frame->Y[offset]);
     if (noise){
