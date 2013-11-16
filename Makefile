@@ -162,9 +162,9 @@ VID_URI_2=file://$(VIDEO_DIR)/F30275.mov
 VID_URI_3=file://$(VIDEO_DIR)/rochester-pal.avi
 VID_URI_4=file://$(VIDEO_DIR)/DEC.flv
 VID_URI_5=file://$(VIDEO_DIR)/alowhum/vts_16_1.vob.avi
-VID_URI_6=file://$(VIDEO_DIR)/movies/louis-theroux-lagos/louis.theroux.law.and.disorder.in.lagos.ws.pdtv.xvid-waters.avi
+VID_URI_LAGOS=file://$(VIDEO_DIR)/movies/louis-theroux-lagos/louis.theroux.law.and.disorder.in.lagos.ws.pdtv.xvid-waters.avi
 VID_URI_7=file://$(VIDEO_DIR)/movies/InBruges.avi
-VID_URI_LAGOS=file://$(VIDEO_DIR)/movies/louis-theroux-zionists/Louis.Theroux.Ultra.Zionists.WS.PDTV.XviD-PVR.avi
+VID_URI_ZION=file://$(VIDEO_DIR)/movies/louis-theroux-zionists/Louis.Theroux.Ultra.Zionists.WS.PDTV.XviD-PVR.avi
 
 VID_W=640
 VID_H=480
