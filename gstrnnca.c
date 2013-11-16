@@ -554,6 +554,36 @@ maybe_learn(GstRnnca *self){
 static inline void
 fill_frame(GstRnnca *self, GstVideoFrame *frame){
   int x, y, offset;
+  if (PERIODIC_CHECK_STASIS &&
+      (self->net->generation & PERIODIC_CHECK_STASIS) == 0){
+    offset = 2 * RNNCA_WIDTH + rand_small_int(&self->net->rng, RNNCA_WIDTH);
+    u8 Y = self->play_frame->Y[offset];
+    u8 Cb = self->play_frame->Cb[offset];
+    u8 Cr = self->play_frame->Cr[offset];
+    const int m = 3;
+    GST_DEBUG("row 2, found yuv %d %d %d", Y, Cb, Cr);
+    for (y = 3; y < RNNCA_HEIGHT - 2; y++){
+      x = rand_small_int(&self->net->rng, RNNCA_WIDTH);
+      offset = y * RNNCA_WIDTH + x;
+      u8 Y2 = self->play_frame->Y[offset];
+      u8 Cb2 = self->play_frame->Cb[offset];
+      u8 Cr2 = self->play_frame->Cr[offset];
+      if (Y < Y2 - m || Y > Y2 + m ||
+          Cb < Cb2 - m || Cb > Cb2 + m ||
+          Cr < Cr2 - m || Cr > Cr2 + m){
+        GST_DEBUG("row %i, found yuv %d %d %d", y, Y2, Cb2, Cr2);
+        goto ok_its_not_flat;
+      }
+    }
+    for (y = 1; y < RNNCA_HEIGHT; y++){
+      x = rand_small_int(&self->net->rng, RNNCA_WIDTH);
+      offset = y * RNNCA_WIDTH + x;
+      self->play_frame->Y[offset] = rand_small_int(&self->net->rng, 256);
+      self->play_frame->Cb[offset] = rand_small_int(&self->net->rng, 256);
+      self->play_frame->Cr[offset] = rand_small_int(&self->net->rng, 256);
+    }
+  }
+ ok_its_not_flat:
   for (y = 0; y < RNNCA_HEIGHT; y++){
     for (x = 0; x < RNNCA_WIDTH; x++){
       RecurNN *net = self->constructors[y * RNNCA_WIDTH + x];
