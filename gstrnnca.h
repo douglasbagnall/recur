@@ -75,7 +75,7 @@ struct _GstRnnca
   GstVideoFilter videofilter;
   RecurNN *net;
   int current_frame;
-  float learn_rate;
+  float pending_learn_rate;
   int osdebug;
   int playing;
   RnncaFrame *frame_prev;

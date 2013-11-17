@@ -44,7 +44,6 @@ enum
 #define DEFAULT_PROP_TRAINING 1
 #define DEFAULT_PROP_EDGES 0
 #define DEFAULT_HIDDEN_SIZE (52 - RNNCA_BIAS)
-#define DEFAULT_PROP_LEARN_RATE 1
 #define DEFAULT_LEARN_RATE 3e-4
 #define MIN_HIDDEN_SIZE 1
 #define MAX_HIDDEN_SIZE 1000000
@@ -62,6 +61,9 @@ static void gst_rnnca_init(GstRnnca *self);
 static void gst_rnnca_set_property(GObject *object, guint prop_id, const GValue *value, GParamSpec *pspec);
 static void gst_rnnca_get_property(GObject *object, guint prop_id, GValue *value, GParamSpec *pspec);
 static GstFlowReturn gst_rnnca_transform_frame_ip(GstVideoFilter *base, GstVideoFrame *buf);
+
+static void maybe_set_learn_rate(GstRnnca *self);
+
 
 static gboolean set_info (GstVideoFilter *filter,
     GstCaps *incaps, GstVideoInfo *in_info,
@@ -168,7 +170,7 @@ gst_rnnca_class_init (GstRnncaClass * g_class)
       g_param_spec_float("learn-rate", "learn-rate",
           "Learning rate for the RNN",
           LEARN_RATE_MIN, LEARN_RATE_MAX,
-          DEFAULT_PROP_LEARN_RATE,
+          DEFAULT_LEARN_RATE,
           G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class, PROP_HIDDEN_SIZE,
@@ -197,7 +199,7 @@ gst_rnnca_init (GstRnnca * self)
   self->playing = 1;
   self->edges = DEFAULT_PROP_EDGES;
   self->hidden_size = DEFAULT_HIDDEN_SIZE;
-  self->learn_rate = DEFAULT_PROP_LEARN_RATE;
+  self->pending_learn_rate = 0;
   GST_INFO("gst rnnca init\n");
 }
 
@@ -281,21 +283,15 @@ load_or_create_net(GstRnnca *self){
   reset_net_filename(self);
   RecurNN *net = TRY_RELOAD ? rnn_load_net(self->net_filename) : NULL;
   if (net == NULL){
-    float learn_rate = DEFAULT_LEARN_RATE;
-    if (self->learn_rate != DEFAULT_PROP_LEARN_RATE){
-      learn_rate = self->learn_rate;
-    }
     net = rnn_new(RNNCA_N_FEATURES, self->hidden_size, 3,
         RNNCA_RNN_FLAGS, RNNCA_RNG_SEED,
-        NULL, RNNCA_BPTT_DEPTH, learn_rate, MOMENTUM, MOMENTUM_WEIGHT,
+        NULL, RNNCA_BPTT_DEPTH, DEFAULT_LEARN_RATE, MOMENTUM, MOMENTUM_WEIGHT,
         RNNCA_BATCH_SIZE, 0);
   }
   else {
     rnn_set_log_file(net, NULL, 0);
-    if (self->learn_rate != DEFAULT_PROP_LEARN_RATE){
-      net->bptt->learn_rate = self->learn_rate;
-    }
   }
+  maybe_set_learn_rate(self);
   return net;
 }
 
@@ -359,7 +355,21 @@ set_info (GstVideoFilter *filter,
   return TRUE;
 }
 
-
+static void
+maybe_set_learn_rate(GstRnnca *self){
+  float lr = self->pending_learn_rate;
+  if (lr){
+    if (self->net){
+      self->net->bptt->learn_rate = lr;
+      self->pending_learn_rate = 0;
+      if (self->trainers){
+        for (int i = 0; i < self->n_trainers; i++){
+          self->trainers[i].net->bptt->learn_rate = lr;
+        }
+      }
+    }
+  }
+}
 
 static inline void
 set_string_prop(const GValue *value, const char **target){
@@ -400,7 +410,8 @@ gst_rnnca_set_property (GObject * object, guint prop_id, const GValue * value,
       break;
 
     case PROP_LEARN_RATE:
-      self->learn_rate = g_value_get_float(value);
+      self->pending_learn_rate = g_value_get_float(value);
+      maybe_set_learn_rate(self);
       break;
 
     default:
@@ -418,7 +429,9 @@ gst_rnnca_get_property (GObject * object, guint prop_id, GValue * value,
 
   switch (prop_id) {
   case PROP_LEARN_RATE:
-    g_value_set_float(value, self->learn_rate);
+    if (self->train_nets){
+      g_value_set_float(value, self->train_nets[0]->bptt->learn_rate);
+    }
     break;
   default:
     G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
