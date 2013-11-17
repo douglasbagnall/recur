@@ -555,7 +555,7 @@ train_net(RnncaTrainer *t, RnncaFrame *prev,  RnncaFrame *now){
         now, prev, now->Y, prev->Y, plane_size, offset);
     float target = BYTE_TO_UNIT(now->Y[offset + plane_size * i]);
     float a = answer[i];
-    float slope = a * (1.0f - a) + 0.05;
+    float slope = a * (1.0f - a);
     net->bptt->o_error[i] = slope * (target - a);
     GST_LOG("target %.2g a %.2g diff %.2g slope %.2g",
         target, a, target - a, slope);
