@@ -90,6 +90,7 @@ struct _GstRnnca
   char *pending_logfile;
   int training;
   u8 *training_map;
+  int edges;
 };
 
 struct _GstRnncaClass

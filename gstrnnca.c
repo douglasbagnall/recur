@@ -33,13 +33,16 @@ enum
   PROP_LOG_FILE,
   PROP_TRAINING,
   PROP_PLAYING,
+  PROP_EDGES,
 };
+
 
 #define DEFAULT_PROP_PGM_DUMP ""
 #define DEFAULT_PROP_LOG_FILE ""
 #define DEFAULT_PROP_SAVE_NET NULL
 #define DEFAULT_PROP_PLAYING 1
 #define DEFAULT_PROP_TRAINING 1
+#define DEFAULT_PROP_EDGES 0
 #define DEFAULT_HIDDEN_SIZE (52 - RNNCA_BIAS)
 #define DEFAULT_PROP_LEARN_RATE 1
 #define DEFAULT_LEARN_RATE 3e-4
@@ -155,6 +158,12 @@ gst_rnnca_class_init (GstRnncaClass * g_class)
           DEFAULT_PROP_TRAINING,
           G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
+  g_object_class_install_property (gobject_class, PROP_EDGES,
+      g_param_spec_boolean("edges", "edges",
+          "Play on edged rectangle, not torus",
+          DEFAULT_PROP_EDGES,
+          G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
+
   g_object_class_install_property (gobject_class, PROP_LEARN_RATE,
       g_param_spec_float("learn-rate", "learn-rate",
           "Learning rate for the RNN",
@@ -186,6 +195,7 @@ gst_rnnca_init (GstRnnca * self)
   self->training_map = NULL;
   self->training = 1;
   self->playing = 1;
+  self->edges = DEFAULT_PROP_EDGES;
   self->hidden_size = DEFAULT_HIDDEN_SIZE;
   self->learn_rate = DEFAULT_PROP_LEARN_RATE;
   GST_INFO("gst rnnca init\n");
@@ -385,6 +395,10 @@ gst_rnnca_set_property (GObject * object, guint prop_id, const GValue * value,
       self->training = g_value_get_boolean(value);
       break;
 
+    case PROP_EDGES:
+      self->edges = g_value_get_boolean(value);
+      break;
+
     case PROP_LEARN_RATE:
       self->learn_rate = g_value_get_float(value);
       break;
@@ -438,7 +452,31 @@ remember_frame(GstRnnca *self, GstVideoFrame *frame){
 #define UNIT_TO_BYTE(x) ((x) * (255.9f))
 
 static inline void
-fill_net_inputs(RecurNN *net, RnncaFrame *frame, int cx, int cy, float noise){
+deal_with_edges(int *x, int *y, int edges)
+{
+  if (edges){
+    *y = MAX(0, MIN(RNNCA_HEIGHT - 1, *y));
+    *x = MAX(0, MIN(RNNCA_WIDTH - 1, *x));
+  }
+  else{
+    if (*y < 0){
+      *y += RNNCA_HEIGHT;
+    }
+    else if (*y >= RNNCA_HEIGHT){
+      *y -= RNNCA_HEIGHT;
+    }
+    if (*x < 0){
+      *x += RNNCA_WIDTH;
+    }
+    else if (*x >= RNNCA_WIDTH){
+      *x -= RNNCA_WIDTH;
+    }
+  }
+}
+
+
+static inline void
+fill_net_inputs(RecurNN *net, RnncaFrame *frame, int cx, int cy, float noise, int edges){
   int y, offset, iy, ix, j;
   int i = 0, x = 0;
   //GST_DEBUG("frame is %p, cx %d, cy %d", frame, cx, cy);
@@ -447,23 +485,7 @@ fill_net_inputs(RecurNN *net, RnncaFrame *frame, int cx, int cy, float noise){
     iy = RNNCA_YUV_OFFSETS[j + 1];
     y = cy + iy;
     x = cx + ix;
-#if RNNCA_TORUS
-    if (y < 0){
-      y += RNNCA_HEIGHT;
-    }
-    else if (y >= RNNCA_HEIGHT){
-      y -= RNNCA_HEIGHT;
-    }
-    if (x < 0){
-      x += RNNCA_WIDTH;
-    }
-    else if (x >= RNNCA_WIDTH){
-      x -= RNNCA_WIDTH;
-    }
-#else
-    y = MAX(0, MIN(RNNCA_HEIGHT - 1, y));
-    x = MAX(0, MIN(RNNCA_WIDTH - 1, x));
-#endif
+    deal_with_edges(&x, &y, edges);
 
     offset = y * RNNCA_WIDTH + x;
     net->real_inputs[i] = BYTE_TO_UNIT(frame->Y[offset]);
@@ -481,23 +503,8 @@ fill_net_inputs(RecurNN *net, RnncaFrame *frame, int cx, int cy, float noise){
     iy = RNNCA_YUV_OFFSETS[j + 1];
     y = cy + iy;
     x = cx + ix;
-#if RNNCA_TORUS
-    if (y < 0){
-      y += RNNCA_HEIGHT;
-    }
-    else if (y >= RNNCA_HEIGHT){
-      y -= RNNCA_HEIGHT;
-    }
-    if (x < 0){
-      x += RNNCA_WIDTH;
-    }
-    else if (x >= RNNCA_WIDTH){
-      x -= RNNCA_WIDTH;
-    }
-#else
-    y = MAX(0, MIN(RNNCA_HEIGHT - 1, y));
-    x = MAX(0, MIN(RNNCA_WIDTH - 1, x));
-#endif
+    deal_with_edges(&x, &y, edges);
+
     offset = y * RNNCA_WIDTH + x;
     net->real_inputs[i] = BYTE_TO_UNIT(frame->Y[offset]);
     if (noise){
@@ -513,7 +520,8 @@ static inline void
 train_net(RnncaTrainer *t, RnncaFrame *prev,  RnncaFrame *now){
   int i, offset, plane_size;
   RecurNN *net = t->net;
-  fill_net_inputs(net, prev, t->x, t->y, 0);
+  /*trainers are not on edges, so edge condition doesn't much matter */
+  fill_net_inputs(net, prev, t->x, t->y, 0, 1);
 
   float *il = net->real_inputs;
   GST_LOG("inputs %.2g %.2g %.2g  %.2g %.2g %.2g  %.2g %.2g %.2g   "
@@ -613,7 +621,7 @@ fill_frame(GstRnnca *self, GstVideoFrame *frame){
   for (y = 0; y < RNNCA_HEIGHT; y++){
     for (x = 0; x < RNNCA_WIDTH; x++){
       RecurNN *net = self->constructors[y * RNNCA_WIDTH + x];
-      fill_net_inputs(net, self->play_frame, x, y, 0);
+      fill_net_inputs(net, self->play_frame, x, y, 0, self->edges);
       float *answer = rnn_opinion(net, NULL);
       fast_sigmoid_array(answer, answer, 3);
       GST_LOG("answer gen %d, x %d y %d, %.2g %.2g %.2g",
