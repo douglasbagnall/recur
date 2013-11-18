@@ -877,11 +877,16 @@ rnn_condition_net(RecurNN *net)
       float damage = cheap_gaussian_noise(&net->rng) * RANDOM_DAMAGE_MAGNITUDE;
       if (t >= net->ih_size){
         t -= net->ih_size;
-        net->ho_weights[t] += damage;
+        int col = t % net->o_size;
+        if (col < net->output_size){
+          net->ho_weights[t] += damage;
+        }
       }
-      else if (! net->bias ||
-          t % net->h_size){ /*don't de-zero bias weights */
-        net->ih_weights[t] += damage;
+      else {
+        int col = t % net->h_size;
+        if (col >= net->bias && col < net->hidden_size + net->bias){
+          net->ih_weights[t] += damage;
+        }
       }
     }
     break;
