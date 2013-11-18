@@ -198,20 +198,20 @@ test-rnnca: libgstrnnca.so
 	$(RNNCA_DEBUG)	$(GDB) 	gst-launch-1.0  \
 	  --gst-plugin-path=$(CURDIR) \
 	$(VID_FILE_SRC_LAGOS) \
-	! rnnca log-file=rnnca.log training=1 playing=1 edges=1 learn-rate=1e-3 \
+	! rnnca log-file=rnnca.log training=1 playing=1 edges=1 learn-rate=1e-3 momentum-soft-start=500 \
 	! videoconvert ! autovideosink
 
 train-rnnca: libgstrnnca.so
 	$(RNNCA_DEBUG) $(GDB) 	gst-launch-1.0  \
 		  --gst-plugin-path=$(CURDIR) \
 		$(VID_FILE_SRC_LAGOS) \
-		! rnnca log-file=rnnca.log training=1 playing=0 learn-rate=1e3 \
+		! rnnca log-file=rnnca.log training=1 playing=0 learn-rate=1e-3 momentum-soft-start=500 momentum=0.95 \
 		! fakesink ;\
 
 play-rnnca: libgstrnnca.so
 	$(RNNCA_DEBUG)	$(GDB) 	gst-launch-1.0  \
 	  --gst-plugin-path=$(CURDIR) \
-	videotestsrc pattern=black  ! $(VID_SPECS) ! rnnca training=0 playing=1 \
+	videotestsrc pattern=black  ! $(VID_SPECS) ! rnnca training=0 playing=1 edges=0 \
 	! videoconvert ! autovideosink
 
 
