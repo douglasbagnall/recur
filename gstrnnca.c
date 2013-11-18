@@ -240,7 +240,7 @@ reset_net_filename(GstRnnca *self){
   self->net_filename = strdup(s);
 }
 
-static int
+UNUSED static int
 compare_trainers(const void *a, const void *b){
   const RnncaTrainer *at = (RnncaTrainer *)a;
   const RnncaTrainer *bt = (RnncaTrainer *)b;
@@ -296,7 +296,7 @@ construct_trainers(GstRnnca *self, int n_requested)
   }
   GST_ERROR("Could only fit %d out of %d desired training nets", j, n_requested);
  done:
-  qsort(self->trainers, j, sizeof(RnncaTrainer), compare_trainers);
+  //qsort(self->trainers, j, sizeof(RnncaTrainer), compare_trainers);
   self->n_trainers = j;
   pgm_dump(mask, w, h, IMAGE_DIR "mask.pgm");
 }
