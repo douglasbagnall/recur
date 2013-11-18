@@ -530,7 +530,7 @@ deal_with_edges(int *x, int *y, int edges)
 
 
 static inline void
-fill_net_inputs(RecurNN *net, RnncaFrame *frame, int cx, int cy, float noise, int edges){
+fill_net_inputs(RecurNN *net, RnncaFrame *frame, int cx, int cy, int edges){
   int y, offset, iy, ix, j;
   int i = 0, x = 0;
   //GST_DEBUG("frame is %p, cx %d, cy %d", frame, cx, cy);
@@ -545,11 +545,6 @@ fill_net_inputs(RecurNN *net, RnncaFrame *frame, int cx, int cy, float noise, in
     net->real_inputs[i] = BYTE_TO_UNIT(frame->Y[offset]);
     net->real_inputs[i + 1] = BYTE_TO_UNIT(frame->Cb[offset]);
     net->real_inputs[i + 2] = BYTE_TO_UNIT(frame->Cr[offset]);
-    if (noise){
-      net->real_inputs[i] += cheap_gaussian_noise(&net->rng) * noise;
-      net->real_inputs[i + 1] += cheap_gaussian_noise(&net->rng) * noise;
-      net->real_inputs[i + 2] += cheap_gaussian_noise(&net->rng) * noise;
-    }
     i += 3;
   }
   for (j = 0; j < RNNCA_Y_ONLY_LEN; j+= 2){
@@ -561,9 +556,6 @@ fill_net_inputs(RecurNN *net, RnncaFrame *frame, int cx, int cy, float noise, in
 
     offset = y * RNNCA_WIDTH + x;
     net->real_inputs[i] = BYTE_TO_UNIT(frame->Y[offset]);
-    if (noise){
-      net->real_inputs[i] += cheap_gaussian_noise(&net->rng) * noise;
-    }
     i++;
   }
   net->real_inputs[i] = abs(cx - RNNCA_WIDTH) * 1.0 / RNNCA_WIDTH;
@@ -576,7 +568,7 @@ train_net(RnncaTrainer *t, RnncaFrame *prev,  RnncaFrame *now, float momentum){
   RecurNN *net = t->net;
   net->bptt->momentum = momentum;
   /*trainers are not on edges, so edge condition doesn't much matter */
-  fill_net_inputs(net, prev, t->x, t->y, 0, 1);
+  fill_net_inputs(net, prev, t->x, t->y, 1);
 
   float *il = net->real_inputs;
   GST_LOG("inputs %.2g %.2g %.2g  %.2g %.2g %.2g  %.2g %.2g %.2g   "
@@ -687,7 +679,7 @@ fill_frame(GstRnnca *self, GstVideoFrame *frame){
   for (y = 0; y < RNNCA_HEIGHT; y++){
     for (x = 0; x < RNNCA_WIDTH; x++){
       RecurNN *net = self->constructors[y * RNNCA_WIDTH + x];
-      fill_net_inputs(net, self->play_frame, x, y, 0, self->edges);
+      fill_net_inputs(net, self->play_frame, x, y, self->edges);
       float *answer = rnn_opinion(net, NULL);
       fast_sigmoid_array(answer, answer, 3);
       GST_LOG("answer gen %d, x %d y %d, %.2g %.2g %.2g",
