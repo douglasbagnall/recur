@@ -751,7 +751,8 @@ apply_sgd_with_bptt_batch(RecurNN *net, float top_error_sum){
   return error_sum;
 }
 
-void bptt_consolidate_many_nets(RecurNN **nets, int n, int nestorov){
+void bptt_consolidate_many_nets(RecurNN **nets, int n, int nestorov,
+    float momentum_soft_start){
   RecurNN *net = nets[0];
   RecurNNBPTT *bptt = net->bptt;
   /*Use first net's delta as gradient accumulator.*/
@@ -771,24 +772,30 @@ void bptt_consolidate_many_nets(RecurNN **nets, int n, int nestorov){
     attention (ppm, etc). */
   net = nets[0];
   bptt = net->bptt;
-  bptt_log_float(net, "momentum", bptt->momentum);
+  float momentum = bptt->momentum;
+  if (momentum_soft_start){
+    /*XXX keeps doing the calculation long after soft_start is over. */
+    float x = momentum_soft_start;
+    momentum = MIN(momentum, 1.0f - x / (1 + net->generation + 2 * x));
+  }
+  bptt_log_float(net, "momentum", momentum);
   if (nestorov == 1){
     apply_learning_with_simplified_nestorov_momentum(net->ho_weights,
         ho_gradient, bptt->ho_momentum,
         net->ho_size, bptt->learn_rate * bptt->ho_scale,
-        bptt->momentum);
+        momentum);
 
     apply_learning_with_simplified_nestorov_momentum(net->ih_weights,
         ih_gradient, bptt->ih_momentum,
-        net->ih_size, bptt->learn_rate, bptt->momentum);
+        net->ih_size, bptt->learn_rate, momentum);
   }
   else {
     apply_learning_with_momentum(net->ho_weights, ho_gradient, bptt->ho_momentum,
         net->ho_size, bptt->learn_rate * bptt->ho_scale,
-        bptt->momentum, bptt->momentum_weight);
+        momentum, bptt->momentum_weight);
 
     apply_learning_with_momentum(net->ih_weights, ih_gradient, bptt->ih_momentum,
-        net->ih_size, bptt->learn_rate, bptt->momentum, bptt->momentum_weight);
+        net->ih_size, bptt->learn_rate, momentum, bptt->momentum_weight);
   }
 }
 

@@ -563,10 +563,9 @@ fill_net_inputs(RecurNN *net, RnncaFrame *frame, int cx, int cy, int edges){
 }
 
 static inline void
-train_net(RnncaTrainer *t, RnncaFrame *prev,  RnncaFrame *now, float momentum){
+train_net(RnncaTrainer *t, RnncaFrame *prev,  RnncaFrame *now){
   int i, offset, plane_size;
   RecurNN *net = t->net;
-  net->bptt->momentum = momentum;
   /*trainers are not on edges, so edge condition doesn't much matter */
   fill_net_inputs(net, prev, t->x, t->y, 1);
 
@@ -601,23 +600,11 @@ static inline void
 maybe_learn(GstRnnca *self){
   int i;
   RecurNN *net = self->train_nets[0];
-  float momentum;
-  if (self->momentum_soft_start){
-    float x = self->momentum_soft_start;
-    momentum = 1.0f - x / (1 + net->generation + 2 * x);
-    if (momentum >= self->momentum){
-      momentum = self->momentum;
-      self->momentum_soft_start = 0;
-    }
-  }
-  else {
-    momentum = self->momentum;
-  }
-
   for (i = 0; i < self->n_trainers; i++){
-    train_net(&self->trainers[i], self->frame_prev, self->frame_now, momentum);
+    train_net(&self->trainers[i], self->frame_prev, self->frame_now);
   }
-  bptt_consolidate_many_nets(self->train_nets, self->n_trainers, 0);
+  bptt_consolidate_many_nets(self->train_nets, self->n_trainers, 0,
+      self->momentum_soft_start);
   if (PERIODIC_PGM_DUMP && (net->generation & PERIODIC_PGM_DUMP) == 0){
     rnn_multi_pgm_dump(net, "how ihw");
   }

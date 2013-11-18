@@ -932,16 +932,8 @@ maybe_learn(GstClassify *self){
     if (PERIODIC_PGM_DUMP && net->generation % PERIODIC_PGM_DUMP == 0){
       rnn_multi_pgm_dump(net, "how ihw");
     }
-    if (self->momentum_soft_start){
-      float x = self->momentum_soft_start;
-      net->bptt->momentum = 1.0f - x / (1 + net->generation + 2 * x);
-      if (net->bptt->momentum >= self->momentum){
-        net->bptt->momentum = self->momentum;
-        self->momentum_soft_start = 0;
-      }
-    }
-
-    bptt_consolidate_many_nets(self->subnets, self->n_channels, 1);
+    bptt_consolidate_many_nets(self->subnets, self->n_channels, 1,
+        self->momentum_soft_start);
     rnn_condition_net(self->net);
     possibly_save_net(self->net, self->net_filename);
     rnn_log_net(net);
