@@ -34,6 +34,8 @@ enum
   PROP_TRAINING,
   PROP_PLAYING,
   PROP_EDGES,
+  PROP_MOMENTUM_SOFT_START,
+  PROP_MOMENTUM,
 };
 
 
@@ -49,6 +51,13 @@ enum
 #define MAX_HIDDEN_SIZE 1000000
 #define LEARN_RATE_MIN 0.0
 #define LEARN_RATE_MAX 1.0
+#define DEFAULT_PROP_MOMENTUM 0.95f
+#define DEFAULT_PROP_MOMENTUM_SOFT_START 0.0f
+#define MOMENTUM_MIN 0.0
+#define MOMENTUM_MAX 1.0
+#define MOMENTUM_SOFT_START_MAX 1e9
+#define MOMENTUM_SOFT_START_MIN 0
+
 
 /* static_functions */
 /* plugin_init    - registers plugin (once)
@@ -180,6 +189,20 @@ gst_rnnca_class_init (GstRnncaClass * g_class)
           DEFAULT_HIDDEN_SIZE,
           G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
+  g_object_class_install_property (gobject_class, PROP_MOMENTUM_SOFT_START,
+      g_param_spec_float("momentum-soft-start", "momentum-soft-start",
+          "Ease into momentum over many generations",
+          MOMENTUM_SOFT_START_MIN, MOMENTUM_SOFT_START_MAX,
+          DEFAULT_PROP_MOMENTUM_SOFT_START,
+          G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+
+  g_object_class_install_property (gobject_class, PROP_MOMENTUM,
+      g_param_spec_float("momentum", "momentum",
+          "(eventual) momentum",
+          MOMENTUM_MIN, MOMENTUM_MAX,
+          DEFAULT_PROP_MOMENTUM,
+          G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+
   vf_class->transform_frame_ip = GST_DEBUG_FUNCPTR (gst_rnnca_transform_frame_ip);
   vf_class->set_info = GST_DEBUG_FUNCPTR (set_info);
   GST_INFO("gst class init\n");
@@ -200,6 +223,8 @@ gst_rnnca_init (GstRnnca * self)
   self->edges = DEFAULT_PROP_EDGES;
   self->hidden_size = DEFAULT_HIDDEN_SIZE;
   self->pending_learn_rate = 0;
+  self->momentum_soft_start = DEFAULT_PROP_MOMENTUM_SOFT_START;
+  self->momentum = DEFAULT_PROP_MOMENTUM;
   GST_INFO("gst rnnca init\n");
 }
 
@@ -285,7 +310,7 @@ load_or_create_net(GstRnnca *self){
   if (net == NULL){
     net = rnn_new(RNNCA_N_FEATURES, self->hidden_size, 3,
         RNNCA_RNN_FLAGS, RNNCA_RNG_SEED,
-        NULL, RNNCA_BPTT_DEPTH, DEFAULT_LEARN_RATE, MOMENTUM, MOMENTUM_WEIGHT,
+        NULL, RNNCA_BPTT_DEPTH, DEFAULT_LEARN_RATE, self->momentum, MOMENTUM_WEIGHT,
         RNNCA_BATCH_SIZE, 0);
   }
   else {
@@ -414,6 +439,14 @@ gst_rnnca_set_property (GObject * object, guint prop_id, const GValue * value,
       maybe_set_learn_rate(self);
       break;
 
+    case PROP_MOMENTUM_SOFT_START:
+      self->momentum_soft_start = g_value_get_float(value);
+      break;
+
+    case PROP_MOMENTUM:
+      self->momentum = g_value_get_float(value);
+      break;
+
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
       break;
@@ -432,6 +465,12 @@ gst_rnnca_get_property (GObject * object, guint prop_id, GValue * value,
     if (self->train_nets){
       g_value_set_float(value, self->train_nets[0]->bptt->learn_rate);
     }
+    break;
+  case PROP_MOMENTUM:
+    g_value_set_float(value, self->momentum);
+    break;
+  case PROP_MOMENTUM_SOFT_START:
+    g_value_set_float(value, self->momentum_soft_start);
     break;
   default:
     G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -530,9 +569,10 @@ fill_net_inputs(RecurNN *net, RnncaFrame *frame, int cx, int cy, float noise, in
 }
 
 static inline void
-train_net(RnncaTrainer *t, RnncaFrame *prev,  RnncaFrame *now){
+train_net(RnncaTrainer *t, RnncaFrame *prev,  RnncaFrame *now, float momentum){
   int i, offset, plane_size;
   RecurNN *net = t->net;
+  net->bptt->momentum = momentum;
   /*trainers are not on edges, so edge condition doesn't much matter */
   fill_net_inputs(net, prev, t->x, t->y, 0, 1);
 
@@ -566,13 +606,24 @@ train_net(RnncaTrainer *t, RnncaFrame *prev,  RnncaFrame *now){
 static inline void
 maybe_learn(GstRnnca *self){
   int i;
+  RecurNN *net = self->train_nets[0];
+  float momentum;
+  if (self->momentum_soft_start){
+    float x = self->momentum_soft_start;
+    momentum = 1.0f - x / (1 + net->generation + 2 * x);
+    if (momentum >= self->momentum){
+      momentum = self->momentum;
+      self->momentum_soft_start = 0;
+    }
+  }
+  else {
+    momentum = self->momentum;
+  }
+
   for (i = 0; i < self->n_trainers; i++){
-    GST_DEBUG("trainer %d/%d (%p), frames %p %p", i, self->n_trainers, self->trainers + i,
-        self->frame_prev, self->frame_now);
-    train_net(&self->trainers[i], self->frame_prev, self->frame_now);
+    train_net(&self->trainers[i], self->frame_prev, self->frame_now, momentum);
   }
   bptt_consolidate_many_nets(self->train_nets, self->n_trainers, 0);
-  RecurNN *net = self->train_nets[0];
   if (PERIODIC_PGM_DUMP && (net->generation & PERIODIC_PGM_DUMP) == 0){
     rnn_multi_pgm_dump(net, "how ihw");
   }

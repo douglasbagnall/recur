@@ -89,6 +89,8 @@ struct _GstRnnca
   int training;
   u8 *training_map;
   int edges;
+  float momentum;
+  int momentum_soft_start;
 };
 
 struct _GstRnncaClass
