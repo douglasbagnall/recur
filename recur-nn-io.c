@@ -155,11 +155,13 @@ rnn_load_net(const char *filename){
   net->rng = tmpnet.rng;
   net->generation = tmpnet.generation;
   net->bptt->index = tmpbptt.index;
-
+  if (version >= 2){
+    net->bptt->ho_scale = tmpbptt.ho_scale;
+  }
 #define CHECK_SCALAR(new, tmp, attr) do {                                   \
   if (new->attr != tmp.attr){                                              \
-    DEBUG("attribute '%s' differs %x vs %x", QUOTE(attr),               \
-        (int)new->attr, (int)tmp.attr);                                \
+    DEBUG("attribute '%s' differs %f vs %f", QUOTE(attr),               \
+        (float)new->attr, (float)tmp.attr);                                \
     goto error;}                                                        \
   } while (0)
 
