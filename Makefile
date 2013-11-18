@@ -165,7 +165,7 @@ VID_URI_5=file://$(VIDEO_DIR)/alowhum/vts_16_1.vob.avi
 VID_URI_LAGOS=file://$(VIDEO_DIR)/movies/louis-theroux-lagos/louis.theroux.law.and.disorder.in.lagos.ws.pdtv.xvid-waters.avi
 VID_URI_7=file://$(VIDEO_DIR)/movies/InBruges.avi
 VID_URI_ZION=file://$(VIDEO_DIR)/movies/louis-theroux-zionists/Louis.Theroux.Ultra.Zionists.WS.PDTV.XviD-PVR.avi
-
+VID_URI_EXIT=file://$(VIDEO_DIR)/movies/exit-through-the-gift-shop/Exit-Through-The-Gift-Shop.avi
 VID_W=640
 VID_H=480
 VID_SPECS = video/x-raw, format=I420, width=$(VID_W), height=$(VID_H)
@@ -184,6 +184,7 @@ VID_FILE_SRC_5 = uridecodebin name=src uri=$(VID_URI_5) ! $(VID_LINE)
 VID_FILE_SRC_6 = uridecodebin name=src uri=$(VID_URI_6) ! $(VID_LINE)
 VID_FILE_SRC_7 = uridecodebin name=src uri=$(VID_URI_7) ! $(VID_LINE)
 VID_FILE_SRC_LAGOS = uridecodebin name=src uri=$(VID_URI_LAGOS) ! $(VID_LINE)
+VID_FILE_SRC_EXIT = uridecodebin name=src uri=$(VID_URI_EXIT) ! $(VID_LINE)
 
 #GST_DEBUG=uridecodebin:7
 #GST_DEBUG=recur*:5
@@ -197,7 +198,7 @@ VALGRIND = valgrind --tool=memcheck --log-file=valgrind.log --trace-children=yes
 test-rnnca: libgstrnnca.so
 	$(RNNCA_DEBUG)	$(GDB) 	gst-launch-1.0  \
 	  --gst-plugin-path=$(CURDIR) \
-	$(VID_FILE_SRC_LAGOS) \
+	$(VID_FILE_SRC_EXIT) \
 	! rnnca log-file=rnnca.log training=1 playing=1 edges=1 learn-rate=1e-3 momentum-soft-start=500 \
 	! videoconvert ! autovideosink
 
@@ -211,8 +212,16 @@ train-rnnca: libgstrnnca.so
 play-rnnca: libgstrnnca.so
 	$(RNNCA_DEBUG)	$(GDB) 	gst-launch-1.0  \
 	  --gst-plugin-path=$(CURDIR) \
-	videotestsrc pattern=black  ! $(VID_SPECS) ! rnnca training=0 playing=1 edges=0 \
+	videotestsrc pattern=black  ! $(VID_SPECS) ! \
+	rnnca training=0 playing=1 edges=1 \
 	! videoconvert ! autovideosink
+
+record-rnnca: libgstrnnca.so
+	$(RNNCA_DEBUG)	$(GDB) 	gst-launch-1.0  \
+	  --gst-plugin-path=$(CURDIR) \
+	videotestsrc pattern=black  ! $(VID_SPECS), framerate=20/1 ! \
+	 rnnca training=0 playing=1 edges=0 \
+	! videoconvert ! vp8enc ! webmmux ! filesink location=rnnca.webm
 
 
 TEST_PIPELINE_CORE = gst-launch-1.0  \

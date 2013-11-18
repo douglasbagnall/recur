@@ -312,7 +312,8 @@ load_or_create_net(GstRnnca *self){
         RNNCA_RNN_FLAGS, RNNCA_RNG_SEED,
         NULL, RNNCA_BPTT_DEPTH, DEFAULT_LEARN_RATE, self->momentum, MOMENTUM_WEIGHT,
         RNNCA_BATCH_SIZE, 0);
-    rnn_randomise_weights(net, 0.2f, 2);
+    rnn_randomise_weights(net, 0.2f, 1);
+    //net->bptt->ho_scale = 0.25;
   }
   else {
     rnn_set_log_file(net, NULL, 0);
