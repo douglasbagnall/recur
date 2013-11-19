@@ -19,7 +19,9 @@ typedef float v4ss __attribute__ ((vector_size (16))) __attribute__ ((aligned (1
 
 #define RECUR_RNG_SUBSEED -2ULL
 
-#define RANDOM_DAMAGE_MAGNITUDE 0.03
+/*controls magnitude of random damage (if that is used):
+  variance = RANDOM_DAMAGE_FACTOR * net->h_size * net->bptt->learn_rate */
+#define RANDOM_DAMAGE_FACTOR 0.5f
 
 #define MAX_TOP_ERROR_FACTOR 2.0f
 /*if bptt error grows by more than MAX_ERROR_GAIN, abort and scale */

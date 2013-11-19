@@ -881,7 +881,8 @@ rnn_condition_net(RecurNN *net)
   case RNN_COND_BIT_RAND:
     {
       int t = rand_small_int(&net->rng, net->ih_size + net->ho_size);
-      float damage = cheap_gaussian_noise(&net->rng) * RANDOM_DAMAGE_MAGNITUDE;
+      float damage = (cheap_gaussian_noise(&net->rng) *
+          RANDOM_DAMAGE_FACTOR * net->h_size * net->bptt->learn_rate);
       if (t >= net->ih_size){
         t -= net->ih_size;
         int col = t % net->o_size;
