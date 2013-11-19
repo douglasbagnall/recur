@@ -202,14 +202,14 @@ test-rnnca: libgstrnnca.so
 	$(RNNCA_DEBUG)	$(GDB) 	gst-launch-1.0  \
 	  --gst-plugin-path=$(CURDIR) \
 	$(VID_FILE_SRC_LAGOS) \
-	! rnnca log-file=rnnca.log training=1 playing=1 edges=1 learn-rate=1e-3 momentum-soft-start=2000 \
+	! rnnca log-file=rnnca.log training=1 playing=1 edges=1 learn-rate=3e-3 momentum-soft-start=2000 \
 	! videoconvert ! xvimagesink
 
 train-rnnca: libgstrnnca.so
 	$(RNNCA_DEBUG) $(GDB) 	gst-launch-1.0  \
 		  --gst-plugin-path=$(CURDIR) \
 		$(VID_FILE_SRC_LAGOS) \
-		! rnnca log-file=rnnca.log training=1 playing=0 learn-rate=1e-3 momentum-soft-start=2000 momentum=0.95 \
+		! rnnca log-file=rnnca.log training=1 playing=0 learn-rate=3e-3 momentum-soft-start=2000 momentum=0.95 \
 		! fakesink ;\
 
 play-rnnca: libgstrnnca.so
