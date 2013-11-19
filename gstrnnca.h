@@ -33,29 +33,59 @@ G_BEGIN_DECLS
 #define PERIODIC_SHUFFLE_TRAINERS 15
 #define PGM_DUMP_CHANGED_MASK 0
 
+#define ARRAY_LEN(x) sizeof(x) / sizeof((x)[0])
+
 const int RNNCA_YUV_OFFSETS[] = {
   -1, -1,   0, -1,   1, -1,
   -1,  0,            1,  0,
   -1,  1,   0,  1,   1,  1
 };
+const int RNNCA_YUV_LEN = ARRAY_LEN(RNNCA_YUV_OFFSETS);
 
+#define USE_Y_ONLY_OFFSETS 1
+#define USE_Y_MEAN_3_OFFSETS 0
+
+#if USE_Y_ONLY_OFFSETS
 const int RNNCA_Y_ONLY_OFFSETS[] = {
-  /*
+
        -1, -2,  1, -2,
   -2, -1,            2, -1,
   -2,  1,            2,  1,
        -1,  2,  1,  2
-  */
 
-       0, -2,
-  -2, 0,    2, 0,
-        0, 2
+  /*
+  -2, -2,  0, -2,  2, -2,
+  -2,  0,          2,  0,
+  -2,  2,  0,  2,  2,  2,
+  *//*
+  0, -2,
+  -2, -1,            2, -1,
+  -2,  1,            2,  1,
+  0, 2
+    */
+};
+const int RNNCA_Y_ONLY_LEN = ARRAY_LEN(RNNCA_Y_ONLY_OFFSETS);
+#else
+const int RNNCA_Y_ONLY_LEN = 0;
+#endif
+
+#if USE_Y_MEAN_3_OFFSETS
+const int RNNCA_Y_MEAN_3_OFFSETS[] = {
+  -1, -2,  0, -2, 1, -2,
+  -1,  2,  0,  2, 1,  2,
+  -2, -1, -2,  0, -2, 1,
+   2, -1,  2,  0,  2, 1,
 };
 
-const int RNNCA_YUV_LEN = sizeof(RNNCA_YUV_OFFSETS) / sizeof(RNNCA_YUV_OFFSETS[0]);
-const int RNNCA_Y_ONLY_LEN = sizeof(RNNCA_Y_ONLY_OFFSETS) / sizeof(RNNCA_Y_ONLY_OFFSETS[0]);
+const int RNNCA_Y_MEAN_3_LEN = ARRAY_LEN(RNNCA_Y_MEAN_3_OFFSETS);
+#else
+const int RNNCA_Y_MEAN_3_LEN = 0;
+#endif
 
-#define RNNCA_N_FEATURES (((RNNCA_YUV_LEN * 3 + RNNCA_Y_ONLY_LEN) >> 1) + 2)
+
+
+#define RNNCA_N_FEATURES (((RNNCA_YUV_LEN * 3 + RNNCA_Y_ONLY_LEN \
+              + RNNCA_Y_MEAN_3_LEN) >> 1) + 2)
 
 typedef struct _RnncaFrame {
   u8 *Y;

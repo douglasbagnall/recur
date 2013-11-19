@@ -231,9 +231,9 @@ gst_rnnca_init (GstRnnca * self)
 static void
 reset_net_filename(GstRnnca *self){
   char s[200];
-  snprintf(s, sizeof(s), "rnnca-i%d-h%d-o%d-b%d-yuv%d-y%d-x%d.net",
+  snprintf(s, sizeof(s), "rnnca-i%d-h%d-o%d-b%d-yuv%d-y%d-m%d-x%d.net",
       RNNCA_N_FEATURES, self->hidden_size, 3,
-      RNNCA_BIAS, RNNCA_YUV_LEN, RNNCA_Y_ONLY_LEN, 2);
+      RNNCA_BIAS, RNNCA_YUV_LEN, RNNCA_Y_ONLY_LEN, RNNCA_Y_MEAN_3_LEN, 2);
   if (self->net_filename){
     free(self->net_filename);
   }
@@ -296,6 +296,10 @@ construct_trainers(GstRnnca *self, int n_requested)
   }
   GST_ERROR("Could only fit %d out of %d desired training nets", j, n_requested);
  done:
+  /*XXX sort means memory access is ordered (but poisson-jumpy), but when the
+    trainers shift the order is lost, so all the sort does is make
+    trainers[0].net unlikely to be train_nets[0], which confuses me
+    sometimes*/
   //qsort(self->trainers, j, sizeof(RnncaTrainer), compare_trainers);
   self->n_trainers = j;
   pgm_dump(mask, w, h, IMAGE_DIR "mask.pgm");
@@ -505,59 +509,59 @@ remember_frame(GstRnnca *self, GstVideoFrame *frame){
 #define BYTE_TO_BALANCED_UNIT(x) (((x) * (1.0f / 127.5f)) - 127.5f)
 #define UNIT_TO_BYTE(x) ((x) * (255.9f))
 
-static inline void
-deal_with_edges(int *x, int *y, int edges)
-{
+static inline int
+get_offset_point(const int *offset, int cx, int cy, int edges){
+  int x = cx + offset[0];
+  int y = cy + offset[1];
   if (edges){
-    *y = MAX(0, MIN(RNNCA_HEIGHT - 1, *y));
-    *x = MAX(0, MIN(RNNCA_WIDTH - 1, *x));
+    y = MAX(0, MIN(RNNCA_HEIGHT - 1, y));
+    x = MAX(0, MIN(RNNCA_WIDTH - 1, x));
   }
   else{
-    if (*y < 0){
-      *y += RNNCA_HEIGHT;
+    if (y < 0){
+      y += RNNCA_HEIGHT;
     }
-    else if (*y >= RNNCA_HEIGHT){
-      *y -= RNNCA_HEIGHT;
+    else if (y >= RNNCA_HEIGHT){
+      y -= RNNCA_HEIGHT;
     }
-    if (*x < 0){
-      *x += RNNCA_WIDTH;
+    if (x < 0){
+      x += RNNCA_WIDTH;
     }
-    else if (*x >= RNNCA_WIDTH){
-      *x -= RNNCA_WIDTH;
+    else if (x >= RNNCA_WIDTH){
+      x -= RNNCA_WIDTH;
     }
   }
+  return y * RNNCA_WIDTH + x;
 }
-
 
 static inline void
 fill_net_inputs(RecurNN *net, RnncaFrame *frame, int cx, int cy, int edges){
-  int y, offset, iy, ix, j;
-  int i = 0, x = 0;
-  //GST_DEBUG("frame is %p, cx %d, cy %d", frame, cx, cy);
+  int j, offset;
+  int i = 0;
   for (j = 0; j < RNNCA_YUV_LEN; j+= 2){
-    ix = RNNCA_YUV_OFFSETS[j];
-    iy = RNNCA_YUV_OFFSETS[j + 1];
-    y = cy + iy;
-    x = cx + ix;
-    deal_with_edges(&x, &y, edges);
-
-    offset = y * RNNCA_WIDTH + x;
+    offset = get_offset_point(RNNCA_YUV_OFFSETS + j, cx, cy, edges);
     net->real_inputs[i] = BYTE_TO_UNIT(frame->Y[offset]);
     net->real_inputs[i + 1] = BYTE_TO_UNIT(frame->Cb[offset]);
     net->real_inputs[i + 2] = BYTE_TO_UNIT(frame->Cr[offset]);
     i += 3;
   }
+#if USE_Y_ONLY_OFFSETS
   for (j = 0; j < RNNCA_Y_ONLY_LEN; j+= 2){
-    ix = RNNCA_YUV_OFFSETS[j];
-    iy = RNNCA_YUV_OFFSETS[j + 1];
-    y = cy + iy;
-    x = cx + ix;
-    deal_with_edges(&x, &y, edges);
-
-    offset = y * RNNCA_WIDTH + x;
+    offset = get_offset_point(RNNCA_Y_ONLY_OFFSETS + j, cx, cy, edges);
     net->real_inputs[i] = BYTE_TO_UNIT(frame->Y[offset]);
     i++;
   }
+#endif
+#if USE_Y_MEAN_3_OFFSETS
+  for (j = 0; j < RNNCA_Y_MEAN_3_LEN; j+= 6){
+    int s;
+    s = frame->Y[get_offset_point(RNNCA_Y_MEAN_3_OFFSETS + j, cx, cy, edges)];
+    s += frame->Y[get_offset_point(RNNCA_Y_MEAN_3_OFFSETS + j + 2, cx, cy, edges)];
+    s += frame->Y[get_offset_point(RNNCA_Y_MEAN_3_OFFSETS + j + 4, cx, cy, edges)];
+    net->real_inputs[i] = BYTE_TO_UNIT(s * 0.333333);
+    i++;
+  }
+#endif
   net->real_inputs[i] = abs(cx - RNNCA_WIDTH) * 1.0 / RNNCA_WIDTH;
   net->real_inputs[i + 1] = abs(cy - RNNCA_HEIGHT) * 1.0 / RNNCA_HEIGHT;
 }
