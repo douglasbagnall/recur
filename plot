@@ -13,7 +13,7 @@ from math import log
 
 DEFAULT_LOGFILE = "classify.log"
 DEFAULT_KEYS = ('error_sum', 'error', 'hidden_sum', 'depth',
-                'error_gain', 'correct', 'momentum'
+                'error_gain', 'correct', 'momentum', 'weight_sum'
                )
 
 def seek_start(f, start):
@@ -45,8 +45,8 @@ def seek_start(f, start):
             step //= 2.7
 
 
-def read_log(fn, names,
-             start=0, length=2000000, step=1):
+def read_log(fn, names, step=1,
+             start=0, length=2000000):
     f = open(fn)
     if start > 10000:
         seek_start(f, start)
