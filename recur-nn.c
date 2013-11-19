@@ -398,6 +398,48 @@ rnn_opinion(RecurNN *net, const float *inputs){
   return net->output_layer;
 }
 
+float *
+rnn_opinion_with_dropout(RecurNN *net, const float *inputs, float dropout){
+  if (inputs){
+    memcpy(net->real_inputs, inputs, net->input_size * sizeof(float));
+  }
+  /*copy in hiddens */
+  int hsize = net->hidden_size + net->bias;
+  memcpy(net->input_layer, net->hidden_layer, hsize * sizeof(float));
+
+  if (net->bias){
+    net->input_layer[0] = 1.0f;
+  }
+  maybe_scale_inputs(net);
+  dropout_aligned_array(net->input_layer, net->i_size, dropout, &net->rng);
+
+  calculate_interlayer(net->input_layer, net->i_size,
+      net->hidden_layer, net->h_size, net->ih_weights);
+
+  ASSUME_ALIGNED(net->hidden_layer);
+  for (int i = 0; i < net->h_size; i++){
+    net->hidden_layer[i] -= RNN_HIDDEN_PENALTY;
+    if (net->hidden_layer[i] > 0){
+      net->hidden_layer[i] /= dropout;
+    }
+    else{
+      net->hidden_layer[i] = 0.0f;
+    }
+  }
+  maybe_scale_hiddens(net);
+
+  if (net->bias)
+    net->hidden_layer[0] = 1.0f;
+  for (int i = net->hidden_size + net->bias; i < net->h_size; i++){
+    net->hidden_layer[i] = 0;
+  }
+  calculate_interlayer(net->hidden_layer, net->h_size,
+      net->output_layer, net->o_size, net->ho_weights);
+
+
+  return net->output_layer;
+}
+
 
 static inline float
 backprop_top_layer(RecurNN *net)

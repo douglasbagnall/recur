@@ -154,6 +154,7 @@ void rnn_randomise_weights(RecurNN *net, float variance, int power);
 void rnn_delete_net(RecurNN *net);
 
 float *rnn_opinion(RecurNN *net, const float *inputs);
+float *rnn_opinion_with_dropout(RecurNN *net, const float *inputs, float dropout);
 
 void rnn_multi_pgm_dump(RecurNN *net, const char *dumpees);
 
@@ -218,9 +219,25 @@ add_aligned_arrays(float *restrict dest, int len, const float *restrict src, flo
 #endif
 }
 
-
-
-
+static inline void
+dropout_aligned_array(float *array, int len, float dropout, rand_ctx *rng){
+  int i;
+  if (dropout == 0.5f){ /*special case using far fewer random numbers*/
+    for (i = 0; i < len;){
+      u64 bits = rand64(rng);
+      int end = i + MIN(64, len - i);
+      for (; i < end; i++){
+        array[i] = (bits & 1) ? array[i] : 0;
+      }
+    }
+  }
+  else {
+    for (i = 0; i < len; i++){
+      /*XXX could use randomise_float_pair() for possibly marginal speedup*/
+      array[i] = (rand_double(rng) > dropout) ? array[i] : 0.0f;
+    }
+  }
+}
 
 static inline float
 soft_clip(float sum, float halfmax){

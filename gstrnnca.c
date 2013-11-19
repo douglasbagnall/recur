@@ -569,15 +569,7 @@ train_net(RnncaTrainer *t, RnncaFrame *prev,  RnncaFrame *now){
   /*trainers are not on edges, so edge condition doesn't much matter */
   fill_net_inputs(net, prev, t->x, t->y, 1);
 
-  float *il = net->real_inputs;
-  GST_LOG("inputs %.2g %.2g %.2g  %.2g %.2g %.2g  %.2g %.2g %.2g   "
-      "%.2g %.2g %.2g  %.2g %.2g %.2g  %.2g %.2g %.2g   "
-      "%.2g %.2g %.2g  %.2g %.2g %.2g  %.2g %.2g %.2g   ",
-      il[0], il[1], il[2], il[3], il[4], il[5], il[6], il[7], il[8],
-      il[9], il[10], il[11], il[12], il[13], il[14], il[15], il[16], il[17],
-      il[18], il[19], il[20], il[21], il[22], il[23], il[24], il[25], il[26]
-  );
-
+  //float *answer = rnn_opinion_with_dropout(net, NULL, 0.5);
   float *answer = rnn_opinion(net, NULL);
   fast_sigmoid_array(answer, answer, 3);
   offset = t->y * RNNCA_WIDTH + t->x;
