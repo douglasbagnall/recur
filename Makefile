@@ -167,8 +167,8 @@ VID_URI_7=file://$(VIDEO_DIR)/movies/InBruges.avi
 VID_URI_TUBBIES=file://$(VIDEO_DIR)/teletubbies.avi
 VID_URI_ZION=file://$(VIDEO_DIR)/movies/louis-theroux-zionists/Louis.Theroux.Ultra.Zionists.WS.PDTV.XviD-PVR.avi
 VID_URI_EXIT=file://$(VIDEO_DIR)/movies/exit-through-the-gift-shop/Exit-Through-The-Gift-Shop.avi
-VID_W=640
-VID_H=480
+VID_W=288
+VID_H=192
 VID_SPECS = video/x-raw, format=I420, width=$(VID_W), height=$(VID_H)
 
 VID_TEST_SRC_1 = videotestsrc pattern=14 kt=2 kxt=1 kyt=3  kxy=3 !\
