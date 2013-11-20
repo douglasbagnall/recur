@@ -21,9 +21,11 @@ G_BEGIN_DECLS
 #define MOMENTUM_WEIGHT 0.5
 
 #if RNNCA_BIAS
-#define RNNCA_RNN_FLAGS (RNN_NET_FLAG_STANDARD | RNN_COND_USE_RAND | RNN_COND_BIT_SCALE)
+#define RNNCA_RNN_FLAGS (RNN_NET_FLAG_STANDARD | RNN_COND_USE_RAND |\
+      RNN_COND_USE_TALL_POPPY)
 #else
-#define RNNCA_RNN_FLAGS (RNN_NET_FLAG_NO_BIAS | RNN_COND_USE_RAND | RNN_COND_BIT_SCALE)
+#define RNNCA_RNN_FLAGS (RNN_NET_FLAG_NO_BIAS | RNN_COND_USE_RAND |\
+      RNN_COND_USE_TALL_POPPY)
 #endif
 
 #define PERIODIC_PGM_DUMP 511
@@ -42,8 +44,8 @@ const int RNNCA_YUV_OFFSETS[] = {
 };
 const int RNNCA_YUV_LEN = ARRAY_LEN(RNNCA_YUV_OFFSETS);
 
-#define USE_Y_ONLY_OFFSETS 1
-#define USE_Y_MEAN_3_OFFSETS 0
+#define USE_Y_ONLY_OFFSETS 0
+#define USE_Y_MEAN_3_OFFSETS 1
 
 #if USE_Y_ONLY_OFFSETS
 const int RNNCA_Y_ONLY_OFFSETS[] = {
@@ -57,12 +59,7 @@ const int RNNCA_Y_ONLY_OFFSETS[] = {
   -2, -2,  0, -2,  2, -2,
   -2,  0,          2,  0,
   -2,  2,  0,  2,  2,  2,
-  *//*
-  0, -2,
-  -2, -1,            2, -1,
-  -2,  1,            2,  1,
-  0, 2
-    */
+  */
 };
 const int RNNCA_Y_ONLY_LEN = ARRAY_LEN(RNNCA_Y_ONLY_OFFSETS);
 #else
@@ -76,7 +73,6 @@ const int RNNCA_Y_MEAN_3_OFFSETS[] = {
   -2, -1, -2,  0, -2, 1,
    2, -1,  2,  0,  2, 1,
 };
-
 const int RNNCA_Y_MEAN_3_LEN = ARRAY_LEN(RNNCA_Y_MEAN_3_OFFSETS);
 #else
 const int RNNCA_Y_MEAN_3_LEN = 0;
