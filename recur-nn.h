@@ -220,7 +220,7 @@ add_aligned_arrays(float *restrict dest, int len, const float *restrict src, flo
 }
 
 static inline void
-dropout_aligned_array(float *array, int len, float dropout, rand_ctx *rng){
+dropout_array(float *array, int len, float dropout, rand_ctx *rng){
   int i;
   if (dropout == 0.5f){ /*special case using far fewer random numbers*/
     for (i = 0; i < len;){
