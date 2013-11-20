@@ -244,7 +244,10 @@ recur_adaptive_downscale(const u8 *src, const int s_width,
     recur_skipping_downscale(src, s_width, s_height, s_stride,
         dest, d_width, d_height, d_stride);
   }
-  else {
+  else if (s_width == d_width && s_height == d_height){
+    memcpy(dest, src, s_width * s_height);
+  }
+  else{
     recur_exact_downscale(src, s_width, s_height, s_stride,
         dest, d_width, d_height, d_stride);
   }
