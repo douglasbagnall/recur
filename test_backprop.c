@@ -259,7 +259,8 @@ one_hot_opinion(RecurNN *net, const int hot){
   //XXX could just set the previous one to zero (i.e. remember it)
   memset(net->real_inputs, 0, net->input_size * sizeof(float));
   net->real_inputs[hot] = 1.0f;
-  float *answer = rnn_opinion(net, NULL);
+  float *answer = rnn_opinion_with_dropout(net, NULL, 0.5);
+  //float *answer = rnn_opinion(net, NULL);
   return answer;
 }
 
@@ -565,7 +566,7 @@ main(int argc, char *argv[]){
       NULL);
 
   Schedule schedule;
-  init_schedule(&schedule, 40, 0, 3e-6, 0.4);
+  init_schedule(&schedule, 60, 0, 3e-6, 0.4);
   long len;
   u8* validate_text;
   u8* text = alloc_and_collapse_text(opt_textfile,
