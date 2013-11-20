@@ -36,7 +36,7 @@ typedef float v4ss __attribute__ ((vector_size (16))) __attribute__ ((aligned (1
 #define INPUT_MEAN_SOFT_TOP 4.0f
 
 #define RNN_INITIAL_WEIGHT_VARIANCE_FACTOR 10.0f
-#define WEIGHT_SCALE (1.0f - 1e-6f)
+#define WEIGHT_SCALE (1.0f - 3e-6f)
 
 /*RNN_CONDITIONING_INTERVAL should be <= 32, ideally a power of 2 */
 #define RNN_CONDITIONING_INTERVAL 8
