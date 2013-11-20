@@ -39,19 +39,20 @@ G_BEGIN_DECLS
 
 const int RNNCA_YUV_OFFSETS[] = {
   -1, -1,   0, -1,   1, -1,
-  -1,  0,   0,  0,   1,  0,
+  -1,  0,            1,  0,
   -1,  1,   0,  1,   1,  1
 };
 const int RNNCA_YUV_LEN = ARRAY_LEN(RNNCA_YUV_OFFSETS);
 
-#define USE_Y_ONLY_OFFSETS 0
-#define USE_Y_MEAN_3_OFFSETS 1
+#define USE_Y_ONLY_OFFSETS 1
+#define USE_Y_MEAN_3_OFFSETS 0
 
 #if USE_Y_ONLY_OFFSETS
 const int RNNCA_Y_ONLY_OFFSETS[] = {
 
        -1, -2,  1, -2,
   -2, -1,            2, -1,
+             0,0,
   -2,  1,            2,  1,
        -1,  2,  1,  2
 
