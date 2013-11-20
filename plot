@@ -30,7 +30,7 @@ def seek_start(f, start):
         line = f.readline()
         while line[:10] != 'generation':
             if not line:
-                generation = 1e300
+                line = 'generation 1e+300'
                 break
             line = f.readline()
 
