@@ -595,7 +595,7 @@ bptt_and_accumulate_error(RecurNN *net, float *ih_delta, float top_error_sum)
 
   float error_sum = 0;
   float max_error_sum = MAX_ERROR_GAIN * top_error_sum;
-  float min_error_sum = MIN_ERROR_FACTOR * net->h_size;
+  float min_error_sum = MIN_ERROR_FACTOR * net->h_size / net->bptt->learn_rate;
 
   memset(ih_delta, 0, net->ih_size * sizeof(float));
   int t;
