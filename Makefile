@@ -163,6 +163,7 @@ VID_URI_3=file://$(VIDEO_DIR)/rochester-pal.avi
 VID_URI_4=file://$(VIDEO_DIR)/DEC.flv
 VID_URI_5=file://$(VIDEO_DIR)/alowhum/vts_16_1.vob.avi
 VID_URI_LAGOS=file://$(VIDEO_DIR)/movies/louis-theroux-lagos/louis.theroux.law.and.disorder.in.lagos.ws.pdtv.xvid-waters.avi
+VID_URI_LAGOS_SMALL=file://$(VIDEO_DIR)/lagos-288-192-20.avi
 VID_URI_7=file://$(VIDEO_DIR)/movies/InBruges.avi
 VID_URI_TUBBIES=file://$(VIDEO_DIR)/teletubbies.avi
 VID_URI_ZION=file://$(VIDEO_DIR)/movies/louis-theroux-zionists/Louis.Theroux.Ultra.Zionists.WS.PDTV.XviD-PVR.avi
@@ -187,6 +188,7 @@ VID_FILE_SRC_TUBBIES = uridecodebin name=src uri=$(VID_URI_TUBBIES) ! $(VID_LINE
 VID_FILE_SRC_BRUGES = uridecodebin name=src uri=$(VID_URI_7) ! $(VID_LINE)
 VID_FILE_SRC_ZION = uridecodebin name=src uri=$(VID_URI_ZION) ! $(VID_LINE)
 VID_FILE_SRC_LAGOS = uridecodebin name=src uri=$(VID_URI_LAGOS) ! $(VID_LINE)
+VID_FILE_SRC_LAGOS_SMALL = uridecodebin name=src uri=$(VID_URI_LAGOS_SMALL) ! $(VID_LINE)
 VID_FILE_SRC_EXIT = uridecodebin name=src uri=$(VID_URI_EXIT) ! $(VID_LINE)
 
 #GST_DEBUG=uridecodebin:7
@@ -201,14 +203,14 @@ VALGRIND = valgrind --tool=memcheck --log-file=valgrind.log --trace-children=yes
 test-rnnca: libgstrnnca.so
 	$(RNNCA_DEBUG)	$(GDB) 	gst-launch-1.0  \
 	  --gst-plugin-path=$(CURDIR) \
-	$(VID_FILE_SRC_LAGOS) \
+	$(VID_FILE_SRC_LAGOS_SMALL) \
 	! rnnca log-file=rnnca.log training=1 playing=1 edges=1 learn-rate=3e-3 momentum-soft-start=2000 \
-	! videoconvert ! xvimagesink
+	! videoconvert ! xvimagesink force-aspect-ratio=0
 
 train-rnnca: libgstrnnca.so
 	$(RNNCA_DEBUG) $(GDB) 	gst-launch-1.0  \
 		  --gst-plugin-path=$(CURDIR) \
-		$(VID_FILE_SRC_LAGOS) \
+		$(VID_FILE_SRC_LAGOS_SMALL) \
 		! rnnca log-file=rnnca.log training=1 playing=0 learn-rate=3e-3 momentum-soft-start=2000 momentum=0.95 \
 		! fakesink ;\
 
@@ -217,7 +219,7 @@ play-rnnca: libgstrnnca.so
 	  --gst-plugin-path=$(CURDIR) \
 	videotestsrc pattern=black  ! $(VID_SPECS) ! \
 	rnnca training=0 playing=1 edges=0 \
-	! videoconvert ! xvimagesink
+	! videoconvert ! xvimagesink force-aspect-ratio=0
 
 record-rnnca: libgstrnnca.so
 	$(RNNCA_DEBUG)	$(GDB) 	gst-launch-1.0  \
