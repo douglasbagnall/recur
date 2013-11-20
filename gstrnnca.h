@@ -9,7 +9,7 @@
 G_BEGIN_DECLS
 
 #define TRY_RELOAD 1
-#define RNNCA_BIAS 1
+#define RNNCA_BIAS 0
 #define RNNCA_N_TRAINERS 30
 #define RNNCA_WIDTH 144
 #define RNNCA_HEIGHT 96
@@ -22,10 +22,10 @@ G_BEGIN_DECLS
 
 #if RNNCA_BIAS
 #define RNNCA_RNN_FLAGS (RNN_NET_FLAG_STANDARD | RNN_COND_USE_RAND |\
-      RNN_COND_USE_TALL_POPPY)
+      RNN_COND_USE_SCALE | RNN_COND_USE_TALL_POPPY)
 #else
 #define RNNCA_RNN_FLAGS (RNN_NET_FLAG_NO_BIAS | RNN_COND_USE_RAND |\
-      RNN_COND_USE_TALL_POPPY)
+       RNN_COND_USE_SCALE | RNN_COND_USE_TALL_POPPY)
 #endif
 
 #define PERIODIC_PGM_DUMP 511
@@ -39,7 +39,7 @@ G_BEGIN_DECLS
 
 const int RNNCA_YUV_OFFSETS[] = {
   -1, -1,   0, -1,   1, -1,
-  -1,  0,            1,  0,
+  -1,  0,   0,  0,   1,  0,
   -1,  1,   0,  1,   1,  1
 };
 const int RNNCA_YUV_LEN = ARRAY_LEN(RNNCA_YUV_OFFSETS);
