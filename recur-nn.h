@@ -46,7 +46,8 @@ typedef float v4ss __attribute__ ((vector_size (16))) __attribute__ ((aligned (1
 /*whether to log the weight sum (relatively costly, often uninformative) */
 #define RNN_LOG_WEIGHT_SUM 0
 
-#define ASM_MARKER(x) asm("/**" QUOTE(x) "**/")
+#define RNN_TALL_POPPY_THRESHOLD 1.0f
+#define RNN_TALL_POPPY_SCALE 0.99f
 
 /* Conditioning flags go in bits 16-23 of net->flags.
 
@@ -61,7 +62,8 @@ typedef float v4ss __attribute__ ((vector_size (16))) __attribute__ ((aligned (1
 
 enum {
   RNN_COND_BIT_SCALE = 0U,
-  RNN_COND_BIT_ZERO = 3U,
+  RNN_COND_BIT_ZERO = 2U,
+  RNN_COND_BIT_TALL_POPPY = 4U,
   RNN_COND_BIT_RAND = 6U
 };
 
@@ -74,6 +76,7 @@ enum {
   /*conditioning flags start at 1 << 16 (65536) */
   RNN_COND_USE_SCALE = (1 << (RNN_COND_BIT_SCALE + RNN_COND_USE_OFFSET)),
   RNN_COND_USE_ZERO = (1 << (RNN_COND_BIT_ZERO + RNN_COND_USE_OFFSET)),
+  RNN_COND_USE_TALL_POPPY = (1 << (RNN_COND_BIT_TALL_POPPY + RNN_COND_USE_OFFSET)),
   RNN_COND_USE_RAND = (1 << (RNN_COND_BIT_RAND + RNN_COND_USE_OFFSET)),
 
   /*more flags can fit after 1 << 24 or so */

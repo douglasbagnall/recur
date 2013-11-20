@@ -606,7 +606,7 @@ maybe_learn(GstRnnca *self){
   }
   rnn_log_net(net);
   self->net->generation = net->generation;
-  rnn_condition_net(self->net);
+  rnn_condition_net(net);
   if (PERIODIC_SAVE_NET && (self->net->generation & PERIODIC_SAVE_NET) == 0){
     rnn_save_net(self->net, self->net_filename);
   }

@@ -906,6 +906,10 @@ rnn_condition_net(RecurNN *net)
 {
   u32 mask = net->flags >> RNN_COND_USE_OFFSET;
   u32 m = net->generation % RNN_CONDITIONING_INTERVAL;
+  MAYBE_DEBUG("flags %x mask  %x m %x, hit %x",
+      net->flags, mask, m, (1 << m) & mask);
+
+
   if (((1 << m) & mask) == 0){
     return;
   }
@@ -941,6 +945,24 @@ rnn_condition_net(RecurNN *net)
           net->ih_weights[t] += damage;
         }
       }
+    }
+    break;
+  case RNN_COND_BIT_TALL_POPPY:
+    {
+      int big_i = 0;
+      float big_v = fabsf(net->ih_weights[0]);
+      for (int i = 1; i < net->ih_size; i++){
+        float v = fabsf(net->ih_weights[i]);
+        if (v > big_v){
+          big_v = v;
+          big_i = i;
+        }
+      }
+      if (big_v > RNN_TALL_POPPY_THRESHOLD){
+        net->ih_weights[big_i] *= RNN_TALL_POPPY_SCALE;
+      }
+      MAYBE_DEBUG("reducing weight %d from %.2g to %.2g",
+          big_i, big_v, net->ih_weights[big_i]);
     }
     break;
   }
