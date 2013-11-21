@@ -25,3 +25,4 @@ test_*
 /path.h
 /ccan/tools/configurator/configurator
 /config.h
+/rnnca-player

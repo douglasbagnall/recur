@@ -146,11 +146,11 @@ path.h:
 	@echo "#endif"                                    >>$@
 
 
-gtk-recur.o: gtk-recur.c  path.h
+
+gtk-recur.o rnnca-player.o: %.o: %.c  path.h
 	$(CC) -c  -MMD $(ALL_CFLAGS) $(CPPFLAGS)  $(INCLUDES)  $(GTK_INCLUDES) -o $@ $<
 
-
-gtk-recur: gtk-recur.o
+rnnca-player gtk-recur: %: %.o
 	$(CC) -Wl,-O1 $^   $(INCLUDES)  $(GTK_INCLUDES) $(DEFINES)  $(LINKS) $(GTK_LINKS)   -o $@
 
 
