@@ -231,9 +231,10 @@ gst_rnnca_init (GstRnnca * self)
 static void
 reset_net_filename(GstRnnca *self){
   char s[200];
-  snprintf(s, sizeof(s), "rnnca-i%d-h%d-o%d-b%d-yuv%d-y%d-m%d-x%d.net",
+  snprintf(s, sizeof(s), "rnnca-i%d-h%d-o%d-b%d-yuv%d-y%d-uv%d-m%d-x%d.net",
       RNNCA_N_FEATURES, self->hidden_size, 3,
-      RNNCA_BIAS, RNNCA_YUV_LEN, RNNCA_Y_ONLY_LEN, RNNCA_Y_MEAN_3_LEN, 2);
+      RNNCA_BIAS, RNNCA_YUV_LEN, RNNCA_Y_ONLY_LEN, RNNCA_UV_ONLY_LEN,
+      RNNCA_Y_MEAN_3_LEN, 2);
   if (self->net_filename){
     free(self->net_filename);
   }
@@ -550,6 +551,14 @@ fill_net_inputs(RecurNN *net, RnncaFrame *frame, int cx, int cy, int edges){
     offset = get_offset_point(RNNCA_Y_ONLY_OFFSETS + j, cx, cy, edges);
     net->real_inputs[i] = BYTE_TO_UNIT(frame->Y[offset]);
     i++;
+  }
+#endif
+#if USE_UV_ONLY_OFFSETS
+  for (j = 0; j < RNNCA_UV_ONLY_LEN; j+= 2){
+    offset = get_offset_point(RNNCA_UV_ONLY_OFFSETS + j, cx, cy, edges);
+    net->real_inputs[i] = BYTE_TO_UNIT(frame->Cb[offset]);
+    net->real_inputs[i + 1] = BYTE_TO_UNIT(frame->Cr[offset]);
+    i += 2;
   }
 #endif
 #if USE_Y_MEAN_3_OFFSETS
