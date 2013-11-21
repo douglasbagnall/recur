@@ -57,10 +57,11 @@ SOURCES =  gstrecur_manager.c gstrecur_audio.c gstrecur_video.c \
 	recur-context.c rescale.c recur-nn.c recur-nn-io.c context-recurse.c mfcc.c
 OBJECTS := $(patsubst %.c,%.o,$(SOURCES))
 
-images nets:
+subdirs = images nets
+$(subdirs):
 	mkdir -p $@
 
-all:: libgstclassify.so images nets
+all:: libgstclassify.so $(subdirs)
 
 clean:
 	rm -f *.so *.o *.a *.d *.s
@@ -200,21 +201,21 @@ VALGRIND = valgrind --tool=memcheck --log-file=valgrind.log --trace-children=yes
 
 #RNNCA_DEBUG=GST_DEBUG=rnnca*:5,recur*:5
 
-test-rnnca: libgstrnnca.so
+test-rnnca: libgstrnnca.so $(subdirs)
 	$(RNNCA_DEBUG)	$(GDB) 	gst-launch-1.0  \
 	  --gst-plugin-path=$(CURDIR) \
 	$(VID_FILE_SRC_LAGOS_SMALL) \
 	! rnnca log-file=rnnca.log training=1 playing=1 edges=0 learn-rate=1e-3 momentum=0.5 \
 	! videoconvert ! xvimagesink force-aspect-ratio=0
 
-train-rnnca: libgstrnnca.so
+train-rnnca: libgstrnnca.so $(subdirs)
 	$(RNNCA_DEBUG) $(GDB) 	gst-launch-1.0  \
 		  --gst-plugin-path=$(CURDIR) \
 		$(VID_FILE_SRC_LAGOS_SMALL) \
 		! rnnca log-file=rnnca.log training=1 playing=0 learn-rate=1e-3 momentum=0.5 \
 		! fakesink ;\
 
-play-rnnca: libgstrnnca.so
+play-rnnca: libgstrnnca.so $(subdirs)
 	$(RNNCA_DEBUG)	$(GDB) 	gst-launch-1.0  \
 	  --gst-plugin-path=$(CURDIR) \
 	videotestsrc pattern=black  ! $(VID_SPECS) ! \

@@ -142,7 +142,6 @@ rnn_set_log_file(RecurNN *net, const char *log_file, int append_dont_truncate){
     }
   }
   else{
-    DEBUG("not starting logging because log_file is NULL");
     net->log = NULL;
   }
 }

@@ -198,7 +198,7 @@ alloc_and_collapse_text(char *filename, const char *alphabet, const u8 *collapse
     long *len){
   int i, j;
   u8 *char_to_net = new_char_lut(alphabet, collapse_chars);
-  FILE *f = fopen(filename, "r");
+  FILE *f = fopen_or_abort(filename, "r");
   int err = fseek(f, 0, SEEK_END);
   *len = ftell(f);
   err |= fseek(f, 0, SEEK_SET);
@@ -232,7 +232,7 @@ static inline void
 dump_collapsed_text(u8 *text, int len, char *name)
 {
   int i;
-  FILE *f = fopen(name, "w");
+  FILE *f = fopen_or_abort(name, "w");
   for (i = 0; i < len; i++){
     fputc(opt_alphabet[text[i]], f);
   }

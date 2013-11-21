@@ -43,8 +43,8 @@ main(void){
   mdct_init(&m_look, WINDOW_SIZE);
   const float *window = _vorbis_window_get(WINDOW_NO);
 
-  FILE *inf = fopen(TEST_AUDIO_FILE, "r");
-  FILE *outf = fopen(DEST_AUDIO_FILE, "w");
+  FILE *inf = fopen_or_abort(TEST_AUDIO_FILE, "r");
+  FILE *outf = fopen_or_abort(DEST_AUDIO_FILE, "w");
 
   /*wav header is 44 bytes. reuse it as-is.*/
   int len = fread(buffer, 1, 44, inf);

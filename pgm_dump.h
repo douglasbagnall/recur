@@ -8,16 +8,16 @@
 #include <math.h>
 #include "recur-common.h"
 
-#ifndef DISABLE_PGM_DUMP
-#define DISABLE_PGM_DUMP 0
-#endif
 
 /*pgm for greyscale */
 static inline void
 pgm_dump(const u8 *data, u32 width, u32 height, const char *name)
 {
-#if ! DISABLE_PGM_DUMP
   FILE *fh = fopen(name, "w");
+  if (fh == NULL){
+    DEBUG("could not open '%s' for writing", name);
+    return;
+  }
   size_t size = width * height;
   fprintf(fh, "P5\n%u %u\n255\n", width, height);
   size_t wrote = fwrite(data, 1, size, fh);
@@ -26,7 +26,6 @@ pgm_dump(const u8 *data, u32 width, u32 height, const char *name)
   }
   fflush(fh);
   fclose(fh);
-#endif
 }
 
 static inline void
@@ -93,9 +92,12 @@ pbm_dump(const u64 *data64,
     const int height,
     const char *name)
 {
-#if ! DISABLE_PGM_DUMP
   u8 *data = (u8*)data64;
   FILE *fh = fopen(name, "w");
+  if (fh == NULL){
+    DEBUG("could not open '%s' for writing", name);
+    return;
+  }
   fprintf(fh, "P4\n%u %u\n", width, height);
   int rx = width;
   u8 byte = 0;
@@ -118,7 +120,6 @@ pbm_dump(const u64 *data64,
 
   fflush(fh);
   fclose(fh);
-#endif
 }
 
 
@@ -146,7 +147,6 @@ putc_colourcoded_float(float f, FILE *fh){
 static inline void
 ppm_dump_signed_unnormalised_float(const float *weights, int width, int height, const char *name)
 {
-#if ! DISABLE_PGM_DUMP
   float biggest = 1e-35f;
   for (int i = 0; i < width * height; i++){
     float f = fabsf(weights[i]);
@@ -156,6 +156,10 @@ ppm_dump_signed_unnormalised_float(const float *weights, int width, int height, 
   float scale = 255.99f / biggest;
   MAYBE_DEBUG("%s biggest is %.2g", name, biggest);
   FILE *fh = fopen(name, "w");
+  if (fh == NULL){
+    DEBUG("could not open '%s' for writing", name);
+    return;
+  }
   fprintf(fh, "P6\n%u %u\n255\n", width, height);
 
   for (int i = 0; i < width * height; i++){
@@ -163,14 +167,12 @@ ppm_dump_signed_unnormalised_float(const float *weights, int width, int height, 
   }
   fflush(fh);
   fclose(fh);
-#endif
 }
 
 
 static inline void
 ppm_dump_signed_unnormalised_colweighted_float(const float *weights, int width, int height, const char *name)
 {
-#if ! DISABLE_PGM_DUMP
   float scales[width];
   memset(scales, 0, sizeof(scales));
   for (int y = 0; y < height; y++){
@@ -185,6 +187,10 @@ ppm_dump_signed_unnormalised_colweighted_float(const float *weights, int width, 
   }
 
   FILE *fh = fopen(name, "w");
+  if (fh == NULL){
+    DEBUG("could not open '%s' for writing", name);
+    return;
+  }
   fprintf(fh, "P6\n%u %u\n255\n", width, height);
 
   for (int y = 0; y < height; y++){
@@ -195,7 +201,6 @@ ppm_dump_signed_unnormalised_colweighted_float(const float *weights, int width, 
   }
   fflush(fh);
   fclose(fh);
-#endif
 }
 
 static inline void

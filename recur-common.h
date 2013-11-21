@@ -147,4 +147,15 @@ BP(void) { asm (""); }
 #define CBP(x) do { if (x) BP(); } while(0)
 #endif
 
+
+static inline FILE *
+fopen_or_abort(char *name, char *mode){
+  FILE *fh = fopen(name, mode);
+  if (fh == NULL){
+    DEBUG("could not open '%s' in mode '%s', aborting...", name, mode);
+    abort();
+  }
+  return fh;
+}
+
 #endif
