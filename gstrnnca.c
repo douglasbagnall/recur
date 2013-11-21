@@ -110,6 +110,9 @@ gst_rnnca_finalize (GObject * obj){
   if (self->training_map){
     free(self->training_map);
   }
+  if (self->history){
+    free(self->history);
+  }
 }
 
 static void
@@ -225,6 +228,7 @@ gst_rnnca_init (GstRnnca * self)
   self->pending_learn_rate = 0;
   self->momentum_soft_start = DEFAULT_PROP_MOMENTUM_SOFT_START;
   self->momentum = DEFAULT_PROP_MOMENTUM;
+  self->history = NULL;
   GST_INFO("gst rnnca init\n");
 }
 
@@ -382,6 +386,10 @@ set_info (GstVideoFilter *filter,
   }
   if (self->trainers == NULL){
     construct_trainers(self, RNNCA_N_TRAINERS);
+  }
+  if (self->history == NULL){
+    self->history = zalloc_aligned_or_die(RNNCA_HISTORY_SAMPLES *
+        sizeof(RnncaPixelHistory));
   }
   maybe_start_logging(self);
   return TRUE;
@@ -641,38 +649,52 @@ maybe_learn(GstRnnca *self){
 }
 
 static inline void
-fill_frame(GstRnnca *self, GstVideoFrame *frame){
-  int x, y, offset;
-  if (PERIODIC_CHECK_STASIS &&
-      (self->net->generation & PERIODIC_CHECK_STASIS) == 0){
-    offset = 2 * RNNCA_WIDTH + rand_small_int(&self->net->rng, RNNCA_WIDTH);
-    u8 Y = self->play_frame->Y[offset];
-    u8 Cb = self->play_frame->Cb[offset];
-    u8 Cr = self->play_frame->Cr[offset];
-    const int m = 3;
-    GST_DEBUG("row 2, found yuv %d %d %d", Y, Cb, Cr);
-    for (y = 3; y < RNNCA_HEIGHT - 2; y++){
-      x = rand_small_int(&self->net->rng, RNNCA_WIDTH);
-      offset = y * RNNCA_WIDTH + x;
-      u8 Y2 = self->play_frame->Y[offset];
-      u8 Cb2 = self->play_frame->Cb[offset];
-      u8 Cr2 = self->play_frame->Cr[offset];
-      if (Y < Y2 - m || Y > Y2 + m ||
-          Cb < Cb2 - m || Cb > Cb2 + m ||
-          Cr < Cr2 - m || Cr > Cr2 + m){
-        GST_DEBUG("row %i, found yuv %d %d %d", y, Y2, Cb2, Cr2);
-        goto ok_its_not_flat;
+check_for_stasis(GstRnnca *self, RnncaFrame *frame){
+  int i;
+  RnncaPixelHistory *h;
+  int min_hits = 99999;
+  rand_ctx *rng = &self->net->rng;
+  if (rand_double(rng) < RNNCA_HISTORY_RATE){
+    for (i = 0; i < RNNCA_HISTORY_SAMPLES; i++){
+      h = &self->history[i];
+      int colour = (
+          (frame->Y[h->offset] << 16) +
+          (frame->Cb[h->offset] << 8) +
+          frame->Cr[h->offset]);
+      if (h->hits == 0){
+        /*a colour changed last time. Reset the pixel.*/
+        h->offset = rand_small_int(rng, RNNCA_WIDTH * RNNCA_HEIGHT);
+        h->hits = 1;
+        h->colour = colour;
+        min_hits = 0;
+      }
+      else if (h->colour == colour){
+        h->hits++;
+        min_hits = MIN(min_hits, h->hits);
+      }
+      else {
+        /*a colour has changed. */
+        h->hits = 0;
+        min_hits = 0;
       }
     }
-    for (y = 1; y < RNNCA_HEIGHT; y++){
-      x = rand_small_int(&self->net->rng, RNNCA_WIDTH);
-      offset = y * RNNCA_WIDTH + x;
-      self->play_frame->Y[offset] = rand_small_int(&self->net->rng, 256);
-      self->play_frame->Cb[offset] = rand_small_int(&self->net->rng, 256);
-      self->play_frame->Cr[offset] = rand_small_int(&self->net->rng, 256);
+    if (min_hits > RNNCA_HISTORY_SEEMS_STUCK){
+      GST_WARNING("trying to restart static image");
+      randomise_mem(rng, frame->Y, RNNCA_WIDTH * RNNCA_HEIGHT * 3);
+      for (i = 0; i < RNNCA_HISTORY_SAMPLES; i++){
+        self->history[i].hits = 0;
+      }
     }
   }
- ok_its_not_flat:
+}
+
+
+static inline void
+fill_frame(GstRnnca *self, GstVideoFrame *frame){
+  int x, y, offset;
+  if (PERIODIC_CHECK_STASIS){
+    check_for_stasis(self, self->play_frame);
+  }
   for (y = 0; y < RNNCA_HEIGHT; y++){
     for (x = 0; x < RNNCA_WIDTH; x++){
       RecurNN *net = self->constructors[y * RNNCA_WIDTH + x];

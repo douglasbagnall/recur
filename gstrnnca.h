@@ -14,6 +14,10 @@ G_BEGIN_DECLS
 #define RNNCA_WIDTH 144
 #define RNNCA_HEIGHT 96
 
+#define RNNCA_HISTORY_SAMPLES 50
+#define RNNCA_HISTORY_RATE 0.1
+#define RNNCA_HISTORY_SEEMS_STUCK (200 * RNNCA_HISTORY_RATE)
+
 #define RNNCA_BATCH_SIZE 1
 #define RNNCA_RNG_SEED 11
 #define RNNCA_BPTT_DEPTH 10
@@ -31,7 +35,7 @@ G_BEGIN_DECLS
 #define PERIODIC_PGM_DUMP 511
 #define PERIODIC_SAVE_NET 255
 
-#define PERIODIC_CHECK_STASIS 0
+#define PERIODIC_CHECK_STASIS 1
 #define PERIODIC_SHUFFLE_TRAINERS 15
 #define PGM_DUMP_CHANGED_MASK 0
 
@@ -125,6 +129,11 @@ typedef struct _RnncaTrainer {
   int y;
 } RnncaTrainer;
 
+typedef struct _RnncaPixelHistory {
+  int offset;
+  int hits;
+  int colour;
+} RnncaPixelHistory;
 
 typedef struct _GstRnnca GstRnnca;
 typedef struct _GstRnncaClass GstRnncaClass;
@@ -152,6 +161,7 @@ struct _GstRnnca
   int edges;
   float momentum;
   int momentum_soft_start;
+  RnncaPixelHistory *history;
 };
 
 struct _GstRnncaClass
