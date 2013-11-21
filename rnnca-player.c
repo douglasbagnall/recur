@@ -29,7 +29,7 @@ static char *option_uri = URI_PREFIX VID_LAGOS;
 
 static GOptionEntry entries[] =
 {
-  { "full-screen", 'f', 0, G_OPTION_ARG_NONE, &option_fullscreen, 
+  { "full-screen", 'f', 0, G_OPTION_ARG_NONE, &option_fullscreen,
     "run full screen", NULL },
   { "width", 'w', 0, G_OPTION_ARG_INT, &option_width, "width of screen", NULL },
   { "height", 'h', 0, G_OPTION_ARG_INT, &option_height, "height of screen", NULL },
@@ -193,7 +193,7 @@ make_pipeline(GError **parse_error,  GMainLoop *loop){
   g_object_set(G_OBJECT(rnnca),
       "edges", option_edges,
       NULL);
-  
+
   return pipeline;
 }
 
