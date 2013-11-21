@@ -3,7 +3,7 @@
 #0 get in place
 sleep 5
 
-#move the mouse pointer to the side
+#move the mouse pointer to the side, just in case
 xdotool mousemove 2000 300
 
 cd /home/douglas/recur
@@ -19,7 +19,5 @@ while true; do
     for x in rnnca*.net; do
         cp "$x" nets/$(date +%Y-%m-%d-%H-%M-%S)-$x
     done
-    ./rnnca-player -f 2>> rnnca-exhibition.log
-    ./rnnca-player -f 2>> rnnca-exhibition.log
     ./rnnca-player -f 2>> rnnca-exhibition.log
 done

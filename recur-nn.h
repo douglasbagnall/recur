@@ -212,6 +212,7 @@ add_aligned_arrays(float *restrict dest, int len, const float *restrict src, flo
   /*dest = dest + src * scale
     cblas_saxpy can do it. */
 #if 1
+  //XXX a prefetch would help
   ASSUME_ALIGNED(dest);
   ASSUME_ALIGNED(src);
   for (int i = 0; i < len; i++){

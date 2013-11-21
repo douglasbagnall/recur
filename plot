@@ -13,7 +13,8 @@ from math import log
 
 DEFAULT_LOGFILE = "classify.log"
 DEFAULT_KEYS = ('error_sum', 'error', 'hidden_sum', 'depth',
-                'error_gain', 'correct', 'momentum', 'weight_sum'
+                'error_gain', 'correct',
+                'weight_sum'
                )
 
 def seek_start(f, start):

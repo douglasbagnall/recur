@@ -219,7 +219,7 @@ play-rnnca: libgstrnnca.so $(subdirs)
 	$(RNNCA_DEBUG)	$(GDB) 	gst-launch-1.0  \
 	  --gst-plugin-path=$(CURDIR) \
 	videotestsrc pattern=black  ! $(VID_SPECS) ! \
-	rnnca training=0 playing=1 edges=1 \
+	rnnca training=0 playing=1 edges=0 \
 	! videoconvert ! xvimagesink force-aspect-ratio=0
 
 record-rnnca: libgstrnnca.so
