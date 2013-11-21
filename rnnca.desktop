@@ -1,6 +1,6 @@
 [Desktop Entry]
-Name=Recur Launcher
-Comment="Put this in ~/.config/autostart to launch Recur automatically"
+Name=RNNCA Launcher
+Comment="Put this in ~/.config/autostart to launch RNNCA automatically"
 Exec="/home/douglas/recur/rnnca-startup.sh"
 Path="/home/douglas/recur/"
 Terminal=false
