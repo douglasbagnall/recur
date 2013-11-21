@@ -238,7 +238,7 @@ reset_net_filename(GstRnnca *self){
   snprintf(s, sizeof(s), "rnnca-i%d-h%d-o%d-b%d-yuv%d-y%d-uv%d-m%d-x%d.net",
       RNNCA_N_FEATURES, self->hidden_size, 3,
       RNNCA_BIAS, RNNCA_YUV_LEN, RNNCA_Y_ONLY_LEN, RNNCA_UV_ONLY_LEN,
-      RNNCA_Y_MEAN_3_LEN, 2);
+      RNNCA_Y_MEAN_3_LEN, RNNCA_POSITIONAL_LEN);
   if (self->net_filename){
     free(self->net_filename);
   }
@@ -579,13 +579,11 @@ fill_net_inputs(RecurNN *net, RnncaFrame *frame, int cx, int cy, int edges){
     i++;
   }
 #endif
-#if 1
-  net->real_inputs[i] = abs(2 * cx - RNNCA_WIDTH) * 1.0 / RNNCA_WIDTH;
-  net->real_inputs[i + 1] = abs(2 * cy - RNNCA_HEIGHT) * 1.0 / RNNCA_HEIGHT;
-#else
-  net->real_inputs[i] = cx * 1.0f / RNNCA_WIDTH;
-  net->real_inputs[i + 1] = cy * 1.0f / RNNCA_HEIGHT;
-#endif
+  float xx = cx * 1.0f / RNNCA_WIDTH;
+  float yy = cy * 1.0f / RNNCA_HEIGHT;
+  net->real_inputs[i] = xx;
+  net->real_inputs[i + 1] = yy;
+  net->real_inputs[i + 2] = (yy - 0.5) *  (yy - 0.5) + (xx - 0.5) *  (xx - 0.5);
 }
 
 static inline void

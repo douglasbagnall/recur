@@ -111,10 +111,12 @@ const int RNNCA_Y_MEAN_3_LEN = ARRAY_LEN(RNNCA_Y_MEAN_3_OFFSETS);
 const int RNNCA_Y_MEAN_3_LEN = 0;
 #endif
 
+static const int RNNCA_POSITIONAL_LEN = 3;
 
-
-#define RNNCA_N_FEATURES (((RNNCA_YUV_LEN * 3 + RNNCA_Y_ONLY_LEN \
-              + RNNCA_UV_ONLY_LEN + (RNNCA_Y_MEAN_3_LEN / 3)) >> 1) + 2)
+#define RNNCA_N_FEATURES (                                              \
+      ((RNNCA_YUV_LEN * 3 + RNNCA_Y_ONLY_LEN    +                       \
+          RNNCA_UV_ONLY_LEN + (RNNCA_Y_MEAN_3_LEN / 3)) >> 1) +         \
+      RNNCA_POSITIONAL_LEN)
 
 typedef struct _RnncaFrame {
   u8 *Y;
