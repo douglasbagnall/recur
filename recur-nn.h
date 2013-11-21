@@ -44,7 +44,7 @@ typedef float v4ss __attribute__ ((vector_size (16))) __attribute__ ((aligned (1
 /*whether to log the hidden sum */
 #define RNN_LOG_HIDDEN_SUM 1
 /*whether to log the weight sum (relatively costly, often uninformative) */
-#define RNN_LOG_WEIGHT_SUM 0
+#define RNN_LOG_WEIGHT_SUM 1
 
 #define RNN_TALL_POPPY_THRESHOLD 1.0f
 #define RNN_TALL_POPPY_SCALE 0.99f

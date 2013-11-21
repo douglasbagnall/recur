@@ -46,7 +46,7 @@ const int RNNCA_YUV_LEN = ARRAY_LEN(RNNCA_YUV_OFFSETS);
 
 #define USE_UV_ONLY_OFFSETS 1
 #define USE_Y_ONLY_OFFSETS 1
-#define USE_Y_MEAN_3_OFFSETS 0
+#define USE_Y_MEAN_3_OFFSETS 1
 
 #if USE_UV_ONLY_OFFSETS
 const int RNNCA_UV_ONLY_OFFSETS[] = {
@@ -70,13 +70,14 @@ const int RNNCA_UV_ONLY_LEN = 0;
 
 #if USE_Y_ONLY_OFFSETS
 const int RNNCA_Y_ONLY_OFFSETS[] = {
-
+  0, 0
+  /*
        -1, -2,  1, -2,
   -2, -1,            2, -1,
     //       0,0,
   -2,  1,            2,  1,
        -1,  2,  1,  2
-
+  */
   /*
   -2, -2,          2, -2,
            0,  0,

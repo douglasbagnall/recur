@@ -571,8 +571,13 @@ fill_net_inputs(RecurNN *net, RnncaFrame *frame, int cx, int cy, int edges){
     i++;
   }
 #endif
-  net->real_inputs[i] = abs(cx - RNNCA_WIDTH) * 1.0 / RNNCA_WIDTH;
-  net->real_inputs[i + 1] = abs(cy - RNNCA_HEIGHT) * 1.0 / RNNCA_HEIGHT;
+#if 1
+  net->real_inputs[i] = abs(2 * cx - RNNCA_WIDTH) * 1.0 / RNNCA_WIDTH;
+  net->real_inputs[i + 1] = abs(2 * cy - RNNCA_HEIGHT) * 1.0 / RNNCA_HEIGHT;
+#else
+  net->real_inputs[i] = cx * 1.0f / RNNCA_WIDTH;
+  net->real_inputs[i + 1] = cy * 1.0f / RNNCA_HEIGHT;
+#endif
 }
 
 static inline void
@@ -582,7 +587,7 @@ train_net(RnncaTrainer *t, RnncaFrame *prev,  RnncaFrame *now){
   /*trainers are not on edges, so edge condition doesn't much matter */
   fill_net_inputs(net, prev, t->x, t->y, 1);
 
-  //float *answer = rnn_opinion_with_dropout(net, NULL, 0.5);
+  //float *answer = rnn_opinion_with_dropout(net, NULL, 0.1);
   float *answer = rnn_opinion(net, NULL);
   fast_sigmoid_array(answer, answer, 3);
   offset = t->y * RNNCA_WIDTH + t->x;
@@ -593,7 +598,7 @@ train_net(RnncaTrainer *t, RnncaFrame *prev,  RnncaFrame *now){
         now, prev, now->Y, prev->Y, plane_size, offset);
     float target = BYTE_TO_UNIT(now->Y[offset + plane_size * i]);
     float a = answer[i];
-    float slope = a * (1.0f - a) + 0.05;
+    float slope = a * (1.0f - a) + 0.1;
     net->bptt->o_error[i] = slope * (target - a);
     GST_LOG("target %.2g a %.2g diff %.2g slope %.2g",
         target, a, target - a, slope);
