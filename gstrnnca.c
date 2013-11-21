@@ -583,7 +583,9 @@ fill_net_inputs(RecurNN *net, RnncaFrame *frame, int cx, int cy, int edges){
   float yy = cy * 1.0f / RNNCA_HEIGHT;
   net->real_inputs[i] = xx;
   net->real_inputs[i + 1] = yy;
-  net->real_inputs[i + 2] = 0.5 - ((yy - 0.5) *  (yy - 0.5) + (xx - 0.5) *  (xx - 0.5));
+  if (RNNCA_POSITIONAL_LEN == 3){
+    net->real_inputs[i + 2] = 0.5 - ((yy - 0.5) *  (yy - 0.5) + (xx - 0.5) *  (xx - 0.5));
+  }
 }
 
 static inline void
