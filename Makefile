@@ -205,14 +205,14 @@ test-rnnca: libgstrnnca.so $(subdirs)
 	$(RNNCA_DEBUG)	$(GDB) 	gst-launch-1.0  \
 	  --gst-plugin-path=$(CURDIR) \
 	$(VID_FILE_SRC_LAGOS_SMALL) \
-	! rnnca log-file=rnnca.log training=1 playing=1 edges=0 learn-rate=1e-3 momentum=0.5 \
+	! rnnca log-file=rnnca.log training=1 playing=1 edges=0  \
 	! videoconvert ! xvimagesink force-aspect-ratio=0
 
 train-rnnca: libgstrnnca.so $(subdirs)
 	$(RNNCA_DEBUG) $(GDB) 	gst-launch-1.0  \
 		  --gst-plugin-path=$(CURDIR) \
 		$(VID_FILE_SRC_LAGOS_SMALL) \
-		! rnnca log-file=rnnca.log training=1 playing=0 learn-rate=1e-3 momentum=0.5 \
+		! rnnca log-file=rnnca.log training=1 playing=0 \
 		! fakesink ;\
 
 play-rnnca: libgstrnnca.so $(subdirs)

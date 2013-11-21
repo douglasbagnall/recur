@@ -16,8 +16,7 @@
 static const char *PIPELINE_TEMPLATE = ("uridecodebin name=src "
     " ! videoscale method=nearest-neighbour ! videoconvert"
     " ! video/x-raw, format=I420, width=" QUOTE(WIDTH) ", height=" QUOTE(HEIGHT)
-    " ! rnnca training=1 name=rnnca playing=1 learn-rate=1e-3 "
-    "momentum=0.5 edges=0 ! videoconvert"
+    " ! rnnca training=1 name=rnnca playing=1 edges=0 ! videoconvert"
     " ! xvimagesink name=videosink force-aspect-ratio=false"
 );
 
