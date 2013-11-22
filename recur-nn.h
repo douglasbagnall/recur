@@ -41,11 +41,6 @@ typedef float v4ss __attribute__ ((vector_size (16))) __attribute__ ((aligned (1
 /*RNN_CONDITIONING_INTERVAL should be <= 32, ideally a power of 2 */
 #define RNN_CONDITIONING_INTERVAL 8
 
-/*whether to log the hidden sum */
-#define RNN_LOG_HIDDEN_SUM 1
-/*whether to log the weight sum (relatively costly, often uninformative) */
-#define RNN_LOG_WEIGHT_SUM 1
-
 #define RNN_TALL_POPPY_THRESHOLD 1.0f
 #define RNN_TALL_POPPY_SCALE 0.99f
 
@@ -72,6 +67,8 @@ enum {
   RNN_NET_FLAG_OWN_WEIGHTS = 2,
   RNN_NET_FLAG_BIAS = 4,
   RNN_NET_FLAG_LOG_APPEND = 8,
+  RNN_NET_FLAG_LOG_HIDDEN_SUM = 16, /*log the hidden sum */
+  RNN_NET_FLAG_LOG_WEIGHT_SUM = 32, /*log the weight sum (can be expensive)*/
 
   /*conditioning flags start at 1 << 16 (65536) */
   RNN_COND_USE_SCALE = (1 << (RNN_COND_BIT_SCALE + RNN_COND_USE_OFFSET)),
@@ -82,7 +79,7 @@ enum {
   /*more flags can fit after 1 << 24 or so */
 
   RNN_NET_FLAG_STANDARD = (RNN_NET_FLAG_OWN_BPTT | RNN_NET_FLAG_OWN_WEIGHTS \
-       | RNN_COND_USE_ZERO | RNN_NET_FLAG_BIAS),
+       | RNN_COND_USE_ZERO | RNN_NET_FLAG_BIAS | RNN_NET_FLAG_LOG_HIDDEN_SUM),
   RNN_NET_FLAG_NO_BIAS = RNN_NET_FLAG_STANDARD & ~ RNN_NET_FLAG_BIAS
 };
 

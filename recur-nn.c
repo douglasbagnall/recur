@@ -662,20 +662,20 @@ bptt_and_accumulate_error(RecurNN *net, float *ih_delta, float top_error_sum)
     bptt_log_int(net, "depth", bptt->depth - t);
     bptt_log_float(net, "scaled_error", bptt->ih_scale * error_sum);
     bptt_log_float(net, "ih_scale", bptt->ih_scale);
-#if RNN_LOG_HIDDEN_SUM
-    float hidden_sum = 0;
-    for (int i = 0; i < net->h_size; i++){
-      hidden_sum += net->hidden_layer[i];
+    if (net->flags & RNN_NET_FLAG_LOG_HIDDEN_SUM){
+      float hidden_sum = 0;
+      for (int i = 0; i < net->h_size; i++){
+        hidden_sum += net->hidden_layer[i];
+      }
+      bptt_log_float(net, "hidden_sum", hidden_sum);
     }
-    bptt_log_float(net, "hidden_sum", hidden_sum);
-#endif
-#if RNN_LOG_WEIGHT_SUM
-    float weight_sum = 0;
-    for (int i = 0; i < net->ih_size; i++){
-      weight_sum += fabsf(weights[i]);
+    if (net->flags & RNN_NET_FLAG_LOG_WEIGHT_SUM){
+      float weight_sum = 0;
+      for (int i = 0; i < net->ih_size; i++){
+        weight_sum += fabsf(weights[i]);
+      }
+      bptt_log_float(net, "weight_sum", weight_sum);
     }
-    bptt_log_float(net, "weight_sum", weight_sum);
-#endif
   }
   return error_sum;
 }
