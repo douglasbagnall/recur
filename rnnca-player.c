@@ -1,15 +1,9 @@
-#include <gst/video/videooverlay.h>
-#include <gst/gst.h>
-#include "recur-common.h"
-#include <gtk/gtk.h>
-#include <gdk/gdkx.h>
-#include "path.h"
+#include "player-common.h"
 
 #define WIDTH  288
 #define HEIGHT 192
 #define FPS 20
 
-#define URI_PREFIX "file://" TEST_VIDEO_DIR "/"
 #define VID_LAGOS "lagos-" QUOTE(WIDTH) "-" QUOTE(HEIGHT) "-" QUOTE(FPS) ".avi"
 //#define VID_LAGOS "small/F36824_FootstepHocket.mov"
 
@@ -38,20 +32,7 @@ static GOptionEntry entries[] =
 };
 
 static GMainLoop *loop = NULL;
-static guintptr video_window_handle = 0;
 static gboolean looping = FALSE;
-
-static void
-toggle_fullscreen(GtkWidget *widget){
-  GdkWindow *gdk_window = gtk_widget_get_window(widget);
-  GdkWindowState state = gdk_window_get_state(gdk_window);
-  if (state & GDK_WINDOW_STATE_FULLSCREEN){
-    gtk_window_unfullscreen(GTK_WINDOW(widget));
-  }
-  else{
-    gtk_window_fullscreen(GTK_WINDOW(widget));
-  }
-}
 
 static void
 toggle_edges(GstElement *pipeline){
@@ -80,45 +61,6 @@ key_press_event_cb(GtkWidget *widget, GdkEventKey *event, GstElement *pipeline)
     break;
   }
   return TRUE;
-}
-
-static void hide_mouse(GtkWidget *widget){
-  GdkWindow *w = gtk_widget_get_window(widget);
-  GdkDisplay *display = gdk_display_get_default();
-  GdkCursor *cursor = gdk_cursor_new_for_display(display, GDK_BLANK_CURSOR);
-  gdk_window_set_cursor(w, cursor);
-  g_object_unref (cursor);
-}
-
-static GstBusSyncReply
-sync_bus_call(GstBus *bus, GstMessage *msg, gpointer data)
-{
- if (!gst_is_video_overlay_prepare_window_handle_message (msg))
-   return GST_BUS_PASS;
-
- if (video_window_handle != 0) {
-   GstVideoOverlay *overlay;
-   // GST_MESSAGE_SRC (msg) will be the video sink element
-   overlay = GST_VIDEO_OVERLAY (GST_MESSAGE_SRC (msg));
-   gst_video_overlay_set_window_handle (overlay, video_window_handle);
- }
- else {
-   g_warning ("Should have obtained video_window_handle by now!");
- }
- gst_message_unref (msg);
- return GST_BUS_DROP;
-}
-
-static void
-set_up_loop(GstElement *source, int flags){
-  DEBUG("loooooping\n");
-  if (! gst_element_seek(source, 1.0, GST_FORMAT_TIME,
-          flags,
-          GST_SEEK_TYPE_SET, 0,
-          GST_SEEK_TYPE_NONE, GST_CLOCK_TIME_NONE
-      )){
-    GST_WARNING("Seek failed!\n");
-  }
 }
 
 static void
