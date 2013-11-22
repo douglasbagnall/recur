@@ -159,24 +159,24 @@ gst_rnnca_class_init (GstRnncaClass * g_class)
           "Log to this file (empty for none)",
           DEFAULT_PROP_LOG_FILE,
           G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
-  /*XXX make these readwrite*/
+
   g_object_class_install_property (gobject_class, PROP_PLAYING,
       g_param_spec_boolean("playing", "playing",
           "Construct imaginary video",
           DEFAULT_PROP_PLAYING,
-          G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
+          G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class, PROP_TRAINING,
       g_param_spec_boolean("training", "training",
           "Learn from incoming video",
           DEFAULT_PROP_TRAINING,
-          G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
+          G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class, PROP_EDGES,
       g_param_spec_boolean("edges", "edges",
           "Play on edged rectangle, not torus",
           DEFAULT_PROP_EDGES,
-          G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
+          G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class, PROP_LEARN_RATE,
       g_param_spec_float("learn-rate", "learn-rate",
@@ -190,7 +190,7 @@ gst_rnnca_class_init (GstRnncaClass * g_class)
           "Size of the RNN hidden layer",
           MIN_HIDDEN_SIZE, MAX_HIDDEN_SIZE,
           DEFAULT_HIDDEN_SIZE,
-          G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
+          G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class, PROP_MOMENTUM_SOFT_START,
       g_param_spec_float("momentum-soft-start", "momentum-soft-start",
@@ -449,6 +449,12 @@ gst_rnnca_set_property (GObject * object, guint prop_id, const GValue * value,
       self->edges = g_value_get_boolean(value);
       break;
 
+    case PROP_HIDDEN_SIZE:
+      if (!self->net){
+        self->hidden_size = g_value_get_int(value);
+      }
+      break;
+
     case PROP_LEARN_RATE:
       self->pending_learn_rate = g_value_get_float(value);
       maybe_set_learn_rate(self);
@@ -486,6 +492,18 @@ gst_rnnca_get_property (GObject * object, guint prop_id, GValue * value,
     break;
   case PROP_MOMENTUM_SOFT_START:
     g_value_set_float(value, self->momentum_soft_start);
+    break;
+  case PROP_HIDDEN_SIZE:
+    g_value_set_int(value, self->hidden_size);
+    break;
+  case PROP_PLAYING:
+    g_value_set_boolean(value, self->playing);
+    break;
+  case PROP_TRAINING:
+    g_value_set_boolean(value, self->training);
+    break;
+  case PROP_EDGES:
+    g_value_set_boolean(value, self->edges);
     break;
   default:
     G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
