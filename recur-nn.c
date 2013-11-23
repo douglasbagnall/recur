@@ -553,16 +553,14 @@ calc_sgd_top_layer(RecurNN *net){
   if (net->bias){
     hiddens[0] = 1.0f;
   }
-
   MAYBE_DEBUG("top error:[0] %g, [1] %g", o_error[0], o_error[1]);
-
   error_sum = backprop_top_layer(net);
+  memset(delta, 0, net->ho_size * sizeof(float));
   for (y = 0; y < net->h_size; y++){
     if (hiddens[y]){
       float *restrict drow = delta + y * net->o_size;
       ASSUME_ALIGNED(drow);
       for (x = 0; x < net->o_size; x++){
-        /*XXX using += would allow diachronic batching*/
         drow[x] = o_error[x] * hiddens[y];
       }
     }
@@ -596,7 +594,6 @@ bptt_and_accumulate_error(RecurNN *net, float *ih_delta, float top_error_sum)
   float max_error_sum = MAX_ERROR_GAIN * top_error_sum;
   float min_error_sum = MIN_ERROR_FACTOR * net->h_size / net->bptt->learn_rate;
 
-  memset(ih_delta, 0, net->ih_size * sizeof(float));
   int t;
   for (t = bptt->depth; t > 0; t--){
     error_sum = 0.0f;
@@ -766,13 +763,12 @@ apply_learning_with_simplified_nestorov_momentum(float *restrict weights,
 static inline float
 apply_sgd_with_bptt(RecurNN *net, float top_error_sum){
   RecurNNBPTT *bptt = net->bptt;
-
+  memset(bptt->ih_delta, 0, net->ih_size * sizeof(float));
   float error_sum = bptt_and_accumulate_error(net, bptt->ih_delta, top_error_sum);
   float rate = bptt->learn_rate * bptt->ih_scale;
 
   apply_learning_with_momentum(net->ih_weights, bptt->ih_delta, bptt->ih_momentum,
       net->ih_size, rate, bptt->momentum, bptt->momentum_weight);
-  memset(bptt->ih_delta, 0, net->ih_size * sizeof(float));
   return error_sum;
 }
 
@@ -780,7 +776,7 @@ static inline float
 apply_sgd_with_bptt_batch(RecurNN *net, float top_error_sum){
   RecurNNBPTT *bptt = net->bptt;
   float rate = bptt->learn_rate;
-  float *gradient = malloc_aligned_or_die(net->ih_size * sizeof(float));
+  float *gradient = zalloc_aligned_or_die(net->ih_size * sizeof(float));
   float error_sum = bptt_and_accumulate_error(net, gradient, top_error_sum);
 
   add_aligned_arrays(bptt->ih_delta, net->ih_size, gradient, bptt->ih_scale);
@@ -860,6 +856,7 @@ bptt_calc_deltas(RecurNN *net){
   float top_error_scaled = softclip_scale(top_error_sum,
       net->h_size * MAX_TOP_ERROR_FACTOR, net->bptt->h_error, net->h_size);
 
+  memset(net->bptt->ih_delta, 0, net->ih_size * sizeof(float));
   float bptt_error_sum = bptt_and_accumulate_error(net,
       net->bptt->ih_delta, top_error_scaled);
   if (net->log){
