@@ -171,7 +171,7 @@ VID_URI_ZION=file://$(VIDEO_DIR)/movies/louis-theroux-zionists/Louis.Theroux.Ult
 VID_URI_EXIT=file://$(VIDEO_DIR)/movies/exit-through-the-gift-shop/Exit-Through-The-Gift-Shop.avi
 VID_W=288
 VID_H=192
-VID_SPECS = video/x-raw, format=I420, width=$(VID_W), height=$(VID_H)
+VID_SPECS = video/x-raw, format=I420, width=$(VID_W), height=$(VID_H), framerate=20/1
 
 VID_TEST_SRC_1 = videotestsrc pattern=14 kt=2 kxt=1 kyt=3  kxy=3 !\
         $(VID_SPECS), framerate=\(fraction\)25/1
@@ -214,6 +214,34 @@ train-rnnca: libgstrnnca.so $(subdirs)
 		$(VID_FILE_SRC_LAGOS_SMALL) \
 		! rnnca log-file=rnnca.log training=1 playing=0 \
 		! fakesink ;\
+
+PROPER_RNNCA_PROPERTIES = momentum-soft-start=3000 momentum=0.95 learn-rate=3e-6 \
+	hidden-size=59 log-file=rnnca.log
+
+train-rnnca-properly: libgstrnnca.so $(subdirs)
+	$(RNNCA_DEBUG) $(GDB) 	gst-launch-1.0  \
+		  --gst-plugin-path=$(CURDIR) \
+		$(VID_FILE_SRC_LAGOS_SMALL) \
+		! rnnca $(PROPER_RNNCA_PROPERTIES) \
+		training=1 playing=0 \
+		! fakesink ;\
+
+test-rnnca-properly: libgstrnnca.so $(subdirs)
+	$(RNNCA_DEBUG) $(GDB) 	gst-launch-1.0  \
+		  --gst-plugin-path=$(CURDIR) \
+		$(VID_FILE_SRC_LAGOS_SMALL) \
+		! rnnca $(PROPER_RNNCA_PROPERTIES) \
+		training=1 playing=1 \
+		!  xvimagesink force-aspect-ratio=0
+
+play-rnnca-properly: libgstrnnca.so $(subdirs)
+	$(RNNCA_DEBUG)	$(GDB) 	gst-launch-1.0  \
+	  --gst-plugin-path=$(CURDIR) \
+	videotestsrc pattern=black  ! $(VID_SPECS)  \
+	! rnnca $(PROPER_RNNCA_PROPERTIES) \
+	training=0 playing=1 edges=0 \
+	! videoconvert ! xvimagesink force-aspect-ratio=0
+
 
 play-rnnca: libgstrnnca.so $(subdirs)
 	$(RNNCA_DEBUG)	$(GDB) 	gst-launch-1.0  \
