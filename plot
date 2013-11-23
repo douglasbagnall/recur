@@ -106,6 +106,8 @@ def plot(logfile, args):
     keys = [x for x in args if not x.isdigit()]
     if keys == []:
         keys= DEFAULT_KEYS
+    elif all(x[0] == '+' for x in keys):
+        keys = list(DEFAULT_KEYS) + [x[1:] for x in keys]
     #numbers are start, length, step tuple
     lists = read_log(logfile, keys, *numbers)
     empties = [k for k, v in lists.items() if len(v) == 0]
