@@ -233,11 +233,12 @@ typedef struct _TemporalPPM {
   char *basename;
   int counter;
   int mode;
+  float **source;
 } TemporalPPM;
 
 static inline TemporalPPM *
 temporal_ppm_alloc(int width, int height, const char *basename, int id,
-    int mode){
+    int mode, float **source){
   TemporalPPM *p = malloc(sizeof(TemporalPPM));
   p->im = malloc_aligned_or_die(width * height * sizeof(float));
   p->width = width;
@@ -247,6 +248,7 @@ temporal_ppm_alloc(int width, int height, const char *basename, int id,
   p->counter = 0;
   p->basename = strdup(basename);
   p->mode = mode;
+  p->source = source;
   return p;
 }
 
@@ -269,7 +271,7 @@ temporal_ppm_write(TemporalPPM *ppm){
     ppm_dump_signed_unnormalised_float(ppm->im, ppm->width, ppm->height, name);
   }
   ppm->y = 0;
-  ppm->counter++;
+  ppm->counter += ppm->height;
 }
 
 static inline void
@@ -285,5 +287,17 @@ temporal_ppm_add_row(TemporalPPM *ppm, const float *row){
   }
 }
 
+static inline void
+temporal_ppm_row_from_source(TemporalPPM *ppm){
+  if (ppm == NULL){
+    DEBUG("temporal PPM not initialised!");
+    return;
+  }
+  memcpy(ppm->im + ppm->y * ppm->width, *ppm->source, ppm->width * sizeof(float));
+  ppm->y++;
+  if (ppm->y == ppm->height){
+    temporal_ppm_write(ppm);
+  }
+}
 
 #endif

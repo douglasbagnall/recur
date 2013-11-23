@@ -23,6 +23,8 @@ G_BEGIN_DECLS
 #define RNNCA_BPTT_DEPTH 10
 #define MOMENTUM_WEIGHT 0.5
 
+#define RNNCA_DO_TEMPORAL_LOGGING 0
+
 #define RNNCA_EXTRA_FLAGS  ( RNN_COND_USE_RAND | RNN_COND_USE_SCALE     \
       | RNN_COND_USE_TALL_POPPY | RNN_NET_FLAG_LOG_WEIGHT_SUM )
 
@@ -145,6 +147,7 @@ struct _GstRnnca
   float momentum;
   int momentum_soft_start;
   RnncaPixelHistory *history;
+  TemporalPPM **temporal_ppms;
 };
 
 struct _GstRnncaClass

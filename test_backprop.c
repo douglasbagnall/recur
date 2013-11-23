@@ -591,7 +591,8 @@ main(int argc, char *argv[]){
   }
 
   if (opt_temporal_pgm_dump){
-    input_ppm = temporal_ppm_alloc(net->i_size, 500, "input_layer", 0, PGM_DUMP_COLOUR);
+    input_ppm = temporal_ppm_alloc(net->i_size, 500, "input_layer", 0, PGM_DUMP_COLOUR,
+        NULL);
   }
   //DEBUG("quietness %d", opt_quiet);
   BELOW_QUIET_LEVEL(2){

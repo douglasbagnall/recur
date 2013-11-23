@@ -83,15 +83,15 @@ init_channel(ParrotChannel *c, RecurNN *net, int id, float learn_rate)
   c->mdct_prev = zalloc_aligned_or_die(PARROT_WINDOW_SIZE / 2 * sizeof(float));
   if (PGM_DUMP_FEATURES){
     c->mfcc_image = temporal_ppm_alloc(PARROT_N_FEATURES, 300, "parrot-mfcc", id,
-        PGM_DUMP_COLOUR);
+        PGM_DUMP_COLOUR, NULL);
     c->pcm_image = temporal_ppm_alloc(PARROT_WINDOW_SIZE, 300, "parrot-pcm", id,
-        PGM_DUMP_COLOUR);
+        PGM_DUMP_COLOUR, NULL);
     c->pcm_image2 = temporal_ppm_alloc(PARROT_WINDOW_SIZE, 300, "parrot-pcm2", id,
-        PGM_DUMP_COLOUR);
+        PGM_DUMP_COLOUR, NULL);
     c->dct_image = temporal_ppm_alloc(PARROT_WINDOW_SIZE / 2, 300, "parrot-dct", id,
-        PGM_DUMP_COLOUR);
+        PGM_DUMP_COLOUR, NULL);
     c->answer_image = temporal_ppm_alloc(PARROT_WINDOW_SIZE / 2, 300, "parrot-out", id,
-        PGM_DUMP_COLOUR);
+        PGM_DUMP_COLOUR, NULL);
   }
   else {
     c->mfcc_image = NULL;

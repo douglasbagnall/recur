@@ -229,6 +229,7 @@ gst_rnnca_init (GstRnnca * self)
   self->momentum_soft_start = DEFAULT_PROP_MOMENTUM_SOFT_START;
   self->momentum = DEFAULT_PROP_MOMENTUM;
   self->history = NULL;
+  self->temporal_ppms = NULL;
   GST_INFO("gst rnnca init\n");
 }
 
@@ -345,6 +346,27 @@ maybe_start_logging(GstRnnca *self){
   }
 }
 
+static void
+maybe_start_temporal_ppms(GstRnnca *self){
+  if (self->temporal_ppms == NULL && RNNCA_DO_TEMPORAL_LOGGING){
+    RecurNN *net = self->train_nets[0];
+    TemporalPPM **p = malloc(8 * sizeof(TemporalPPM*));
+    self->temporal_ppms = p;
+    p[0] = temporal_ppm_alloc(net->i_size, 150, "inputs", 0,
+        PGM_DUMP_COLOUR, &net->input_layer);
+    p[1] = temporal_ppm_alloc(net->h_size, 150, "hidden", 0,
+        PGM_DUMP_COLOUR, &net->hidden_layer);
+    p[2] = temporal_ppm_alloc(net->o_size, 150, "o_error", 0,
+        PGM_DUMP_COLOUR, &net->bptt->o_error);
+    p[3] = temporal_ppm_alloc(net->i_size, 150, "h_error", 0,
+        PGM_DUMP_COLOUR, &net->bptt->h_error);
+    p[4] = temporal_ppm_alloc(net->i_size, 150, "i_error", 0,
+        PGM_DUMP_COLOUR, &net->bptt->i_error);
+    p[5] = NULL;
+  }
+}
+
+
 static gboolean
 set_info (GstVideoFilter *filter,
     GstCaps *incaps, GstVideoInfo *in_info,
@@ -392,6 +414,7 @@ set_info (GstVideoFilter *filter,
         sizeof(RnncaPixelHistory));
   }
   maybe_start_logging(self);
+  maybe_start_temporal_ppms(self);
   return TRUE;
 }
 
@@ -663,6 +686,11 @@ maybe_learn(GstRnnca *self){
     /*XXX maybe keep in sorted order ?*/
     GST_DEBUG("shifted trainer %d to %d,%d, map %s", i, t->x, t->y, name);
 #endif
+  }
+  if (self->temporal_ppms){
+    for (i = 0; self->temporal_ppms[i]; i++){
+      temporal_ppm_row_from_source(self->temporal_ppms[i]);
+    }
   }
 }
 

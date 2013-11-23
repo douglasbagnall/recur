@@ -116,7 +116,7 @@ init_channel(ClassifyChannel *c, RecurNN *net, int window_size, int id, float le
   c->features = zalloc_aligned_or_die(net->input_size * sizeof(float));
   if (PGM_DUMP_FEATURES){
     c->mfcc_image = temporal_ppm_alloc(net->input_size, 300, "mfcc", id,
-        PGM_DUMP_COLOUR);
+        PGM_DUMP_COLOUR, &c->features);
   }
   else {
     c->mfcc_image = NULL;
@@ -849,7 +849,7 @@ prepare_channel_features(GstClassify *self, s16 *buffer_i, int j){
   /*get the features -- after which pcm_now is finished with. */
   pcm_to_features(self->mfcc_factory, c->features, c->pcm_now, self->mfccs);
   if (c->mfcc_image){
-    temporal_ppm_add_row(c->mfcc_image, c->features);
+    temporal_ppm_row_from_source(c->mfcc_image);
   }
 
   float *tmp;
