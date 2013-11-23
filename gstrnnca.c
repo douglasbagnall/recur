@@ -647,7 +647,7 @@ train_net(RnncaTrainer *t, RnncaFrame *prev,  RnncaFrame *now){
         now, prev, now->Y, prev->Y, plane_size, offset);
     float target = BYTE_TO_UNIT(now->Y[offset + plane_size * i]);
     float a = answer[i];
-    float slope = a * (1.0f - a) + 0.1;
+    float slope = a * (1.0f - a);
     net->bptt->o_error[i] = slope * (target - a);
     GST_LOG("target %.2g a %.2g diff %.2g slope %.2g",
         target, a, target - a, slope);
@@ -667,6 +667,11 @@ maybe_learn(GstRnnca *self){
   if (PERIODIC_PGM_DUMP && (net->generation & PERIODIC_PGM_DUMP) == 0){
     rnn_multi_pgm_dump(net, "how ihw");
   }
+#if SPECIFIC_PGM_DUMP
+  if (net->generation > 1400 && net->generation < 1410){
+    rnn_multi_pgm_dump(net, "how ihw hom ihm hod ihd");
+  }
+#endif
   rnn_log_net(net);
   self->net->generation = net->generation;
   rnn_condition_net(net);

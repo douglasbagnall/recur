@@ -10,7 +10,6 @@ G_BEGIN_DECLS
 
 #define TRY_RELOAD 1
 #define RNNCA_BIAS 1
-#define RNNCA_N_TRAINERS 20
 #define RNNCA_WIDTH 144
 #define RNNCA_HEIGHT 96
 
@@ -25,8 +24,16 @@ G_BEGIN_DECLS
 
 #define RNNCA_DO_TEMPORAL_LOGGING 0
 
+#define LONG_WALK 0
+
+#if LONG_WALK
 #define RNNCA_EXTRA_FLAGS  ( RNN_COND_USE_RAND | RNN_COND_USE_SCALE     \
       | RNN_COND_USE_TALL_POPPY | RNN_NET_FLAG_LOG_WEIGHT_SUM )
+#define RNNCA_N_TRAINERS 20
+#else
+#define RNNCA_EXTRA_FLAGS  ( RNN_COND_USE_SCALE | RNN_NET_FLAG_LOG_WEIGHT_SUM )
+#define RNNCA_N_TRAINERS 200
+#endif
 
 #if RNNCA_BIAS
 #define RNNCA_RNN_FLAGS (RNN_NET_FLAG_STANDARD | RNNCA_EXTRA_FLAGS)
@@ -35,6 +42,7 @@ G_BEGIN_DECLS
 #endif
 
 #define PERIODIC_PGM_DUMP 0
+#define SPECIFIC_PGM_DUMP 0
 #define PERIODIC_SAVE_NET 511
 
 #define PERIODIC_CHECK_STASIS 1
@@ -45,15 +53,15 @@ G_BEGIN_DECLS
 
 const int RNNCA_YUV_OFFSETS[] = {
   -1, -1,   0, -1,   1, -1,
-  -1,  0,            1,  0,
+  -1,  0,   0,  0,   1,  0,
   -1,  1,   0,  1,   1,  1,
 
 };
 const int RNNCA_YUV_LEN = ARRAY_LEN(RNNCA_YUV_OFFSETS);
 
 #define USE_UV_ONLY_OFFSETS 0
-#define USE_Y_ONLY_OFFSETS 1
-#define USE_Y_MEAN_3_OFFSETS 0
+#define USE_Y_ONLY_OFFSETS 0
+#define USE_Y_MEAN_3_OFFSETS 1
 
 #if USE_UV_ONLY_OFFSETS
 const int RNNCA_UV_ONLY_OFFSETS[] = {
@@ -67,12 +75,12 @@ const int RNNCA_UV_ONLY_LEN = 0;
 #if USE_Y_ONLY_OFFSETS
 const int RNNCA_Y_ONLY_OFFSETS[] = {
 #if USE_Y_MEAN_3_OFFSETS
-             0,0,
+  0,0,
 #else
 
        -1, -2,  1, -2,
   -2, -1,            2, -1,
-             0,0,
+             //             0,0,
   -2,  1,            2,  1,
        -1,  2,  1,  2
 #endif
