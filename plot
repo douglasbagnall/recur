@@ -47,12 +47,12 @@ def seek_start(f, start):
 
 
 def read_log(fn, names, step=1,
-             start=0, length=2000000):
+             start=0, length=0):
     f = open(fn)
     if start > 10000:
         seek_start(f, start)
     if length == 0:
-        length = 999999999
+        length = 10 ** 9
     gen = []
     series = {'generation': gen}
     for name in names:
@@ -75,6 +75,8 @@ def read_log(fn, names, step=1,
             if current != generation:
                 gen.append(generation)
                 current = generation
+                if len(gen) > length:
+                    break
     f.close()
     return series
 
