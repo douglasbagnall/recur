@@ -598,10 +598,9 @@ bptt_and_accumulate_error(RecurNN *net, float *ih_delta, float top_error_sum)
   for (t = bptt->depth; t > 0; t--){
     error_sum = 0.0f;
     int offset = (t + bptt->index) % bptt->depth;
-    float *restrict inputs = bptt->history + offset * net->i_size;
+    const float *restrict inputs = bptt->history + offset * net->i_size;
     ASSUME_ALIGNED(inputs);
     if (net->bias){
-      inputs[0] = 1.0f;
       h_error[0] = 0.0;
     }
     for (int i = net->hidden_size + net->bias; i < net->h_size; i++){
