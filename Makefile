@@ -216,7 +216,7 @@ train-rnnca: libgstrnnca.so $(subdirs)
 		! fakesink ;\
 
 PROPER_RNNCA_PROPERTIES = momentum-soft-start=3000 momentum=0.95 learn-rate=3e-6 \
-	hidden-size=59 log-file=rnnca.log
+	hidden-size=79 log-file=rnnca.log offsets=Y011112C011102
 
 train-rnnca-properly: libgstrnnca.so $(subdirs)
 	$(RNNCA_DEBUG) $(GDB) 	gst-launch-1.0  \
@@ -241,6 +241,16 @@ play-rnnca-properly: libgstrnnca.so $(subdirs)
 	! rnnca $(PROPER_RNNCA_PROPERTIES) \
 	training=0 playing=1 edges=0 \
 	! videoconvert ! xvimagesink force-aspect-ratio=0
+
+#RNNCA_DEBUG=GST_DEBUG=5
+
+record-rnnca-properly: libgstrnnca.so
+	$(RNNCA_DEBUG)	$(GDB) 	gst-launch-1.0 	--gst-plugin-path=$(CURDIR) \
+	avimux name=mux ! filesink location=rnnca2.avi \
+	videotestsrc pattern=black  ! $(VID_SPECS) \
+	! rnnca $(PROPER_RNNCA_PROPERTIES) \
+	 training=0 playing=1 edges=0 \
+	! videoconvert ! x264enc bitrate=512 ! mux.
 
 
 play-rnnca: libgstrnnca.so $(subdirs)
