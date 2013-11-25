@@ -26,10 +26,11 @@ typedef float v4ss __attribute__ ((vector_size (16))) __attribute__ ((aligned (1
 #define MAX_TOP_ERROR_FACTOR 2.0f
 /*if bptt error grows by more than MAX_ERROR_GAIN, abort and scale */
 #define MAX_ERROR_GAIN 2.0f
-/*MIN_ERROR_FACTOR is minimum mean error */
+/*MIN_ERROR_FACTOR is related to the minimum mean error*/
 #define MIN_ERROR_FACTOR 1e-11f
 /* RNN_HIDDEN_PENALTY is subtracted from each hidden node, forcing low numbers to zero.
- 1e-3f is safe, but less accurate than 1e-4f */
+ 1e-3f is safe, but less accurate than 1e-4f
+XXX this really ought to be adjustable or adjust itself */
 #define RNN_HIDDEN_PENALTY 1e-4f
 /*scaling for hidden and input numbers */
 #define HIDDEN_MEAN_SOFT_TOP 16.0f
