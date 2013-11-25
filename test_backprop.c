@@ -32,6 +32,7 @@
 #define DEFAULT_BPTT_BATCH_SIZE 1
 #define DEFAULT_VALIDATE_CHARS 0
 #define DEFAULT_VALIDATION_OVERLAP 1
+#define DEFAULT_DROPOUT 0
 #define DEFAULT_OVERRIDE 0
 #define DEFAULT_DETERMINISTIC_CONFAB 0
 #define DEFAULT_SAVE_NET 1
@@ -65,6 +66,7 @@ static char * opt_collapse_chars = HASH_CHARS;
 static char * opt_textfile = DICKENS_SHUFFLED_TEXT;
 static bool opt_bias = DEFAULT_BIAS;
 static bool opt_reload = DEFAULT_RELOAD;
+static float opt_dropout = DEFAULT_DROPOUT;
 static float opt_momentum_weight = DEFAULT_MOMENTUM_WEIGHT;
 static float opt_momentum_soft_start = DEFAULT_MOMENTUM_SOFT_START;
 static u64 opt_rng_seed = DEFAULT_RNG_SEED;
@@ -157,6 +159,8 @@ static struct opt_table options[] = {
       &opt_deterministic_confab, "Use best guess in confab, not random sampling"),
   OPT_WITHOUT_ARG("--no-save-net", opt_set_invbool,
       &opt_deterministic_confab, "Don't save learnt changes"),
+  OPT_WITH_ARG("--dropout=<0-1>", opt_set_floatval, opt_show_floatval,
+      &opt_dropout, "dropout this fraction of hidden nodes"),
 
 
   OPT_WITHOUT_ARG("-h|--help", opt_usage_and_exit,
@@ -259,8 +263,13 @@ one_hot_opinion(RecurNN *net, const int hot){
   //XXX could just set the previous one to zero (i.e. remember it)
   memset(net->real_inputs, 0, net->input_size * sizeof(float));
   net->real_inputs[hot] = 1.0f;
-  float *answer = rnn_opinion_with_dropout(net, NULL, 0.5);
-  //float *answer = rnn_opinion(net, NULL);
+  float *answer;
+  if (opt_dropout){
+    answer = rnn_opinion_with_dropout(net, NULL, opt_dropout);
+  }
+  else {
+    answer = rnn_opinion(net, NULL);
+  }
   return answer;
 }
 
