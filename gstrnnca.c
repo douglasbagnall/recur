@@ -37,6 +37,7 @@ enum
   PROP_OFFSETS,
   PROP_MOMENTUM_SOFT_START,
   PROP_MOMENTUM,
+  PROP_DROPOUT,
 };
 
 
@@ -54,9 +55,12 @@ enum
 #define LEARN_RATE_MIN 0.0
 #define LEARN_RATE_MAX 1.0
 #define DEFAULT_PROP_MOMENTUM 0.5f
+#define DEFAULT_PROP_DROPOUT 0.0f
 #define DEFAULT_PROP_MOMENTUM_SOFT_START 0.0f
 #define MOMENTUM_MIN 0.0
 #define MOMENTUM_MAX 1.0
+#define DROPOUT_MIN 0.0
+#define DROPOUT_MAX 1.0
 #define MOMENTUM_SOFT_START_MAX 1e9
 #define MOMENTUM_SOFT_START_MIN 0
 
@@ -214,6 +218,13 @@ gst_rnnca_class_init (GstRnncaClass * g_class)
           DEFAULT_PROP_MOMENTUM,
           G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
+  g_object_class_install_property (gobject_class, PROP_DROPOUT,
+      g_param_spec_float("dropout", "dropout",
+          "dropout this percentage of neurons",
+          DROPOUT_MIN, DROPOUT_MAX,
+          DEFAULT_PROP_DROPOUT,
+          G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+
   vf_class->transform_frame_ip = GST_DEBUG_FUNCPTR (gst_rnnca_transform_frame_ip);
   vf_class->set_info = GST_DEBUG_FUNCPTR (set_info);
   GST_INFO("gst class init\n");
@@ -236,6 +247,7 @@ gst_rnnca_init (GstRnnca * self)
   self->pending_learn_rate = 0;
   self->momentum_soft_start = DEFAULT_PROP_MOMENTUM_SOFT_START;
   self->momentum = DEFAULT_PROP_MOMENTUM;
+  self->dropout = DEFAULT_PROP_DROPOUT;
   self->history = NULL;
   self->temporal_ppms = NULL;
   self->offsets_Y = NULL;
@@ -579,6 +591,13 @@ gst_rnnca_set_property (GObject * object, guint prop_id, const GValue * value,
 
     case PROP_MOMENTUM:
       self->momentum = g_value_get_float(value);
+      if (self->train_nets && self->train_nets[0]){
+        self->train_nets[0]->bptt->momentum = self->momentum;
+      }
+      break;
+
+    case PROP_DROPOUT:
+      self->dropout = g_value_get_float(value);
       break;
 
     default:
@@ -599,6 +618,9 @@ gst_rnnca_get_property (GObject * object, guint prop_id, GValue * value,
     if (self->train_nets){
       g_value_set_float(value, self->train_nets[0]->bptt->learn_rate);
     }
+    break;
+  case PROP_DROPOUT:
+    g_value_set_float(value, self->dropout);
     break;
   case PROP_MOMENTUM:
     g_value_set_float(value, self->momentum);
@@ -707,9 +729,13 @@ train_net(GstRnnca *self, RnncaTrainer *t, RnncaFrame *prev,  RnncaFrame *now){
   RecurNN *net = t->net;
   /*trainers are not on edges, so edge condition doesn't much matter */
   fill_net_inputs(self, net, prev, t->x, t->y, 1);
-
-  //float *answer = rnn_opinion_with_dropout(net, NULL, 0.1);
-  float *answer = rnn_opinion(net, NULL);
+  float *answer;
+  if (self->dropout){
+    answer = rnn_opinion_with_dropout(net, NULL, self->dropout);
+  }
+  else {
+    answer = rnn_opinion(net, NULL);
+  }
   fast_sigmoid_array(answer, answer, 3);
   offset = t->y * RNNCA_WIDTH + t->x;
   GST_DEBUG("x %d, y %d, offset %d", t->x, t->y, offset);
