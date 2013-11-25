@@ -49,65 +49,11 @@ G_BEGIN_DECLS
 #define PERIODIC_SHUFFLE_TRAINERS 7
 #define PGM_DUMP_CHANGED_MASK 0
 
+#define RNNCA_DEFAULT_PATTERN "Y00120111C0111"
+
 #define ARRAY_LEN(x) sizeof(x) / sizeof((x)[0])
 
-const int RNNCA_YUV_OFFSETS[] = {
-  -1, -1,   0, -1,   1, -1,
-  -1,  0,   0,  0,   1,  0,
-  -1,  1,   0,  1,   1,  1,
-
-};
-const int RNNCA_YUV_LEN = ARRAY_LEN(RNNCA_YUV_OFFSETS);
-
-#define USE_UV_ONLY_OFFSETS 0
-#define USE_Y_ONLY_OFFSETS 0
-#define USE_Y_MEAN_3_OFFSETS 1
-
-#if USE_UV_ONLY_OFFSETS
-const int RNNCA_UV_ONLY_OFFSETS[] = {
-};
-const int RNNCA_UV_ONLY_LEN = ARRAY_LEN(RNNCA_UV_ONLY_OFFSETS);
-#else
-const int RNNCA_UV_ONLY_LEN = 0;
-#endif
-
-
-#if USE_Y_ONLY_OFFSETS
-const int RNNCA_Y_ONLY_OFFSETS[] = {
-#if USE_Y_MEAN_3_OFFSETS
-  0,0,
-#else
-
-       -1, -2,  1, -2,
-  -2, -1,            2, -1,
-             //             0,0,
-  -2,  1,            2,  1,
-       -1,  2,  1,  2
-#endif
-};
-const int RNNCA_Y_ONLY_LEN = ARRAY_LEN(RNNCA_Y_ONLY_OFFSETS);
-#else
-const int RNNCA_Y_ONLY_LEN = 0;
-#endif
-
-#if USE_Y_MEAN_3_OFFSETS
-const int RNNCA_Y_MEAN_3_OFFSETS[] = {
-  -1, -2,  0, -2, 1, -2,
-  -1,  2,  0,  2, 1,  2,
-  -2, -1, -2,  0, -2, 1,
-   2, -1,  2,  0,  2, 1,
-};
-const int RNNCA_Y_MEAN_3_LEN = ARRAY_LEN(RNNCA_Y_MEAN_3_OFFSETS);
-#else
-const int RNNCA_Y_MEAN_3_LEN = 0;
-#endif
-
 static const int RNNCA_POSITIONAL_LEN = 2;
-
-#define RNNCA_N_FEATURES (                                              \
-      ((RNNCA_YUV_LEN * 3 + RNNCA_Y_ONLY_LEN    +                       \
-          RNNCA_UV_ONLY_LEN + (RNNCA_Y_MEAN_3_LEN / 3)) >> 1) +         \
-      RNNCA_POSITIONAL_LEN)
 
 typedef struct _RnncaFrame {
   u8 *Y;
@@ -156,6 +102,13 @@ struct _GstRnnca
   int momentum_soft_start;
   RnncaPixelHistory *history;
   TemporalPPM **temporal_ppms;
+  int *offsets_Y;
+  int len_Y;
+  int *offsets_C;
+  int len_C;
+  int len_pos;
+  char *offset_pattern;
+  float dropout;
 };
 
 struct _GstRnncaClass

@@ -34,6 +34,7 @@ enum
   PROP_TRAINING,
   PROP_PLAYING,
   PROP_EDGES,
+  PROP_OFFSETS,
   PROP_MOMENTUM_SOFT_START,
   PROP_MOMENTUM,
 };
@@ -41,6 +42,7 @@ enum
 
 #define DEFAULT_PROP_PGM_DUMP ""
 #define DEFAULT_PROP_LOG_FILE ""
+#define DEFAULT_PROP_OFFSETS RNNCA_DEFAULT_PATTERN
 #define DEFAULT_PROP_SAVE_NET NULL
 #define DEFAULT_PROP_PLAYING 1
 #define DEFAULT_PROP_TRAINING 1
@@ -160,6 +162,12 @@ gst_rnnca_class_init (GstRnncaClass * g_class)
           DEFAULT_PROP_LOG_FILE,
           G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
+  g_object_class_install_property (gobject_class, PROP_OFFSETS,
+      g_param_spec_string("offsets", "offsets",
+          "Offset pattern ([YC], followed by digit pairs)",
+          DEFAULT_PROP_OFFSETS,
+          G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+
   g_object_class_install_property (gobject_class, PROP_PLAYING,
       g_param_spec_boolean("playing", "playing",
           "Construct imaginary video",
@@ -230,16 +238,22 @@ gst_rnnca_init (GstRnnca * self)
   self->momentum = DEFAULT_PROP_MOMENTUM;
   self->history = NULL;
   self->temporal_ppms = NULL;
+  self->offsets_Y = NULL;
+  self->offsets_C = NULL;
+  self->len_Y = 0;
+  self->len_C = 0;
+  self->len_pos = RNNCA_POSITIONAL_LEN;
+  self->offset_pattern = RNNCA_DEFAULT_PATTERN;
   GST_INFO("gst rnnca init\n");
 }
 
 static void
 reset_net_filename(GstRnnca *self){
   char s[200];
-  snprintf(s, sizeof(s), "rnnca-i%d-h%d-o%d-b%d-yuv%d-y%d-uv%d-m%d-x%d.net",
-      RNNCA_N_FEATURES, self->hidden_size, 3,
-      RNNCA_BIAS, RNNCA_YUV_LEN, RNNCA_Y_ONLY_LEN, RNNCA_UV_ONLY_LEN,
-      RNNCA_Y_MEAN_3_LEN, RNNCA_POSITIONAL_LEN);
+  int input_size = self->len_Y + self->len_C * 2 + self->len_pos;
+  snprintf(s, sizeof(s), "rnnca-i%d-h%d-o%d-b%d-y%d-uv%d-x%d-%s.net",
+      input_size, self->hidden_size, 3,
+      RNNCA_BIAS, self->len_Y, self->len_C, self->len_pos, self->offset_pattern);
   if (self->net_filename){
     free(self->net_filename);
   }
@@ -318,7 +332,8 @@ load_or_create_net(GstRnnca *self){
   reset_net_filename(self);
   RecurNN *net = TRY_RELOAD ? rnn_load_net(self->net_filename) : NULL;
   if (net == NULL){
-    net = rnn_new(RNNCA_N_FEATURES, self->hidden_size, 3,
+    int input_size = self->len_Y  + self->len_C * 2 + self->len_pos;
+    net = rnn_new(input_size, self->hidden_size, 3,
         RNNCA_RNN_FLAGS, RNNCA_RNG_SEED,
         NULL, RNNCA_BPTT_DEPTH, DEFAULT_LEARN_RATE, self->momentum, MOMENTUM_WEIGHT,
         RNNCA_BATCH_SIZE, 0);
@@ -366,6 +381,71 @@ maybe_start_temporal_ppms(GstRnnca *self){
   }
 }
 
+static void
+setup_inputs(GstRnnca *self){
+  int i;
+  char *pattern = self->offset_pattern;
+  int plen = strlen(pattern);
+  char c;
+  int max_size = plen * sizeof(int) * 2 * 8;
+  self->offsets_Y = malloc_aligned_or_die(max_size);
+  self->offsets_C = malloc_aligned_or_die(max_size);
+  int *target = self->offsets_Y;
+  int *len = &self->len_Y;
+  int pair[2];
+  int parity = 0;
+  for (i = 0; i < plen; i++){
+    c = pattern[i];
+    if (c == 'Y'){
+      len = &self->len_Y;
+      target = self->offsets_Y;
+      continue;
+    }
+    if (c == 'C'){
+      len = &self->len_C;
+      target = self->offsets_C;
+      continue;
+    }
+    if (c >= '0' && c <= '9'){
+      pair[parity] = c - '0';
+      parity = 1 - parity;
+      if (parity == 0){/*this is a pair*/
+        int x = MIN(pair[0], pair[1]);
+        int y = MAX(pair[0], pair[1]);
+        /*the three symmetries (diagonal, horizontal, vertical) are variously
+          cancelled out by zeros and x and y being equal.*/
+        do {
+          do {
+            do {
+              target[*len * 2] = x;
+              target[*len * 2 + 1] = y;
+              *len += 1;
+              printf("%d,%d; ", x, y);
+              if (*len > max_size){
+                goto no_room;
+              }
+              y = -y;
+            } while (y < 0);
+            x = -x;
+          } while (x < 0);
+          /*swap*/
+          x ^= y;
+          y ^= x;
+          x ^= y;
+        }
+        while (y < x);
+      }
+    }
+    else {
+      GST_WARNING("unknown character in offset string: %c", c);
+    }
+  }
+  printf ("\nfound %d Y and %d C pairs\n", self->len_Y, self->len_C);
+  return;
+ no_room:
+  GST_ERROR("ran out of room for offsets '%s' (allocated %d)",
+      pattern, max_size);
+}
 
 static gboolean
 set_info (GstVideoFilter *filter,
@@ -374,6 +454,9 @@ set_info (GstVideoFilter *filter,
 {
   GstRnnca *self = GST_RNNCA (filter);
   int i;
+  if (self->offsets_Y == NULL && self->offsets_C == NULL){
+    setup_inputs(self);
+  }
   if (self->net == NULL){
     self->net = load_or_create_net(self);
   }
@@ -460,6 +543,13 @@ gst_rnnca_set_property (GObject * object, guint prop_id, const GValue * value,
       maybe_start_logging(self);
       break;
 
+    case PROP_OFFSETS:
+      if (self->offsets_Y == 0 && self->offsets_C == 0){
+        /*will leak if repeatedly set, so don't do that*/
+        self->offset_pattern = g_value_dup_string(value);
+      }
+      break;
+
     case PROP_PLAYING:
       self->playing = g_value_get_boolean(value);
       break;
@@ -528,6 +618,9 @@ gst_rnnca_get_property (GObject * object, guint prop_id, GValue * value,
   case PROP_EDGES:
     g_value_set_boolean(value, self->edges);
     break;
+  case PROP_OFFSETS:
+    g_value_set_string(value, self->offset_pattern);
+    break;
   default:
     G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
     break;
@@ -585,56 +678,35 @@ get_offset_point(const int *offset, int cx, int cy, int edges){
 }
 
 static inline void
-fill_net_inputs(RecurNN *net, RnncaFrame *frame, int cx, int cy, int edges){
+fill_net_inputs(GstRnnca *self, RecurNN *net, RnncaFrame *frame, int cx, int cy, int edges){
   int j, offset;
   int i = 0;
-  for (j = 0; j < RNNCA_YUV_LEN; j+= 2){
-    offset = get_offset_point(RNNCA_YUV_OFFSETS + j, cx, cy, edges);
-    net->real_inputs[i] = BYTE_TO_UNIT(frame->Y[offset]);
-    net->real_inputs[i + 1] = BYTE_TO_UNIT(frame->Cb[offset]);
-    net->real_inputs[i + 2] = BYTE_TO_UNIT(frame->Cr[offset]);
-    i += 3;
-  }
-#if USE_Y_ONLY_OFFSETS
-  for (j = 0; j < RNNCA_Y_ONLY_LEN; j+= 2){
-    offset = get_offset_point(RNNCA_Y_ONLY_OFFSETS + j, cx, cy, edges);
+  for (j = 0; j < self->len_Y; j++){
+    offset = get_offset_point(self->offsets_Y + j * 2, cx, cy, edges);
     net->real_inputs[i] = BYTE_TO_UNIT(frame->Y[offset]);
     i++;
   }
-#endif
-#if USE_UV_ONLY_OFFSETS
-  for (j = 0; j < RNNCA_UV_ONLY_LEN; j+= 2){
-    offset = get_offset_point(RNNCA_UV_ONLY_OFFSETS + j, cx, cy, edges);
+  for (j = 0; j < self->len_C; j++){
+    offset = get_offset_point(self->offsets_C + j * 2, cx, cy, edges);
     net->real_inputs[i] = BYTE_TO_UNIT(frame->Cb[offset]);
     net->real_inputs[i + 1] = BYTE_TO_UNIT(frame->Cr[offset]);
     i += 2;
   }
-#endif
-#if USE_Y_MEAN_3_OFFSETS
-  for (j = 0; j < RNNCA_Y_MEAN_3_LEN; j+= 6){
-    int s;
-    s = frame->Y[get_offset_point(RNNCA_Y_MEAN_3_OFFSETS + j, cx, cy, edges)];
-    s += frame->Y[get_offset_point(RNNCA_Y_MEAN_3_OFFSETS + j + 2, cx, cy, edges)];
-    s += frame->Y[get_offset_point(RNNCA_Y_MEAN_3_OFFSETS + j + 4, cx, cy, edges)];
-    net->real_inputs[i] = BYTE_TO_UNIT(s * 0.333333);
-    i++;
-  }
-#endif
   float xx = cx * 1.0f / RNNCA_WIDTH;
   float yy = cy * 1.0f / RNNCA_HEIGHT;
   net->real_inputs[i] = xx;
   net->real_inputs[i + 1] = yy;
-  if (RNNCA_POSITIONAL_LEN == 3){
+  if (self->len_pos == 3){
     net->real_inputs[i + 2] = 0.5 - ((yy - 0.5) *  (yy - 0.5) + (xx - 0.5) *  (xx - 0.5));
   }
 }
 
 static inline void
-train_net(RnncaTrainer *t, RnncaFrame *prev,  RnncaFrame *now){
+train_net(GstRnnca *self, RnncaTrainer *t, RnncaFrame *prev,  RnncaFrame *now){
   int i, offset, plane_size;
   RecurNN *net = t->net;
   /*trainers are not on edges, so edge condition doesn't much matter */
-  fill_net_inputs(net, prev, t->x, t->y, 1);
+  fill_net_inputs(self, net, prev, t->x, t->y, 1);
 
   //float *answer = rnn_opinion_with_dropout(net, NULL, 0.1);
   float *answer = rnn_opinion(net, NULL);
@@ -660,7 +732,7 @@ maybe_learn(GstRnnca *self){
   int i;
   RecurNN *net = self->train_nets[0];
   for (i = 0; i < self->n_trainers; i++){
-    train_net(&self->trainers[i], self->frame_prev, self->frame_now);
+    train_net(self, &self->trainers[i], self->frame_prev, self->frame_now);
   }
   bptt_consolidate_many_nets(self->train_nets, self->n_trainers, 0,
       self->momentum_soft_start);
@@ -749,7 +821,7 @@ fill_frame(GstRnnca *self, GstVideoFrame *frame){
   for (y = 0; y < RNNCA_HEIGHT; y++){
     for (x = 0; x < RNNCA_WIDTH; x++){
       RecurNN *net = self->constructors[y * RNNCA_WIDTH + x];
-      fill_net_inputs(net, self->play_frame, x, y, self->edges);
+      fill_net_inputs(self, net, self->play_frame, x, y, self->edges);
       float *answer = rnn_opinion(net, NULL);
       fast_sigmoid_array(answer, answer, 3);
       GST_LOG("answer gen %d, x %d y %d, %.2g %.2g %.2g",
