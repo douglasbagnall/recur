@@ -22,6 +22,9 @@
 #define DEFAULT_TEMPORAL_PGM_DUMP 0
 #define DEFAULT_RELOAD 0
 #define DEFAULT_LEARN_RATE 0.001
+#define DEFAULT_LEARN_RATE_MIN DEFAULT_LEARN_RATE
+#define DEFAULT_LEARN_RATE_INERTIA 60
+#define DEFAULT_LEARN_RATE_SCALE 0.4
 #define DEFAULT_BPTT_DEPTH 30
 #define DEFAULT_MOMENTUM 0.95
 #define DEFAULT_MOMENTUM_WEIGHT 0.5
@@ -57,6 +60,9 @@ static TemporalPPM *input_ppm;
 static uint opt_hidden_size = DEFAULT_HIDDEN_SIZE;
 static uint opt_bptt_depth = DEFAULT_BPTT_DEPTH;
 static float opt_learn_rate = DEFAULT_LEARN_RATE;
+static float opt_learn_rate_min = DEFAULT_LEARN_RATE_MIN;
+static int  opt_learn_rate_inertia = DEFAULT_LEARN_RATE_INERTIA;
+static float opt_learn_rate_scale = DEFAULT_LEARN_RATE_SCALE;
 static float opt_momentum = DEFAULT_MOMENTUM;
 static int opt_quiet = 0;
 static char * opt_filename = NULL;
@@ -119,8 +125,14 @@ static struct opt_table options[] = {
       &opt_validation_overlap, "> 1 to use lapped validation (quicker)"),
   OPT_WITH_ARG("--start-char=<n>", opt_set_intval, opt_show_intval,
       &opt_start_char, "character to start epoch on (-1 for auto)"),
-  OPT_WITH_ARG("-l|--learn-rate=<float>", opt_set_floatval, opt_show_floatval,
-      &opt_learn_rate, "learning rate"),
+  OPT_WITH_ARG("-l|--learn-rate=<0-1>", opt_set_floatval, opt_show_floatval,
+      &opt_learn_rate, "initial learning rate"),
+  OPT_WITH_ARG("--learn-rate-min=<0-1>", opt_set_floatval, opt_show_floatval,
+      &opt_learn_rate_min, "minimum learning rate (>learn-rate is off)"),
+  OPT_WITH_ARG("--learn-rate-inertia=<int>", opt_set_intval, opt_show_intval,
+      &opt_learn_rate_inertia, "tardiness of learn-rate reduction (try 30-90)"),
+  OPT_WITH_ARG("--learn-rate-scale=<int>", opt_set_floatval, opt_show_floatval,
+      &opt_learn_rate_scale, "size of learn rate reductions"),
   OPT_WITH_ARG("-m|--momentum=<float>", opt_set_floatval, opt_show_floatval,
       &opt_momentum, "momentum"),
   OPT_WITH_ARG("--momentum-weight=<float>", opt_set_floatval, opt_show_floatval,
@@ -575,7 +587,8 @@ main(int argc, char *argv[]){
       NULL);
 
   Schedule schedule;
-  init_schedule(&schedule, 60, 0, 3e-6, 0.4);
+  init_schedule(&schedule, opt_learn_rate_inertia, 0, opt_learn_rate_min,
+      opt_learn_rate_scale);
   long len;
   u8* validate_text;
   u8* text = alloc_and_collapse_text(opt_textfile,
