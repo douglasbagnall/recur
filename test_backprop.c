@@ -42,6 +42,7 @@
 #define DEFAULT_LOG_FILE "bptt.log"
 #define DEFAULT_START_CHAR -1
 #define DEFAULT_HIDDEN_SIZE 199
+#define DEFAULT_WEIGHT_SPARSITY 1
 
 #define BELOW_QUIET_LEVEL(quiet) if (opt_quiet < quiet)
 
@@ -82,6 +83,7 @@ static int opt_validation_overlap = DEFAULT_VALIDATION_OVERLAP;
 static int opt_start_char = DEFAULT_START_CHAR;
 static bool opt_override = DEFAULT_OVERRIDE;
 static uint opt_bptt_batch_size = DEFAULT_BPTT_BATCH_SIZE;
+static uint opt_weight_sparsity = DEFAULT_WEIGHT_SPARSITY;
 static bool opt_temporal_pgm_dump = DEFAULT_TEMPORAL_PGM_DUMP;
 static bool opt_periodic_pgm_dump = DEFAULT_PERIODIC_PGM_DUMP;
 static bool opt_deterministic_confab = DEFAULT_DETERMINISTIC_CONFAB;
@@ -119,6 +121,8 @@ static struct opt_table options[] = {
       &opt_stop, "Stop after this many generations (0: no stop)"),
   OPT_WITH_ARG("--bptt-batch-size=<n>", opt_set_uintval_bi, opt_show_uintval_bi,
       &opt_bptt_batch_size, "bptt minibatch size"),
+  OPT_WITH_ARG("--weight-sparsity=<n>", opt_set_uintval_bi, opt_show_uintval_bi,
+      &opt_weight_sparsity, "higher for more initial weights near zero"),
   OPT_WITH_ARG("-V|--validate-chars=<n>", opt_set_intval_bi, opt_show_intval_bi,
       &opt_validate_chars, "Retain this many characters for validation"),
   OPT_WITH_ARG("--validation-overlap=<n>", opt_set_intval, opt_show_intval,
@@ -548,6 +552,10 @@ load_or_create_net(void){
         opt_logfile, opt_bptt_depth, opt_learn_rate,
         opt_momentum, opt_momentum_weight,
         opt_bptt_batch_size, 1);
+    if (opt_weight_sparsity > 1){
+      rnn_randomise_weights(net, RNN_INITIAL_WEIGHT_VARIANCE_FACTOR / net->h_size,
+          opt_weight_sparsity);
+    }
   }
   else if (opt_override){
     RecurNNBPTT *bptt = net->bptt;
