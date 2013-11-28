@@ -1,4 +1,4 @@
-/* GStreamer
+/* Gstreamer parrot plugin
  * Copyright (C) <2013> Douglas Bagnall <douglas@halo.gen.nz>
  *
  */
@@ -45,11 +45,6 @@ enum
 #define LEARN_RATE_MAX 1.0
 
 /* static_functions */
-/* plugin_init    - registers plugin (once)
-   XXX_base_init  - for the gobject class (once, obsolete)
-   XXX_class_init - for global state (once)
-   XXX_init       - for each plugin instance
-*/
 static void gst_parrot_class_init(GstParrotClass *g_class);
 static void gst_parrot_init(GstParrot *self);
 static void gst_parrot_set_property(GObject *object, guint prop_id, const GValue *value, GParamSpec *pspec);

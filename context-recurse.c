@@ -161,7 +161,6 @@ recur_train_nets(RecurContext *context, RecurFrame *src_frame,
       net->bptt->o_error[i] = slope * (target - a);
     }
     bptt_calc_deltas(net);
-    /*XXX want to delay momentum, weight updates until end */
   }
   consolidate_and_apply_learning(context);
 

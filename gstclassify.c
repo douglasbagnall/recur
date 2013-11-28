@@ -81,11 +81,6 @@ enum
 #define MOMENTUM_SOFT_START_MIN 0
 
 /* static_functions */
-/* plugin_init    - registers plugin (once)
-   XXX_base_init  - for the gobject class (once, obsolete)
-   XXX_class_init - for global state (once)
-   XXX_init       - for each plugin instance
-*/
 static void gst_classify_class_init(GstClassifyClass *g_class);
 static void gst_classify_init(GstClassify *self);
 static void gst_classify_set_property(GObject *object, guint prop_id, const GValue *value, GParamSpec *pspec);

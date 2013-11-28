@@ -1,7 +1,6 @@
 #ifndef HAVE_PGM_DUMP
 #define HAVE_PGM_DUMP
 
-//XXX segfaults if IMAGE_DIR doesn't exist
 #define IMAGE_DIR "images/"
 
 #include <string.h>

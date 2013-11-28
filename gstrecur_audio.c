@@ -23,11 +23,6 @@ enum
 };
 
 /* static_functions */
-/* plugin_init    - registers plugin (once)
-   XXX_base_init  - for the gobject class (once, obsolete)
-   XXX_class_init - for global state (once)
-   XXX_init       - for each plugin instance
-*/
 static void gst_recur_audio_class_init(GstRecurAudioClass *g_class);
 static void gst_recur_audio_init(GstRecurAudio *self);
 static void gst_recur_audio_set_property(GObject *object, guint prop_id, const GValue *value, GParamSpec *pspec);

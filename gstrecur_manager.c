@@ -12,11 +12,6 @@
 #include <math.h>
 
 /* static_functions */
-/* plugin_init    - registers plugin (once)
-   XXX_base_init  - for the gobject class (once, obsolete)
-   XXX_class_init - for global state (once)
-   XXX_init       - for each plugin instance
-*/
 static void gst_recur_manager_class_init(GstRecurManagerClass *g_class);
 static void gst_recur_manager_init(GstRecurManager *self);
 static void gst_recur_manager_set_property(GObject *object, guint prop_id, const GValue *value, GParamSpec *pspec);
