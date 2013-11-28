@@ -7,18 +7,20 @@ RECORD_URI=file:///home/douglas/recur/test-video/lagos-288-192-20-short.avi
 MOMENTUM=0.95
 MSS=4000
 LR=1e-6
-HS=79
-DROPOUT=0.5
+HS=59
+DROPOUT=0
 BASENAME=$(basename $URI)
-PATTERN=Y00011112C000111
+PATTERN=Y00011102C000111
 
-for i in {1..100}; do
-    if [[ $i < 4 ]]; then
+for i in {1..20}; do
+    if [[ $i < 3 ]]; then
         LR=1e-5
-    elif [[ $i < 8 ]]; then
+    elif [[ $i < 6 ]]; then
         LR=3e-6
-    else
+    elif [[ $i < 10 ]]; then
         LR=1e-6
+    else
+        LR=3e-7
     fi
     for j in {1..5}; do
         echo training $i.$j LR $LR

@@ -220,7 +220,7 @@ train-rnnca: libgstrnnca.so $(subdirs)
 		! fakesink ;\
 
 PROPER_RNNCA_PROPERTIES = momentum-soft-start=3000 momentum=0.95 learn-rate=3e-6 \
-	hidden-size=79 log-file=rnnca.log offsets=Y011112C011102
+	hidden-size=79 log-file=rnnca.log offsets=Y000111C000111
 
 train-rnnca-properly: libgstrnnca.so $(subdirs)
 	$(RNNCA_DEBUG) $(GDB) 	gst-launch-1.0  \
