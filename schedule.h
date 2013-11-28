@@ -20,13 +20,14 @@ eval_simple(Schedule *s, RecurNN *net, float score){
   if (bptt->learn_rate <= s->learn_rate_min){
     return;
   }
+  int sample_size = s->recent_len / 3;
   i = rand_small_int(&net->rng, s->recent_len);
   s->recent[i] = score;
   if (s->timeout){
     s->timeout--;
     return;
   }
-  for (++i, j = 0; j < s->recent_len / 3; j++, i++){
+  for (++i, j = 0; j < sample_size; j++, i++){
     if (i >= s->recent_len)
       i = 0;
     if (score + s->margin < s->recent[i]){
@@ -35,8 +36,10 @@ eval_simple(Schedule *s, RecurNN *net, float score){
   }
   s->timeout = s->recent_len;
   bptt->learn_rate = MAX(s->learn_rate_min, bptt->learn_rate * s->learn_rate_mul);
-  DEBUG("recent %g, score %g, momentum %g, generation %d; setting learn_rate to %g",
-      s->recent[i], score, net->bptt->momentum, net->generation, bptt->learn_rate);
+  DEBUG("generation %7d: entropy %.4g exceeds %d recent samples (margin %.2g)."
+      " setting learn_rate to %.3g. momentum %.3g",
+      net->generation, score, sample_size, s->margin,
+      bptt->learn_rate, net->bptt->momentum);
 }
 
 static void
