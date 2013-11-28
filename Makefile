@@ -1,23 +1,21 @@
 all::
 
-GDB_ALWAYS_FLAGS = -ggdb -O3
-WARNINGS = -Wall -Wextra -Wno-unused-parameter -Wno-missing-field-initializers -ftree-vectorizer-verbose=0 -fno-inline
-# -Wunsafe-loop-optimizations  -ftree-vectorizer-verbose=2  -fno-inline
-# -fno-trapping-math
+local.mak:
+	@if [ ! -e $@ ] ; then \
+	  echo " You need a './local.mak'. For a start either symlink or"; \
+	  echo " copy and modify './local.mak.example.x86_64'."; \
+	  false; \
+	fi
 
-GST_VERSION = 1.0
+include local.mak
 
-ARCH = $(shell arch)
-ifeq "$(ARCH)" "x86_64"
-ARCH_CFLAGS = -fPIC -DPIC -m64
-else
-ARCH_CFLAGS = -m32 -msse2
-endif
+WARNINGS = -Wall -Wextra -Wno-unused-parameter -Wno-missing-field-initializers
 
 LIB_ARCH_DIR = /usr/lib/$(ARCH)-linux-gnu
 INC_ARCH_DIR = /usr/include/$(ARCH)-linux-gnu
 INC_DIR = /usr/include
 
+### Alternative compilers
 #CC = nccgen -ncgcc -ncld -ncfabs
 #CC = /usr/bin/clang
 #CC = /usr/local/bin/clang
@@ -25,10 +23,10 @@ INC_DIR = /usr/include
 #CLANG_FLAGS = -fslp-vectorize-aggressive
 #CLANG_FLAGS =  -fplugin=/usr/lib/gcc/x86_64-linux-gnu/4.7/plugin/dragonegg.so
 
-ALL_CFLAGS = -march=native -pthread $(VECTOR_FLAGS) $(WARNINGS) -pipe  -D_GNU_SOURCE -std=gnu1x $(INCLUDES) $(ARCH_CFLAGS) $(CFLAGS) $(GDB_ALWAYS_FLAGS) -ffast-math -funsafe-loop-optimizations $(CLANG_FLAGS) -std=gnu11
+ALL_CFLAGS = -march=native -pthread $(WARNINGS) -pipe  -D_GNU_SOURCE $(INCLUDES) $(ARCH_CFLAGS) $(CFLAGS) $(DEV_CFLAGS) -ffast-math -funsafe-loop-optimizations $(CLANG_FLAGS) -std=gnu11 $(CFLAGS)
 ALL_LDFLAGS = $(LDFLAGS)
 
-GST_INCLUDES =  -isystem $(INC_DIR)/gstreamer-$(GST_VERSION)\
+GST_INCLUDES =  -isystem $(INC_DIR)/gstreamer-1.0\
 	 -isystem $(INC_DIR)/glib-2.0\
 	 -isystem $(LIB_ARCH_DIR)/glib-2.0/include\
 	 -isystem $(INC_DIR)/glib-2.0/include\
@@ -47,19 +45,15 @@ INCLUDES = -I. $(GST_INCLUDES)
 COMMON_LINKS = -L/usr/local/lib  -lm -pthread -lrt \
 		 -lblas -lcdb
 
-GST_LINKS = -lgstbase-$(GST_VERSION) -lgstreamer-$(GST_VERSION) \
-	 -lgobject-2.0 -lglib-2.0 -lgstvideo-$(GST_VERSION)  \
-	-lgmodule-2.0 -lgthread-2.0  -lgstfft-$(GST_VERSION) -lgstaudio-$(GST_VERSION) \
+GST_LINKS = -lgstbase-1.0 -lgstreamer-1.0 \
+	 -lgobject-2.0 -lglib-2.0 -lgstvideo-1.0  \
+	-lgmodule-2.0 -lgthread-2.0  -lgstfft-1.0 -lgstaudio-1.0 \
 
 LINKS = $(COMMON_LINKS) $(GST_LINKS)
 
 GTK_LINKS =  -lgtk-3 -lgdk-3
 
 OPT_OBJECTS = ccan/opt/opt.o ccan/opt/parse.o ccan/opt/helpers.o ccan/opt/usage.o
-
-SOURCES =  gstrecur_manager.c gstrecur_audio.c gstrecur_video.c \
-	recur-context.c rescale.c recur-nn.c recur-nn-io.c context-recurse.c mfcc.c
-OBJECTS := $(patsubst %.c,%.o,$(SOURCES))
 
 subdirs = images nets
 $(subdirs):
@@ -79,12 +73,11 @@ pgm-clean:
 
 # Ensure we don't end up with empty file if configurator fails!
 config.h: ccan/tools/configurator/configurator
-	ccan/tools/configurator/configurator $(CC) $(CFLAGS) > $@.tmp && mv $@.tmp $@
+	ccan/tools/configurator/configurator $(CC) $(ALL_CFLAGS) > $@.tmp && mv $@.tmp $@
 
 .c.o:
 	$(CC)  -c -MMD $(ALL_CFLAGS) $(CPPFLAGS) -o $@ $<
 
-#ASM_OPTS= -fverbose-asm
 %.s:	%.c
 	$(CC)  -S $(ASM_OPTS)  $(ALL_CFLAGS) $(CPPFLAGS) -o $@ $<
 
@@ -96,40 +89,46 @@ config.h: ccan/tools/configurator/configurator
 
 %.c: %.h
 
+#recur-nn.o works better with -fprefetch-loop-arrays
 NN_SPECIAL_FLAGS =  -fprefetch-loop-arrays
 
 recur-nn.o: recur-nn.c
 	$(CC)  -c -MMD $(ALL_CFLAGS) $(CPPFLAGS) $(NN_SPECIAL_FLAGS) -o $@ $<
 
-libgstrecur.so: $(OBJECTS)
-	$(CC) -shared -Wl,-O1 $+  $(INCLUDES) $(DEFINES)  $(LINKS) -Wl,-soname -Wl,$@ \
+RNN_OBJECTS =  recur-nn.o recur-nn-io.o
+
+RECUR_OBJECTS = gstrecur_manager.o gstrecur_audio.o gstrecur_video.o \
+	recur-context.o context-recurse.o
+
+libgstrecur.so: $(RECUR_OBJECTS) $(RNN_OBJECTS) rescale.o mfcc.o
+	$(CC) -shared -Wl,-O1 $+ $(INCLUDES) $(DEFINES) $(LINKS) -Wl,-soname -Wl,$@ \
 	  -o $@
 
-libgstrnnca.so: recur-nn.o recur-nn-io.o gstrnnca.o rescale.o
-	$(CC) -shared -Wl,-O1 $+  $(INCLUDES) $(DEFINES)  $(LINKS) -Wl,-soname -Wl,$@ \
+libgstrnnca.so: $(RNN_OBJECTS) gstrnnca.o rescale.o
+	$(CC) -shared -Wl,-O1 $+ $(INCLUDES) $(DEFINES) $(LINKS) -Wl,-soname -Wl,$@ \
 	  -o $@
 
-libgstparrot.so: recur-nn.o recur-nn-io.o  mdct.o gstparrot.o mfcc.o
-	$(CC) -shared -Wl,-O1 $+  $(INCLUDES) $(DEFINES)  $(LINKS) -Wl,-soname -Wl,$@ \
+libgstparrot.so: $(RNN_OBJECTS)  mdct.o gstparrot.o mfcc.o
+	$(CC) -shared -Wl,-O1 $+ $(INCLUDES) $(DEFINES) $(LINKS) -Wl,-soname -Wl,$@ \
 	  -o $@
 
-libgstclassify.so: recur-nn.o recur-nn-io.o gstclassify.o mfcc.o
-	$(CC) -shared -Wl,-O1 $+  $(INCLUDES) $(DEFINES)  $(LINKS) -Wl,-soname -Wl,$@ \
+libgstclassify.so: $(RNN_OBJECTS) gstclassify.o mfcc.o
+	$(CC) -shared -Wl,-O1 $+ $(INCLUDES) $(DEFINES) $(LINKS) -Wl,-soname -Wl,$@ \
 	  -o $@
 
-test_mfcc_table: %: recur-context.o recur-nn.o recur-nn-io.o rescale.o %.o
-	$(CC) -Wl,-O1 $^  $(INCLUDES) $(DEFINES)  $(LINKS)  -o $@
+test_mfcc_table: %: recur-context.o $(RNN_OBJECTS) rescale.o %.o
+	$(CC) -Wl,-O1 $^ $(INCLUDES) $(DEFINES) $(LINKS)  -o $@
 
 test_%: test_%.o path.h
-	$(CC) -Wl,-O1 $^   -I. $(DEFINES)  $(COMMON_LINKS)   -o $@
+	$(CC) -Wl,-O1 $^  -I. $(DEFINES)  $(COMMON_LINKS)   -o $@
 
 test_window_functions test_dct: %: mfcc.o %.o path.h
-	$(CC) -Wl,-O1 $^   $(INCLUDES) $(DEFINES)  $(LINKS)  -o $@
+	$(CC) -Wl,-O1 $^ $(INCLUDES) $(DEFINES) $(LINKS)  -o $@
 
 test_simple_rescale test_rescale: %: rescale.o %.o  path.h
 	$(CC) -Wl,-O1 $^   -I. $(DEFINES)  $(COMMON_LINKS)  -o $@
 
-test_backprop test_fb_backprop: %: recur-nn.o recur-nn-io.o %.o  path.h $(OPT_OBJECTS)
+test_backprop test_fb_backprop: %: $(RNN_OBJECTS) %.o  path.h $(OPT_OBJECTS)
 	$(CC) -Iccan/opt/ -Wl,-O1 $^   -I. $(DEFINES)  $(COMMON_LINKS)  -o $@
 
 test_mdct: %: recur-nn.o mdct.o window.o %.o  path.h
@@ -150,12 +149,11 @@ path.h:
 	@echo "#endif"                                    >>$@
 
 
-
 gtk-recur.o rnnca-player.o: %.o: %.c  path.h
-	$(CC) -c  -MMD $(ALL_CFLAGS) $(CPPFLAGS)  $(INCLUDES)  $(GTK_INCLUDES) -o $@ $<
+	$(CC) -c  -MMD $(ALL_CFLAGS) $(CPPFLAGS) $(INCLUDES)  $(GTK_INCLUDES) -o $@ $<
 
 rnnca-player gtk-recur: %: %.o
-	$(CC) -Wl,-O1 $^   $(INCLUDES)  $(GTK_INCLUDES) $(DEFINES)  $(LINKS) $(GTK_LINKS)   -o $@
+	$(CC) -Wl,-O1 $^ $(INCLUDES) $(GTK_INCLUDES) $(DEFINES) $(LINKS) $(GTK_LINKS)   -o $@
 
 
 .PHONY: all test-pipeline clean pgm-clean
@@ -414,7 +412,5 @@ cppcheck:
 	 -UGST_DISABLE_DEPRECATED -UG_PLATFORM_WIN64 -UDLL_EXPORT -UG_PLATFORM_WIN32 \
 	-UG_OS_WIN32  *.[ch]
 
-
 perf-stat:
 	sudo perf stat -e cpu-cycles,instructions,cache-references,cache-misses ./test_backprop
-	#sudo perf stat -e cpu-cycles,instructions,cache-references,cache-misses,branch-instructions,branch-misses,bus-cycles,ref-cycles,page-faults,minor-faults,major-faults,cpu-migrations,L1-dcache-loads,L1-dcache-load-misses,L1-dcache-stores,L1-dcache-store-misses,L1-dcache-prefetches,L1-dcache-prefetch-misses,L1-icache-loads,L1-icache-load-misses,L1-icache-prefetches,L1-icache-prefetch-misses,LLC-loads,LLC-load-misses,LLC-stores,LLC-store-misses,LLC-prefetches,LLC-prefetch-misses,dTLB-loads,dTLB-load-misses,dTLB-stores,dTLB-store-misses,dTLB-prefetches,dTLB-prefetch-misses,iTLB-loads,iTLB-load-misses,branch-loads,branch-load-misses ./test_backprop

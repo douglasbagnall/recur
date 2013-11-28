@@ -27,3 +27,4 @@ test_*
 /config.h
 /rnnca-player
 /examples/
+local.mak

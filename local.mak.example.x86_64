@@ -1,0 +1,7 @@
+DEV_CFLAGS = -ggdb -O3 -ftree-vectorizer-verbose=0 -fno-inline
+ARCH_CFLAGS = -fPIC -DPIC -m64
+
+ARCH = x86_64
+
+# -Wunsafe-loop-optimizations  -ftree-vectorizer-verbose=2  -fno-inline
+# -fno-trapping-math
