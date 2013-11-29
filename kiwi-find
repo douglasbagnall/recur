@@ -1,0 +1,110 @@
+#!/usr/bin/python
+import os, sys
+import random
+import itertools
+import time
+
+from classify import gst_init, TRAINING, TESTING, Gst
+from classify import KIWI_MFCCS as MFCCS
+from classify import KIWI_CLASSES as CLASSES
+from classify import KIWI_HIDDEN_SIZE as HIDDEN_SIZE
+from classify import KIWI_WINDOW_SIZE as WINDOW_SIZE
+from classify import KIWI_BASENAME as BASENAME
+from classify import COLOURS
+from classify import BaseClassifier, load_timings
+
+TEST_AUDIO_DIR = "/home/douglas/corpora/kiwi/test/"
+KIWI_TIMING_DATA = '/home/douglas/corpora/kiwi/times.txt'
+
+QUIET = False
+
+class KiwiClassifier(BaseClassifier):
+    pending_files = []
+    quiet = False
+
+    def classify_files_emitting_timings(self, files):
+        self.pending_files = files
+        self.classifier.set_property('mode', -1)
+        self.load_next_file()
+        self.mainloop.run()
+
+    def load_next_file(self):
+        self.pipeline.set_state(Gst.State.READY)
+        fn = self.pending_files.pop()
+        self.current_file = fn
+        self.classifier.set_property("forget", 0)
+        self.filesrcs[0].set_property('location', fn)
+        self.file_results = []
+        self.pipeline.set_state(Gst.State.PLAYING)
+
+    def on_element(self, bus, msg):
+        s = msg.get_structure()
+        if s.get_name() != "classify":
+            return
+        v = s.get_value
+        winner = v('channel 0 winner')
+        #print winner
+        self.file_results.append(winner)
+
+    def print_file_results(self):
+        #self.pipeline.set_state(Gst.State.READY)
+        #XXX base step on discoverable values
+        step = 1024 * 2 / 8000.0
+        prev = 0
+        rolling = 5
+        times = []
+        for i, result in enumerate(self.file_results):
+            rolling += 2 * result - 1
+            if rolling < 0:
+                rolling = 0
+            elif rolling > 9:
+                rolling = 9
+            kiwi = rolling > 4
+            if kiwi != prev:
+                times.append(i * step)
+            prev = kiwi
+
+        if len(times) & 1:
+            times.append(i * step)
+
+        print self.current_file,
+        print " ".join("%.1f" %x for x in times)
+        #self.pipeline.set_state(Gst.State.PLAYING)
+
+
+    def on_eos(self, bus, msg):
+        self.print_file_results()
+        if self.pending_files:
+            self.load_next_file()
+
+    def on_error(self, bus, msg):
+        pass
+
+def load_files_and_timings(d, classes):
+    all_timings = load_timings(KIWI_TIMING_DATA, classes, classes[-1], QUIET)
+    #print all_timings
+    basefiles = [x for x in os.listdir(d)
+                 if x.endswith('.wav') and x[0] in classes]
+    files = [os.path.join(d, x) for x in basefiles]
+    timings = [all_timings[x] for x in files]
+    return files, timings
+
+def main(argv):
+    global QUIET
+    gst_init()
+    if '-q' in argv:
+        argv.remove('-q')
+        QUIET = True
+
+    c = KiwiClassifier(mfccs=MFCCS,
+                       hsize=HIDDEN_SIZE,
+                       channels=1,
+                       classes=CLASSES,
+                       window_size=WINDOW_SIZE,
+                       basename=BASENAME)
+    c.quiet = QUIET
+    d = argv[0]
+    files = [os.path.join(d, f) for f in os.listdir(d)]
+    c.classify_files_emitting_timings(files)
+
+main(sys.argv[1:])
