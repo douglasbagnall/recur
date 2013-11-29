@@ -51,15 +51,17 @@ class KiwiClassifier(BaseClassifier):
         #XXX base step on discoverable values
         step = 1024 * 2 / 8000.0
         prev = 0
-        rolling = 5
+        rolling = 6
         times = []
+        #result is 1 for noise, 0 for kiwi.
         for i, result in enumerate(self.file_results):
             rolling += 2 * result - 1
             if rolling < 0:
                 rolling = 0
             elif rolling > 9:
                 rolling = 9
-            kiwi = rolling > 4
+            kiwi = rolling < 5
+            #print result, rolling
             if kiwi != prev:
                 times.append(i * step)
             prev = kiwi
