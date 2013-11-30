@@ -782,7 +782,7 @@ possibly_save_net(RecurNN *net, char *filename)
 
 
 static inline void
-send_message(GstClassify *self, float mean_err)
+send_message(GstClassify *self, float mean_err, GstClockTime pts)
 {
   GstMessage *msg;
   char *name = "classify";
@@ -809,6 +809,7 @@ send_message(GstClassify *self, float mean_err)
     gst_structure_set(s, key, G_TYPE_INT, c->current_winner, NULL);
   }
   msg = gst_message_new_element(GST_OBJECT(self), s);
+  msg->timestamp = pts;
   gst_element_post_message(GST_ELEMENT(self), msg);
 }
 
@@ -946,7 +947,7 @@ maybe_learn(GstClassify *self){
 }
 
 static inline void
-emit_opinions(GstClassify *self){
+emit_opinions(GstClassify *self, GstClockTime pts){
   int j;
   s16 *buffer;
   for (buffer = prepare_next_chunk(self); buffer;
@@ -963,7 +964,7 @@ emit_opinions(GstClassify *self){
         err_sum += net->bptt->o_error[c->current_target];
       }
     }
-    send_message(self, err_sum / self->n_channels);
+    send_message(self, err_sum / self->n_channels, pts);
   }
 }
 
@@ -979,7 +980,7 @@ gst_classify_transform_ip (GstBaseTransform * base, GstBuffer *buf)
     maybe_learn(self);
   }
   else {
-    emit_opinions(self);
+    emit_opinions(self, GST_BUFFER_PTS(buf));
   }
   GST_LOG("classify_transform returning OK");
   return ret;

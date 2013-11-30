@@ -32,6 +32,7 @@ class KiwiClassifier(BaseClassifier):
         self.pipeline.set_state(Gst.State.READY)
         fn = self.pending_files.pop()
         self.current_file = fn
+        self.current_winner = None
         self.classifier.set_property("forget", 0)
         self.filesrcs[0].set_property('location', fn)
         self.file_results = []
@@ -43,31 +44,23 @@ class KiwiClassifier(BaseClassifier):
             return
         v = s.get_value
         winner = v('channel 0 winner')
-        #print winner
-        self.file_results.append(winner)
+        if winner != self.current_winner:
+            self.current_winner = winner
+            self.file_results.append((winner, msg.timestamp))
 
     def print_file_results(self):
         #self.pipeline.set_state(Gst.State.READY)
         #XXX base step on discoverable values
-        step = 1024 * 2 / 8000.0
         prev = 0
-        rolling = 6
         times = []
         #result is 1 for noise, 0 for kiwi.
-        for i, result in enumerate(self.file_results):
-            rolling += 2 * result - 1
-            if rolling < 0:
-                rolling = 0
-            elif rolling > 9:
-                rolling = 9
-            kiwi = rolling < 5
-            #print result, rolling
-            if kiwi != prev:
-                times.append(i * step)
-            prev = kiwi
-
-        if len(times) & 1:
-            times.append(i * step)
+        start_time = self.file_results[0][1]
+        for winner, t in self.file_results:
+            #print winner, t
+            secs = (t - start_time) * 1e-9
+            if winner != prev:
+                times.append(secs)
+            prev = winner
 
         print self.current_file,
         print " ".join("%.1f" %x for x in times)
@@ -81,15 +74,6 @@ class KiwiClassifier(BaseClassifier):
 
     def on_error(self, bus, msg):
         pass
-
-def load_files_and_timings(d, classes):
-    all_timings = load_timings(KIWI_TIMING_DATA, classes, classes[-1], QUIET)
-    #print all_timings
-    basefiles = [x for x in os.listdir(d)
-                 if x.endswith('.wav') and x[0] in classes]
-    files = [os.path.join(d, x) for x in basefiles]
-    timings = [all_timings[x] for x in files]
-    return files, timings
 
 def main(argv):
     global QUIET
@@ -106,7 +90,7 @@ def main(argv):
                        basename=BASENAME)
     c.quiet = QUIET
     d = argv[0]
-    files = [os.path.join(d, f) for f in os.listdir(d)]
+    files = [os.path.join(d, f) for f in os.listdir(d) if f.endswith('.wav')]
     c.classify_files_emitting_timings(files)
 
 main(sys.argv[1:])
