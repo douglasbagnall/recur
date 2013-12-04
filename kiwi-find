@@ -62,7 +62,6 @@ class KiwiClassifier(BaseClassifier):
         frame_size = WINDOW_SIZE / (2.0 * 8000.0)
         margin = int(2.0 / frame_size)
 
-        times = []
         #result is 1 for noise, 0 for kiwi.
         results = np.array([1] * margin +
                            self.winners +
