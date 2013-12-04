@@ -113,10 +113,12 @@ def main(argv):
                        window_size=WINDOW_SIZE,
                        basename=BASENAME)
     c.quiet = QUIET
-    d = argv[0]
-    files = [os.path.join(d, f) for f in os.listdir(d) if f.endswith('.wav')]
-    files.sort()
-    files.reverse()
-    c.classify_files_emitting_timings(files)
+    allfiles = []
+    for d, dirs, files in os.walk(argv[0]):
+        allfiles.extend([os.path.join(d, f) for f in files if
+                         f.endswith('.wav')])
+    allfiles.sort()
+    allfiles.reverse()
+    c.classify_files_emitting_timings(allfiles)
 
 main(sys.argv[1:])
