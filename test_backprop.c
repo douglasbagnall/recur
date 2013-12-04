@@ -455,22 +455,22 @@ epoch(RecurNN *net, RecurNN *confab_net, RecurNN *validate_net,
       int k = net->generation >> 10;
       entropy /= -1024.0f;
       if (vlen){
-        ventropy = validate(validate_net, vtext + vlen * vcounter, vlen);
         if (vlap > 1){
-          vcounter ++;
+          vcounter++;
           if (vcounter == vlap){
             vcounter = 0;
           }
-          vhistory[vcounter] = ventropy;
-          ventropy = 0; /*messy*/
+          vhistory[vcounter] = validate(validate_net, vtext + vlen * vcounter, vlen);
+          float vsum = 0;
           float vdiv = vlap;
           for (int j = 0; j < vlap; j++){
             vdiv -= vhistory[j] == 0;
-            ventropy += vhistory[j];
+            vsum += vhistory[j];
           }
-          ventropy /= vdiv;
+          ventropy = vdiv ? vsum / vdiv : 0;
         }
         else {
+          ventropy = validate(validate_net, vtext, vlen);
           *vhistory = ventropy;
         }
       }
