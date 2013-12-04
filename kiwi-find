@@ -13,6 +13,14 @@ from classify import KIWI_BASENAME as BASENAME
 from classify import COLOURS
 from classify import BaseClassifier, load_timings
 
+from math import *
+import numpy as np
+try:
+    from scipy.signal import fftconvolve as convolve
+except ImportError:
+    print >> sys.stderr, "Can't find scipy.signal, trying numpy"
+    from numpy import convolve
+
 TEST_AUDIO_DIR = "/home/douglas/corpora/kiwi/test/"
 KIWI_TIMING_DATA = '/home/douglas/corpora/kiwi/times.txt'
 
@@ -35,7 +43,8 @@ class KiwiClassifier(BaseClassifier):
         self.current_winner = None
         self.classifier.set_property("forget", 0)
         self.filesrcs[0].set_property('location', fn)
-        self.file_results = []
+        self.winners = []
+        self.times = []
         self.pipeline.set_state(Gst.State.PLAYING)
 
     def on_element(self, bus, msg):
@@ -44,23 +53,36 @@ class KiwiClassifier(BaseClassifier):
             return
         v = s.get_value
         winner = v('channel 0 winner')
-        if winner != self.current_winner:
-            self.current_winner = winner
-            self.file_results.append((winner, msg.timestamp))
+        self.winners.append(winner)
+        self.times.append(msg.timestamp)
 
     def print_file_results(self):
         #self.pipeline.set_state(Gst.State.READY)
         #XXX base step on discoverable values
-        prev = 0
+        frame_size = WINDOW_SIZE / (2.0 * 8000.0)
+        margin = int(2.0 / frame_size)
+
         times = []
         #result is 1 for noise, 0 for kiwi.
-        start_time = self.file_results[0][1]
-        for winner, t in self.file_results:
-            #print winner, t
-            secs = (t - start_time) * 1e-9
-            if winner != prev:
-                times.append(secs)
-            prev = winner
+        results = np.array([1] * margin +
+                           self.winners +
+                           [1] * margin, dtype=np.float32)
+        results -= 0.5
+        # a gaussian window, roughly 0.0111 on the edge
+        window = np.array([exp(-0.5 * ((x - margin) * 3.0 / margin) ** 2)
+                           for x in range(margin * 2 + 1)])
+
+        blurred = convolve(results, window, 'same')
+        times = []
+        prev = 1
+        for t, v in zip(self.times, blurred):
+            state = v > 5
+            if state != prev:
+                times.append(t * 1e-9)
+                prev = state
+
+        if len(times) & 1:
+            times.append(self.times[-1] * 1e-9 + frame_size)
 
         print self.current_file,
         print " ".join("%.1f" %x for x in times)
@@ -71,6 +93,8 @@ class KiwiClassifier(BaseClassifier):
         self.print_file_results()
         if self.pending_files:
             self.load_next_file()
+        else:
+            self.stop()
 
     def on_error(self, bus, msg):
         pass
@@ -91,6 +115,8 @@ def main(argv):
     c.quiet = QUIET
     d = argv[0]
     files = [os.path.join(d, f) for f in os.listdir(d) if f.endswith('.wav')]
+    files.sort()
+    files.reverse()
     c.classify_files_emitting_timings(files)
 
 main(sys.argv[1:])
