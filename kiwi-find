@@ -76,7 +76,7 @@ class KiwiClassifier(BaseClassifier):
         times = []
         prev = 1
         for t, v in zip(self.times, blurred):
-            state = v > 5
+            state = v > 10
             if state != prev:
                 times.append(t * 1e-9)
                 prev = state
