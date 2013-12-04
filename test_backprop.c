@@ -174,7 +174,7 @@ static struct opt_table options[] = {
   OPT_WITHOUT_ARG("--deterministic-confab", opt_set_bool,
       &opt_deterministic_confab, "Use best guess in confab, not random sampling"),
   OPT_WITHOUT_ARG("--no-save-net", opt_set_invbool,
-      &opt_deterministic_confab, "Don't save learnt changes"),
+      &opt_save_net, "Don't save learnt changes"),
   OPT_WITH_ARG("--dropout=<0-1>", opt_set_floatval, opt_show_floatval,
       &opt_dropout, "dropout this fraction of hidden nodes"),
 
