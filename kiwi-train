@@ -3,6 +3,7 @@ import os, sys
 import random
 import itertools
 import time
+import argparse
 
 from classify import gst_init, TRAINING, TESTING
 from classify import KIWI_MFCCS as MFCCS
@@ -11,7 +12,7 @@ from classify import KIWI_HIDDEN_SIZE as HIDDEN_SIZE
 from classify import KIWI_WINDOW_SIZE as WINDOW_SIZE
 from classify import KIWI_BASENAME as BASENAME
 from classify import COLOURS
-from classify import Trainer, lr_steps, categorised_files, load_timings
+from classify import Trainer, lr_steps, categorised_files, load_all_timings_binary
 
 NET_LOG_FILE = "kiwi.log"
 
@@ -19,8 +20,6 @@ TRAIN_AUDIO_DIR = "/home/douglas/corpora/kiwi/train/"
 VALIDATE_AUDIO_DIR = "/home/douglas/corpora/kiwi/validate/"
 
 KIWI_TIMING_DATA = '/home/douglas/corpora/kiwi/times.txt'
-
-QUIET = False
 
 class KiwiTrainer(Trainer):
     def next_training_set(self):
@@ -35,8 +34,9 @@ class KiwiTrainer(Trainer):
             self.classifier.set_property('learn_rate', r)
 
         for fs in self.filesrcs:
-            c, fn = self.trainers.next()
-            timings = self.timings[fn]
+            fn = self.trainers.next()
+            timings = self.timings.get(fn, [(1, 0)])
+            c = ('K' if timings != [(1, 0)] else '-')
             self.targets.append(c)
             targets.extend('c%dt%.2f' % x for x in timings)
             targets.append(' ')
@@ -106,49 +106,70 @@ class KiwiTrainer(Trainer):
         else:
             self.lr_adjust = 1.0
 
+def recursive_wav_finder(d):    
+    for root, dirs, files in os.walk(d):
+        for f in files:
+            if f.endswith(".wav"):
+                yield os.path.join(root, f)
 
-def main(argv):
-    global QUIET
+def main():
     gst_init()
-    if '-q' in argv:
-        argv.remove('-q')
-        QUIET = True
-    if argv:
-        lr = lr_steps(*(float(x) for x in argv))
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-v', '--verbose', action='store_true',
+                        help='lots of rubbish output')
+    parser.add_argument('-t', '--timings',
+                        help='read timings from here')
+    parser.add_argument('-k', '--dir-with-timings', action='append',
+                        help='use this directory with timings')
+    parser.add_argument('-n', '--dir-without-timings', action='append',
+                        help="use this directory without timings")
+    parser.add_argument('-H', '--hidden-size', type=int,
+                        help="number of hidden neurons")
 
-    else:
-        lr = lr_steps(#3e-5, 2,
-                      1e-5, 6,
-                      3e-6, 18,
-                      1e-6, 54,
-                      3e-7, 108,
-                      1e-7)
+    args = parser.parse_args()
+    lr = lr_steps(
+        1e-5, 200,
+        3e-6, 100,
+        1e-6, 100,
+        3e-7, 100,
+        1e-7)
+    dropout = lr_steps(0.5, 180, 0)
 
+    timed_files = []
+    for d in args.dir_with_timings:
+        timed_files.extend(recursive_wav_finder(d))
 
-    train_data = categorised_files(TRAIN_AUDIO_DIR, CLASSES)
-    test_data = categorised_files(VALIDATE_AUDIO_DIR, CLASSES)
+    untimed_files = []
+    for d in args.dir_without_timings:
+        untimed_files.extend(recursive_wav_finder(d))
+
+    random.seed(1)
+    random.shuffle(timed_files)
+    random.shuffle(untimed_files)
+    validate_files = timed_files[:36] + untimed_files[:36]
+    training_files = timed_files[36:] * 4 + untimed_files[36:]
+    random.shuffle(validate_files)
+    random.shuffle(training_files)
+
+    print args.hidden_size
 
     c = KiwiTrainer(mfccs=MFCCS,
-                    hsize=HIDDEN_SIZE,
+                    hsize=args.hidden_size,
                     channels=72,
                     classes=CLASSES,
                     window_size=WINDOW_SIZE,
                     basename=BASENAME)
-    c.quiet = QUIET
-    c.timings = [load_timings(KIWI_TIMING_DATA, CLASSES, CLASSES[-1], QUIET)[x]
-                 for x in files]
 
+    c.quiet = not args.verbose
+    timings = load_all_timings_binary(args.timings)
+    c.timings = {x: timings[x] for x in timed_files}
+    print c.timings
 
-    trainers = []
-    testers = []
-    for k in CLASSES[:-1] * 4 + CLASSES[-1]:
-        trainers.append([(k, x) for x in train_data[k]])
-        testers.append([(k, x) for x in test_data[k]])
     try:
-        c.train(trainers, testers, iterations=1000,
+        c.train([training_files], [validate_files], iterations=1000,
                 learn_rate=lr, log_file=NET_LOG_FILE,
                 properties=(('log-class-numbers', 1),
-                            ('momentum-soft-start', 5000),
+                            ('momentum-soft-start', 15000),
                             ('momentum', 0.95),
                             ))
     finally:
@@ -156,4 +177,4 @@ def main(argv):
         #c.classifier.set_property('save-net', '')
 
 
-main(sys.argv[1:])
+main()

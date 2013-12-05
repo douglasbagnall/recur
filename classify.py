@@ -62,6 +62,7 @@ class BaseClassifier(object):
         if self.pipeline is None:
             self.init_pipeline()
         x = Gst.ElementFactory.make(el, name)
+        #print el, x, name
         self.pipeline.add(x)
         if link is not None:
             x.link(link)
@@ -439,6 +440,23 @@ class GTKClassifier(BaseClassifier):
         p.seek_simple(Gst.Format.TIME, 0, then)
 
 
+def load_all_timings_binary(fn):
+    f = open(fn)
+    timings = {}
+    for line in f:
+        d = line.split()
+        events = [(1, 0)]
+        if len(d) > 1:
+            for i, t in enumerate(d[1:]):
+                events.append((i & 1, float(t)))
+            #don't duplicate numbers
+            if events[1][1] == 0:
+                del events[0]
+        timings[d[0]] = events
+    f.close()
+    return timings
+
+
 def load_timings(fn, classes, default, quiet=True):
     f = open(fn)
     timings = {}
@@ -465,4 +483,5 @@ def load_timings(fn, classes, default, quiet=True):
         for k, v in timings.items():
             if k[0] != default:
                 print k, v
+    f.close()
     return timings
