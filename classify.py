@@ -62,7 +62,6 @@ class BaseClassifier(object):
         if self.pipeline is None:
             self.init_pipeline()
         x = Gst.ElementFactory.make(el, name)
-        #print el, x, name
         self.pipeline.add(x)
         if link is not None:
             x.link(link)
@@ -349,7 +348,7 @@ class Trainer(BaseClassifier):
                 self.next_training_set()
             else:
                 self.test_set()
-                self.pipeline.set_state(Gst.State.PLAYING)
+        self.pipeline.set_state(Gst.State.PLAYING)
 
     def on_error(self, bus, msg):
         print('Error:', msg.parse_error())

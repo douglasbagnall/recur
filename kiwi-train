@@ -106,7 +106,7 @@ class KiwiTrainer(Trainer):
         else:
             self.lr_adjust = 1.0
 
-def recursive_wav_finder(d):    
+def recursive_wav_finder(d):
     for root, dirs, files in os.walk(d):
         for f in files:
             if f.endswith(".wav"):
