@@ -16,13 +16,8 @@ from classify import Trainer, lr_steps, categorised_files, load_all_timings_bina
 
 NET_LOG_FILE = "kiwi.log"
 
-TRAIN_AUDIO_DIR = "/home/douglas/corpora/kiwi/train/"
-VALIDATE_AUDIO_DIR = "/home/douglas/corpora/kiwi/validate/"
-
-KIWI_TIMING_DATA = '/home/douglas/corpora/kiwi/times.txt'
-
 class KiwiTrainer(Trainer):
-    def next_training_set(self):
+    def next_training_set(self, src=None):
         targets = []
         self.targets = []
         starttime = self.timestamp
@@ -33,8 +28,11 @@ class KiwiTrainer(Trainer):
                    (self.counter, self.iterations, r, self.timestamp - starttime))
             self.classifier.set_property('learn_rate', r)
 
+        if src is None:
+            src = self.trainers
+
         for fs in self.filesrcs:
-            fn = self.trainers.next()
+            fn = src.next()
             timings = self.timings.get(fn, [(1, 0)])
             c = ('K' if timings != [(1, 0)] else '-')
             self.targets.append(c)
@@ -51,8 +49,9 @@ class KiwiTrainer(Trainer):
     def test_set(self):
         self.test_scores = [0] * len(self.classes)
         self.test_runs = [0] * len(self.classes)
+        self.classifier.set_property('dropout', 0)
         self.classifier.set_property('forget', 0)
-        self.next_training_set()
+        self.next_training_set(iter(self.testset))
         self.classifier.set_property('mode', 0)
         self.mode = TESTING
         self.test_n = 0
@@ -146,12 +145,8 @@ def main():
     random.seed(1)
     random.shuffle(timed_files)
     random.shuffle(untimed_files)
-    validate_files = timed_files[:36] + untimed_files[:36]
-    training_files = timed_files[36:] * 4 + untimed_files[36:]
-    random.shuffle(validate_files)
-    random.shuffle(training_files)
-
-    print args.hidden_size
+    validate_streams = [timed_files[:36] + untimed_files[:36]]
+    training_streams = [timed_files[36:], untimed_files[36:]]
 
     c = KiwiTrainer(mfccs=MFCCS,
                     hsize=args.hidden_size,
@@ -163,11 +158,10 @@ def main():
     c.quiet = not args.verbose
     timings = load_all_timings_binary(args.timings)
     c.timings = {x: timings[x] for x in timed_files}
-    print c.timings
 
     try:
-        c.train([training_files], [validate_files], iterations=1000,
-                learn_rate=lr, log_file=NET_LOG_FILE,
+        c.train(training_streams, validate_streams, iterations=10000,
+                learn_rate=lr, dropout=dropout, log_file=NET_LOG_FILE,
                 properties=(('log-class-numbers', 1),
                             ('momentum-soft-start', 15000),
                             ('momentum', 0.95),
