@@ -170,6 +170,7 @@ def main():
                 properties=(('log-class-numbers', 1),
                             ('momentum-soft-start', 15000),
                             ('momentum', 0.95),
+                            ('error-weight', '2:1'),
                             ))
     finally:
         pass

@@ -108,6 +108,7 @@ struct _GstClassify
   int window_no;
   int mode;
   float dropout;
+  float *error_weight;
 };
 
 

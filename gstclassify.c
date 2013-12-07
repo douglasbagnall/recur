@@ -47,6 +47,7 @@ enum
   PROP_WINDOW_SIZE,
   PROP_BASENAME,
   PROP_DROPOUT,
+  PROP_ERROR_WEIGHT,
 
   PROP_LAST
 };
@@ -54,6 +55,7 @@ enum
 #define DEFAULT_PROP_TARGET ""
 #define DEFAULT_PROP_PGM_DUMP ""
 #define DEFAULT_PROP_LOG_FILE ""
+#define DEFAULT_PROP_ERROR_WEIGHT ""
 #define DEFAULT_BASENAME "classify"
 #define DEFAULT_PROP_SAVE_NET NULL
 #define DEFAULT_PROP_LOG_CLASS_NUMBERS 0
@@ -293,6 +295,12 @@ gst_classify_class_init (GstClassifyClass * klass)
           DEFAULT_WINDOW_SIZE,
           G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
+  g_object_class_install_property (gobject_class, PROP_ERROR_WEIGHT,
+      g_param_spec_string("error-weight", "error-weight",
+          "Weight output errors (space or colon separated floats)",
+          DEFAULT_PROP_ERROR_WEIGHT,
+          G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+
 
   trans_class->transform_ip = GST_DEBUG_FUNCPTR (gst_classify_transform_ip);
   af_class->setup = GST_DEBUG_FUNCPTR (gst_classify_setup);
@@ -318,6 +326,7 @@ gst_classify_init (GstClassify * self)
   self->dropout = DEFAULT_PROP_DROPOUT;
   self->momentum = DEFAULT_PROP_MOMENTUM;
   self->basename = strdup(DEFAULT_BASENAME);
+  self->error_weight = NULL;
   GST_INFO("gst classify init\n");
 }
 
@@ -580,6 +589,40 @@ maybe_parse_target_string(GstClassify *self){
 }
 
 static void
+maybe_parse_error_weight_string(GstClassify *self){
+  char *orig, *s, *e;
+  s = e = orig = self->pending_properties[PROP_ERROR_WEIGHT];
+  int i;
+  if (s == NULL || self->channels == NULL){
+    GST_DEBUG("not parsing error_weight string:"
+        "either it (%p) or channels (%p) is NULL",
+        s, self->channels);
+     return;
+   }
+  GST_DEBUG("parsing error weights '%s'", s);
+  if (*s == 0){
+    if (self->error_weight){
+      free(self->error_weight);
+      self->error_weight = 0;
+    }
+  }
+  else {
+    int len = self->net->output_size;
+    if (self->error_weight == NULL){
+      self->error_weight = malloc_aligned_or_die(len);
+    }
+    for (i = 0; i < len && *e && *s; i++, s = e + 1){
+      self->error_weight[i] = strtof(s, &e);
+    }
+    if (i < len){
+      GST_WARNING("error weight string property is short"
+          "found %d numbers, wanted %d in '%s'", i, len, orig);
+    }
+  }
+  free_pending_property(self, PROP_ERROR_WEIGHT);
+}
+
+static void
 maybe_start_logging(GstClassify *self){
   const char *s = self->pending_properties[PROP_LOG_FILE];
   GST_DEBUG("pending log '%s'; subnets is %p", s, self->subnets);
@@ -633,6 +676,11 @@ gst_classify_set_property (GObject * object, guint prop_id, const GValue * value
     case PROP_TARGET:
       set_pending_property(self, prop_id, value);
       maybe_parse_target_string(self);
+      break;
+
+    case PROP_ERROR_WEIGHT:
+      set_pending_property(self, prop_id, value);
+      maybe_parse_error_weight_string(self);
       break;
 
     case PROP_PGM_DUMP:
@@ -875,7 +923,7 @@ prepare_channel_features(GstClassify *self, s16 *buffer_i, int j){
 }
 
 static inline float
-train_channel(ClassifyChannel *c, float dropout){
+train_channel(ClassifyChannel *c, float dropout, float *error_weights){
   RecurNN *net = c->net;
   bptt_advance(net);
   float *answer;
@@ -888,6 +936,11 @@ train_channel(ClassifyChannel *c, float dropout){
   c->current_winner = softmax_best_guess(net->bptt->o_error, answer,
       net->output_size);
   net->bptt->o_error[c->current_target] += 1.0f;
+  if (error_weights){
+    for (int i = 0; i < net->output_size; i ++){
+      net->bptt->o_error[i] *= error_weights[i];
+    }
+  }
   bptt_calc_deltas(net);
   return net->bptt->o_error[c->current_target];
 }
@@ -943,7 +996,7 @@ maybe_learn(GstClassify *self){
     }
     for (j = 0; j < self->n_channels; j++){
       ClassifyChannel *c = prepare_channel_features(self, buffer, j);
-      err_sum += train_channel(c, self->dropout);
+      err_sum += train_channel(c, self->dropout, self->error_weight);
       winners += c->current_winner == c->current_target;
       class_counts[c->current_target]++;
     }
