@@ -131,12 +131,11 @@ def main():
     args = parser.parse_args()
     lr = lr_steps(
         1e-5, 200,
-        3e-6, 100,
-        1e-6, 100,
-        3e-7, 100,
+        3e-6, 300,
+        1e-6, 400,
+        3e-7, 600,
         1e-7)
-    dropout = lr_steps(0.5, 180, 0)
-
+    dropout = lr_steps(0)
     timed_files = []
     for d in args.dir_with_timings:
         timed_files.extend(recursive_wav_finder(d))
@@ -149,7 +148,11 @@ def main():
     random.shuffle(timed_files)
     random.shuffle(untimed_files)
     validate_streams = [timed_files[:36] + untimed_files[:36]]
-    training_streams = [timed_files[36:], untimed_files[36:]]
+    training_streams = [timed_files[36:], timed_files[36:],
+                        timed_files[36:], timed_files[36:],
+                        timed_files[36:], untimed_files[36:]]
+    for x in training_streams:
+        random.shuffle(x)
 
     c = KiwiTrainer(mfccs=MFCCS,
                     hsize=args.hidden_size,
@@ -161,7 +164,6 @@ def main():
     c.quiet = not args.verbose
     timings = load_all_timings_binary(args.timings)
     c.timings = {x: timings[x] for x in timed_files}
-
     try:
         c.train(training_streams, validate_streams, iterations=10000,
                 learn_rate=lr, dropout=dropout, log_file=NET_LOG_FILE,
