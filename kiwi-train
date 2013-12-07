@@ -22,10 +22,13 @@ class KiwiTrainer(Trainer):
         self.targets = []
         starttime = self.timestamp
         self.timestamp = time.time()
+        dropout = self.dropout.next()
+        self.classifier.set_property('dropout', dropout)
         if self.learn_rate is not None:
             r = self.learn_rate.next() * self.lr_adjust
-            print ("%s/%s learn_rate %s elapsed %.2f" %
-                   (self.counter, self.iterations, r, self.timestamp - starttime))
+            print ("%s/%s learn_rate %.4g dropout %.2g elapsed %.2f" %
+                   (self.counter, self.iterations, r, dropout,
+                    self.timestamp - starttime))
             self.classifier.set_property('learn_rate', r)
 
         if src is None:

@@ -232,7 +232,7 @@ def eternal_shuffler(iters, max_iterations=-1):
 class Trainer(BaseClassifier):
     trainers = None
     lr_adjust = 1.0
-    def train(self, trainers, testers, iterations=100, learn_rate=None,
+    def train(self, trainers, testers, iterations=100, learn_rate=None, dropout=0.0,
               log_file=DEFAULT_LOG_FILE, properties=()):
         """data is a dictionary mapping class IDs to lists of filenames.
         """
@@ -240,6 +240,10 @@ class Trainer(BaseClassifier):
             self.learn_rate = itertools.repeat(learn_rate)
         else:
             self.learn_rate = learn_rate
+        if isinstance(dropout, float):
+            self.dropout = itertools.repeat(dropout)
+        else:
+            self.dropout = dropout
         self.counter = 0
         self.iterations = iterations
         self.trainers = eternal_shuffler(trainers)
@@ -264,6 +268,7 @@ class Trainer(BaseClassifier):
             fs.set_property('location', fn)
             if not self.quiet:
                 print c, fn
+        self.classifier.set_property('dropout', 0)
         self.classifier.set_property('forget', 0)
         self.classifier.set_property('target', '')
         self.mode = TESTING
@@ -314,10 +319,12 @@ class Trainer(BaseClassifier):
         self.targets = []
         starttime = self.timestamp
         self.timestamp = time.time()
+        dropout = self.dropout.next()
+        self.classifier.set_property('dropout', dropout)
         if self.learn_rate is not None:
             r = self.learn_rate.next() * self.lr_adjust
-            print ("%s/%s learn_rate %s elapsed %.2f" %
-                   (self.counter, self.iterations, r, self.timestamp - starttime))
+            print ("%s/%s learn_rate %s dropout %f elapsed %.2f" %
+                   (self.counter, self.iterations, r, dropout, self.timestamp - starttime))
             self.classifier.set_property('learn_rate', r)
 
         for fs in self.filesrcs:
