@@ -46,6 +46,7 @@ enum
   PROP_MODE,
   PROP_WINDOW_SIZE,
   PROP_BASENAME,
+  PROP_DROPOUT,
 
   PROP_LAST
 };
@@ -65,6 +66,7 @@ enum
 #define DEFAULT_WINDOW_SIZE 256
 #define DEFAULT_HIDDEN_SIZE 199
 #define DEFAULT_LEARN_RATE 0.0001
+#define DEFAULT_PROP_DROPOUT 0.0f
 #define MIN_PROP_CLASSES 1
 #define MAX_PROP_CLASSES 1000000
 #define MIN_HIDDEN_SIZE 1
@@ -75,6 +77,8 @@ enum
 #define LEARN_RATE_MAX 1.0
 #define MOMENTUM_MIN 0.0
 #define MOMENTUM_MAX 1.0
+#define DROPOUT_MIN 0.0
+#define DROPOUT_MAX 1.0
 #define MIN_PROP_MFCCS 0
 #define MAX_PROP_MFCCS (CLASSIFY_N_FFT_BINS - 1)
 #define MOMENTUM_SOFT_START_MAX 1e9
@@ -254,6 +258,13 @@ gst_classify_class_init (GstClassifyClass * klass)
           DEFAULT_LEARN_RATE,
           G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
+  g_object_class_install_property (gobject_class, PROP_DROPOUT,
+      g_param_spec_float("dropout", "dropout",
+          "dropout this portion of neurons in training",
+          DROPOUT_MIN, DROPOUT_MAX,
+          DEFAULT_PROP_DROPOUT,
+          G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+
   g_object_class_install_property (gobject_class, PROP_MOMENTUM_SOFT_START,
       g_param_spec_float("momentum-soft-start", "momentum-soft-start",
           "Ease into momentum over many generations",
@@ -304,6 +315,7 @@ gst_classify_init (GstClassify * self)
   self->hidden_size = DEFAULT_HIDDEN_SIZE;
   self->window_size = DEFAULT_WINDOW_SIZE;
   self->momentum_soft_start = DEFAULT_PROP_MOMENTUM_SOFT_START;
+  self->dropout = DEFAULT_PROP_DROPOUT;
   self->momentum = DEFAULT_PROP_MOMENTUM;
   self->basename = strdup(DEFAULT_BASENAME);
   GST_INFO("gst classify init\n");
@@ -667,6 +679,10 @@ gst_classify_set_property (GObject * object, guint prop_id, const GValue * value
       maybe_set_mode(self, g_value_get_int(value));
       break;
 
+    case PROP_DROPOUT:
+      self->dropout = g_value_get_float(value);
+      break;
+
     case PROP_LEARN_RATE:
       self->learn_rate = g_value_get_float(value);
       if (self->net){
@@ -755,6 +771,9 @@ gst_classify_get_property (GObject * object, guint prop_id, GValue * value,
     break;
   case PROP_MOMENTUM:
     g_value_set_float(value, self->momentum);
+    break;
+  case PROP_DROPOUT:
+    g_value_set_float(value, self->dropout);
     break;
   case PROP_MOMENTUM_SOFT_START:
     g_value_set_float(value, self->momentum_soft_start);
@@ -856,10 +875,16 @@ prepare_channel_features(GstClassify *self, s16 *buffer_i, int j){
 }
 
 static inline float
-train_channel(ClassifyChannel *c){
+train_channel(ClassifyChannel *c, float dropout){
   RecurNN *net = c->net;
   bptt_advance(net);
-  float *answer = rnn_opinion(net, c->features);
+  float *answer;
+  if (dropout){
+    answer = rnn_opinion_with_dropout(net, NULL, dropout);
+  }
+  else {
+    answer = rnn_opinion(net, NULL);
+  }
   c->current_winner = softmax_best_guess(net->bptt->o_error, answer,
       net->output_size);
   net->bptt->o_error[c->current_target] += 1.0f;
@@ -918,7 +943,7 @@ maybe_learn(GstClassify *self){
     }
     for (j = 0; j < self->n_channels; j++){
       ClassifyChannel *c = prepare_channel_features(self, buffer, j);
-      err_sum += train_channel(c);
+      err_sum += train_channel(c, self->dropout);
       winners += c->current_winner == c->current_target;
       class_counts[c->current_target]++;
     }
