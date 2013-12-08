@@ -582,23 +582,19 @@ maybe_parse_target_string(GstClassify *self){
      return;
    }
   GST_DEBUG("parsing target '%s'", s);
-  if (s == NULL || self->channels == NULL){
-    GST_DEBUG("not parsing NULL target string (%p) channels is %p",
-        s, self->channels);
-  }
-  else if (*s == 0){
+  if (*s == 0){
     reset_channel_targets(self);
   }
   else {
-    int ret;
+    int result;
     if (*s == 'c'){
-      ret = parse_complex_target_string(self, s);
+      result = parse_complex_target_string(self, s);
     }
     else {
-      ret = parse_simple_target_string(self, s);
+      result = parse_simple_target_string(self, s);
     }
     if (self->mode != STICKY_CLASSIFY_MODE){
-      self->mode = (ret == 0) ? TRAINING_MODE : CLASSIFY_MODE;
+      self->mode = (result == 0) ? TRAINING_MODE : CLASSIFY_MODE;
     }
   }
   free_pending_property(self, PROP_TARGET);
