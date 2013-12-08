@@ -925,13 +925,12 @@ prepare_channel_features(GstClassify *self, s16 *buffer_i, int j){
 static inline float
 train_channel(ClassifyChannel *c, float dropout, float *error_weights){
   RecurNN *net = c->net;
-  bptt_advance(net);
   float *answer;
   if (dropout){
-    answer = rnn_opinion_with_dropout(net, NULL, dropout);
+    answer = rnn_opinion_with_dropout(net, c->features, dropout);
   }
   else {
-    answer = rnn_opinion(net, NULL);
+    answer = rnn_opinion(net, c->features);
   }
   c->current_winner = softmax_best_guess(net->bptt->o_error, answer,
       net->output_size);
