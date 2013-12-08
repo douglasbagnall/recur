@@ -119,9 +119,14 @@ init_channel(ClassifyChannel *c, RecurNN *net, int window_size, int id, float le
   c->pcm_next = zalloc_aligned_or_die(window_size * sizeof(float));
   c->pcm_now = zalloc_aligned_or_die(window_size * sizeof(float));
   c->features = zalloc_aligned_or_die(net->input_size * sizeof(float));
-  if (PGM_DUMP_FEATURES){
+  if (PGM_DUMP_FEATURES && id == 0){
+#if 0
+    c->mfcc_image = temporal_ppm_alloc(net->i_size * net->bptt->depth, 300, "mfcc", id,
+        PGM_DUMP_COLOUR, &c->net->bptt->history);
+#else
     c->mfcc_image = temporal_ppm_alloc(net->input_size, 300, "mfcc", id,
         PGM_DUMP_COLOUR, &c->features);
+#endif
   }
   else {
     c->mfcc_image = NULL;
