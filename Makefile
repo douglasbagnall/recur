@@ -22,6 +22,8 @@ INC_DIR = /usr/include
 #CC = /usr/local/bin/clang  -Weverything -Wno-documentation -Wno-system-headers -Wno-sign-conversion -Wno-conversion -Wno-gnu -Wno-variadic-macros -Wno-vla -Wno-disabled-macro-expansion
 #CLANG_FLAGS = -fslp-vectorize-aggressive
 #CLANG_FLAGS =  -fplugin=/usr/lib/gcc/x86_64-linux-gnu/4.7/plugin/dragonegg.so
+#CC = clang -Xclang -analyze -Xclang -analyzer-checker=debug.ViewCallGraph
+
 
 ALL_CFLAGS = -march=native -pthread $(WARNINGS) -pipe  -D_GNU_SOURCE $(INCLUDES) $(ARCH_CFLAGS) $(CFLAGS) $(DEV_CFLAGS) -ffast-math -funsafe-loop-optimizations $(CLANG_FLAGS) -std=gnu11 $(CFLAGS)
 ALL_LDFLAGS = $(LDFLAGS)
