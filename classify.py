@@ -236,11 +236,11 @@ class Trainer(BaseClassifier):
               log_file=DEFAULT_LOG_FILE, properties=()):
         """data is a dictionary mapping class IDs to lists of filenames.
         """
-        if isinstance(learn_rate, float):
+        if isinstance(learn_rate, (int, float)):
             self.learn_rate = itertools.repeat(learn_rate)
         else:
             self.learn_rate = learn_rate
-        if isinstance(dropout, float):
+        if isinstance(dropout, (int, float)):
             self.dropout = itertools.repeat(dropout)
         else:
             self.dropout = dropout
