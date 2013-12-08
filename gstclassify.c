@@ -48,6 +48,7 @@ enum
   PROP_BASENAME,
   PROP_DROPOUT,
   PROP_ERROR_WEIGHT,
+  PROP_BPTT_DEPTH,
 
   PROP_LAST
 };
@@ -64,6 +65,7 @@ enum
 #define DEFAULT_PROP_MOMENTUM 0.95f
 #define DEFAULT_PROP_MOMENTUM_SOFT_START 0.0f
 #define DEFAULT_PROP_CLASSES 2
+#define DEFAULT_PROP_BPTT_DEPTH 30
 #define DEFAULT_PROP_FORGET 0
 #define DEFAULT_WINDOW_SIZE 256
 #define DEFAULT_HIDDEN_SIZE 199
@@ -71,6 +73,8 @@ enum
 #define DEFAULT_PROP_DROPOUT 0.0f
 #define MIN_PROP_CLASSES 1
 #define MAX_PROP_CLASSES 1000000
+#define MIN_PROP_BPTT_DEPTH 1
+#define MAX_PROP_BPTT_DEPTH 1000
 #define MIN_HIDDEN_SIZE 1
 #define MAX_HIDDEN_SIZE 1000000
 #define WINDOW_SIZE_MAX 8192
@@ -227,6 +231,13 @@ gst_classify_class_init (GstClassifyClass * klass)
           DEFAULT_PROP_CLASSES,
           G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
+  g_object_class_install_property (gobject_class, PROP_BPTT_DEPTH,
+      g_param_spec_int("bptt-depth", "bptt-depth",
+          "Backprop through time to this depth",
+          MIN_PROP_BPTT_DEPTH, MAX_PROP_BPTT_DEPTH,
+          DEFAULT_PROP_BPTT_DEPTH,
+          G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+
   g_object_class_install_property (gobject_class, PROP_MFCCS,
       g_param_spec_int("mfccs", "mfccs",
           "Use this many MFCCs, or zero for fft bins",
@@ -319,6 +330,7 @@ gst_classify_init (GstClassify * self)
   self->class_events = NULL;
   self->class_events_index = 0;
   self->n_class_events = 0;
+  self->bptt_depth = DEFAULT_PROP_BPTT_DEPTH;
   self->learn_rate = DEFAULT_LEARN_RATE;
   self->hidden_size = DEFAULT_HIDDEN_SIZE;
   self->window_size = DEFAULT_WINDOW_SIZE;
@@ -360,7 +372,7 @@ load_or_create_net(GstClassify *self){
     int n_features = self->mfccs ? self->mfccs : CLASSIFY_N_FFT_BINS;
     net = rnn_new(n_features, self->hidden_size,
         self->n_classes, CLASSIFY_RNN_FLAGS, CLASSIFY_RNG_SEED,
-        NULL, CLASSIFY_BPTT_DEPTH, self->learn_rate, self->momentum, MOMENTUM_WEIGHT,
+        NULL, self->bptt_depth, self->learn_rate, self->momentum, MOMENTUM_WEIGHT,
         CLASSIFY_BATCH_SIZE, 0);
   }
   else {
@@ -749,7 +761,8 @@ gst_classify_set_property (GObject * object, guint prop_id, const GValue * value
       self->momentum = g_value_get_float(value);
       break;
 
-      /*CLASSES, MFCCS, and HIDDEN_SIZE have no effect if set late (after net creation)
+      /*CLASSES, MFCCS, BPTT_DEPTH,
+        and HIDDEN_SIZE have no effect if set late (after net creation)
        */
 #define SET_INT_IF_NOT_TOO_LATE(attr, name) do {                        \
         if (self->net == NULL){                                         \
@@ -771,6 +784,10 @@ gst_classify_set_property (GObject * object, guint prop_id, const GValue * value
 
     case PROP_CLASSES:
       SET_INT_IF_NOT_TOO_LATE(n_classes, "number of classes");
+      break;
+
+    case PROP_BPTT_DEPTH:
+      SET_INT_IF_NOT_TOO_LATE(bptt_depth, "bptt depth");
       break;
 
     case PROP_HIDDEN_SIZE:
@@ -810,6 +827,9 @@ gst_classify_get_property (GObject * object, guint prop_id, GValue * value,
     break;
   case PROP_CLASSES:
     g_value_set_int(value, self->n_classes);
+    break;
+  case PROP_BPTT_DEPTH:
+    g_value_set_int(value, self->bptt_depth);
     break;
   case PROP_MFCCS:
     g_value_set_int(value, self->mfccs);

@@ -11,7 +11,6 @@
 G_BEGIN_DECLS
 
 #define CLASSIFY_RNG_SEED 11
-#define CLASSIFY_BPTT_DEPTH 30
 #define MOMENTUM_WEIGHT 0.5
 
 #define CLASSIFY_MAX_CHANNELS 200
@@ -107,6 +106,7 @@ struct _GstClassify
   int window_size;
   int window_no;
   int mode;
+  int bptt_depth;
   float dropout;
   float *error_weight;
 };
