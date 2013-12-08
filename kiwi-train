@@ -19,7 +19,6 @@ NET_LOG_FILE = "kiwi.log"
 class KiwiTrainer(Trainer):
     def next_training_set(self, src=None):
         targets = []
-        self.targets = []
         starttime = self.timestamp
         self.timestamp = time.time()
         dropout = self.dropout.next()
@@ -37,13 +36,11 @@ class KiwiTrainer(Trainer):
         for fs in self.filesrcs:
             fn = src.next()
             timings = self.timings.get(fn, [(1, 0)])
-            c = ('K' if timings != [(1, 0)] else '-')
-            self.targets.append(c)
             targets.extend('c%dt%.2f' % x for x in timings)
             targets.append(' ')
             fs.set_property('location', fn)
             if not self.quiet:
-                print c, fn, timings
+                print fn, timings
 
         target_string = ''.join(targets) + ' '
         self.classifier.set_property('target', target_string)
