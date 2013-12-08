@@ -473,21 +473,21 @@ parse_complex_target_string(GstClassify *self, const char *str){
     nc += *s == ' ';
   }
   if (self->n_class_events < n){
-    GST_DEBUG("found %d targets, %d channels, prev %d events (%p)", n, nc,
+    GST_LOG("found %d targets, %d channels, prev %d events (%p)", n, nc,
         self->n_class_events, self->class_events);
     self->class_events = realloc_or_die(self->class_events,
         (n + 2) * sizeof(ClassifyClassEvent));
   }
   self->n_class_events = n;
   self->class_events_index = 0;
-  GST_DEBUG("events %p, n %d", self->class_events, n);
+  GST_LOG("events %p, n %d", self->class_events, n);
   s = str;
   float time_to_window_no = CLASSIFY_RATE * 2.0f / self->window_size + 0.5;
   for (i = 0; i < n; i++){
 #define ERROR_IF(x) if (x) goto parse_error
     ev = &self->class_events[i];
     ev->channel = channel;
-    //GST_DEBUG("i %d s '%s' ev %p", i, s, ev);
+    //GST_LOG("i %d s '%s' ev %p", i, s, ev);
     ERROR_IF(*s != 'c');
     s++;
     ev->class = strtol(s, &e, 10);
@@ -503,7 +503,7 @@ parse_complex_target_string(GstClassify *self, const char *str){
       channel++;
       s++;
     }
-    GST_DEBUG("event: channel %d target %d window %d starting %.2f (request %.2f)",
+    GST_LOG("event: channel %d target %d window %d starting %.2f (request %.2f)",
         ev->channel, ev->class, ev->window_no,
         (double)ev->window_no * self->window_size / (2.0f * CLASSIFY_RATE), time);
 #undef ERROR_IF
@@ -525,7 +525,7 @@ parse_simple_target_string(GstClassify *self, const char *s){
   int i;
   for (i = 0; i < self->n_channels; i++){
     x = strtol(s, &e, 10);
-    GST_DEBUG("channel %d got %ld s is %s, %p  e is %p", i, x, s, s, e);
+    GST_LOG("channel %d got %ld s is %s, %p  e is %p", i, x, s, s, e);
     if (s == e){ /*no digits at all */
       goto parse_error;
     }
@@ -535,7 +535,7 @@ parse_simple_target_string(GstClassify *self, const char *s){
       goto parse_error;
     }
   }
-  GST_DEBUG("target %d", self->channels[0].current_target);
+  GST_LOG("target %d", self->channels[0].current_target);
   return 0;
  parse_error:
   GST_WARNING("Can't parse '%s' into %d channels: stopping after %d",
@@ -978,10 +978,10 @@ prepare_next_chunk(GstClassify *self){
   if (len < 0){
     len += self->queue_size;
   }
-  GST_DEBUG("start %d end %d len %d chunk %d queue_size %d", self->incoming_start,
+  GST_LOG("start %d end %d len %d chunk %d queue_size %d", self->incoming_start,
       self->incoming_end, len, chunk_size, self->queue_size);
   if (len < chunk_size){
-    GST_DEBUG("returning NULL");
+    GST_LOG("returning NULL");
     return NULL;
   }
   self->incoming_start += chunk_size;
@@ -995,14 +995,14 @@ prepare_next_chunk(GstClassify *self){
       break;
     }
     self->channels[ev->channel].current_target = ev->class;
-    GST_DEBUG("event %d/%d: channel %d target -> %d at window  %d (%d)",
+    GST_LOG("event %d/%d: channel %d target -> %d at window  %d (%d)",
         self->class_events_index, self->n_class_events,
         ev->channel, ev->class, self->window_no, ev->window_no);
     self->class_events_index++;
   }
 
   self->window_no++;
-  GST_DEBUG("returning %p", self->incoming_queue + self->incoming_start);
+  GST_LOG("returning %p", self->incoming_queue + self->incoming_start);
 
   return self->incoming_queue + self->incoming_start;
 }
