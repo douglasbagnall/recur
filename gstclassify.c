@@ -962,6 +962,7 @@ train_channel(ClassifyChannel *c, float dropout, float *error_weights){
     }
   }
   bptt_calc_deltas(net);
+  bptt_advance(net);
   return net->bptt->o_error[c->current_target];
 }
 
