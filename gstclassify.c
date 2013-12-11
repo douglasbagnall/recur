@@ -49,6 +49,7 @@ enum
   PROP_DROPOUT,
   PROP_ERROR_WEIGHT,
   PROP_BPTT_DEPTH,
+  PROP_WEIGHT_SPARSITY,
   PROP_LAWN_MOWER,
 
   PROP_LAST
@@ -69,6 +70,7 @@ enum
 #define DEFAULT_PROP_CLASSES 2
 #define DEFAULT_PROP_BPTT_DEPTH 30
 #define DEFAULT_PROP_FORGET 0
+#define DEFAULT_PROP_WEIGHT_SPARSITY 1
 #define DEFAULT_WINDOW_SIZE 256
 #define DEFAULT_HIDDEN_SIZE 199
 #define DEFAULT_LEARN_RATE 0.0001
@@ -85,6 +87,8 @@ enum
 #define LEARN_RATE_MAX 1.0
 #define MOMENTUM_MIN 0.0
 #define MOMENTUM_MAX 1.0
+#define WEIGHT_SPARSITY_MIN 0
+#define WEIGHT_SPARSITY_MAX 10
 #define DROPOUT_MIN 0.0
 #define DROPOUT_MAX 1.0
 #define MIN_PROP_MFCCS 0
@@ -252,6 +256,13 @@ gst_classify_class_init (GstClassifyClass * klass)
           DEFAULT_PROP_MFCCS,
           G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
+  g_object_class_install_property (gobject_class, PROP_WEIGHT_SPARSITY,
+      g_param_spec_int("weight-sparsity", "weight-sparsity",
+          "higher numbers for more initial weights near zero",
+          WEIGHT_SPARSITY_MIN, WEIGHT_SPARSITY_MAX,
+          DEFAULT_PROP_WEIGHT_SPARSITY,
+          G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
+
   g_object_class_install_property (gobject_class, PROP_FORGET,
       g_param_spec_boolean("forget", "forget",
           "Forget the current hidden layer (all channels)",
@@ -350,6 +361,7 @@ gst_classify_init (GstClassify * self)
   self->dropout = DEFAULT_PROP_DROPOUT;
   self->momentum = DEFAULT_PROP_MOMENTUM;
   self->basename = strdup(DEFAULT_BASENAME);
+  self->weight_sparsity = DEFAULT_PROP_WEIGHT_SPARSITY;
   self->error_weight = NULL;
   self->pending_net_flags = CLASSIFY_RNN_FLAGS;
   GST_INFO("gst classify init\n");
@@ -387,6 +399,11 @@ load_or_create_net(GstClassify *self){
         self->n_classes, self->pending_net_flags, CLASSIFY_RNG_SEED,
         NULL, self->bptt_depth, self->learn_rate, self->momentum, MOMENTUM_WEIGHT,
         CLASSIFY_BATCH_SIZE, 0);
+    if (self->weight_sparsity > 1){
+      rnn_randomise_weights(net, RNN_INITIAL_WEIGHT_VARIANCE_FACTOR / net->h_size,
+          self->weight_sparsity);
+    }
+
   }
   else {
     rnn_set_log_file(net, NULL, 0);
@@ -803,6 +820,10 @@ gst_classify_set_property (GObject * object, guint prop_id, const GValue * value
 
     case PROP_MFCCS:
       SET_INT_IF_NOT_TOO_LATE(mfccs, "number of MFCCs");
+      break;
+
+    case PROP_WEIGHT_SPARSITY:
+      SET_INT_IF_NOT_TOO_LATE(weight_sparsity, "weight_sparsity");
       break;
 
     case PROP_CLASSES:

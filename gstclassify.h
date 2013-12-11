@@ -107,6 +107,7 @@ struct _GstClassify
   int window_no;
   int mode;
   int bptt_depth;
+  int weight_sparsity;
   float dropout;
   float *error_weight;
   u32 pending_net_flags;
