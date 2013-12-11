@@ -44,6 +44,7 @@ XXX this really ought to be adjustable or adjust itself */
 
 #define RNN_TALL_POPPY_THRESHOLD 1.0f
 #define RNN_TALL_POPPY_SCALE 0.99f
+#define RNN_LAWN_MOWER_THRESHOLD 10.0f
 
 /* Conditioning flags go in bits 16-23 of net->flags.
 
@@ -59,6 +60,7 @@ XXX this really ought to be adjustable or adjust itself */
 enum {
   RNN_COND_BIT_SCALE = 0U,
   RNN_COND_BIT_ZERO = 2U,
+  RNN_COND_BIT_LAWN_MOWER = 3U,
   RNN_COND_BIT_TALL_POPPY = 4U,
   RNN_COND_BIT_RAND = 6U
 };
@@ -74,6 +76,7 @@ enum {
   /*conditioning flags start at 1 << 16 (65536) */
   RNN_COND_USE_SCALE = (1 << (RNN_COND_BIT_SCALE + RNN_COND_USE_OFFSET)),
   RNN_COND_USE_ZERO = (1 << (RNN_COND_BIT_ZERO + RNN_COND_USE_OFFSET)),
+  RNN_COND_USE_LAWN_MOWER = (1 << (RNN_COND_BIT_LAWN_MOWER + RNN_COND_USE_OFFSET)),
   RNN_COND_USE_TALL_POPPY = (1 << (RNN_COND_BIT_TALL_POPPY + RNN_COND_USE_OFFSET)),
   RNN_COND_USE_RAND = (1 << (RNN_COND_BIT_RAND + RNN_COND_USE_OFFSET)),
 

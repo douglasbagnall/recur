@@ -960,6 +960,14 @@ rnn_condition_net(RecurNN *net)
           big_i, big_v, net->ih_weights[big_i]);
     }
     break;
+  case RNN_COND_BIT_LAWN_MOWER:
+    {
+      for (int i = 0; i < net->ih_size; i++){
+        net->ih_weights[i] = MAX(net->ih_weights[i], -RNN_LAWN_MOWER_THRESHOLD);
+        net->ih_weights[i] = MIN(net->ih_weights[i],  RNN_LAWN_MOWER_THRESHOLD);
+      }
+    }
+    break;
   }
 }
 

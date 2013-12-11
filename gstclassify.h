@@ -109,6 +109,7 @@ struct _GstClassify
   int bptt_depth;
   float dropout;
   float *error_weight;
+  u32 pending_net_flags;
 };
 
 

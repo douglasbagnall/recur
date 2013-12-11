@@ -49,6 +49,7 @@ enum
   PROP_DROPOUT,
   PROP_ERROR_WEIGHT,
   PROP_BPTT_DEPTH,
+  PROP_LAWN_MOWER,
 
   PROP_LAST
 };
@@ -60,6 +61,7 @@ enum
 #define DEFAULT_BASENAME "classify"
 #define DEFAULT_PROP_SAVE_NET NULL
 #define DEFAULT_PROP_LOG_CLASS_NUMBERS 0
+#define DEFAULT_PROP_LAWN_MOWER 0
 #define DEFAULT_PROP_MODE 0
 #define DEFAULT_PROP_MFCCS 0
 #define DEFAULT_PROP_MOMENTUM 0.95f
@@ -315,6 +317,11 @@ gst_classify_class_init (GstClassifyClass * klass)
       g_param_spec_string("error-weight", "error-weight",
           "Weight output errors (space or colon separated floats)",
           DEFAULT_PROP_ERROR_WEIGHT,
+
+  g_object_class_install_property (gobject_class, PROP_LAWN_MOWER,
+      g_param_spec_boolean("lawn-mower", "lawn-mower",
+          "Don't let any weight grow bigger than " QUOTE(RNN_LAWN_MOWER_THRESHOLD),
+          DEFAULT_PROP_LAWN_MOWER,
           G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
 
@@ -344,6 +351,7 @@ gst_classify_init (GstClassify * self)
   self->momentum = DEFAULT_PROP_MOMENTUM;
   self->basename = strdup(DEFAULT_BASENAME);
   self->error_weight = NULL;
+  self->pending_net_flags = CLASSIFY_RNN_FLAGS;
   GST_INFO("gst classify init\n");
 }
 
@@ -376,7 +384,7 @@ load_or_create_net(GstClassify *self){
   if (net == NULL){
     int n_features = self->mfccs ? self->mfccs : CLASSIFY_N_FFT_BINS;
     net = rnn_new(n_features, self->hidden_size,
-        self->n_classes, CLASSIFY_RNN_FLAGS, CLASSIFY_RNG_SEED,
+        self->n_classes, self->pending_net_flags, CLASSIFY_RNG_SEED,
         NULL, self->bptt_depth, self->learn_rate, self->momentum, MOMENTUM_WEIGHT,
         CLASSIFY_BATCH_SIZE, 0);
   }
@@ -732,6 +740,20 @@ gst_classify_set_property (GObject * object, guint prop_id, const GValue * value
       }
       break;
 
+    case PROP_LAWN_MOWER:
+      {
+        gboolean bit = g_value_get_boolean(value);
+        u32 mask = RNN_COND_USE_LAWN_MOWER;
+        u32 flags = (self->net) ? self->net->flags : self->pending_net_flags;
+        if (bit){
+          flags |= mask;
+        }
+        else {
+          flags &= ~mask;
+        }
+      }
+      break;
+
     case PROP_LOG_CLASS_NUMBERS:
       self->log_class_numbers = g_value_get_boolean(value);
       break;
@@ -853,6 +875,13 @@ gst_classify_get_property (GObject * object, guint prop_id, GValue * value,
   case PROP_WINDOW_SIZE:
     g_value_set_int(value, self->window_size);
     break;
+  case PROP_LAWN_MOWER:
+    {
+      u32 flags = (self->net) ? self->net->flags : self->pending_net_flags;
+      g_value_set_boolean(value, !! (flags & RNN_COND_USE_LAWN_MOWER));
+    }
+    break;
+
   default:
     G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
     break;
