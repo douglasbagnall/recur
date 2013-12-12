@@ -268,10 +268,11 @@ rnn_randomise_weights(RecurNN *net, float variance, int shape){
 
 void
 rnn_forget_history(RecurNN *net, int bptt_too){
-  memset(net->hidden_layer, 0, net->h_size * sizeof(float));
-  memset(net->input_layer, 0, net->hidden_size * sizeof(float));
+  zero_aligned_array(net->hidden_layer, net->h_size);
+  /*zero aligned array doesn't work on possibly unaligned length */
+  memset(net->input_layer, 0, (net->hidden_size + net->bias) * sizeof(float));
   if (bptt_too && net->bptt){
-    memset(net->bptt->history, 0, net->bptt->depth * net->i_size * sizeof(float));
+    zero_aligned_array(net->bptt->history, net->bptt->depth * net->i_size);
   }
 }
 
@@ -555,7 +556,7 @@ calc_sgd_top_layer(RecurNN *net){
   }
   MAYBE_DEBUG("top error:[0] %g, [1] %g", o_error[0], o_error[1]);
   error_sum = backprop_top_layer(net);
-  memset(delta, 0, net->ho_size * sizeof(float));
+  zero_aligned_array(delta, net->ho_size);
   for (y = 0; y < net->h_size; y++){
     if (hiddens[y]){
       float *restrict drow = delta + y * net->o_size;
@@ -762,7 +763,7 @@ apply_learning_with_simplified_nestorov_momentum(float *restrict weights,
 static inline float
 apply_sgd_with_bptt(RecurNN *net, float top_error_sum){
   RecurNNBPTT *bptt = net->bptt;
-  memset(bptt->ih_delta, 0, net->ih_size * sizeof(float));
+  zero_aligned_array(bptt->ih_delta, net->ih_size);
   float error_sum = bptt_and_accumulate_error(net, bptt->ih_delta, top_error_sum);
   float rate = bptt->learn_rate * bptt->ih_scale;
 
@@ -785,7 +786,7 @@ apply_sgd_with_bptt_batch(RecurNN *net, float top_error_sum){
   if ((net->generation % bptt->batch_size) == 0){
     apply_learning_with_momentum(net->ih_weights, bptt->ih_delta, bptt->ih_momentum,
         net->ih_size, rate, bptt->momentum, bptt->momentum_weight);
-    memset(bptt->ih_delta, 0, net->ih_size * sizeof(float));
+    zero_aligned_array(bptt->ih_delta, net->ih_size);
   }
   return error_sum;
 }
@@ -855,7 +856,7 @@ bptt_calc_deltas(RecurNN *net){
   float top_error_scaled = softclip_scale(top_error_sum,
       net->h_size * MAX_TOP_ERROR_FACTOR, net->bptt->h_error, net->h_size);
 
-  memset(net->bptt->ih_delta, 0, net->ih_size * sizeof(float));
+  zero_aligned_array(net->bptt->ih_delta, net->ih_size);
   float bptt_error_sum = bptt_and_accumulate_error(net,
       net->bptt->ih_delta, top_error_scaled);
   if (net->log){

@@ -98,8 +98,8 @@ class KiwiTrainer(Trainer):
                     COLOURS['Z']))
         print ''.join(output)
         if winners > 0.9:
-            self.save_net(tag='goodness-%d-%d' %
-                          (int(rightness * 100), int(winners * 100)))
+            self.save_named_net(tag='goodness-%d-%d' %
+                                (int(rightness * 100), int(winners * 100)))
         if rightness > 0.75:
             self.lr_adjust = 0.1 / (rightness - 0.65)
         else:
@@ -122,17 +122,28 @@ def main():
                         help='use this directory with timings')
     parser.add_argument('-n', '--dir-without-timings', action='append',
                         help="use this directory without timings")
+    parser.add_argument('-l', '--learn-rate', type=float,
+                        help="learning rate")
+    parser.add_argument('-i', '--iterations', type=int, default=10000,
+                        help="how many file cycles to run for")
     parser.add_argument('-H', '--hidden-size', type=int,
                         help="number of hidden neurons")
+    parser.add_argument('-N', '--no-save-net', action='store_true',
+                        help="don't save the net, periodically or otherwise")
 
     args = parser.parse_args()
-    lr = lr_steps(
-        1e-5, 200,
-        3e-6, 300,
-        1e-6, 400,
-        3e-7, 600,
-        1e-7)
-    dropout = lr_steps(0)
+    if args.learn_rate:
+        lr = lr_steps(args.learn_rate)
+    else:
+        lr = lr_steps(
+            #1e-4, 200,
+            1e-5, 1,
+            3e-6, 4,
+            1e-6, 16,
+            3e-7, 64,
+            1e-7)
+    #dropout = lr_steps(0.3, 1400, 0)
+    dropout = 0
     timed_files = []
     for d in args.dir_with_timings:
         timed_files.extend(recursive_wav_finder(d))
@@ -158,22 +169,19 @@ def main():
                     window_size=WINDOW_SIZE,
                     basename=BASENAME)
 
+    c.SAVE_NET = not args.no_save_net
     c.quiet = not args.verbose
     timings = load_all_timings_binary(args.timings)
     c.timings = {x: timings[x] for x in timed_files}
-    try:
-        c.train(training_streams, validate_streams, iterations=10000,
-                learn_rate=lr, dropout=dropout, log_file=NET_LOG_FILE,
-                properties=(('log-class-numbers', 1),
-                            ('momentum-soft-start', 15000),
-                            ('momentum', 0.95),
-                            #('lawn-mower', 1),
-                            ('weight-sparsity', 2),
-                            #('error-weight', '4:1'),
-                            ))
-    finally:
-        pass
-        #c.classifier.set_property('save-net', '')
 
+    c.train(training_streams, validate_streams, iterations=args.iterations,
+            learn_rate=lr, dropout=dropout, log_file=NET_LOG_FILE,
+            properties=(('log-class-numbers', 1),
+                        ('momentum-soft-start', 15000),
+                        ('momentum', 0.95),
+                        #('lawn-mower', 1),
+                        ('weight-sparsity', 2),
+                        #('error-weight', '4:1'),
+                        ))
 
 main()

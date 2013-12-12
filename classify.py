@@ -17,7 +17,7 @@ TMP_HIDDEN_SIZE = 499
 KIWI_HIDDEN_SIZE = 299
 TMP_MFCCS = 16
 KIWI_MFCCS = 16
-KIWI_WINDOW_SIZE = 2048
+KIWI_WINDOW_SIZE = 1024
 TMP_WINDOW_SIZE = 256
 KIWI_BASENAME = 'kiwi'
 TMP_BASENAME = 'classify'
@@ -232,6 +232,7 @@ def eternal_shuffler(iters, max_iterations=-1):
 class Trainer(BaseClassifier):
     trainers = None
     lr_adjust = 1.0
+    SAVE_NET = True
     def train(self, trainers, testers, iterations=100, learn_rate=None, dropout=0.0,
               log_file=DEFAULT_LOG_FILE, properties=()):
         """data is a dictionary mapping class IDs to lists of filenames.
@@ -301,19 +302,23 @@ class Trainer(BaseClassifier):
                     COLOURS['Z']))
         print ''.join(output)
         if winners > 0.9:
-            self.save_net(tag='goodness-%d-%d' %
-                          (int(rightness * 100), int(winners * 100)))
+            self.save_named_net(tag='goodness-%d-%d' %
+                                (int(rightness * 100), int(winners * 100)))
         if rightness > 0.75:
             self.lr_adjust = 0.1 / (rightness - 0.65)
         else:
             self.lr_adjust = 1.0
 
 
-    def save_net(self, tag='', dir=SAVE_LOCATION):
+    def save_named_net(self, tag='', dir=SAVE_LOCATION):
         fn = ("%s/%s-%s-%s.net" %
               (dir, self.basename, time.time(), tag))
         print "saving %s" % fn
-        self.classifier.set_property('save-net', fn)
+        self.save_net(fn)
+
+    def save_net(self, name=''):
+        if self.SAVE_NET:
+            self.classifier.set_property('save-net', name)
 
     def next_training_set(self):
         self.targets = []
@@ -347,7 +352,7 @@ class Trainer(BaseClassifier):
             self.test_scores = None
             self.next_training_set()
         else:
-            self.classifier.set_property('save-net', '')
+            self.save_net()
             self.counter += 1
             if self.counter == self.iterations:
                 self.stop()

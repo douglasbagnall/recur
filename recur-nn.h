@@ -216,9 +216,22 @@ add_aligned_arrays(float *restrict dest, int len, const float *restrict src, flo
   //XXX a prefetch would help
   ASSUME_ALIGNED(dest);
   ASSUME_ALIGNED(src);
+#if VECTOR_ALL_THE_WAY && 0
+  len >>= 2;
+  v4ss *vd = (v4ss*)dest;
+  v4ss *vs = (v4ss*)src;
+  v4ss v_scale = {scale, scale, scale, scale};
+  for (int i = 0; i < len; i++){
+    __builtin_prefetch(&vs[i + 3]);
+    __builtin_prefetch(&vd[i + 3]);
+    vd[i] += vs[i] * v_scale;
+  }
+
+#else
   for (int i = 0; i < len; i++){
     dest[i] += src[i] * scale;
   }
+#endif
 #else
   cblas_saxpy(len, scale, src, 1, dest, 1);
 #endif
@@ -274,6 +287,28 @@ zero_small_numbers(float *array, int len)
   }
 }
 
+#define ZERO_WITH_MEMSET 0
 
+static inline void
+zero_aligned_array(float *array, int size){
+  ASSUME_ALIGNED(array);
+#if ZERO_WITH_MEMSET
+  memset(array, 0, size * sizeof(float));
+#else
+  int i;
+#if VECTOR
+  size >>= 2;
+  v4ss *v_array = (v4ss*)array;
+  v4ss vz = {0, 0, 0, 0};
+  for (i = 0; i < size; i++){
+    v_array[i] = vz;
+  }
+#else
+  for (i = 0; i < size; i++){
+    array[i] = 0.0f;
+  }
+#endif
+#endif
+}
 
 #endif
