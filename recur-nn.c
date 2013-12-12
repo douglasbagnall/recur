@@ -244,7 +244,10 @@ rnn_randomise_weights(RecurNN *net, float variance, int shape){
   /*higher shape indicates greater kurtosis. shape 0 means automatically
     determine shape (crudely).*/
   if (shape == 0){
-    shape = 1 + net->h_size / 500;
+    shape = (int)(1.0f + sqrtf(net->h_size / 400.0));
+  }
+  if (shape > 10){
+    shape = 10;
   }
   for (y = 0; y < net->i_size; y++){
     /*zero for bias, will be overwritten if inapplicable*/

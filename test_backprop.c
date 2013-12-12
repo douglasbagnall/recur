@@ -552,11 +552,7 @@ load_or_create_net(void){
         input_size, flags, 1,
         opt_logfile, opt_bptt_depth, opt_learn_rate,
         opt_momentum, opt_momentum_weight,
-        opt_bptt_batch_size, 1);
-    if (opt_weight_sparsity > 1){
-      rnn_randomise_weights(net, RNN_INITIAL_WEIGHT_VARIANCE_FACTOR / net->h_size,
-          opt_weight_sparsity);
-    }
+        opt_bptt_batch_size, opt_weight_sparsity);
   }
   else if (opt_override){
     RecurNNBPTT *bptt = net->bptt;

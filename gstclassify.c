@@ -398,12 +398,7 @@ load_or_create_net(GstClassify *self){
     net = rnn_new(n_features, self->hidden_size,
         self->n_classes, self->pending_net_flags, CLASSIFY_RNG_SEED,
         NULL, self->bptt_depth, self->learn_rate, self->momentum, MOMENTUM_WEIGHT,
-        CLASSIFY_BATCH_SIZE, 0);
-    if (self->weight_sparsity > 1){
-      rnn_randomise_weights(net, RNN_INITIAL_WEIGHT_VARIANCE_FACTOR / net->h_size,
-          self->weight_sparsity);
-    }
-
+        CLASSIFY_BATCH_SIZE, self->weight_sparsity);
   }
   else {
     rnn_set_log_file(net, NULL, 0);
