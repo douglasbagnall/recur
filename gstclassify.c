@@ -328,6 +328,7 @@ gst_classify_class_init (GstClassifyClass * klass)
       g_param_spec_string("error-weight", "error-weight",
           "Weight output errors (space or colon separated floats)",
           DEFAULT_PROP_ERROR_WEIGHT,
+          G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class, PROP_LAWN_MOWER,
       g_param_spec_boolean("lawn-mower", "lawn-mower",
