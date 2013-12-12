@@ -1073,7 +1073,7 @@ maybe_learn(GstClassify *self){
     if (PERIODIC_PGM_DUMP && net->generation % PERIODIC_PGM_DUMP == 0){
       rnn_multi_pgm_dump(net, "how ihw");
     }
-    bptt_consolidate_many_nets(self->subnets, self->n_channels, 1,
+    bptt_consolidate_many_nets(self->subnets, self->n_channels, 0,
         self->momentum_soft_start);
     rnn_condition_net(self->net);
     possibly_save_net(self->net, self->net_filename);
