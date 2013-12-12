@@ -26,6 +26,7 @@
 #define DEFAULT_LEARN_RATE_INERTIA 60
 #define DEFAULT_LEARN_RATE_SCALE 0.4
 #define DEFAULT_BPTT_DEPTH 30
+#define DEFAULT_BPTT_ADAPTIVE_MIN 1
 #define DEFAULT_MOMENTUM 0.95
 #define DEFAULT_MOMENTUM_WEIGHT 0.5
 #define DEFAULT_MOMENTUM_SOFT_START 0
@@ -82,6 +83,7 @@ static int opt_validate_chars = DEFAULT_VALIDATE_CHARS;
 static int opt_validation_overlap = DEFAULT_VALIDATION_OVERLAP;
 static int opt_start_char = DEFAULT_START_CHAR;
 static bool opt_override = DEFAULT_OVERRIDE;
+static bool opt_bptt_adaptive_min = DEFAULT_BPTT_ADAPTIVE_MIN;
 static uint opt_bptt_batch_size = DEFAULT_BPTT_BATCH_SIZE;
 static uint opt_weight_sparsity = DEFAULT_WEIGHT_SPARSITY;
 static bool opt_temporal_pgm_dump = DEFAULT_TEMPORAL_PGM_DUMP;
@@ -155,6 +157,10 @@ static struct opt_table options[] = {
       &opt_reload, "try to reload the net"),
   OPT_WITHOUT_ARG("-N|--no-reload", opt_set_invbool,
       &opt_reload, "Don't try to reload"),
+  OPT_WITHOUT_ARG("--bptt-adaptive-min", opt_set_bool,
+      &opt_bptt_adaptive_min, "auto-adapt BPTT minimum error threshold (default)"),
+  OPT_WITHOUT_ARG("--no-bptt-adaptive-min", opt_set_invbool,
+      &opt_bptt_adaptive_min, "don't auto-adapt BPTT minimum error threshold"),
   OPT_WITHOUT_ARG("-o|--override-params", opt_set_bool,
       &opt_override, "override meta-parameters in loaded net (where possible)"),
   OPT_WITH_ARG("-f|--filename=<file>", opt_set_charp, opt_show_charp, &opt_filename,
@@ -548,6 +554,9 @@ load_or_create_net(void){
   if (net == NULL){
     int input_size = strlen(opt_alphabet);
     u32 flags = opt_bias ? RNN_NET_FLAG_STANDARD : RNN_NET_FLAG_NO_BIAS;
+    if (opt_bptt_adaptive_min){
+      flags |= RNN_NET_FLAG_BPTT_ADAPTIVE_MIN_ERROR;
+    }
     net = rnn_new(input_size, opt_hidden_size,
         input_size, flags, 1,
         opt_logfile, opt_bptt_depth, opt_learn_rate,

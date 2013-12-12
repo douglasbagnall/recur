@@ -34,6 +34,7 @@ new_bptt(RecurNN *net, int depth, float learn_rate, float momentum,
 
   bptt->index = 0;
   bptt->ho_scale = ((float) net->output_size) / net->hidden_size;
+  bptt->min_error_factor = BASE_MIN_ERROR_FACTOR * net->h_size;
   MAYBE_DEBUG("weights:   ih %p ho %p", net->ih_weights, net->ho_weights);
   MAYBE_DEBUG("momentum:  ih %p ho %p", bptt->ih_momentum, bptt->ho_momentum);
   MAYBE_DEBUG("delta:     ih %p ho %p", bptt->ih_delta, bptt->ho_delta);
@@ -596,8 +597,8 @@ bptt_and_accumulate_error(RecurNN *net, float *ih_delta, float top_error_sum)
 
   float error_sum = 0;
   float max_error_sum = MAX_ERROR_GAIN * top_error_sum;
-  float min_error_sum = MIN_ERROR_FACTOR * net->h_size / net->bptt->learn_rate;
-
+  float min_error_sum = MIN(bptt->min_error_factor / net->bptt->learn_rate,
+      MIN_ERROR_GAIN * top_error_sum);
   int t;
   for (t = bptt->depth; t > 0; t--){
     error_sum = 0.0f;
@@ -645,7 +646,7 @@ bptt_and_accumulate_error(RecurNN *net, float *ih_delta, float top_error_sum)
     float *tmp = h_error;
     h_error = i_error;
     i_error = tmp;
-    if (error_sum < min_error_sum || error_sum >  max_error_sum){
+    if (error_sum < min_error_sum || error_sum > max_error_sum){
       break;
     }
   }
@@ -655,13 +656,18 @@ bptt_and_accumulate_error(RecurNN *net, float *ih_delta, float top_error_sum)
   }
   else {
     bptt->ih_scale = 1.0f;
+    if (net->flags & RNN_NET_FLAG_BPTT_ADAPTIVE_MIN_ERROR){
+      int depth_error = bptt->depth / 4 - t;
+      bptt->min_error_factor *= (1.0f + depth_error * 1e-3);
+      bptt->min_error_factor = MAX(bptt->min_error_factor, ABS_MIN_ERROR_FACTOR);
+    }
   }
-
 
   if (net->log){
     bptt_log_int(net, "depth", bptt->depth - t);
     bptt_log_float(net, "scaled_error", bptt->ih_scale * error_sum);
     bptt_log_float(net, "ih_scale", bptt->ih_scale);
+    bptt_log_float(net, "min_error_threshold", min_error_sum);
     if (net->flags & RNN_NET_FLAG_LOG_HIDDEN_SUM){
       float hidden_sum = 0;
       for (int i = 0; i < net->h_size; i++){

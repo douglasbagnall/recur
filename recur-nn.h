@@ -23,11 +23,22 @@ typedef float v4ss __attribute__ ((vector_size (16))) __attribute__ ((aligned (1
   variance = RANDOM_DAMAGE_FACTOR * net->h_size * net->bptt->learn_rate */
 #define RANDOM_DAMAGE_FACTOR 0.5f
 
+/*{MIN,MAX}_*_ERROR_FACTORs control how deep the bptt training goes.
+
+  If the backpropagated numer drops below a value based on the MIN settings,
+  or above a number based on MAX, the back-propagation loop stops.
+
+  See bptt_and_accumulate_error()
+*/
 #define MAX_TOP_ERROR_FACTOR 2.0f
 /*if bptt error grows by more than MAX_ERROR_GAIN, abort and scale */
 #define MAX_ERROR_GAIN 2.0f
-/*MIN_ERROR_FACTOR is related to the minimum mean error*/
-#define MIN_ERROR_FACTOR 1e-11f
+/*BASE_MIN_ERROR_FACTOR relates to initial minimum mean error*/
+#define BASE_MIN_ERROR_FACTOR 1e-11f
+/*min_error_factor never goes below ABS_MIN_ERROR_FACTOR*/
+#define ABS_MIN_ERROR_FACTOR 1e-20f
+/*MIN_ERROR_GAIN */
+#define MIN_ERROR_GAIN 1e-8f
 /* RNN_HIDDEN_PENALTY is subtracted from each hidden node, forcing low numbers to zero.
  1e-3f is safe, but less accurate than 1e-4f
 XXX this really ought to be adjustable or adjust itself */
@@ -72,6 +83,7 @@ enum {
   RNN_NET_FLAG_LOG_APPEND = 8,
   RNN_NET_FLAG_LOG_HIDDEN_SUM = 16, /*log the hidden sum */
   RNN_NET_FLAG_LOG_WEIGHT_SUM = 32, /*log the weight sum (can be expensive)*/
+  RNN_NET_FLAG_BPTT_ADAPTIVE_MIN_ERROR = 64, /*min error threshold auto-adjusts*/
 
   /*conditioning flags start at 1 << 16 (65536) */
   RNN_COND_USE_SCALE = (1 << (RNN_COND_BIT_SCALE + RNN_COND_USE_OFFSET)),
@@ -136,6 +148,7 @@ struct _RecurNNBPTT {
   float momentum;
   float momentum_weight;
   int batch_size;
+  float min_error_factor;
 };
 
 #define ALIGNED_SIZEOF(x)  ((sizeof(x) + 15UL) & ~15UL)
