@@ -11,6 +11,7 @@ test_*
 /test-images/output
 /test-images/dickens
 /test-images/*.txt
+/test-images/more-text/*.txt
 !/test-images/erewhon.txt
 /test-video
 /test-audio
