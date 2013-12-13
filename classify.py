@@ -496,3 +496,10 @@ def load_timings(fn, classes, default, quiet=True):
                 print k, v
     f.close()
     return timings
+
+def recursive_wav_finder(d):
+    for root, dirs, files in os.walk(d):
+        for f in files:
+            if f.endswith(".wav"):
+                yield os.path.join(root, f)
+

@@ -8,10 +8,9 @@ import argparse
 from classify import gst_init, TRAINING, TESTING
 from classify import KIWI_MFCCS as MFCCS
 from classify import KIWI_CLASSES as CLASSES
-from classify import KIWI_HIDDEN_SIZE as HIDDEN_SIZE
 from classify import KIWI_WINDOW_SIZE as WINDOW_SIZE
 from classify import KIWI_BASENAME as BASENAME
-from classify import COLOURS
+from classify import COLOURS, recursive_wav_finder
 from classify import Trainer, lr_steps, categorised_files, load_all_timings_binary
 
 NET_LOG_FILE = "kiwi.log"
@@ -105,12 +104,6 @@ class KiwiTrainer(Trainer):
         else:
             self.lr_adjust = 1.0
 
-def recursive_wav_finder(d):
-    for root, dirs, files in os.walk(d):
-        for f in files:
-            if f.endswith(".wav"):
-                yield os.path.join(root, f)
-
 def main():
     gst_init()
     parser = argparse.ArgumentParser()
@@ -141,7 +134,8 @@ def main():
             3e-6, 4,
             1e-6, 16,
             3e-7, 64,
-            1e-7)
+            1e-7, 2000,
+            3e-8)
     #dropout = lr_steps(0.3, 1400, 0)
     dropout = 0
     timed_files = []
@@ -181,7 +175,7 @@ def main():
                         ('momentum', 0.95),
                         #('lawn-mower', 1),
                         ('weight-sparsity', 2),
-                        #('error-weight', '4:1'),
+                        ('error-weight', '5:3'),
                         ))
 
 main()
