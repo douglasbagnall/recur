@@ -22,7 +22,7 @@ rnn_save_net(RecurNN *net, const char *filename){
     goto error;
 
   /*save a version number*/
-  const int version = 2;
+  const int version = 3;
   cdb_make_add(&cdbm, FORMAT_VERSION, strlen(FORMAT_VERSION), &version, sizeof(version));
 
 #define SAVE_SCALAR(obj, attr) do {                                     \
@@ -69,6 +69,7 @@ rnn_save_net(RecurNN *net, const char *filename){
   SAVE_SCALAR(net->bptt, momentum);
   SAVE_SCALAR(net->bptt, momentum_weight);
   SAVE_SCALAR(net->bptt, batch_size);
+  SAVE_SCALAR(net->bptt, min_error_factor);   /*version 3 and above*/
   SAVE_ARRAY(net->bptt, i_error, net->i_size);
   SAVE_ARRAY(net->bptt, h_error, net->h_size);
   SAVE_ARRAY(net->bptt, o_error, net->o_size);
@@ -145,7 +146,9 @@ rnn_load_net(const char *filename){
   if (version >= 2){
     READ_SCALAR(tmpbptt, ho_scale);
   }
-
+  if (version >= 3){
+    READ_SCALAR(tmpbptt, min_error_factor);
+  }
 #undef READ_SCALAR
 
   net = rnn_new(tmpnet.input_size, tmpnet.hidden_size,
@@ -157,6 +160,9 @@ rnn_load_net(const char *filename){
   net->bptt->index = tmpbptt.index;
   if (version >= 2){
     net->bptt->ho_scale = tmpbptt.ho_scale;
+  }
+  if (version >= 3){
+    net->bptt->min_error_factor = tmpbptt.min_error_factor;
   }
 #define CHECK_SCALAR(new, tmp, attr) do {                                   \
   if (new->attr != tmp.attr){                                              \
@@ -187,12 +193,18 @@ rnn_load_net(const char *filename){
   CHECK_SCALAR(net->bptt, tmpbptt, depth);
   CHECK_SCALAR(net->bptt, tmpbptt, batch_size);
   CHECK_SCALAR(net->bptt, tmpbptt, index);
-  if (version == 0){
+  if (version >= 2){
+    CHECK_SCALAR(net->bptt, tmpbptt, ho_scale);
+  }
+  else {
     /*ho_scale wasn't originally saved. But it was always set as follows. */
     net->bptt->ho_scale = ((float)tmpnet.output_size) / tmpnet.hidden_size;
   }
-  else if (version >= 2){
-    CHECK_SCALAR(net->bptt, tmpbptt, ho_scale);
+  if (version >= 3){
+    CHECK_SCALAR(net->bptt, tmpbptt, min_error_factor);
+  }
+  else {
+    net->bptt->min_error_factor = BASE_MIN_ERROR_FACTOR * net->h_size;
   }
 #undef CHECK_SCALAR
 
