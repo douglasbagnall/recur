@@ -34,7 +34,9 @@ typedef float v4ss __attribute__ ((vector_size (16))) __attribute__ ((aligned (1
 /*if bptt error grows by more than MAX_ERROR_GAIN, abort and scale */
 #define MAX_ERROR_GAIN 2.0f
 /*BASE_MIN_ERROR_FACTOR relates to initial minimum mean error*/
-#define BASE_MIN_ERROR_FACTOR 1e-11f
+#define BASE_MIN_ERROR_FACTOR 1e-12f
+/*MAX_MIN_ERROR_FACTOR puts a limit on the growth of min_error_factor*/
+#define MAX_MIN_ERROR_FACTOR 1e-2f
 /*min_error_factor never goes below ABS_MIN_ERROR_FACTOR*/
 #define ABS_MIN_ERROR_FACTOR 1e-20f
 /*MIN_ERROR_GAIN */
