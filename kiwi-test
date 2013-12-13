@@ -28,6 +28,7 @@ class KiwiClassifier(BaseClassifier):
         self.pending_files = list(reversed(files))
         self.pending_timings = list(reversed(timings))
         self.classifier.set_property('mode', -1)
+        self.kiwi_probabilities = []
         self.load_next_file()
         self.mainloop.run()
         return self.all_results
@@ -54,10 +55,12 @@ class KiwiClassifier(BaseClassifier):
         correct = v('channel 0 correct')
         winner = v('channel 0 winner')
         target = v('channel 0 target')
-        #print correct, winner, target, winner == target, s.to_string()
+        kiwi_prob = -v('channel 0, output 0')
+        #print s.to_string()
         self.file_class_results[target][correct] += 1
         self.class_results[target][correct] += 1
         self.file_results.append((target, correct))
+        self.kiwi_probabilities.append((kiwi_prob, target == 0))
 
     def report(self):
         self.pipeline.set_state(Gst.State.READY)
@@ -117,7 +120,42 @@ class KiwiClassifier(BaseClassifier):
 
         print ''.join(out)
         #print self.file_class_results
+
         self.pipeline.set_state(Gst.State.PLAYING)
+
+
+    def show_roc_curve(self):
+        import matplotlib.pyplot as plt
+        kp = sorted(self.kiwi_probabilities)
+        first_true = -1
+        last_false = 0
+        i = 0
+        sum_true = sum(1 for x in kp if x[1])
+        sum_false = len(kp) - sum_true
+
+        n_true = 0
+        n_false = 0
+        tp_scale = 1.0 / sum_true
+        fp_scale = 1.0 / sum_false
+        tp = []
+        fp = []
+        for prob, truth in kp:
+            n_true += truth
+            n_false += not truth
+            false_positives = sum_false - n_false
+            true_positives = sum_true - n_true
+            fp.append(false_positives * fp_scale)
+            tp.append(true_positives * tp_scale)
+
+        fp.reverse()
+        tp.reverse()
+        #print zip(fp, tp)
+        #print kp
+        self.kiwi_probabilities = []
+        plt.plot(fp, tp)
+        plt.show()
+
+
 
 
     def on_eos(self, bus, msg):
@@ -136,6 +174,8 @@ class KiwiClassifier(BaseClassifier):
                 i += 1
             print "%s windows == %.2f minutes" % (gt,
                                                   gt * WINDOW_SIZE / (2.0 * 60 * 8000))
+            self.show_roc_curve()
+
             self.stop()
         else:
             self.load_next_file()
@@ -193,7 +233,7 @@ def main():
     t = [timings[x] for x in timed_files]
 
     #XXX we have no test stream
-    files = [timed_files[:36] + untimed_files[:36]]
+    #files = timed_files[:36] + untimed_files[:36]
     c.classify_files_with_timings(timed_files[:36], t)
 
 main()
