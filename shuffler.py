@@ -4,6 +4,8 @@ import random
 import os, sys
 import re
 
+MIN_PARA_SIZE = 80
+
 def shuffle(text):
     paragraphs = re.split("\n\s*\n\s*", text)
     snippets = []
@@ -11,10 +13,10 @@ def shuffle(text):
     for p in paragraphs:
         if p2 is not None:
             p2 += p
-            if len(p2) > 50:
+            if len(p2) > MIN_PARA_SIZE:
                 snippets.append(p2)
                 p2 = None
-        elif len(p) > 50:
+        elif len(p) > MIN_PARA_SIZE:
             snippets.append(p)
         else:
             p2 = p
