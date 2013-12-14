@@ -369,9 +369,7 @@ class Trainer(BaseClassifier):
         total = 0
         s = msg.get_structure()
         name = s.get_name()
-        if name == 'classify-setup':
-            print "got message", name
-        elif name == 'classify' and self.mode == TESTING:
+        if name == 'classify' and self.mode == TESTING:
             self.test_n += 1
             v = s.get_value
             for i, t in enumerate(self.test_targets):
@@ -502,4 +500,3 @@ def recursive_wav_finder(d):
         for f in files:
             if f.endswith(".wav"):
                 yield os.path.join(root, f)
-

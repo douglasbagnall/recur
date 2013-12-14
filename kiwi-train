@@ -59,19 +59,15 @@ class KiwiTrainer(Trainer):
         total = 0
         s = msg.get_structure()
         name = s.get_name()
-        if name == 'classify-setup':
-            print "got message", name
-        elif name == 'classify' and self.mode == TESTING:
+        if name == 'classify' and self.mode == TESTING:
             self.test_n += self.channels
             v = s.get_value
             for i in range(self.channels):
-                #winner = v('channel %d winner' % i)
                 target = v('channel %d target' % i)
                 correct = v('channel %d correct' % i)
                 self.test_scores[target] += correct
                 self.test_runs[target] += 1
                 total += correct
-                #print target
 
     def evaluate_test(self):
         #print self.test_scores
