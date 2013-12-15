@@ -684,7 +684,7 @@ main(int argc, char *argv[]){
   }
   int start_char;
   if (opt_start_char >= 0 && opt_start_char < len - 1){
-    start_char = net->generation % len;
+    start_char = opt_start_char;
   }
   else {
     start_char = net->generation % len;
