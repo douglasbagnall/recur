@@ -44,6 +44,8 @@
 #define DEFAULT_START_CHAR -1
 #define DEFAULT_HIDDEN_SIZE 199
 #define DEFAULT_WEIGHT_SPARSITY 1
+#define DEFAULT_LEARN_CAPITALS 0
+#define DEFAULT_DUMP_COLLAPSED_TEXT NULL
 
 #define BELOW_QUIET_LEVEL(quiet) if (opt_quiet < quiet)
 
@@ -72,6 +74,7 @@ static char * opt_logfile = DEFAULT_LOG_FILE;
 static char * opt_alphabet = NET_TO_CHAR;
 static char * opt_collapse_chars = HASH_CHARS;
 static char * opt_textfile = DICKENS_SHUFFLED_TEXT;
+static char * opt_dump_collapsed_text = DEFAULT_DUMP_COLLAPSED_TEXT;
 static bool opt_bias = DEFAULT_BIAS;
 static bool opt_reload = DEFAULT_RELOAD;
 static float opt_dropout = DEFAULT_DROPOUT;
@@ -90,6 +93,7 @@ static bool opt_temporal_pgm_dump = DEFAULT_TEMPORAL_PGM_DUMP;
 static bool opt_periodic_pgm_dump = DEFAULT_PERIODIC_PGM_DUMP;
 static bool opt_deterministic_confab = DEFAULT_DETERMINISTIC_CONFAB;
 static bool opt_save_net = DEFAULT_SAVE_NET;
+static bool opt_learn_capitals = DEFAULT_LEARN_CAPITALS;
 
 /* Following ccan/opt/helpers.c opt_set_longval, etc */
 static char *
@@ -169,6 +173,8 @@ static struct opt_table options[] = {
       "log to this filename"),
   OPT_WITH_ARG("-t|--text-file=<file>", opt_set_charp, opt_show_charp, &opt_textfile,
       "learn from this text"),
+  OPT_WITH_ARG("-t|--dump-collapsed-text=<file>", opt_set_charp, opt_show_charp,
+      &opt_dump_collapsed_text, "dump internal text representation here"),
   OPT_WITH_ARG("-A|--alphabet=<chars>", opt_set_charp, opt_show_charp, &opt_alphabet,
       "Use only these characters"),
   OPT_WITH_ARG("-C|--collapse-chars=<chars>", opt_set_charp, opt_show_charp,
@@ -177,6 +183,8 @@ static struct opt_table options[] = {
       &opt_temporal_pgm_dump, "Dump ppm images showing inputs change over time"),
   OPT_WITHOUT_ARG("--periodic-pgm-dump", opt_set_bool,
       &opt_periodic_pgm_dump, "Dump ppm images of weights, every 1k generations"),
+  OPT_WITHOUT_ARG("--learn-capitals", opt_set_bool,
+      &opt_learn_capitals, "learn to predict capitalisation"),
   OPT_WITHOUT_ARG("--deterministic-confab", opt_set_bool,
       &opt_deterministic_confab, "Use best guess in confab, not random sampling"),
   OPT_WITHOUT_ARG("--no-save-net", opt_set_invbool,
@@ -213,8 +221,14 @@ new_char_lut(const char *alphabet, const u8 *collapse_chars){
   for (i = 0; i < len; i++){
     u8 c = alphabet[i];
     ctn[c] = i;
-    if (islower(c))
-      ctn[c - 32] = i;
+    if (islower(c)){
+      if (opt_learn_capitals){
+        ctn[c - 32] = i | 0x80;
+      }
+      else {
+        ctn[c - 32] = i;
+      }
+    }
   }
   return ctn;
 }
@@ -260,7 +274,13 @@ dump_collapsed_text(u8 *text, int len, char *name)
   int i;
   FILE *f = fopen_or_abort(name, "w");
   for (i = 0; i < len; i++){
-    fputc(opt_alphabet[text[i]], f);
+    u8 c = text[i];
+    if (c & 0x80){
+      fputc(toupper(opt_alphabet[c & 0x7f]), f);
+    }
+    else{
+      fputc(opt_alphabet[c], f);
+    }
   }
   fclose(f);
 }
@@ -284,7 +304,10 @@ static inline float*
 one_hot_opinion(RecurNN *net, const int hot){
   //XXX could just set the previous one to zero (i.e. remember it)
   memset(net->real_inputs, 0, net->input_size * sizeof(float));
-  net->real_inputs[hot] = 1.0f;
+  if (opt_learn_capitals && (hot & 0x80)){
+    net->real_inputs[net->input_size - 1] = 1.0f;
+  }
+  net->real_inputs[hot & 0x7f] = 1.0f;
   float *answer;
   if (opt_dropout){
     answer = rnn_opinion_with_dropout(net, NULL, opt_dropout);
@@ -299,29 +322,48 @@ static inline float
 net_error_bptt(RecurNN *net, float *restrict error, int c, int next, int *correct){
   ASSUME_ALIGNED(error);
   float *answer = one_hot_opinion(net, c);
-  int winner = softmax_best_guess(error, answer, net->output_size);
+  int winner;
+  if (opt_learn_capitals){
+    int len = net->output_size - 2;
+    float *cap_error = error + len;
+    float *cap_answer = answer + len;
+    winner = softmax_best_guess(error, answer, len);
+    int next_cap = next & 0x80 ? 1 : 0;
+    softmax_best_guess(cap_error, cap_answer, 2);
+    cap_error[next_cap] += 1.0f;
+  }
+  else {
+    winner = softmax_best_guess(error, answer, net->output_size);
+  }
+  next &= 0x7f;
   *correct = (winner == next);
   error[next] += 1.0f;
   return error[next];
 }
 
 static void
-sgd_one(RecurNN *net, const int current, const int next, float *error, int *correct){
+sgd_one(RecurNN *net, int current, int next,
+    float *error, int *correct){
   RecurNNBPTT *bptt = net->bptt;
-  float sum;
   bptt_advance(net);
-  sum = net_error_bptt(net, bptt->o_error, current, next, correct);
-
+  *error = net_error_bptt(net, bptt->o_error, current, next, correct);
   bptt_calculate(net);
-
-  *error = sum;
 }
 
 
 static inline int
 opinion_deterministic(RecurNN *net, int hot){
   float *answer = one_hot_opinion(net, hot);
-  return search_for_max(answer, net->output_size);
+  if (opt_learn_capitals){
+    int len = net->output_size - 2;
+    float *cap_answer = answer + len;
+    int c = search_for_max(answer, len);
+    int cap = search_for_max(cap_answer, 2);
+    return c | (cap ? 0x80 : 0);
+  }
+  else {
+    return search_for_max(answer, net->output_size);
+  }
 }
 
 static inline int
@@ -329,17 +371,24 @@ opinion_probabilistic(RecurNN *net, int hot){
   int i;
   float r;
   float *answer = one_hot_opinion(net, hot);
+  int n_chars = net->output_size - (opt_learn_capitals ? 2 : 0);
+  int cap = 0;
   float error[net->output_size];
-  softmax(error, answer, net->output_size);
-
+  if (opt_learn_capitals){
+    r = rand_double(&net->rng);
+    softmax(error, answer + n_chars, 2);
+    if (r > error[0])
+      cap = 0x80;
+  }
+  softmax(error, answer, n_chars);
   /*outer loop in case error doesn't quite add to 1 */
   for(;;){
     r = rand_double(&net->rng);
     float accum = 0.0;
-    for (i = 0; i < net->output_size; i++){
+    for (i = 0; i < n_chars; i++){
       accum += error[i];
       if (r < accum)
-        return i;
+        return i | cap;
     }
   }
 }
@@ -349,6 +398,7 @@ validate(RecurNN *net, const u8 *text, int len){
   float error[net->output_size];
   float entropy = 0.0f;
   int i;
+  int n_chars = net->output_size - (opt_learn_capitals ? 2 : 0);
   /*skip the first few because state depends too much on previous experience */
   int skip = MIN(len / 10, 5);
   for (i = 0; i < skip; i++){
@@ -356,8 +406,8 @@ validate(RecurNN *net, const u8 *text, int len){
   }
   for (; i < len - 1; i++){
     float *answer = one_hot_opinion(net, text[i]);
-    softmax(error, answer, net->output_size);
-    float e = error[text[i + 1]];
+    softmax(error, answer, n_chars);
+    float e = error[text[i + 1] & 0x7f];
     if (e > 0.0f)
       entropy += log2f(e);
     else
@@ -366,7 +416,6 @@ validate(RecurNN *net, const u8 *text, int len){
   entropy /= -(len - skip - 1);
   return entropy;
 }
-
 
 static void
 confabulate(RecurNN *net, char *text, int len,
@@ -378,7 +427,12 @@ confabulate(RecurNN *net, char *text, int len,
       n = opinion_deterministic(net, n);
     else
       n = opinion_probabilistic(net, n);
+    int cap = n & 0x80;
+    n &= 0x7f;
     int c = opt_alphabet[n];
+    if (cap){
+      c = toupper(c);
+    }
     text[i] = c;
   }
 }
@@ -528,14 +582,16 @@ static char*
 construct_net_filename(void){
   char s[260];
   int alpha_size = strlen(opt_alphabet);
+  int input_size = alpha_size + opt_learn_capitals ? 1 : 0;
+  int output_size = alpha_size + opt_learn_capitals ? 2 : 0;
   uint sig = 0;
   snprintf(s, sizeof(s), "%s--%s", opt_alphabet, opt_collapse_chars);
   for (uint i = 0; i < strlen(s); i++){
     sig ^= ROTATE(sig - s[i], 13) + s[i];
   }
-  snprintf(s, sizeof(s), "text-s%0x-i%d-h%d-o%d-b%d-B%d.net",
-      sig, alpha_size, opt_hidden_size, alpha_size,
-      opt_bias, opt_bptt_batch_size);
+  snprintf(s, sizeof(s), "text-s%0x-i%d-h%d-o%d-b%d-B%d-c%d.net",
+      sig, input_size, opt_hidden_size, output_size,
+      opt_bias, opt_bptt_batch_size, opt_learn_capitals);
   return strdup(s);
 }
 
@@ -553,12 +609,17 @@ load_or_create_net(void){
   }
   if (net == NULL){
     int input_size = strlen(opt_alphabet);
+    int output_size = input_size;
+    if (opt_learn_capitals){
+      input_size++;
+      output_size += 2;
+    }
     u32 flags = opt_bias ? RNN_NET_FLAG_STANDARD : RNN_NET_FLAG_NO_BIAS;
-    if (opt_bptt_adaptive_min){
+    if (opt_bptt_adaptive_min){/*on by default*/
       flags |= RNN_NET_FLAG_BPTT_ADAPTIVE_MIN_ERROR;
     }
     net = rnn_new(input_size, opt_hidden_size,
-        input_size, flags, 1,
+        output_size, flags, 1,
         opt_logfile, opt_bptt_depth, opt_learn_rate,
         opt_momentum, opt_momentum_weight,
         opt_bptt_batch_size, opt_weight_sparsity);
@@ -577,7 +638,6 @@ load_or_create_net(void){
 int
 main(int argc, char *argv[]){
   feenableexcept(FE_DIVBYZERO | FE_INVALID | FE_OVERFLOW);
-  //feenableexcept(FE_ALL_EXCEPT & ~ FE_INEXACT);
   opt_register_table(options, NULL);
   if (!opt_parse(&argc, argv, opt_log_stderr)){
     exit(1);
@@ -607,6 +667,10 @@ main(int argc, char *argv[]){
   u8* validate_text;
   u8* text = alloc_and_collapse_text(opt_textfile,
       opt_alphabet, (u8 *)opt_collapse_chars, &len);
+  if (opt_dump_collapsed_text){
+    dump_collapsed_text(text, len, opt_dump_collapsed_text);
+  }
+
   if (opt_validate_chars > 2){
     len -= opt_validate_chars;
     validate_text = text + len;
@@ -630,7 +694,7 @@ main(int argc, char *argv[]){
     input_ppm = temporal_ppm_alloc(net->i_size, 500, "input_layer", 0, PGM_DUMP_COLOUR,
         NULL);
   }
-  //DEBUG("quietness %d", opt_quiet);
+
   BELOW_QUIET_LEVEL(2){
     START_TIMER(run);
     for (int i = 0;;i++){
@@ -644,11 +708,11 @@ main(int argc, char *argv[]){
       start_char = 0;
     }
   }
-  else {
+  else {/* quiet level 2+ */
     for (;;){
       epoch(net, confab_net, validate_net, &schedule,
-          text, len, validate_text, opt_validate_chars, opt_validation_overlap,
-          start_char);
+          text, len, validate_text, opt_validate_chars,
+          opt_validation_overlap, start_char);
       start_char = 0;
     }
   }
