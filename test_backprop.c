@@ -571,54 +571,6 @@ report_on_progress(RecurNN *net, RecurNN *confab_net, float ventropy,
   *entropy = 0.0f;
 }
 
-void
-epoch(RecurNN *net, RecurNN *confab_net, Ventropy *v,
-    Schedule *schedule,
-    const u8 *text, const int len,
-    const int start){
-  int i;
-  float error = 0.0f;
-  float entropy = 0.0f;
-  int correct = 0;
-
-  for(i = start; i < len - 1; i++){
-    float e;
-    int c;
-    if (opt_momentum_soft_start){
-      adjust_momentum_soft_start(net);
-    }
-
-    sgd_one(net, text[i], text[i + 1], &e, &c);
-    correct += c;
-
-    error += e;
-    entropy += log2f(1.0f - e);
-
-    if (opt_temporal_pgm_dump){
-      temporal_ppm_add_row(input_ppm, net->input_layer);
-    }
-
-    if ((net->generation & 1023) == 0){
-      float ventropy = calc_ventropy(v, 1);
-      report_on_progress(net, confab_net, ventropy, &correct, &error, &entropy,
-          1.0f / 1024.0f);
-      if (opt_save_net && opt_filename){
-        rnn_save_net(net, opt_filename);
-      }
-      if (opt_periodic_pgm_dump){
-        rnn_multi_pgm_dump(net, "ihw how");
-      }
-      schedule->eval(schedule, net, ventropy);
-    }
-    if (opt_stop && net->generation >= opt_stop){
-      finish(net, v);
-    }
-  }
-  BELOW_QUIET_LEVEL(1){
-    long_confab(confab_net, CONFAB_SIZE, 6);
-  }
-}
-
 static void
 epoch_multi_tap(RecurNN **nets, int n_nets, RecurNN *confab_net, Ventropy *v,
     Schedule *schedule,
@@ -631,32 +583,40 @@ epoch_multi_tap(RecurNN **nets, int n_nets, RecurNN *confab_net, Ventropy *v,
   float e;
   int c;
   int spacing = (len - 1) / n_nets;
+  RecurNN *net = nets[0];
   for(i = start; i < len - 1; i++){
     if (opt_momentum_soft_start){
       adjust_momentum_soft_start(nets[0]);
     }
-    for (j = 0; j < n_nets; j++){
-      RecurNN *net = nets[j];
-      int offset = i + j * spacing;
-      if (offset >= len - 1){
-        offset -= len - 1;
+    if (n_nets > 1){
+      for (j = 0; j < n_nets; j++){
+        RecurNN *net = nets[j];
+        int offset = i + j * spacing;
+        if (offset >= len - 1){
+          offset -= len - 1;
+        }
+        bptt_advance(net);
+        e = net_error_bptt(net, net->bptt->o_error,
+            text[offset], text[offset + 1], &c);
+        bptt_calc_deltas(net);
+        correct += c;
+        error += e;
+        entropy += capped_log2f(1.0 - e);
       }
-      bptt_advance(net);
-      e = net_error_bptt(net, net->bptt->o_error,
-          text[offset], text[offset + 1], &c);
-      bptt_calc_deltas(net);
+      bptt_consolidate_many_nets(nets, n_nets, 0, 0);
+    }
+    else {
+      sgd_one(net, text[i], text[i + 1], &e, &c);
       correct += c;
       error += e;
-      entropy += capped_log2f(1.0 - e);
+      entropy += log2f(1.0f - e);
     }
-    bptt_consolidate_many_nets(nets, n_nets, 0, 0);
 
     if (opt_temporal_pgm_dump){
       temporal_ppm_add_row(input_ppm, nets[0]->input_layer);
     }
 
     if ((nets[0]->generation & 1023) == 0){
-      RecurNN *net = nets[0];
       float ventropy = calc_ventropy(v, 1);
       report_on_progress(net, confab_net, ventropy, &correct, &error, &entropy,
           1.0f / (1024.0f * n_nets));
@@ -668,7 +628,7 @@ epoch_multi_tap(RecurNN **nets, int n_nets, RecurNN *confab_net, Ventropy *v,
       }
       schedule->eval(schedule, net, ventropy);
     }
-    if (opt_stop && nets[0]->generation >= opt_stop){
+    if (opt_stop && net->generation >= opt_stop){
       finish(nets[0], v);
     }
   }
@@ -817,14 +777,8 @@ main(int argc, char *argv[]){
     for (int i = 0;;i++){
       DEBUG("Starting epoch %d. learn rate %g.", i, net->bptt->learn_rate);
       START_TIMER(epoch);
-      if (opt_multi_tap > 1){
-        epoch_multi_tap(nets, opt_multi_tap, confab_net, &v, &schedule,
-            text, len, start_char);
-      }
-      else {
-        epoch(net, confab_net, &v, &schedule,
-            text, len, start_char);
-      }
+      epoch_multi_tap(nets, opt_multi_tap, confab_net, &v, &schedule,
+          text, len, start_char);
       DEBUG_TIMER(epoch);
       DEBUG_TIMER(run);
       start_char = 0;
@@ -832,14 +786,8 @@ main(int argc, char *argv[]){
   }
   else {/* quiet level 2+ */
     for (;;){
-      if (opt_multi_tap > 1){
-        epoch_multi_tap(nets, opt_multi_tap, confab_net, &v, &schedule,
-            text, len, start_char);
-      }
-      else {
-        epoch(net, confab_net, &v, &schedule,
-            text, len, start_char);
-      }
+      epoch_multi_tap(nets, opt_multi_tap, confab_net, &v, &schedule,
+          text, len, start_char);
       start_char = 0;
     }
   }
