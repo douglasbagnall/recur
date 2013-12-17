@@ -572,7 +572,7 @@ report_on_progress(RecurNN *net, RecurNN *confab_net, float ventropy,
 }
 
 static void
-epoch_multi_tap(RecurNN **nets, int n_nets, RecurNN *confab_net, Ventropy *v,
+epoch(RecurNN **nets, int n_nets, RecurNN *confab_net, Ventropy *v,
     Schedule *schedule,
     const u8 *text, const int len,
     const int start){
@@ -586,19 +586,19 @@ epoch_multi_tap(RecurNN **nets, int n_nets, RecurNN *confab_net, Ventropy *v,
   RecurNN *net = nets[0];
   for(i = start; i < len - 1; i++){
     if (opt_momentum_soft_start){
-      adjust_momentum_soft_start(nets[0]);
+      adjust_momentum_soft_start(net);
     }
     if (n_nets > 1){
       for (j = 0; j < n_nets; j++){
-        RecurNN *net = nets[j];
+        RecurNN *n = nets[j];
         int offset = i + j * spacing;
         if (offset >= len - 1){
           offset -= len - 1;
         }
-        bptt_advance(net);
-        e = net_error_bptt(net, net->bptt->o_error,
+        bptt_advance(n);
+        e = net_error_bptt(n, n->bptt->o_error,
             text[offset], text[offset + 1], &c);
-        bptt_calc_deltas(net);
+        bptt_calc_deltas(n);
         correct += c;
         error += e;
         entropy += capped_log2f(1.0 - e);
@@ -613,10 +613,10 @@ epoch_multi_tap(RecurNN **nets, int n_nets, RecurNN *confab_net, Ventropy *v,
     }
 
     if (opt_temporal_pgm_dump){
-      temporal_ppm_add_row(input_ppm, nets[0]->input_layer);
+      temporal_ppm_add_row(input_ppm, net->input_layer);
     }
 
-    if ((nets[0]->generation & 1023) == 0){
+    if ((net->generation & 1023) == 0){
       float ventropy = calc_ventropy(v, 1);
       report_on_progress(net, confab_net, ventropy, &correct, &error, &entropy,
           1.0f / (1024.0f * n_nets));
@@ -629,7 +629,7 @@ epoch_multi_tap(RecurNN **nets, int n_nets, RecurNN *confab_net, Ventropy *v,
       schedule->eval(schedule, net, ventropy);
     }
     if (opt_stop && net->generation >= opt_stop){
-      finish(nets[0], v);
+      finish(net, v);
     }
   }
   BELOW_QUIET_LEVEL(1){
@@ -777,7 +777,7 @@ main(int argc, char *argv[]){
     for (int i = 0;;i++){
       DEBUG("Starting epoch %d. learn rate %g.", i, net->bptt->learn_rate);
       START_TIMER(epoch);
-      epoch_multi_tap(nets, opt_multi_tap, confab_net, &v, &schedule,
+      epoch(nets, opt_multi_tap, confab_net, &v, &schedule,
           text, len, start_char);
       DEBUG_TIMER(epoch);
       DEBUG_TIMER(run);
@@ -786,7 +786,7 @@ main(int argc, char *argv[]){
   }
   else {/* quiet level 2+ */
     for (;;){
-      epoch_multi_tap(nets, opt_multi_tap, confab_net, &v, &schedule,
+      epoch(nets, opt_multi_tap, confab_net, &v, &schedule,
           text, len, start_char);
       start_char = 0;
     }
