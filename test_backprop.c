@@ -690,15 +690,17 @@ epoch_multi_tap(RecurNN **nets, int n_nets, RecurNN *confab_net, Ventropy *v,
   }
 }
 
+
 static char*
 construct_net_filename(void){
   char s[260];
   int alpha_size = strlen(opt_alphabet);
-  int input_size = alpha_size + opt_learn_capitals ? 1 : 0;
-  int output_size = alpha_size + opt_learn_capitals ? 2 : 0;
+  int input_size = alpha_size + (opt_learn_capitals ? 1 : 0);
+  int output_size = alpha_size + (opt_learn_capitals ? 2 : 0);
   uint sig = 0;
   snprintf(s, sizeof(s), "%s--%s", opt_alphabet, opt_collapse_chars);
-  for (uint i = 0; i < strlen(s); i++){
+  uint len = strlen(s);
+  for (uint i = 0; i < len; i++){
     sig ^= ROTATE(sig - s[i], 13) + s[i];
   }
   snprintf(s, sizeof(s), "text-s%0x-i%d-h%d-o%d-b%d-B%d-c%d.net",
