@@ -545,18 +545,41 @@ finish(RecurNN *net, Ventropy *v){
   exit(0);
 }
 
+static inline void
+report_on_progress(RecurNN *net, RecurNN *confab_net, float ventropy,
+    int *correct, float *error, float *entropy, float scale){
+  char confab[CONFAB_SIZE + 1];
+  confab[CONFAB_SIZE] = 0;
+  int k = net->generation >> 10;
+  *entropy *= -scale;
+  *error *= scale;
+  float accuracy = *correct * scale;
+  BELOW_QUIET_LEVEL(1){
+    confabulate(confab_net, confab, CONFAB_SIZE, opt_deterministic_confab);
+    Q_DEBUG(1, "%5dk e.%02d t%.2f v%.2f a.%02d |%s|", k, (int)(*error * 100 + 0.5),
+        *entropy, ventropy,
+        (int)(accuracy * 100 + 0.5), confab);
+  }
+  bptt_log_float(net, "error", *error);
+  bptt_log_float(net, "t_entropy", *entropy);
+  bptt_log_float(net, "v_entropy", ventropy);
+  bptt_log_float(net, "momentum", net->bptt->momentum);
+  bptt_log_float(net, "accuracy", accuracy);
+  bptt_log_float(net, "learn-rate", net->bptt->learn_rate);
+  *correct = 0;
+  *error = 0.0f;
+  *entropy = 0.0f;
+}
+
 void
 epoch(RecurNN *net, RecurNN *confab_net, Ventropy *v,
     Schedule *schedule,
     const u8 *text, const int len,
     const int start){
   int i;
-  char confab[CONFAB_SIZE + 1];
-  confab[CONFAB_SIZE] = 0;
   float error = 0.0f;
   float entropy = 0.0f;
   int correct = 0;
-  float ventropy = 0.0f;
 
   for(i = start; i < len - 1; i++){
     float e;
@@ -576,24 +599,9 @@ epoch(RecurNN *net, RecurNN *confab_net, Ventropy *v,
     }
 
     if ((net->generation & 1023) == 0){
-      int k = net->generation >> 10;
-      entropy /= -1024.0f;
-      ventropy = calc_ventropy(v, 1);
-      BELOW_QUIET_LEVEL(1){
-        confabulate(confab_net, confab, CONFAB_SIZE, opt_deterministic_confab);
-        Q_DEBUG(1, "%5dk e.%02d t%.2f v%.2f a.%02d |%s|", k, (int)(error / 10.24f + 0.5),
-            entropy, ventropy,
-            (int)(correct / 10.24f + 0.5), confab);
-      }
-      bptt_log_float(net, "error", error / 1024.0f);
-      bptt_log_float(net, "t_entropy", entropy);
-      bptt_log_float(net, "v_entropy", ventropy);
-      bptt_log_float(net, "momentum", net->bptt->momentum);
-      bptt_log_float(net, "accuracy", correct / 1024.0f);
-      bptt_log_float(net, "learn-rate", net->bptt->learn_rate);
-      correct = 0;
-      error = 0.0f;
-      entropy = 0.0f;
+      float ventropy = calc_ventropy(v, 1);
+      report_on_progress(net, confab_net, ventropy, &correct, &error, &entropy,
+          1.0f / 1024.0f);
       if (opt_save_net && opt_filename){
         rnn_save_net(net, opt_filename);
       }
@@ -617,11 +625,8 @@ epoch_multi_tap(RecurNN **nets, int n_nets, RecurNN *confab_net, Ventropy *v,
     const u8 *text, const int len,
     const int start){
   int i, j;
-  char confab[CONFAB_SIZE + 1];
-  confab[CONFAB_SIZE] = 0;
   float error = 0.0f;
   float entropy = 0.0f;
-  float ventropy = 0.0f;
   int correct = 0;
   float e;
   int c;
@@ -652,27 +657,9 @@ epoch_multi_tap(RecurNN **nets, int n_nets, RecurNN *confab_net, Ventropy *v,
 
     if ((nets[0]->generation & 1023) == 0){
       RecurNN *net = nets[0];
-      int k = net->generation >> 10;
-      entropy /= -1024.0f * n_nets;
-      error /= (1024.0f * n_nets);
-      float accuracy = correct / (1024.0f * n_nets);
-      ventropy = calc_ventropy(v, 1);
-
-      BELOW_QUIET_LEVEL(1){
-        confabulate(confab_net, confab, CONFAB_SIZE, opt_deterministic_confab);
-        Q_DEBUG(1, "%5dk e.%02d t%.2f v%.2f a.%02d |%s|", k, (int)(error * 100 + 0.5),
-            entropy, ventropy,
-            (int)(accuracy * 100.0 + 0.5), confab);
-      }
-      bptt_log_float(net, "error", error);
-      bptt_log_float(net, "t_entropy", entropy);
-      bptt_log_float(net, "v_entropy", ventropy);
-      bptt_log_float(net, "momentum", net->bptt->momentum);
-      bptt_log_float(net, "accuracy", accuracy);
-      bptt_log_float(net, "learn-rate", net->bptt->learn_rate);
-      correct = 0;
-      error = 0.0f;
-      entropy = 0.0f;
+      float ventropy = calc_ventropy(v, 1);
+      report_on_progress(net, confab_net, ventropy, &correct, &error, &entropy,
+          1.0f / (1024.0f * n_nets));
       if (opt_save_net && opt_filename){
         rnn_save_net(net, opt_filename);
       }
