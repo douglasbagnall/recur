@@ -725,9 +725,9 @@ apply_learning_with_momentum(float *restrict weights,
   //#pragma omp parallel for
   for (int i = 0; i < size; i++){
     float t = delta[i] * rate;
-    weights[i] += t + momentums[i] * momentum_weight;
-    momentums[i] += t;
-    momentums[i] *= momentum;
+    float m = momentums[i];
+    weights[i] += t + m * momentum_weight;
+    momentums[i] = (m + t) * momentum;
   }
 #endif
   MAYBE_DEBUG("momentums %.2g %.2g %.2g %.2g %.2g",
