@@ -205,7 +205,7 @@ static struct opt_table options[] = {
 
 static inline float
 capped_log2f(float x){
-  return (x == 0) ? -50 : log2f(x);
+  return (x < 1e-30f) ? -100.0f : log2f(x);
 }
 
 static u8*
@@ -609,7 +609,7 @@ epoch(RecurNN **nets, int n_nets, RecurNN *confab_net, Ventropy *v,
       sgd_one(net, text[i], text[i + 1], &e, &c);
       correct += c;
       error += e;
-      entropy += log2f(1.0f - e);
+      entropy += capped_log2f(1.0f - e);
     }
 
     if (opt_temporal_pgm_dump){
