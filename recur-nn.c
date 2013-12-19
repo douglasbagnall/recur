@@ -735,43 +735,15 @@ apply_learning_with_momentum(float *restrict weights,
 }
 
 static void
-apply_learning_with_simplified_nestorov_momentum(float *restrict weights,
-    const float *restrict delta, float *restrict momentums,
-    int size, const float rate, const float momentum){
-
-  ASSUME_ALIGNED(weights);
-  ASSUME_ALIGNED(delta);
+update_momentum_but_not_weights(float *restrict momentums, const float *restrict delta,
+    int size, const float momentum, const float rate){
   ASSUME_ALIGNED(momentums);
-/*GCC actually does as well or better with its own vectorisation*/
-#if VECTOR_ALL_THE_WAY
-
-  size /= 4;
-  v4ss rate_v = {rate, rate, rate, rate};
-  v4ss momentum_v = {momentum, momentum, momentum, momentum};
-  float mp1 = momentum + 1.0f;
-  v4ss momentum_plus_1_v = {mp1, mp1, mp1, mp1};
-  v4ss *vd = (v4ss*)delta;
-  v4ss *vw = (v4ss*)weights;
-  v4ss *vm = (v4ss*)momentums;
+  ASSUME_ALIGNED(delta);
   for (int i = 0; i < size; i++){
-    v4ss t = vd[i] * rate_v;
-    v4ss m = vm[i];
-    vm[i] = (m + t) * momentum_v;
-    vw[i] += momentum_plus_1_v * t + m * momentum_v;
-  }
-
-#else
-
-  //#pragma omp parallel for
-  for (int i = 0; i < size; i++){
+    float m = momentums[i] * momentum;
     float t = delta[i] * rate;
-    weights[i] += (1 + momentum) * t + momentums[i] * momentum;
-    momentums[i] += t;
-    momentums[i] *= momentum;
+    momentums[i] = m + t;
   }
-#endif
-  MAYBE_DEBUG("momentums %.2g %.2g %.2g %.2g %.2g",
-      momentums[0], momentums[3], momentums[6], momentums[10], momentums[11]);
 }
 
 static inline float
@@ -834,14 +806,24 @@ void bptt_consolidate_many_nets(RecurNN **nets, int n, int nestorov,
   }
   bptt_log_float(net, "momentum", momentum);
   if (nestorov == 1){
-    apply_learning_with_simplified_nestorov_momentum(net->ho_weights,
-        ho_gradient, bptt->ho_momentum,
-        net->ho_size, bptt->learn_rate * bptt->ho_scale,
-        momentum);
+    update_momentum_but_not_weights(bptt->ho_momentum,
+        ho_gradient, net->ho_size, momentum, bptt->learn_rate * bptt->ho_scale);
 
-    apply_learning_with_simplified_nestorov_momentum(net->ih_weights,
-        ih_gradient, bptt->ih_momentum,
-        net->ih_size, bptt->learn_rate, momentum);
+    update_momentum_but_not_weights(bptt->ih_momentum,
+        ih_gradient, net->ih_size, momentum, bptt->learn_rate);
+
+    add_aligned_arrays(net->ho_weights, net->ho_size, bptt->ho_momentum, 1.0f);
+    add_aligned_arrays(net->ih_weights, net->ih_size, bptt->ih_momentum, 1.0f);
+  }
+  else if (nestorov == 2){ /*reverse nestorov, like classical */
+    add_aligned_arrays(net->ho_weights, net->ho_size, bptt->ho_momentum, 1.0f);
+    add_aligned_arrays(net->ih_weights, net->ih_size, bptt->ih_momentum, 1.0f);
+
+    update_momentum_but_not_weights(bptt->ho_momentum,
+        ho_gradient, net->ho_size, momentum, bptt->learn_rate * bptt->ho_scale);
+
+    update_momentum_but_not_weights(bptt->ih_momentum,
+        ih_gradient, net->ih_size, momentum, bptt->learn_rate);
   }
   else {
     apply_learning_with_momentum(net->ho_weights, ho_gradient, bptt->ho_momentum,
