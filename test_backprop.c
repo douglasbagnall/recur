@@ -592,6 +592,12 @@ epoch(RecurNN **nets, int n_nets, RecurNN *confab_net, Ventropy *v,
       adjust_momentum_soft_start(net);
     }
     if (n_nets > 1 || opt_momentum_style){
+      if (opt_momentum_style == 1){
+        scale_aligned_array(net->bptt->ih_momentum, net->ih_size, net->bptt->momentum);
+        add_aligned_arrays(net->ih_weights, net->ih_size, net->bptt->ih_momentum, 1.0f);
+        scale_aligned_array(net->bptt->ho_momentum, net->ho_size, net->bptt->momentum);
+        add_aligned_arrays(net->ho_weights, net->ho_size, net->bptt->ho_momentum, 1.0f);
+      }
       for (j = 0; j < n_nets; j++){
         RecurNN *n = nets[j];
         int offset = i + j * spacing;
