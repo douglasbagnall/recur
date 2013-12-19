@@ -47,6 +47,7 @@
 #define DEFAULT_LEARN_CAPITALS 0
 #define DEFAULT_DUMP_COLLAPSED_TEXT NULL
 #define DEFAULT_MULTI_TAP 0
+#define DEFAULT_MOMENTUM_STYLE 0
 
 #define BELOW_QUIET_LEVEL(quiet) if (opt_quiet < quiet)
 
@@ -96,6 +97,7 @@ static bool opt_deterministic_confab = DEFAULT_DETERMINISTIC_CONFAB;
 static bool opt_save_net = DEFAULT_SAVE_NET;
 static bool opt_learn_capitals = DEFAULT_LEARN_CAPITALS;
 static uint opt_multi_tap = DEFAULT_MULTI_TAP;
+static int opt_momentum_style = DEFAULT_MOMENTUM_STYLE;
 
 /* Following ccan/opt/helpers.c opt_set_longval, etc */
 static char *
@@ -195,7 +197,8 @@ static struct opt_table options[] = {
       &opt_dropout, "dropout this fraction of hidden nodes"),
   OPT_WITH_ARG("--multi-tap=<n>", opt_set_uintval, opt_show_uintval,
       &opt_multi_tap, "read at n evenly spaced points in parallel"),
-
+  OPT_WITH_ARG("--momentum-style=<n>", opt_set_intval, opt_show_intval,
+      &opt_momentum_style, "0: hyper-simplified Nestorov, 1: Nestorov, 2: classical"),
 
   OPT_WITHOUT_ARG("-h|--help", opt_usage_and_exit,
       ": Rnn modelling of text at the character level",
@@ -588,7 +591,7 @@ epoch(RecurNN **nets, int n_nets, RecurNN *confab_net, Ventropy *v,
     if (opt_momentum_soft_start){
       adjust_momentum_soft_start(net);
     }
-    if (n_nets > 1){
+    if (n_nets > 1 || opt_momentum_style){
       for (j = 0; j < n_nets; j++){
         RecurNN *n = nets[j];
         int offset = i + j * spacing;
@@ -603,7 +606,7 @@ epoch(RecurNN **nets, int n_nets, RecurNN *confab_net, Ventropy *v,
         error += e;
         entropy += capped_log2f(1.0 - e);
       }
-      bptt_consolidate_many_nets(nets, n_nets, 0, 0);
+      bptt_consolidate_many_nets(nets, n_nets, opt_momentum_style, 0);
     }
     else {
       sgd_one(net, text[i], text[i + 1], &e, &c);
