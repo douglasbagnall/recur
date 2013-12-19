@@ -110,6 +110,7 @@ struct _GstClassify
   int mode;
   int bptt_depth;
   int weight_sparsity;
+  int momentum_style;
   float dropout;
   float *error_weight;
   u32 pending_net_flags;

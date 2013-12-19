@@ -37,6 +37,7 @@ enum
   PROP_LEARN_RATE,
   PROP_HIDDEN_SIZE,
   PROP_MOMENTUM,
+  PROP_MOMENTUM_STYLE,
   PROP_MOMENTUM_SOFT_START,
   PROP_MFCCS,
   PROP_SAVE_NET,
@@ -67,6 +68,7 @@ enum
 #define DEFAULT_PROP_MFCCS 0
 #define DEFAULT_PROP_MOMENTUM 0.95f
 #define DEFAULT_PROP_MOMENTUM_SOFT_START 0.0f
+#define DEFAULT_PROP_MOMENTUM_STYLE 1
 #define DEFAULT_PROP_CLASSES 2
 #define DEFAULT_PROP_BPTT_DEPTH 30
 #define DEFAULT_PROP_FORGET 0
@@ -87,6 +89,8 @@ enum
 #define LEARN_RATE_MAX 1.0
 #define MOMENTUM_MIN 0.0
 #define MOMENTUM_MAX 1.0
+#define MOMENTUM_STYLE_MIN 0
+#define MOMENTUM_STYLE_MAX 2
 #define WEIGHT_SPARSITY_MIN 0
 #define WEIGHT_SPARSITY_MAX 10
 #define DROPOUT_MIN 0.0
@@ -308,6 +312,13 @@ gst_classify_class_init (GstClassifyClass * klass)
           "(eventual) momentum",
           MOMENTUM_MIN, MOMENTUM_MAX,
           DEFAULT_PROP_MOMENTUM,
+          G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+
+  g_object_class_install_property (gobject_class, PROP_MOMENTUM_STYLE,
+      g_param_spec_int("momentum-style", "momentum-style",
+          "0: hypersimplified Nesterov, 1: Nesterov, 2: classical momentum",
+          MOMENTUM_STYLE_MIN, MOMENTUM_STYLE_MAX,
+          DEFAULT_PROP_MOMENTUM_STYLE,
           G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class, PROP_HIDDEN_SIZE,
@@ -797,6 +808,10 @@ gst_classify_set_property (GObject * object, guint prop_id, const GValue * value
       self->momentum = g_value_get_float(value);
       break;
 
+    case PROP_MOMENTUM_STYLE:
+      self->momentum_style = g_value_get_int(value);
+      break;
+
       /*CLASSES, MFCCS, BPTT_DEPTH,
         and HIDDEN_SIZE have no effect if set late (after net creation)
        */
@@ -886,6 +901,9 @@ gst_classify_get_property (GObject * object, guint prop_id, GValue * value,
   case PROP_MOMENTUM_SOFT_START:
     g_value_set_float(value, self->momentum_soft_start);
     break;
+  case PROP_MOMENTUM_STYLE:
+    g_value_set_int(value, self->momentum_style);
+    break;
   case PROP_HIDDEN_SIZE:
     g_value_set_int(value, self->hidden_size);
     break;
@@ -960,6 +978,7 @@ pcm_to_features(RecurAudioBinner *mf, float *features, float *pcm, int mfccs){
     answer = recur_extract_log_freq_bins(mf, pcm);
     n_features = CLASSIFY_N_FFT_BINS;
   }
+  /*XXX could do at least one less copy */
   for (int i = 0; i < n_features; i++){
     features[i] = answer[i];
   }
@@ -1003,6 +1022,7 @@ train_channel(ClassifyChannel *c, float dropout, float *error_weights){
       net->output_size);
   net->bptt->o_error[c->current_target] += 1.0f;
   if (error_weights){
+    GST_DEBUG("error weights %f %f", error_weights[0], error_weights[1]);
     for (int i = 0; i < net->output_size; i ++){
       net->bptt->o_error[i] *= error_weights[i];
     }
@@ -1073,7 +1093,7 @@ maybe_learn(GstClassify *self){
     if (PERIODIC_PGM_DUMP && net->generation % PERIODIC_PGM_DUMP == 0){
       rnn_multi_pgm_dump(net, "how ihw");
     }
-    bptt_consolidate_many_nets(self->subnets, self->n_channels, 0,
+    bptt_consolidate_many_nets(self->subnets, self->n_channels, self->momentum_style,
         self->momentum_soft_start);
     rnn_condition_net(self->net);
     possibly_save_net(self->net, self->net_filename);
