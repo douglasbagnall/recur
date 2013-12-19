@@ -83,7 +83,7 @@ static float opt_dropout = DEFAULT_DROPOUT;
 static float opt_momentum_weight = DEFAULT_MOMENTUM_WEIGHT;
 static float opt_momentum_soft_start = DEFAULT_MOMENTUM_SOFT_START;
 static u64 opt_rng_seed = DEFAULT_RNG_SEED;
-static uint opt_stop = DEFAULT_STOP;
+static int opt_stop = DEFAULT_STOP;
 static int opt_validate_chars = DEFAULT_VALIDATE_CHARS;
 static int opt_validation_overlap = DEFAULT_VALIDATION_OVERLAP;
 static int opt_start_char = DEFAULT_START_CHAR;
@@ -127,8 +127,8 @@ static struct opt_table options[] = {
       &opt_bptt_depth, "max depth of BPTT recursion"),
   OPT_WITH_ARG("-r|--rng-seed=<seed>", opt_set_ulongval_bi, opt_show_ulongval_bi,
       &opt_rng_seed, "RNG seed (-1 for auto)"),
-  OPT_WITH_ARG("-s|--stop-after=<n>", opt_set_uintval_bi, opt_show_uintval_bi,
-      &opt_stop, "Stop after this many generations (0: no stop)"),
+  OPT_WITH_ARG("-s|--stop-after=<n>", opt_set_intval_bi, opt_show_intval_bi,
+      &opt_stop, "Stop at generation n (0: no stop, negative means relative)"),
   OPT_WITH_ARG("--bptt-batch-size=<n>", opt_set_uintval_bi, opt_show_uintval_bi,
       &opt_bptt_batch_size, "bptt minibatch size"),
   OPT_WITH_ARG("--weight-sparsity=<n>", opt_set_uintval_bi, opt_show_uintval_bi,
@@ -637,7 +637,7 @@ epoch(RecurNN **nets, int n_nets, RecurNN *confab_net, Ventropy *v,
       }
       schedule->eval(schedule, net, ventropy);
     }
-    if (opt_stop && net->generation >= opt_stop){
+    if (opt_stop && (int)net->generation >= opt_stop){
       finish(net, v);
     }
   }
@@ -780,6 +780,10 @@ main(int argc, char *argv[]){
 
   init_ventropy(&v, validate_net, validate_text,
       opt_validate_chars, opt_validation_overlap);
+
+  if (opt_stop < 0){
+    opt_stop = net->generation - opt_stop;
+  }
 
   BELOW_QUIET_LEVEL(2){
     START_TIMER(run);
