@@ -808,20 +808,18 @@ void bptt_consolidate_many_nets(RecurNN **nets, int n, int nestorov,
   if (nestorov == 1){
     update_momentum_but_not_weights(bptt->ho_momentum,
         ho_gradient, net->ho_size, momentum, bptt->learn_rate * bptt->ho_scale);
+    add_aligned_arrays(net->ho_weights, net->ho_size, bptt->ho_momentum, 1.0f);
 
     update_momentum_but_not_weights(bptt->ih_momentum,
         ih_gradient, net->ih_size, momentum, bptt->learn_rate);
-
-    add_aligned_arrays(net->ho_weights, net->ho_size, bptt->ho_momentum, 1.0f);
     add_aligned_arrays(net->ih_weights, net->ih_size, bptt->ih_momentum, 1.0f);
   }
   else if (nestorov == 2){ /*reverse nestorov, like classical */
     add_aligned_arrays(net->ho_weights, net->ho_size, bptt->ho_momentum, 1.0f);
-    add_aligned_arrays(net->ih_weights, net->ih_size, bptt->ih_momentum, 1.0f);
-
     update_momentum_but_not_weights(bptt->ho_momentum,
         ho_gradient, net->ho_size, momentum, bptt->learn_rate * bptt->ho_scale);
 
+    add_aligned_arrays(net->ih_weights, net->ih_size, bptt->ih_momentum, 1.0f);
     update_momentum_but_not_weights(bptt->ih_momentum,
         ih_gradient, net->ih_size, momentum, bptt->learn_rate);
   }
