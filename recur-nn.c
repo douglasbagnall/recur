@@ -800,20 +800,9 @@ void bptt_consolidate_many_nets(RecurNN **nets, int n, int nesterov,
   /*Use first net's delta as gradient accumulator.*/
   float *ho_gradient = bptt->ho_delta;
   float *ih_gradient = bptt->ih_delta;
-  scale_aligned_array(ih_gradient, net->ih_size, bptt->ih_scale);
   int ho_size = net->ho_size;
   int ih_size = net->ih_size;
-  for (int i = 1; i < n; i++){
-    net = nets[i];
-    bptt = net->bptt;
-    add_aligned_arrays(ho_gradient, ho_size, bptt->ho_delta, 1.0f);
-    add_aligned_arrays(ih_gradient, ih_size, bptt->ih_delta, bptt->ih_scale);
-  }
-  /*All nets (should) have the same weights and usable momentums, so it would
-    be OK to just use the last one, but nets[0] is the one that gets debugging
-    attention (ppm, etc). */
-  net = nets[0];
-  bptt = net->bptt;
+
   float momentum = bptt->momentum;
   if (momentum_soft_start){
     /*XXX keeps doing the calculation long after soft_start is over. */
@@ -826,28 +815,48 @@ void bptt_consolidate_many_nets(RecurNN **nets, int n, int nesterov,
     /*simplified Nesterov momentum */
     momentum_weight = momentum * momentum / (1.0 + momentum);
   }
-  if (nesterov == 1){
+
+  for (int i = 1; i < n; i++){
+    add_aligned_arrays(ho_gradient, ho_size, nets[i]->bptt->ho_delta, 1.0f);
+  }
+  switch (nesterov){
+  case 1:
     apply_learning_with_nesterov_momentum(bptt->ho_momentum, ho_gradient,
         net->ho_weights, net->ho_size, momentum, bptt->learn_rate * bptt->ho_scale);
-
-    apply_learning_with_nesterov_momentum(bptt->ih_momentum, ih_gradient,
-        net->ih_weights, net->ih_size, momentum, bptt->learn_rate);
-  }
-  else if (nesterov == 2){ /*classical momentum, momentum weight 1*/
+    break;
+  case 2:
     apply_learning_with_momentum(net->ho_weights, ho_gradient, bptt->ho_momentum,
         net->ho_size, bptt->learn_rate * bptt->ho_scale,
         momentum, 1.0f);
-
-    apply_learning_with_momentum(net->ih_weights, ih_gradient, bptt->ih_momentum,
-        net->ih_size, bptt->learn_rate, momentum, 1.0f);
-  }
-  else {
+    break;
+  default:
     apply_learning_with_momentum(net->ho_weights, ho_gradient, bptt->ho_momentum,
         net->ho_size, bptt->learn_rate * bptt->ho_scale,
         momentum, momentum_weight);
+    break;
+  }
 
+  if (bptt->ih_scale != 1.0f){
+    scale_aligned_array(ih_gradient, net->ih_size, bptt->ih_scale);
+  }
+  for (int i = 1; i < n; i++){
+    add_aligned_arrays(ih_gradient, ih_size, nets[i]->bptt->ih_delta,
+        nets[i]->bptt->ih_scale);
+  }
+
+  switch (nesterov){
+  case 1:
+    apply_learning_with_nesterov_momentum(bptt->ih_momentum, ih_gradient,
+        net->ih_weights, net->ih_size, momentum, bptt->learn_rate);
+    break;
+  case 2:
+    apply_learning_with_momentum(net->ih_weights, ih_gradient, bptt->ih_momentum,
+        net->ih_size, bptt->learn_rate, momentum, 1.0f);
+    break;
+  default:
     apply_learning_with_momentum(net->ih_weights, ih_gradient, bptt->ih_momentum,
         net->ih_size, bptt->learn_rate, momentum, momentum_weight);
+    break;
   }
 }
 
