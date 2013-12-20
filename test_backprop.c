@@ -198,7 +198,7 @@ static struct opt_table options[] = {
   OPT_WITH_ARG("--multi-tap=<n>", opt_set_uintval, opt_show_uintval,
       &opt_multi_tap, "read at n evenly spaced points in parallel"),
   OPT_WITH_ARG("--momentum-style=<n>", opt_set_intval, opt_show_intval,
-      &opt_momentum_style, "0: hyper-simplified Nestorov, 1: Nestorov, 2: classical"),
+      &opt_momentum_style, "0: hyper-simplified Nesterov, 1: Nesterov, 2: classical"),
 
   OPT_WITHOUT_ARG("-h|--help", opt_usage_and_exit,
       ": Rnn modelling of text at the character level",
@@ -503,7 +503,7 @@ init_ventropy(Ventropy *v, RecurNN *net, const u8 *text, const int len, const in
   v->len = len;
   v->lap = lap;
   v->lapsize = len / lap;
-  v->history = calloc(v->lap, sizeof(float));
+  v->history = calloc(lap, sizeof(float));
   v->entropy = 0;
   v->counter = 0;
 }
@@ -662,6 +662,7 @@ construct_net_filename(void){
   snprintf(s, sizeof(s), "text-s%0x-i%d-h%d-o%d-b%d-B%d-c%d.net",
       sig, input_size, opt_hidden_size, output_size,
       opt_bias, opt_bptt_batch_size, opt_learn_capitals);
+  DEBUG("filename: %s", s);
   return strdup(s);
 }
 
