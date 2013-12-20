@@ -746,8 +746,6 @@ update_momentum_but_not_weights(float *restrict momentums, const float *restrict
    }
  }
 
-
-
 static void
 apply_learning_with_nesterov_momentum(float *restrict momentums,
     const float *restrict delta, float *restrict weights,
@@ -823,6 +821,11 @@ void bptt_consolidate_many_nets(RecurNN **nets, int n, int nesterov,
     momentum = MIN(momentum, 1.0f - x / (1 + net->generation + 2 * x));
   }
   bptt_log_float(net, "momentum", momentum);
+  float momentum_weight = bptt->momentum_weight;
+  if (nesterov == 3){
+    /*simplified Nesterov momentum */
+    momentum_weight = momentum * momentum / (1.0 + momentum);
+  }
   if (nesterov == 1){
     apply_learning_with_nesterov_momentum(bptt->ho_momentum, ho_gradient,
         net->ho_weights, net->ho_size, momentum, bptt->learn_rate * bptt->ho_scale);
@@ -841,10 +844,10 @@ void bptt_consolidate_many_nets(RecurNN **nets, int n, int nesterov,
   else {
     apply_learning_with_momentum(net->ho_weights, ho_gradient, bptt->ho_momentum,
         net->ho_size, bptt->learn_rate * bptt->ho_scale,
-        momentum, bptt->momentum_weight);
+        momentum, momentum_weight);
 
     apply_learning_with_momentum(net->ih_weights, ih_gradient, bptt->ih_momentum,
-        net->ih_size, bptt->learn_rate, momentum, bptt->momentum_weight);
+        net->ih_size, bptt->learn_rate, momentum, momentum_weight);
   }
 }
 
