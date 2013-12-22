@@ -35,7 +35,7 @@ queue_audio_segment(GstBuffer *buffer, s16 *const queue, const int queue_size,
     *end = len - snip;
   }
 
-  GST_LOG("queueing audio starting %llu, ending %llu",
+  GST_LOG("queueing audio starting %" PRIu64  ", ending %" PRIu64,
       GST_BUFFER_PTS(buffer), GST_BUFFER_PTS(buffer) + GST_BUFFER_DURATION(buffer));
   gst_buffer_unmap(buffer, &map);
 }
