@@ -44,6 +44,7 @@
 #define DEFAULT_START_CHAR -1
 #define DEFAULT_HIDDEN_SIZE 199
 #define DEFAULT_WEIGHT_SPARSITY 1
+#define DEFAULT_PERFORATE_WEIGHTS 0.0f
 #define DEFAULT_LEARN_CAPITALS 0
 #define DEFAULT_DUMP_COLLAPSED_TEXT NULL
 #define DEFAULT_MULTI_TAP 0
@@ -91,6 +92,7 @@ static bool opt_override = DEFAULT_OVERRIDE;
 static bool opt_bptt_adaptive_min = DEFAULT_BPTT_ADAPTIVE_MIN;
 static uint opt_bptt_batch_size = DEFAULT_BPTT_BATCH_SIZE;
 static uint opt_weight_sparsity = DEFAULT_WEIGHT_SPARSITY;
+static float opt_perforate_weights = DEFAULT_PERFORATE_WEIGHTS;
 static bool opt_temporal_pgm_dump = DEFAULT_TEMPORAL_PGM_DUMP;
 static bool opt_periodic_pgm_dump = DEFAULT_PERIODIC_PGM_DUMP;
 static bool opt_deterministic_confab = DEFAULT_DETERMINISTIC_CONFAB;
@@ -133,6 +135,8 @@ static struct opt_table options[] = {
       &opt_bptt_batch_size, "bptt minibatch size"),
   OPT_WITH_ARG("--weight-sparsity=<n>", opt_set_uintval_bi, opt_show_uintval_bi,
       &opt_weight_sparsity, "higher for more initial weights near zero"),
+  OPT_WITH_ARG("--perforate-weights=<0-1>", opt_set_floatval, opt_show_floatval,
+      &opt_perforate_weights, "Zero this portion of weights"),
   OPT_WITH_ARG("-V|--validate-chars=<n>", opt_set_intval_bi, opt_show_intval_bi,
       &opt_validate_chars, "Retain this many characters for validation"),
   OPT_WITH_ARG("--validation-overlap=<n>", opt_set_intval, opt_show_intval,
@@ -694,6 +698,9 @@ load_or_create_net(void){
         opt_logfile, opt_bptt_depth, opt_learn_rate,
         opt_momentum, opt_momentum_weight,
         opt_bptt_batch_size, opt_weight_sparsity);
+    if (opt_perforate_weights > 0 && opt_perforate_weights < 1){
+      rnn_perforate_weights(net, opt_perforate_weights);
+    }
   }
   else if (opt_override){
     RecurNNBPTT *bptt = net->bptt;

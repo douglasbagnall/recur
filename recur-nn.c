@@ -270,6 +270,11 @@ rnn_randomise_weights(RecurNN *net, float variance, int shape){
   }
 }
 
+void rnn_perforate_weights(RecurNN *net, float p){
+  dropout_array(net->ih_weights, net->ih_size, p, &net->rng);
+  dropout_array(net->ho_weights, net->ho_size, p, &net->rng);
+}
+
 void
 rnn_forget_history(RecurNN *net, int bptt_too){
   zero_aligned_array(net->hidden_layer, net->h_size);

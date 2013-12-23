@@ -193,6 +193,8 @@ void rnn_log_net(RecurNN *net);
 
 void rnn_forget_history(RecurNN *net, int bptt_too);
 
+void rnn_perforate_weights(RecurNN *net, float p);
+
 static inline void
 bptt_log_float(RecurNN *net, char *name, float value){
   if (net->log){
