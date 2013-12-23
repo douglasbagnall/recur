@@ -1,5 +1,5 @@
 #include "recur-nn.h"
-#include "pgm_dump.h"
+#include "recur-nn-helpers.h"
 #include <math.h>
 #include "path.h"
 #include "badmaths.h"
