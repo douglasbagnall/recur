@@ -8,6 +8,7 @@
 #include "mdct.h"
 #include "mfcc.h"
 #include "badmaths.h"
+#include "pgm_dump.h"
 
 G_BEGIN_DECLS
 

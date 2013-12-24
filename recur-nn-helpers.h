@@ -11,6 +11,9 @@
 #include <cblas.h>
 #include "pgm_dump.h"
 
+#if VECTOR
+typedef float v4ss __attribute__ ((vector_size (16))) __attribute__ ((aligned (16)));
+#endif
 
 #define ALIGNED_SIZEOF(x)  ((sizeof(x) + 15UL) & ~15UL)
 #define ALIGNED_VECTOR_LEN(x, type) ((((x) * sizeof(type) + 15UL) & ~15UL) / sizeof(type))

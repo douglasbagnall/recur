@@ -1,10 +1,6 @@
 #include "recur-nn.h"
 #include "recur-nn-helpers.h"
 
-#if VECTOR
-typedef float v4ss __attribute__ ((vector_size (16))) __attribute__ ((aligned (16)));
-#endif
-
 static RecurNNBPTT *
 new_bptt(RecurNN *net, int depth, float learn_rate, float momentum,
          float momentum_weight, int batch_size){

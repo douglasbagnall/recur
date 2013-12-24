@@ -5,6 +5,7 @@
 #include "recur-common.h"
 #include "recur-nn.h"
 #include "badmaths.h"
+#include "pgm_dump.h"
 
 G_BEGIN_DECLS
 

@@ -19,6 +19,7 @@
 #include <gst/fft/gstfftf32.h>
 #include <gst/video/video.h>
 #include <gst/audio/audio.h>
+#include "pgm_dump.h"
 
 #define RECUR_AUDIO_CHANNELS 1
 #define RECUR_AUDIO_RATE 16000
