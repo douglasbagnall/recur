@@ -97,7 +97,7 @@ rnn_new(uint input_size, uint hidden_size, uint output_size, int flags,
   if (flags & RNN_NET_FLAG_OWN_BPTT){
     net->bptt = new_bptt(net, bptt_depth, learn_rate, momentum,
         momentum_weight, batch_size);
-    bptt_advance(net);
+    rnn_bptt_advance(net);
   }
   else {
     net->real_inputs = net->input_layer + net->hidden_size + net->bias;
@@ -139,7 +139,7 @@ rnn_set_log_file(RecurNN *net, const char *log_file, int append_dont_truncate){
     char *mode = append_dont_truncate ? "a" : "w";
     net->log = fopen(log_file, mode);
     if (! append_dont_truncate){
-      bptt_log_int(net, "generation", net->generation);
+      rnn_log_int(net, "generation", net->generation);
     }
   }
   else{
@@ -329,7 +329,7 @@ maybe_scale_hiddens(RecurNN *net){
       scale_aligned_array(net->bptt->ih_momentum, net->ih_size, scale);
     }
     MAYBE_DEBUG("scaling weights (hidden sum %f > %f)", sum, softclip);
-    bptt_log_float(net, "weight_scale", scale);
+    rnn_log_float(net, "weight_scale", scale);
 #endif
   }
 }
@@ -656,24 +656,24 @@ bptt_and_accumulate_error(RecurNN *net, float *ih_delta, const float top_error_s
   }
 
   if (net->log){
-    bptt_log_int(net, "depth", bptt->depth - t);
-    bptt_log_float(net, "scaled_error", bptt->ih_scale * error_sum);
-    bptt_log_float(net, "ih_scale", bptt->ih_scale);
-    bptt_log_float(net, "min_error_threshold", min_error_sum);
-    bptt_log_float(net, "min_error_factor", bptt->min_error_factor);
+    rnn_log_int(net, "depth", bptt->depth - t);
+    rnn_log_float(net, "scaled_error", bptt->ih_scale * error_sum);
+    rnn_log_float(net, "ih_scale", bptt->ih_scale);
+    rnn_log_float(net, "min_error_threshold", min_error_sum);
+    rnn_log_float(net, "min_error_factor", bptt->min_error_factor);
     if (net->flags & RNN_NET_FLAG_LOG_HIDDEN_SUM){
       float hidden_sum = 0;
       for (int i = 0; i < net->h_size; i++){
         hidden_sum += net->hidden_layer[i];
       }
-      bptt_log_float(net, "hidden_sum", hidden_sum);
+      rnn_log_float(net, "hidden_sum", hidden_sum);
     }
     if (net->flags & RNN_NET_FLAG_LOG_WEIGHT_SUM){
       float weight_sum = 0;
       for (int i = 0; i < net->ih_size; i++){
         weight_sum += fabsf(weights[i]);
       }
-      bptt_log_float(net, "weight_sum", weight_sum);
+      rnn_log_float(net, "weight_sum", weight_sum);
     }
   }
   return error_sum;
@@ -781,7 +781,7 @@ apply_sgd_with_bptt_batch(RecurNN *net, float top_error_sum){
   return error_sum;
 }
 
-void bptt_consolidate_many_nets(RecurNN **nets, int n, int nesterov,
+void rnn_consolidate_many_nets(RecurNN **nets, int n, int nesterov,
     float momentum_soft_start){
   RecurNN *net = nets[0];
   RecurNNBPTT *bptt = net->bptt;
@@ -797,7 +797,7 @@ void bptt_consolidate_many_nets(RecurNN **nets, int n, int nesterov,
     float x = momentum_soft_start;
     momentum = MIN(momentum, 1.0f - x / (1 + net->generation + 2 * x));
   }
-  bptt_log_float(net, "momentum", momentum);
+  rnn_log_float(net, "momentum", momentum);
   float momentum_weight = bptt->momentum_weight;
   if (nesterov == 3){
     /*simplified Nesterov momentum */
@@ -850,7 +850,7 @@ void bptt_consolidate_many_nets(RecurNN **nets, int n, int nesterov,
 
 
 void
-bptt_advance(RecurNN *net){
+rnn_bptt_advance(RecurNN *net){
   RecurNNBPTT *bptt = net->bptt;
   bptt->index++;
   if (bptt->index == bptt->depth)
@@ -860,7 +860,7 @@ bptt_advance(RecurNN *net){
 }
 
 void
-bptt_calc_deltas(RecurNN *net){
+rnn_bptt_calc_deltas(RecurNN *net){
   float top_error_sum = calc_sgd_top_layer(net);
   float top_error_scaled = softclip_scale(top_error_sum,
       net->h_size * MAX_TOP_ERROR_FACTOR, net->bptt->h_error, net->h_size);
@@ -870,15 +870,15 @@ bptt_calc_deltas(RecurNN *net){
       net->bptt->ih_delta, top_error_scaled);
   net->generation++;
   if (net->log){
-    bptt_log_float(net, "error_gain", bptt_error_sum / (top_error_scaled + 1e-6));
-    bptt_log_float(net, "top_error_scaled", top_error_scaled);
-    bptt_log_float(net, "top_error_raw", top_error_sum);
-    bptt_log_int(net, "generation", net->generation);
+    rnn_log_float(net, "error_gain", bptt_error_sum / (top_error_scaled + 1e-6));
+    rnn_log_float(net, "top_error_scaled", top_error_scaled);
+    rnn_log_float(net, "top_error_raw", top_error_sum);
+    rnn_log_int(net, "generation", net->generation);
   }
 }
 
 void
-bptt_calculate(RecurNN *net){
+rnn_bptt_calculate(RecurNN *net){
   float bptt_error_sum;
   float top_error_sum = apply_sgd_top_layer(net);
   float top_error_scaled = softclip_scale(top_error_sum,
@@ -890,11 +890,11 @@ bptt_calculate(RecurNN *net){
     bptt_error_sum = apply_sgd_with_bptt(net, top_error_scaled);
   net->generation++;
   if (net->log){
-    bptt_log_float(net, "top_error_scaled", top_error_scaled);
-    bptt_log_float(net, "top_error_raw", top_error_sum);
-    bptt_log_float(net, "error_sum", bptt_error_sum);
-    bptt_log_float(net, "error_gain", bptt_error_sum / (top_error_scaled + 1e-6));
-    bptt_log_int(net, "generation", net->generation);
+    rnn_log_float(net, "top_error_scaled", top_error_scaled);
+    rnn_log_float(net, "top_error_raw", top_error_sum);
+    rnn_log_float(net, "error_sum", bptt_error_sum);
+    rnn_log_float(net, "error_gain", bptt_error_sum / (top_error_scaled + 1e-6));
+    rnn_log_int(net, "generation", net->generation);
   }
   rnn_condition_net(net);
 }
@@ -997,15 +997,15 @@ void rnn_log_net(RecurNN *net)
     for (i = 0; i < net->h_size; i++){
       hidden_error += fabsf(net->bptt->h_error[i]);
     }
-    bptt_log_float(net, "output_error", top_error);
-    bptt_log_float(net, "hidden_error", hidden_error);
+    rnn_log_float(net, "output_error", top_error);
+    rnn_log_float(net, "hidden_error", hidden_error);
   }
 #if 0
   float hidden_sum = 0;
   for (i = 0; i < net->h_size; i++){
     hidden_sum += net->hidden_layer[i];
   }
-  bptt_log_float(net, "hidden_sum", hidden_sum);
+  rnn_log_float(net, "hidden_sum", hidden_sum);
 #endif
 }
 

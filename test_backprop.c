@@ -361,9 +361,9 @@ static void
 sgd_one(RecurNN *net, int current, int next,
     float *error, int *correct){
   RecurNNBPTT *bptt = net->bptt;
-  bptt_advance(net);
+  rnn_bptt_advance(net);
   *error = net_error_bptt(net, bptt->o_error, current, next, correct);
-  bptt_calculate(net);
+  rnn_bptt_calculate(net);
 }
 
 
@@ -567,12 +567,12 @@ report_on_progress(RecurNN *net, RecurNN *confab_net, float ventropy,
         *entropy, ventropy,
         (int)(accuracy * 100 + 0.5), confab);
   }
-  bptt_log_float(net, "error", *error);
-  bptt_log_float(net, "t_entropy", *entropy);
-  bptt_log_float(net, "v_entropy", ventropy);
-  bptt_log_float(net, "momentum", net->bptt->momentum);
-  bptt_log_float(net, "accuracy", accuracy);
-  bptt_log_float(net, "learn-rate", net->bptt->learn_rate);
+  rnn_log_float(net, "error", *error);
+  rnn_log_float(net, "t_entropy", *entropy);
+  rnn_log_float(net, "v_entropy", ventropy);
+  rnn_log_float(net, "momentum", net->bptt->momentum);
+  rnn_log_float(net, "accuracy", accuracy);
+  rnn_log_float(net, "learn-rate", net->bptt->learn_rate);
   *correct = 0;
   *error = 0.0f;
   *entropy = 0.0f;
@@ -608,15 +608,15 @@ epoch(RecurNN **nets, int n_nets, RecurNN *confab_net, Ventropy *v,
         if (offset >= len - 1){
           offset -= len - 1;
         }
-        bptt_advance(n);
+        rnn_bptt_advance(n);
         e = net_error_bptt(n, n->bptt->o_error,
             text[offset], text[offset + 1], &c);
-        bptt_calc_deltas(n);
+        rnn_bptt_calc_deltas(n);
         correct += c;
         error += e;
         entropy += capped_log2f(1.0 - e);
       }
-      bptt_consolidate_many_nets(nets, n_nets, opt_momentum_style, 0);
+      rnn_consolidate_many_nets(nets, n_nets, opt_momentum_style, 0);
     }
     else {
       sgd_one(net, text[i], text[i + 1], &e, &c);

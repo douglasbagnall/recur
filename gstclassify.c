@@ -1027,8 +1027,8 @@ train_channel(ClassifyChannel *c, float dropout, float *error_weights){
       net->bptt->o_error[i] *= error_weights[i];
     }
   }
-  bptt_calc_deltas(net);
-  bptt_advance(net);
+  rnn_bptt_calc_deltas(net);
+  rnn_bptt_advance(net);
   return net->bptt->o_error[c->current_target];
 }
 
@@ -1093,7 +1093,7 @@ maybe_learn(GstClassify *self){
     if (PERIODIC_PGM_DUMP && net->generation % PERIODIC_PGM_DUMP == 0){
       rnn_multi_pgm_dump(net, "how ihw");
     }
-    bptt_consolidate_many_nets(self->subnets, self->n_channels, self->momentum_style,
+    rnn_consolidate_many_nets(self->subnets, self->n_channels, self->momentum_style,
         self->momentum_soft_start);
     rnn_condition_net(self->net);
     possibly_save_net(self->net, self->net_filename);
@@ -1102,11 +1102,11 @@ maybe_learn(GstClassify *self){
       for (i = 0; i < self->n_classes; i++){
         char s[20];
         snprintf(s, sizeof(s), "class-%d", i);
-        bptt_log_int(net, s, class_counts[i]);
+        rnn_log_int(net, s, class_counts[i]);
       }
     }
-    bptt_log_float(net, "error", err_sum / self->n_channels);
-    bptt_log_float(net, "correct", winners / self->n_channels);
+    rnn_log_float(net, "error", err_sum / self->n_channels);
+    rnn_log_float(net, "correct", winners / self->n_channels);
     self->net->generation = net->generation;
   }
 }

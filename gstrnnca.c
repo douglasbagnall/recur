@@ -745,7 +745,7 @@ train_net(GstRnnca *self, RnncaTrainer *t, RnncaFrame *prev,  RnncaFrame *now){
     GST_LOG("target %.2g a %.2g diff %.2g slope %.2g",
         target, a, target - a, slope);
   }
-  bptt_calc_deltas(net);
+  rnn_bptt_calc_deltas(net);
 }
 
 static inline void
@@ -755,7 +755,7 @@ maybe_learn(GstRnnca *self){
   for (i = 0; i < self->n_trainers; i++){
     train_net(self, &self->trainers[i], self->frame_prev, self->frame_now);
   }
-  bptt_consolidate_many_nets(self->train_nets, self->n_trainers, 0,
+  rnn_consolidate_many_nets(self->train_nets, self->n_trainers, 0,
       self->momentum_soft_start);
   if (PERIODIC_PGM_DUMP && (net->generation & PERIODIC_PGM_DUMP) == 0){
     rnn_multi_pgm_dump(net, "how ihw");

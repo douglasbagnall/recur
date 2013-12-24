@@ -464,7 +464,7 @@ tanh_opinion(RecurNN *net, float *in){
 
 static inline float *
 train_net(RecurNN *net, float *features, float *target){
-  bptt_advance(net);
+  rnn_bptt_advance(net);
   float *answer = tanh_opinion(net, features);
 
   /*Tanh derivative is allegedly 1 - y * y
@@ -473,7 +473,7 @@ train_net(RecurNN *net, float *features, float *target){
     float a = answer[i];
     net->bptt->o_error[i] = (1 - a * a) * (target[i] - a);
   }
-  bptt_calc_deltas(net);
+  rnn_bptt_calc_deltas(net);
   return answer;
 }
 
@@ -542,7 +542,7 @@ maybe_learn(GstParrot *self){
     if (PERIODIC_PGM_DUMP && net->generation % PERIODIC_PGM_DUMP == 0){
       rnn_multi_pgm_dump(net, "how ihw");
     }
-    bptt_consolidate_many_nets(self->training_nets, self->n_channels, 1, 0);
+    rnn_consolidate_many_nets(self->training_nets, self->n_channels, 1, 0);
     rnn_condition_net(self->net);
     self->net->generation = net->generation;
     possibly_save_net(self->net, self->net_filename);

@@ -46,9 +46,9 @@ net_error_bptt(RecurNN *net, float *error, int c, int next){
 static float
 sgd_one(RecurNN *net, const int current, const int next){
   RecurNNBPTT *bptt = net->bptt;
-  bptt_advance(net);
+  rnn_bptt_advance(net);
   float sum = net_error_bptt(net, bptt->o_error, current, next);
-  bptt_calculate(net);
+  rnn_bptt_calculate(net);
   return sum;
 }
 

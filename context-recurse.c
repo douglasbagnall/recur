@@ -128,7 +128,7 @@ consolidate_and_apply_learning(RecurContext *context){
   for (int j = 0; j < RECUR_N_TRAINERS; j++){
     nets[j] = context->trainers[j].net;
   }
-  bptt_consolidate_many_nets(nets, RECUR_N_TRAINERS, 0, 0);
+  rnn_consolidate_many_nets(nets, RECUR_N_TRAINERS, 0, 0);
 }
 
 void
@@ -138,7 +138,7 @@ recur_train_nets(RecurContext *context, RecurFrame *src_frame,
   for (int j = 0; j < RECUR_N_TRAINERS; j++){
     RecurTrainer *t = &context->trainers[j];
     RecurNN *net = t->net;
-    bptt_advance(net);
+    rnn_bptt_advance(net);
 
     float *video_in = copy_audio_inputs(net, context);
 
@@ -160,7 +160,7 @@ recur_train_nets(RecurContext *context, RecurFrame *src_frame,
       float slope = a * (1.0f - a);
       net->bptt->o_error[i] = slope * (target - a);
     }
-    bptt_calc_deltas(net);
+    rnn_bptt_calc_deltas(net);
   }
   consolidate_and_apply_learning(context);
 

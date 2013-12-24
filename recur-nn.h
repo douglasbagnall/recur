@@ -169,13 +169,13 @@ void rnn_multi_pgm_dump(RecurNN *net, const char *dumpees);
 RecurNN* rnn_load_net(const char *filename);
 int rnn_save_net(RecurNN *net, const char *filename);
 
-void bptt_advance(RecurNN *net);
-void bptt_calculate(RecurNN *net);
+void rnn_bptt_advance(RecurNN *net);
+void rnn_bptt_calculate(RecurNN *net);
 
-void bptt_consolidate_many_nets(RecurNN **nets, int n, int nesterov,
+void rnn_consolidate_many_nets(RecurNN **nets, int n, int nesterov,
     float momentum_soft_start);
 
-void bptt_calc_deltas(RecurNN *net);
+void rnn_bptt_calc_deltas(RecurNN *net);
 
 void rnn_condition_net(RecurNN *net);
 void rnn_log_net(RecurNN *net);
@@ -185,14 +185,14 @@ void rnn_forget_history(RecurNN *net, int bptt_too);
 void rnn_perforate_weights(RecurNN *net, float p);
 
 static inline void
-bptt_log_float(RecurNN *net, char *name, float value){
+rnn_log_float(RecurNN *net, char *name, float value){
   if (net->log){
     fprintf(net->log, "%s %.5g\n", name, value);
   }
 }
 
 static inline void
-bptt_log_int(RecurNN *net, char *name, int value){
+rnn_log_int(RecurNN *net, char *name, int value){
   if (net->log){
     fprintf(net->log, "%s %d\n", name, value);
   }
