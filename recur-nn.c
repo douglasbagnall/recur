@@ -723,18 +723,6 @@ apply_learning_with_momentum(float *restrict weights,
 }
 
 static void
-update_momentum_but_not_weights(float *restrict momentums, const float *restrict delta,
-     int size, const float momentum, const float rate){
-   ASSUME_ALIGNED(momentums);
-   ASSUME_ALIGNED(delta);
-   for (int i = 0; i < size; i++){
-     float m = momentums[i] * momentum;
-     float t = delta[i] * rate;
-     momentums[i] = m + t;
-   }
- }
-
-static void
 apply_learning_with_nesterov_momentum(float *restrict momentums,
     const float *restrict delta, float *restrict weights,
     int size, const float momentum, const float rate){
