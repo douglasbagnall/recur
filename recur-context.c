@@ -30,7 +30,7 @@ consume_audio_samples(GQueue *queue, float *destination,
                       GstClockTime centre_time, size_t window_size){
   GstClockTime duration = SAMPLES_TO_NS(window_size);
   if (duration / 2 > centre_time){
-    GST_LOG("Too early: duration %llu, centre_time %llu",
+    GST_LOG("Too early: duration %" PRIu64 ", centre_time %" PRIu64,
         duration, centre_time);
     return BAD_VIDEO_PTS;
   }
@@ -49,9 +49,9 @@ consume_audio_samples(GQueue *queue, float *destination,
      a_start >= start: newer than start, part of buffer
      a_start + duration < start: too old, discard.
    */
-  GST_LOG("recur samples %zu, duration %llu, start %llu end %llu",
+  GST_LOG("recur samples %zu, duration %" PRIu64 ", start %" PRIu64 " end %" PRIu64,
       window_size, duration, start_time, end_time);
-  GST_LOG("recur video centre time %" GST_TIME_FORMAT " == %llu",
+  GST_LOG("recur video centre time %" GST_TIME_FORMAT " == %" PRIu64,
       GST_TIME_ARGS(centre_time), centre_time);
 
   for (;;){
@@ -62,9 +62,9 @@ consume_audio_samples(GQueue *queue, float *destination,
     }
     a_start = GST_BUFFER_PTS(b);
     a_end = a_start + GST_BUFFER_DURATION(b);
-    GST_LOG("recur audio start time %" GST_TIME_FORMAT " == %llu",
+    GST_LOG("recur audio start time %" GST_TIME_FORMAT " == %" PRIu64,
         GST_TIME_ARGS(a_start), a_start);
-    GST_LOG("recur audio end time %" GST_TIME_FORMAT " == %llu",
+    GST_LOG("recur audio end time %" GST_TIME_FORMAT " == %" PRIu64,
         GST_TIME_ARGS(a_end), a_end);
 
     if (a_end < start_time){
@@ -187,7 +187,7 @@ recur_fill_video_frame(RecurContext *context, GstVideoFrame *dest)
   src_frame->pending = 0;
   GstClockTime centre_time = src_frame->centre_time;
 
-  GST_LOG("recur centre time %" GST_TIME_FORMAT " == %llu",
+  GST_LOG("recur centre time %" GST_TIME_FORMAT " == %" PRIu64,
       GST_TIME_ARGS(centre_time),
       centre_time);
 
@@ -251,7 +251,7 @@ void
 recur_queue_audio_segment(RecurContext *context, GstBuffer *buffer)
 {
   gst_buffer_ref(buffer);
-  GST_LOG("queueing audio starting %llu, ending %llu",
+  GST_LOG("queueing audio starting %" PRIu64 ", ending %" PRIu64,
       GST_BUFFER_PTS(buffer), GST_BUFFER_PTS(buffer) + GST_BUFFER_DURATION(buffer));
   g_queue_push_tail(&context->audio_queue, buffer);
   GST_LOG("queue is now %u long", g_queue_get_length (&context->audio_queue ));

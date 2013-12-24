@@ -12,8 +12,6 @@ dump_frame(GstVideoFrame *f){
       f->flags, f->buffer, f->meta, f->id);
   GST_DEBUG("data %p %p %p",
       f->data[0], f->data[1], f->data[2]);
-  GST_DEBUG("map %p %p %p",
-      f->map[0], f->map[1], f->map[2]);
 
   GST_DEBUG("width %d height %d size %zu",
       vi->width, vi->height, vi->size);
