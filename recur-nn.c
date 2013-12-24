@@ -151,23 +151,6 @@ rnn_set_log_file(RecurNN *net, const char *log_file, int append_dont_truncate){
   }
 }
 
-void
-rnn_fd_dup_log(RecurNN *net, RecurNN* src)
-{
-  int fd, srcfd;
-  if (src->log){
-    srcfd = fileno(src->log);
-      fd = dup(srcfd);
-    net->log = fdopen(fd, "w");
-  }
-  else{
-    DEBUG("not duping NULL log file");
-    net->log = NULL;
-  }
-}
-
-
-
 /*clone a net.
   if flags contains RNN_NET_FLAG_OWN_WEIGHTS,
   the net will have its own copy of the parent's weights.
