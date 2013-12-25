@@ -789,7 +789,7 @@ void rnn_consolidate_many_nets(RecurNN **nets, int n, int nesterov,
   float momentum_weight = bptt->momentum_weight;
   if (nesterov == 3){
     /*simplified Nesterov momentum */
-    momentum_weight = momentum * momentum / (1.0 + momentum);
+    momentum_weight = momentum / (1.0 + momentum);
   }
 
   for (int i = 1; i < n; i++){
