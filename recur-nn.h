@@ -98,6 +98,13 @@ enum {
 /*initial momentum weight for weighted momentum */
 #define RNN_MOMENTUM_WEIGHT 0.5f
 
+enum {
+  RNN_MOMENTUM_WEIGHTED = 0,
+  RNN_MOMENTUM_NESTEROV,
+  RNN_MOMENTUM_SIMPLIFIED_NESTEROV,
+  RNN_MOMENTUM_CLASSICAL
+};
+
 typedef struct _RecurNN RecurNN;
 typedef struct _RecurNNBPTT RecurNNBPTT;
 
@@ -177,6 +184,9 @@ void rnn_bptt_calculate(RecurNN *net);
 
 void rnn_consolidate_many_nets(RecurNN **nets, int n, int nesterov,
     float momentum_soft_start);
+
+void
+rnn_prepare_nesterov_momentum(RecurNN *net);
 
 void rnn_bptt_calc_deltas(RecurNN *net);
 

@@ -48,7 +48,7 @@
 #define DEFAULT_LEARN_CAPITALS 0
 #define DEFAULT_DUMP_COLLAPSED_TEXT NULL
 #define DEFAULT_MULTI_TAP 0
-#define DEFAULT_MOMENTUM_STYLE 0
+#define DEFAULT_MOMENTUM_STYLE RNN_MOMENTUM_WEIGHTED
 
 #define BELOW_QUIET_LEVEL(quiet) if (opt_quiet < quiet)
 
@@ -202,7 +202,7 @@ static struct opt_table options[] = {
   OPT_WITH_ARG("--multi-tap=<n>", opt_set_uintval, opt_show_uintval,
       &opt_multi_tap, "read at n evenly spaced points in parallel"),
   OPT_WITH_ARG("--momentum-style=<n>", opt_set_intval, opt_show_intval,
-      &opt_momentum_style, "0: hyper-simplified Nesterov, 1: Nesterov, 2: classical"),
+      &opt_momentum_style, "0: weighted, 1: Nesterov, 2: simplified N., 3: classical"),
 
   OPT_WITHOUT_ARG("-h|--help", opt_usage_and_exit,
       ": Rnn modelling of text at the character level",
@@ -595,12 +595,9 @@ epoch(RecurNN **nets, int n_nets, RecurNN *confab_net, Ventropy *v,
     if (opt_momentum_soft_start){
       adjust_momentum_soft_start(net);
     }
-    if (n_nets > 1 || opt_momentum_style){
-      if (opt_momentum_style == 1){
-        scale_aligned_array(net->bptt->ih_momentum, net->ih_size, net->bptt->momentum);
-        add_aligned_arrays(net->ih_weights, net->ih_size, net->bptt->ih_momentum, 1.0f);
-        scale_aligned_array(net->bptt->ho_momentum, net->ho_size, net->bptt->momentum);
-        add_aligned_arrays(net->ho_weights, net->ho_size, net->bptt->ho_momentum, 1.0f);
+    if (n_nets > 1 || opt_momentum_style != RNN_MOMENTUM_WEIGHTED){
+      if (opt_momentum_style == RNN_MOMENTUM_NESTEROV){
+        rnn_prepare_nesterov_momentum(net);
       }
       for (j = 0; j < n_nets; j++){
         RecurNN *n = nets[j];

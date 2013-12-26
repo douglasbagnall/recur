@@ -719,10 +719,21 @@ apply_learning_with_momentum(float *restrict weights,
       momentums[0], momentums[3], momentums[6], momentums[10], momentums[11]);
 }
 
+
+void
+rnn_prepare_nesterov_momentum(RecurNN *net){
+  scale_aligned_array(net->bptt->ih_momentum, net->ih_size, net->bptt->momentum);
+  add_aligned_arrays(net->ih_weights, net->ih_size, net->bptt->ih_momentum, 1.0f);
+  scale_aligned_array(net->bptt->ho_momentum, net->ho_size, net->bptt->momentum);
+  add_aligned_arrays(net->ho_weights, net->ho_size, net->bptt->ho_momentum, 1.0f);
+}
+
+/*with standard Nesterov momentum, the momentum has previously been scaled and
+  added to the weights.*/
 static void
 apply_learning_with_nesterov_momentum(float *restrict momentums,
     const float *restrict delta, float *restrict weights,
-    int size, const float momentum, const float rate){
+    int size, const float rate){
   ASSUME_ALIGNED(momentums);
   ASSUME_ALIGNED(delta);
   ASSUME_ALIGNED(weights);
@@ -765,7 +776,7 @@ apply_sgd_with_bptt_batch(RecurNN *net, float top_error_sum){
   return error_sum;
 }
 
-void rnn_consolidate_many_nets(RecurNN **nets, int n, int nesterov,
+void rnn_consolidate_many_nets(RecurNN **nets, int n, int momentum_style,
     float momentum_soft_start){
   RecurNN *net = nets[0];
   RecurNNBPTT *bptt = net->bptt;
@@ -781,25 +792,27 @@ void rnn_consolidate_many_nets(RecurNN **nets, int n, int nesterov,
     float x = momentum_soft_start;
     momentum = MIN(momentum, 1.0f - x / (1 + net->generation + 2 * x));
   }
-  rnn_log_float(net, "momentum", momentum);
-  float momentum_weight = bptt->momentum_weight;
-  if (nesterov == 3){
-    /*simplified Nesterov momentum */
+  float momentum_weight;
+
+  switch (momentum_style){
+  case RNN_MOMENTUM_SIMPLIFIED_NESTEROV:
     momentum_weight = momentum / (1.0 + momentum);
+    break;
+  case RNN_MOMENTUM_CLASSICAL:
+    momentum_weight = 1.0f;
+    break;
+  default:
+    momentum_weight = bptt->momentum_weight;
+    break;
   }
 
   for (int i = 1; i < n; i++){
     add_aligned_arrays(ho_gradient, ho_size, nets[i]->bptt->ho_delta, 1.0f);
   }
-  switch (nesterov){
-  case 1:
+  switch (momentum_style){
+  case RNN_MOMENTUM_NESTEROV:
     apply_learning_with_nesterov_momentum(bptt->ho_momentum, ho_gradient,
-        net->ho_weights, net->ho_size, momentum, bptt->learn_rate * bptt->ho_scale);
-    break;
-  case 2:
-    apply_learning_with_momentum(net->ho_weights, ho_gradient, bptt->ho_momentum,
-        net->ho_size, bptt->learn_rate * bptt->ho_scale,
-        momentum, 1.0f);
+        net->ho_weights, net->ho_size, bptt->learn_rate * bptt->ho_scale);
     break;
   default:
     apply_learning_with_momentum(net->ho_weights, ho_gradient, bptt->ho_momentum,
@@ -808,6 +821,7 @@ void rnn_consolidate_many_nets(RecurNN **nets, int n, int nesterov,
     break;
   }
 
+  /*the various gradients may to be scaled before summing*/
   if (bptt->ih_scale != 1.0f){
     scale_aligned_array(ih_gradient, net->ih_size, bptt->ih_scale);
   }
@@ -816,20 +830,18 @@ void rnn_consolidate_many_nets(RecurNN **nets, int n, int nesterov,
         nets[i]->bptt->ih_scale);
   }
 
-  switch (nesterov){
-  case 1:
+  switch (momentum_style){
+  case RNN_MOMENTUM_NESTEROV:
     apply_learning_with_nesterov_momentum(bptt->ih_momentum, ih_gradient,
-        net->ih_weights, net->ih_size, momentum, bptt->learn_rate);
-    break;
-  case 2:
-    apply_learning_with_momentum(net->ih_weights, ih_gradient, bptt->ih_momentum,
-        net->ih_size, bptt->learn_rate, momentum, 1.0f);
+        net->ih_weights, net->ih_size, bptt->learn_rate);
     break;
   default:
     apply_learning_with_momentum(net->ih_weights, ih_gradient, bptt->ih_momentum,
         net->ih_size, bptt->learn_rate, momentum, momentum_weight);
     break;
   }
+  rnn_log_float(net, "momentum", momentum);
+  rnn_log_float(net, "momentum_weight", momentum_weight);
 }
 
 
