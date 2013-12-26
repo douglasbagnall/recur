@@ -342,7 +342,7 @@ load_or_create_net(GstRnnca *self){
     int input_size = self->len_Y  + self->len_C * 2 + self->len_pos;
     net = rnn_new(input_size, self->hidden_size, 3,
         RNNCA_RNN_FLAGS, RNNCA_RNG_SEED,
-        NULL, RNNCA_BPTT_DEPTH, DEFAULT_LEARN_RATE, self->momentum, MOMENTUM_WEIGHT,
+        NULL, RNNCA_BPTT_DEPTH, DEFAULT_LEARN_RATE, self->momentum,
         RNNCA_BATCH_SIZE, 0);
     rnn_randomise_weights(net, 0.1f, 1);
     //net->bptt->ho_scale = 0.25;

@@ -95,6 +95,9 @@ enum {
 };
 
 
+/*initial momentum weight for weighted momentum */
+#define RNN_MOMENTUM_WEIGHT 0.5f
+
 typedef struct _RecurNN RecurNN;
 typedef struct _RecurNNBPTT RecurNNBPTT;
 
@@ -150,7 +153,7 @@ struct _RecurNNBPTT {
 
 RecurNN * rnn_new(uint input_size, uint hidden_size, uint output_size,
     int flags, u64 rng_seed, const char *log_file, int depth, float learn_rate,
-    float momentum, float momentum_weight, int batch_size, int weight_shape);
+    float momentum, int batch_size, int weight_shape);
 
 RecurNN * rnn_clone(RecurNN *parent, int flags,
     u64 rng_seed, const char *log_file);

@@ -56,7 +56,6 @@ typedef s16 audio_sample;
 
 #define LEARN_RATE 3e-6
 #define MOMENTUM 0.9
-#define MOMENTUM_WEIGHT 0.5
 
 #define RECUR_FQ_LENGTH 16
 

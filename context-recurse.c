@@ -93,7 +93,7 @@ recur_setup_nets(RecurContext *context, const char *log_file)
   if (net == NULL){
     net = rnn_new(RECUR_N_MFCCS + RECUR_N_VIDEO_FEATURES,
         RECUR_N_HIDDEN, RECUR_OUTPUT_SIZE, RNN_NET_FLAG_STANDARD, RECUR_RNG_SEED,
-        NULL, RECUR_BPTT_DEPTH, LEARN_RATE, MOMENTUM, MOMENTUM_WEIGHT,
+        NULL, RECUR_BPTT_DEPTH, LEARN_RATE, MOMENTUM,
         RECUR_BATCH_SIZE, 0);
   }
   context->net = net;

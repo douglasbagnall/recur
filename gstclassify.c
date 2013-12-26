@@ -409,7 +409,7 @@ load_or_create_net(GstClassify *self){
     int n_features = self->mfccs ? self->mfccs : CLASSIFY_N_FFT_BINS;
     net = rnn_new(n_features, self->hidden_size,
         self->n_classes, self->pending_net_flags, CLASSIFY_RNG_SEED,
-        NULL, self->bptt_depth, self->learn_rate, self->momentum, MOMENTUM_WEIGHT,
+        NULL, self->bptt_depth, self->learn_rate, self->momentum,
         CLASSIFY_BATCH_SIZE, self->weight_sparsity);
   }
   else {
