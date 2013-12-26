@@ -708,8 +708,6 @@ apply_learning_with_momentum(float *restrict weights,
   }
 
 #else
-
-  //#pragma omp parallel for
   for (int i = 0; i < size; i++){
     float t = delta[i] * rate;
     float m = momentums[i];
@@ -730,7 +728,6 @@ apply_learning_with_nesterov_momentum(float *restrict momentums,
   ASSUME_ALIGNED(weights);
   for (int i = 0; i < size; i++){
     float t = delta[i] * rate;
-    //float m = momentums[i] + t;
     weights[i] += t;
     momentums[i] += t;
   }
