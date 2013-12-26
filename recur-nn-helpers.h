@@ -34,7 +34,8 @@ scale_aligned_array(float *array, int len, float scale)
 }
 
 static inline void
-add_aligned_arrays(float *restrict dest, int len, const float *restrict src, float scale)
+add_aligned_arrays(float *restrict dest, int len, const float *restrict src,
+    const float scale)
 {
   /*dest = dest + src * scale
     cblas_saxpy can do it. */
@@ -46,16 +47,32 @@ add_aligned_arrays(float *restrict dest, int len, const float *restrict src, flo
   len >>= 2;
   v4ss *vd = (v4ss*)dest;
   v4ss *vs = (v4ss*)src;
-  v4ss v_scale = {scale, scale, scale, scale};
-  for (int i = 0; i < len; i++){
-    __builtin_prefetch(&vs[i + 3]);
-    __builtin_prefetch(&vd[i + 3]);
-    vd[i] += vs[i] * v_scale;
+  if (scale != 1.0f){
+    v4ss v_scale = {scale, scale, scale, scale};
+    for (int i = 0; i < len; i++){
+      __builtin_prefetch(&vs[i + 3]);
+      __builtin_prefetch(&vd[i + 3]);
+      vd[i] += vs[i] * v_scale;
+    }
+  }
+  else {
+    for (int i = 0; i < len; i++){
+      __builtin_prefetch(&vs[i + 3]);
+      __builtin_prefetch(&vd[i + 3]);
+      vd[i] += vs[i];
+    }
   }
 
 #else
-  for (int i = 0; i < len; i++){
-    dest[i] += src[i] * scale;
+  if (scale == 1.0f){
+    for (int i = 0; i < len; i++){
+      dest[i] += src[i];
+    }
+  }
+  else {
+    for (int i = 0; i < len; i++){
+      dest[i] += src[i] * scale;
+    }
   }
 #endif
 #else
