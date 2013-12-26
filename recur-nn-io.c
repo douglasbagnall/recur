@@ -137,32 +137,37 @@ rnn_load_net(const char *filename){
   READ_SCALAR(tmpnet, rng);
   READ_SCALAR(tmpnet, generation);
   READ_SCALAR(tmpnet, flags);
-  READ_SCALAR(tmpbptt, depth);
-  READ_SCALAR(tmpbptt, batch_size);
-  READ_SCALAR(tmpbptt, learn_rate);
-  READ_SCALAR(tmpbptt, index);
-  READ_SCALAR(tmpbptt, momentum);
-  READ_SCALAR(tmpbptt, momentum_weight);
-  if (version >= 2){
-    READ_SCALAR(tmpbptt, ho_scale);
-  }
-  if (version >= 3){
-    READ_SCALAR(tmpbptt, min_error_factor);
+  if (tmpnet.flags & RNN_NET_FLAG_OWN_BPTT){
+    READ_SCALAR(tmpbptt, depth);
+    READ_SCALAR(tmpbptt, batch_size);
+    READ_SCALAR(tmpbptt, learn_rate);
+    READ_SCALAR(tmpbptt, index);
+    READ_SCALAR(tmpbptt, momentum);
+    READ_SCALAR(tmpbptt, momentum_weight);
+    if (version >= 2){
+      READ_SCALAR(tmpbptt, ho_scale);
+    }
+    if (version >= 3){
+      READ_SCALAR(tmpbptt, min_error_factor);
+    }
   }
 #undef READ_SCALAR
 
   net = rnn_new(tmpnet.input_size, tmpnet.hidden_size,
       tmpnet.output_size, tmpnet.flags, 0, NULL,
       tmpbptt.depth, tmpbptt.learn_rate, tmpbptt.momentum,
-      tmpbptt.momentum_weight, tmpbptt.batch_size, -1);
+      tmpbptt.batch_size, -1);
   net->rng = tmpnet.rng;
   net->generation = tmpnet.generation;
   net->bptt->index = tmpbptt.index;
-  if (version >= 2){
-    net->bptt->ho_scale = tmpbptt.ho_scale;
-  }
-  if (version >= 3){
-    net->bptt->min_error_factor = tmpbptt.min_error_factor;
+  if (net->bptt){
+    net->bptt->momentum_weight = tmpbptt.momentum_weight;
+    if (version >= 2){
+      net->bptt->ho_scale = tmpbptt.ho_scale;
+    }
+    if (version >= 3){
+      net->bptt->min_error_factor = tmpbptt.min_error_factor;
+    }
   }
 #define CHECK_SCALAR(new, tmp, attr) do {                                   \
   if (new->attr != tmp.attr){                                              \
@@ -190,21 +195,23 @@ rnn_load_net(const char *filename){
 
   CHECK_SCALAR(net, tmpnet, generation);
   CHECK_SCALAR(net, tmpnet, flags);
-  CHECK_SCALAR(net->bptt, tmpbptt, depth);
-  CHECK_SCALAR(net->bptt, tmpbptt, batch_size);
-  CHECK_SCALAR(net->bptt, tmpbptt, index);
-  if (version >= 2){
-    CHECK_SCALAR(net->bptt, tmpbptt, ho_scale);
-  }
-  else {
-    /*ho_scale wasn't originally saved. But it was always set as follows. */
-    net->bptt->ho_scale = ((float)tmpnet.output_size) / tmpnet.hidden_size;
-  }
-  if (version >= 3){
-    CHECK_SCALAR(net->bptt, tmpbptt, min_error_factor);
-  }
-  else {
-    net->bptt->min_error_factor = BASE_MIN_ERROR_FACTOR * net->h_size;
+  if (net->bptt){
+    CHECK_SCALAR(net->bptt, tmpbptt, depth);
+    CHECK_SCALAR(net->bptt, tmpbptt, batch_size);
+    CHECK_SCALAR(net->bptt, tmpbptt, index);
+    if (version >= 2){
+      CHECK_SCALAR(net->bptt, tmpbptt, ho_scale);
+    }
+    else {
+      /*ho_scale wasn't originally saved. But it was always set as follows. */
+      net->bptt->ho_scale = ((float)tmpnet.output_size) / tmpnet.hidden_size;
+    }
+    if (version >= 3){
+      CHECK_SCALAR(net->bptt, tmpbptt, min_error_factor);
+    }
+    else {
+      net->bptt->min_error_factor = BASE_MIN_ERROR_FACTOR * net->h_size;
+    }
   }
 #undef CHECK_SCALAR
 
@@ -227,14 +234,15 @@ rnn_load_net(const char *filename){
   READ_ARRAY(net, ih_weights, net->ih_size * sizeof(float));
   READ_ARRAY(net, ho_weights, net->ho_size * sizeof(float));
 
-  READ_ARRAY(net->bptt, i_error, net->i_size * sizeof(float));
-  READ_ARRAY(net->bptt, h_error, net->h_size * sizeof(float));
-  READ_ARRAY(net->bptt, o_error, net->o_size * sizeof(float));
-  READ_ARRAY(net->bptt, ih_momentum, net->ih_size * sizeof(float));
-  READ_ARRAY(net->bptt, ho_momentum, net->ho_size * sizeof(float));
-  READ_ARRAY(net->bptt, history, net->bptt->depth * net->i_size * sizeof(float));
-  READ_ARRAY(net->bptt, ih_delta, net->ih_size * sizeof(float));
-
+  if(net->bptt){
+    READ_ARRAY(net->bptt, i_error, net->i_size * sizeof(float));
+    READ_ARRAY(net->bptt, h_error, net->h_size * sizeof(float));
+    READ_ARRAY(net->bptt, o_error, net->o_size * sizeof(float));
+    READ_ARRAY(net->bptt, ih_momentum, net->ih_size * sizeof(float));
+    READ_ARRAY(net->bptt, ho_momentum, net->ho_size * sizeof(float));
+    READ_ARRAY(net->bptt, history, net->bptt->depth * net->i_size * sizeof(float));
+    READ_ARRAY(net->bptt, ih_delta, net->ih_size * sizeof(float));
+  }
 #undef READ_ARRAY
   close(fd);
   DEBUG("successfully loaded net '%s'", filename);
