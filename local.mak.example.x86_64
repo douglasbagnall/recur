@@ -5,3 +5,4 @@ ARCH = x86_64
 
 # -Wunsafe-loop-optimizations  -ftree-vectorizer-verbose=2  -fno-inline
 # -fno-trapping-math
+# -fno-omit-frame-pointer
