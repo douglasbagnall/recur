@@ -274,8 +274,14 @@ calculate_interlayer(const float *restrict inputs,
     int output_size,
     const float *restrict weights)
 {
-#if 0
-  /* Naive xy */
+#if 1
+  /* Naive opinion tests ~25% quicker than cblas opinion for scarcely trained
+     nets of all sizes, and 50% quicker for highly trained 1999 neuron
+     nets.
+
+     Probably the knowledge that the input array is fairly sparse is more
+     valuable than atlas/openblas's clever use of cache.
+ */
   ASSUME_ALIGNED(inputs);
   ASSUME_ALIGNED(outputs);
   ASSUME_ALIGNED(weights);
