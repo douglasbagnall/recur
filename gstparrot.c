@@ -266,7 +266,7 @@ load_or_create_net(GstParrot *self){
     net = rnn_new(PARROT_N_FEATURES, self->hidden_size,
         PARROT_N_FEATURES, PARROT_RNN_FLAGS, PARROT_RNG_SEED,
         NULL, PARROT_BPTT_DEPTH, self->learn_rate, MOMENTUM,
-        PARROT_BATCH_SIZE, 0);
+        PARROT_BATCH_SIZE, 0, 0.5);
   }
   else {
     rnn_set_log_file(net, NULL, 0);

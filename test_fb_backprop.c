@@ -130,7 +130,7 @@ main(void){
   RecurNN *net = rnn_new(INPUT_SIZE, HIDDEN_SIZE,
       INPUT_SIZE, BIAS ? RNN_NET_FLAG_STANDARD : RNN_NET_FLAG_NO_BIAS,
       1, NET_LOG_FILE, BPTT_DEPTH, LEARN_RATE, MOMENTUM,
-      BPTT_BATCH_SIZE, 1);
+      BPTT_BATCH_SIZE, 1, 0);
   START_TIMER(epoch);
   epoch(net, 5000000);
   DEBUG_TIMER(epoch);

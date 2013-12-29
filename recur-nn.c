@@ -44,7 +44,7 @@ new_bptt(RecurNN *net, int depth, float learn_rate, float momentum,
 RecurNN *
 rnn_new(uint input_size, uint hidden_size, uint output_size, int flags,
     u64 rng_seed, const char *log_file, int bptt_depth, float learn_rate,
-    float momentum, int batch_size, int weight_shape){
+    float momentum, int batch_size, int weight_shape, float weight_perforation){
   RecurNN *net = calloc(1, sizeof(RecurNN));
   int bias = !! (flags & RNN_NET_FLAG_BIAS);
   float *fm;
@@ -87,7 +87,7 @@ rnn_new(uint input_size, uint hidden_size, uint output_size, int flags,
     SET_ATTR_SIZE(ho_weights, ho_size);
     if (weight_shape >= 0){
       rnn_randomise_weights(net, RNN_INITIAL_WEIGHT_VARIANCE_FACTOR / net->h_size,
-          weight_shape);
+          weight_shape, weight_perforation);
     }
   }
 #undef SET_ATTR_SIZE
@@ -195,7 +195,7 @@ rnn_clone(RecurNN *parent, int flags,
 
   net = rnn_new(parent->input_size, parent->hidden_size, parent->output_size,
       flags, rng_seed, log_file, bptt_depth, learn_rate, momentum,
-      batch_size, -1);
+      batch_size, -1, 0.5);
 
   if (parent->bptt && (flags & RNN_NET_FLAG_OWN_BPTT)){
     net->bptt->momentum_weight = parent->bptt->momentum_weight;
@@ -220,10 +220,21 @@ gaussian_power(rand_ctx *rng, float a, int power){
   return a;
 }
 
+/*XXX Glorot and Bengio suggest
+
+  sqrt(6.0 / (inputs + outputs)) * uniform(-1, 1)
+
+  for tanh networks.
+
+  Sutskever recommends sparsely populated weights scaled so that the maximum
+  eigenvalue is 1.2.
+ */
 
 void
-rnn_randomise_weights(RecurNN *net, float variance, int shape){
+rnn_randomise_weights(RecurNN *net, float variance, int shape, double perforation){
   int x, y;
+  memset(net->ih_weights, 0, net->ih_size * sizeof(float));
+  memset(net->ho_weights, 0, net->ho_size * sizeof(float));
   /*higher shape indicates greater kurtosis. shape 0 means automatically
     determine shape (crudely).*/
   if (shape == 0){
@@ -232,22 +243,24 @@ rnn_randomise_weights(RecurNN *net, float variance, int shape){
   if (shape > 10){
     shape = 10;
   }
+  if (perforation < 0){
+    perforation = 0;
+  }
+  else if (perforation >= 1.0){
+    return; /*perforation of 1 means entirely zeros */
+  }
   for (y = 0; y < net->i_size; y++){
-    /*zero for bias, will be overwritten if inapplicable*/
-    net->ih_weights[y * net->h_size] = 0;
     for (x = net->bias; x < net->hidden_size + net->bias; x++){
-      net->ih_weights[y * net->h_size + x] = gaussian_power(&net->rng, variance, shape);
-    }
-    for (x = net->hidden_size + net->bias; x < net->h_size; x++){
-      net->ih_weights[y * net->h_size + x] = 0;
+      if (rand_double(&net->rng) > perforation){
+        net->ih_weights[y * net->h_size + x] = gaussian_power(&net->rng, variance, shape);
+      }
     }
   }
   for (y = 0; y < net->h_size; y++){
     for (x = 0; x < net->output_size; x++){
-      net->ho_weights[y * net->o_size + x] = gaussian_power(&net->rng, variance, shape);
-    }
-    for (x = net->output_size; x < net->o_size; x++){
-      net->ho_weights[y * net->o_size + x] = 0;
+      if (rand_double(&net->rng) > perforation){
+        net->ho_weights[y * net->o_size + x] = gaussian_power(&net->rng, variance, shape);
+      }
     }
   }
 }

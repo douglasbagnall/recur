@@ -160,14 +160,14 @@ struct _RecurNNBPTT {
 
 RecurNN * rnn_new(uint input_size, uint hidden_size, uint output_size,
     int flags, u64 rng_seed, const char *log_file, int depth, float learn_rate,
-    float momentum, int batch_size, int weight_shape);
+    float momentum, int batch_size, int weight_shape, float weight_perforation);
 
 RecurNN * rnn_clone(RecurNN *parent, int flags,
     u64 rng_seed, const char *log_file);
 
 void rnn_set_log_file(RecurNN *net, const char * log_file, int append_dont_truncate);
 
-void rnn_randomise_weights(RecurNN *net, float variance, int power);
+void rnn_randomise_weights(RecurNN *net, float variance, int power, double perforation);
 
 void rnn_delete_net(RecurNN *net);
 

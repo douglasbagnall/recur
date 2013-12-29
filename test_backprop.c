@@ -693,10 +693,8 @@ load_or_create_net(void){
     net = rnn_new(input_size, opt_hidden_size,
         output_size, flags, 1,
         opt_logfile, opt_bptt_depth, opt_learn_rate,
-        opt_momentum, opt_bptt_batch_size, opt_weight_sparsity);
-    if (opt_perforate_weights > 0 && opt_perforate_weights < 1){
-      rnn_perforate_weights(net, opt_perforate_weights);
-    }
+        opt_momentum, opt_bptt_batch_size, opt_weight_sparsity,
+        opt_perforate_weights);
     net->bptt->momentum_weight = opt_momentum_weight;
   }
   else if (opt_override){

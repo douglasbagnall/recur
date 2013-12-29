@@ -156,7 +156,7 @@ rnn_load_net(const char *filename){
   net = rnn_new(tmpnet.input_size, tmpnet.hidden_size,
       tmpnet.output_size, tmpnet.flags, 0, NULL,
       tmpbptt.depth, tmpbptt.learn_rate, tmpbptt.momentum,
-      tmpbptt.batch_size, -1);
+      tmpbptt.batch_size, -1, 0.5);
   net->rng = tmpnet.rng;
   net->generation = tmpnet.generation;
   net->bptt->index = tmpbptt.index;
