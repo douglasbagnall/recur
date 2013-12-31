@@ -3,7 +3,7 @@
 
 static RecurNNBPTT *
 new_bptt(RecurNN *net, int depth, float learn_rate, float momentum,
-         int batch_size){
+    int batch_size, int use_momentum){
   RecurNNBPTT *bptt = calloc(sizeof(RecurNNBPTT), 1);
   MAYBE_DEBUG("allocated bptt %p", bptt);
   bptt->depth = depth;
@@ -13,7 +13,10 @@ new_bptt(RecurNN *net, int depth, float learn_rate, float momentum,
   batch_size = MAX(1, batch_size);
   bptt->batch_size = batch_size;
   size_t vlen = net->i_size * 2 + net->h_size * 0 + net->o_size * 1;
-  vlen += 2 * (net->ih_size + net->ho_size);
+  vlen += net->ih_size + net->ho_size;
+  if (use_momentum){
+    vlen += net->ih_size + net->ho_size;
+  }
   vlen += depth * net->i_size;
 
   float *fm = zalloc_aligned_or_die(vlen * sizeof(float));
@@ -21,8 +24,10 @@ new_bptt(RecurNN *net, int depth, float learn_rate, float momentum,
   /*haphazard arrangement of arrays has a point, see comment in rnn_new*/
 #define SET_ATTR_SIZE(attr, size) bptt->attr = fm; fm += (size);
   SET_ATTR_SIZE(o_error,           net->o_size);
-  SET_ATTR_SIZE(ih_momentum,       net->ih_size);
-  SET_ATTR_SIZE(ho_momentum,       net->ho_size);
+  if (use_momentum){
+    SET_ATTR_SIZE(ih_momentum,       net->ih_size);
+    SET_ATTR_SIZE(ho_momentum,       net->ho_size);
+  }
   /*h_error uses strictly larger i_size, facilitating switching between the 2*/
   SET_ATTR_SIZE(i_error,           net->i_size);
   SET_ATTR_SIZE(history,           depth * net->i_size);
@@ -95,7 +100,8 @@ rnn_new(uint input_size, uint hidden_size, uint output_size, int flags,
   MAYBE_DEBUG("flags is %d including bptt %d", flags, flags & RNN_NET_FLAG_OWN_BPTT);
   /* bptt */
   if (flags & RNN_NET_FLAG_OWN_BPTT){
-    net->bptt = new_bptt(net, bptt_depth, learn_rate, momentum, batch_size);
+    net->bptt = new_bptt(net, bptt_depth, learn_rate, momentum, batch_size,
+        flags & RNN_NET_FLAG_OWN_MOMENTUMS);
     rnn_bptt_advance(net);
   }
   else {
@@ -199,6 +205,10 @@ rnn_clone(RecurNN *parent, int flags,
 
   if (parent->bptt && (flags & RNN_NET_FLAG_OWN_BPTT)){
     net->bptt->momentum_weight = parent->bptt->momentum_weight;
+    if (!(flags & RNN_NET_FLAG_OWN_MOMENTUMS)){
+      net->bptt->ih_momentum = parent->bptt->ih_momentum;
+      net->bptt->ho_momentum = parent->bptt->ho_momentum;
+    }
   }
   if (flags & RNN_NET_FLAG_OWN_WEIGHTS){
     memcpy(net->ih_weights, parent->ih_weights, net->ih_size * sizeof(float));
@@ -343,7 +353,7 @@ maybe_scale_hiddens(RecurNN *net){
     /*scale the weights as well, but not quite as much */
     float scale = (1.0f + soft_clip(sum, softclip)) * 0.5f;
     scale_aligned_array(net->ih_weights, net->ih_size, scale);
-    if (net->bptt){
+    if (net->bptt && net->bptt->ih_momentum){
       scale_aligned_array(net->bptt->ih_momentum, net->ih_size, scale);
     }
     MAYBE_DEBUG("scaling weights (hidden sum %f > %f)", sum, softclip);

@@ -79,6 +79,7 @@ enum {
   RNN_NET_FLAG_LOG_HIDDEN_SUM = 16, /*log the hidden sum */
   RNN_NET_FLAG_LOG_WEIGHT_SUM = 32, /*log the weight sum (can be expensive)*/
   RNN_NET_FLAG_BPTT_ADAPTIVE_MIN_ERROR = 64, /*min error threshold auto-adjusts*/
+  RNN_NET_FLAG_OWN_MOMENTUMS = 128, /*whether momentum arrays are allocated */
 
   /*conditioning flags start at 1 << 16 (65536) */
   RNN_COND_USE_SCALE = (1 << (RNN_COND_BIT_SCALE + RNN_COND_USE_OFFSET)),
@@ -90,7 +91,8 @@ enum {
   /*more flags can fit after 1 << 24 or so */
 
   RNN_NET_FLAG_STANDARD = (RNN_NET_FLAG_OWN_BPTT | RNN_NET_FLAG_OWN_WEIGHTS \
-       | RNN_COND_USE_ZERO | RNN_NET_FLAG_BIAS | RNN_NET_FLAG_LOG_HIDDEN_SUM),
+       | RNN_COND_USE_ZERO | RNN_NET_FLAG_BIAS | RNN_NET_FLAG_LOG_HIDDEN_SUM \
+      | RNN_NET_FLAG_OWN_MOMENTUMS),
   RNN_NET_FLAG_NO_BIAS = RNN_NET_FLAG_STANDARD & ~ RNN_NET_FLAG_BIAS
 };
 
