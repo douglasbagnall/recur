@@ -69,24 +69,43 @@ typedef uint8_t u8;
 typedef int8_t s8;
 typedef unsigned int uint;
 
-/*memory allocation */
+/*memory allocation. It needs to be SSE aligned */
 #define ALIGNMENT 16
 static inline __attribute__((malloc)) void *
 malloc_aligned_or_die(size_t size){
   void *mem;
-  int err = posix_memalign(&mem, ALIGNMENT, size);
-  if (err){
-    fprintf(stderr, "posix_memalign returned %d trying to allocate "
-        "%zu bytes aligned on %u byte boundaries\n", err, size, ALIGNMENT);
-    abort();
+  if (sizeof(void*) * 2 >= ALIGNMENT){
+    mem = malloc(size);
+    if (mem == NULL){
+      fprintf(stderr, "malloc of %zu bytes failed\n", size);
+      abort();
+    }
+  }
+  else {
+    int err = posix_memalign(&mem, ALIGNMENT, size);
+    if (err){
+      fprintf(stderr, "posix_memalign returned %d trying to allocate "
+          "%zu bytes aligned on %u byte boundaries\n", err, size, ALIGNMENT);
+      abort();
+    }
   }
   return mem;
 }
 
 static inline __attribute__((malloc)) void *
 zalloc_aligned_or_die(size_t size){
-  void *mem = malloc_aligned_or_die(size);
-  memset(mem, 0, size);
+  void *mem;
+  if (sizeof(void*) * 2 >= ALIGNMENT){
+    mem = calloc(size, 1);
+    if (mem == NULL){
+      fprintf(stderr, "calloc(%zu, 1) failed\n", size);
+      abort();
+    }
+  }
+  else {
+    mem = malloc_aligned_or_die(size);
+    memset(mem, 0, size);
+  }
   return mem;
 }
 
