@@ -619,7 +619,7 @@ fill_audio_segment(GstParrot *self, GstBuffer *outbuf)
   if (n_samples < len16){
     int remainder = len16 - n_samples;
     GST_LOG("copying remainder of %d samples to buffer of %d",
-        remainder);
+        remainder, len16);
     memcpy(map.data + n_samples * sizeof(s16),
         self->outgoing_queue, remainder * sizeof(s16));
     self->outgoing_start = remainder;
