@@ -101,7 +101,7 @@ rnn_new(uint input_size, uint hidden_size, uint output_size, int flags,
   /* bptt */
   if (flags & RNN_NET_FLAG_OWN_BPTT){
     net->bptt = new_bptt(net, bptt_depth, learn_rate, momentum, batch_size,
-        flags & RNN_NET_FLAG_OWN_MOMENTUMS);
+        flags);
     rnn_bptt_advance(net);
   }
   else {
@@ -205,7 +205,7 @@ rnn_clone(RecurNN *parent, int flags,
 
   if (parent->bptt && (flags & RNN_NET_FLAG_OWN_BPTT)){
     net->bptt->momentum_weight = parent->bptt->momentum_weight;
-    if (!(flags & RNN_NET_FLAG_OWN_MOMENTUMS)){
+    if (flags & RNN_NET_FLAG_NO_MOMENTUMS){
       net->bptt->ih_momentum = parent->bptt->ih_momentum;
       net->bptt->ho_momentum = parent->bptt->ho_momentum;
     }

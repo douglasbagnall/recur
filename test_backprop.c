@@ -737,7 +737,7 @@ main(int argc, char *argv[]){
   if (opt_multi_tap > 1){
     for (uint i = 1; i < opt_multi_tap; i++){
       nets[i] = rnn_clone(net,
-          net->flags & ~(RNN_NET_FLAG_OWN_WEIGHTS | RNN_NET_FLAG_OWN_MOMENTUMS),
+          (net->flags & ~RNN_NET_FLAG_OWN_WEIGHTS) | RNN_NET_FLAG_NO_MOMENTUMS,
           RECUR_RNG_SUBSEED,
           NULL);
     }
