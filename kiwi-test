@@ -125,6 +125,8 @@ class KiwiClassifier(BaseClassifier):
 
 
     def show_roc_curve(self):
+        if NO_ROC:
+            return
         import matplotlib.pyplot as plt
         kp = sorted(self.kiwi_probabilities)
         self.kiwi_probabilities = []
@@ -232,11 +234,13 @@ def load_files_and_timings(d, classes):
     return files, timings
 
 def main():
-    global QUIET
+    global QUIET, NO_ROC
     gst_init()
     parser = argparse.ArgumentParser()
     parser.add_argument('-v', '--verbose', action='store_true',
                         help='lots of rubbish output')
+    parser.add_argument('-x', '--no-roc', action='store_true',
+                        help='no ROC curves')
     parser.add_argument('-t', '--timings',
                         help='read timings from here')
     parser.add_argument('-k', '--dir-with-timings', action='append',
@@ -251,7 +255,7 @@ def main():
     args = parser.parse_args()
 
     QUIET = not args.verbose
-
+    NO_ROC = args.no_roc
     c = KiwiClassifier(mfccs=MFCCS,
                        hsize=args.hidden_size,
                        channels=1,
