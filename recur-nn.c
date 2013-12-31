@@ -687,10 +687,7 @@ bptt_and_accumulate_error(RecurNN *net, float *ih_delta, const float top_error_s
       rnn_log_float(net, "hidden_sum", hidden_sum);
     }
     if (net->flags & RNN_NET_FLAG_LOG_WEIGHT_SUM){
-      float weight_sum = 0;
-      for (int i = 0; i < net->ih_size; i++){
-        weight_sum += fabsf(weights[i]);
-      }
+      float weight_sum = abs_sum_aligned_array(weights, net->ih_size);
       rnn_log_float(net, "weight_sum", weight_sum);
     }
   }
@@ -1070,4 +1067,25 @@ rnn_multi_pgm_dump(RecurNN *net, const char *dumpees){
     if (array)
       dump_colour_weights_autoname(array, x, y, token, net->generation);
   }
+}
+
+void
+rnn_scale_initial_weights(RecurNN *net, float factor){
+  float ih_sum = abs_sum_aligned_array(net->ih_weights, net->ih_size);
+  float ho_sum = abs_sum_aligned_array(net->ho_weights, net->ho_size);
+
+  factor *= (net->i_size + net->h_size + net->o_size);
+  float ih_ratio = sqrtf(factor * (net->h_size * net->i_size)) / ih_sum;
+  float ho_ratio = sqrtf(factor * (net->h_size * net->o_size)) / ho_sum;
+
+  scale_aligned_array(net->ih_weights, net->ih_size, ih_ratio);
+  scale_aligned_array(net->ho_weights, net->ho_size, ho_ratio);
+
+  DEBUG("ih sum was %.1f, now %.1f; ratio %.2g",
+      ih_sum, abs_sum_aligned_array(net->ih_weights, net->ih_size),
+      ih_ratio);
+
+  DEBUG("ho sum was %.1f, now %.1f; ratio %.2g",
+      ho_sum, abs_sum_aligned_array(net->ho_weights, net->ho_size),
+      ho_ratio);
 }

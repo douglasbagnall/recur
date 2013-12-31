@@ -168,6 +168,7 @@ RecurNN * rnn_clone(RecurNN *parent, int flags,
 void rnn_set_log_file(RecurNN *net, const char * log_file, int append_dont_truncate);
 
 void rnn_randomise_weights(RecurNN *net, float variance, int power, double perforation);
+void rnn_scale_initial_weights(RecurNN *net, float factor);
 
 void rnn_delete_net(RecurNN *net);
 

@@ -130,6 +130,17 @@ zero_small_numbers(float *array, int len)
   }
 }
 
+static inline float
+abs_sum_aligned_array(const float *array, int len)
+{
+  float sum = 0.0f;
+  ASSUME_ALIGNED(array);
+  for (int i = 0; i < len; i++){
+    sum += fabsf(array[i]);
+  }
+  return sum;
+}
+
 #define ZERO_WITH_MEMSET 0
 
 static inline void

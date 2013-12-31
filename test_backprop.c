@@ -49,6 +49,7 @@
 #define DEFAULT_DUMP_COLLAPSED_TEXT NULL
 #define DEFAULT_MULTI_TAP 0
 #define DEFAULT_MOMENTUM_STYLE RNN_MOMENTUM_WEIGHTED
+#define DEFAULT_WEIGHT_SCALE_FACTOR 0
 
 #define BELOW_QUIET_LEVEL(quiet) if (opt_quiet < quiet)
 
@@ -100,6 +101,7 @@ static bool opt_save_net = DEFAULT_SAVE_NET;
 static bool opt_learn_capitals = DEFAULT_LEARN_CAPITALS;
 static uint opt_multi_tap = DEFAULT_MULTI_TAP;
 static int opt_momentum_style = DEFAULT_MOMENTUM_STYLE;
+static float opt_weight_scale_factor = DEFAULT_WEIGHT_SCALE_FACTOR;
 
 /* Following ccan/opt/helpers.c opt_set_longval, etc */
 static char *
@@ -203,6 +205,8 @@ static struct opt_table options[] = {
       &opt_multi_tap, "read at n evenly spaced points in parallel"),
   OPT_WITH_ARG("--momentum-style=<n>", opt_set_intval, opt_show_intval,
       &opt_momentum_style, "0: weighted, 1: Nesterov, 2: simplified N., 3: classical"),
+  OPT_WITH_ARG("--weight-scale-factor=<float>", opt_set_floatval, opt_show_floatval,
+      &opt_weight_scale_factor, "scale newly initialised weights (try ~0.5)"),
 
   OPT_WITHOUT_ARG("-h|--help", opt_usage_and_exit,
       ": Rnn modelling of text at the character level",
@@ -696,6 +700,9 @@ load_or_create_net(void){
         opt_momentum, opt_bptt_batch_size, opt_weight_sparsity,
         opt_perforate_weights);
     net->bptt->momentum_weight = opt_momentum_weight;
+    if (opt_weight_scale_factor > 0){
+      rnn_scale_initial_weights(net, opt_weight_scale_factor);
+    }
   }
   else if (opt_override){
     RecurNNBPTT *bptt = net->bptt;
