@@ -598,10 +598,10 @@ epoch(RecurNN **nets, int n_nets, RecurNN *confab_net, Ventropy *v,
   int correct = 0;
   float e;
   int c;
-  uint report_counter = 1;
   int spacing = (len - 1) / n_nets;
   RecurNN *net = nets[0];
-  for(i = start; i < len - 1; i++, report_counter++){
+  uint report_counter = net->generation % opt_report_interval;
+  for(i = start; i < len - 1; i++){
     if (opt_momentum_soft_start){
       adjust_momentum_soft_start(net);
     }
@@ -635,7 +635,7 @@ epoch(RecurNN **nets, int n_nets, RecurNN *confab_net, Ventropy *v,
     if (opt_temporal_pgm_dump){
       temporal_ppm_add_row(input_ppm, net->input_layer);
     }
-
+    report_counter++;
     if (report_counter >= opt_report_interval){
       report_counter = 0;
       float ventropy = calc_ventropy(v, 1);
