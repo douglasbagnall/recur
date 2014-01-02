@@ -50,6 +50,7 @@
 #define DEFAULT_MULTI_TAP 0
 #define DEFAULT_MOMENTUM_STYLE RNN_MOMENTUM_WEIGHTED
 #define DEFAULT_WEIGHT_SCALE_FACTOR 0
+#define DEFAULT_REPORT_INTERVAL 1024
 
 #define BELOW_QUIET_LEVEL(quiet) if (opt_quiet < quiet)
 
@@ -102,6 +103,8 @@ static bool opt_learn_capitals = DEFAULT_LEARN_CAPITALS;
 static uint opt_multi_tap = DEFAULT_MULTI_TAP;
 static int opt_momentum_style = DEFAULT_MOMENTUM_STYLE;
 static float opt_weight_scale_factor = DEFAULT_WEIGHT_SCALE_FACTOR;
+static uint opt_report_interval = DEFAULT_REPORT_INTERVAL;
+
 
 /* Following ccan/opt/helpers.c opt_set_longval, etc */
 static char *
@@ -207,6 +210,8 @@ static struct opt_table options[] = {
       &opt_momentum_style, "0: weighted, 1: Nesterov, 2: simplified N., 3: classical"),
   OPT_WITH_ARG("--weight-scale-factor=<float>", opt_set_floatval, opt_show_floatval,
       &opt_weight_scale_factor, "scale newly initialised weights (try ~0.5)"),
+  OPT_WITH_ARG("--report-interval=<n>", opt_set_uintval_bi, opt_show_uintval_bi,
+      &opt_report_interval, "how often to validate and report"),
 
   OPT_WITHOUT_ARG("-h|--help", opt_usage_and_exit,
       ": Rnn modelling of text at the character level",
@@ -593,9 +598,10 @@ epoch(RecurNN **nets, int n_nets, RecurNN *confab_net, Ventropy *v,
   int correct = 0;
   float e;
   int c;
+  uint report_counter = 1;
   int spacing = (len - 1) / n_nets;
   RecurNN *net = nets[0];
-  for(i = start; i < len - 1; i++){
+  for(i = start; i < len - 1; i++, report_counter++){
     if (opt_momentum_soft_start){
       adjust_momentum_soft_start(net);
     }
@@ -630,10 +636,11 @@ epoch(RecurNN **nets, int n_nets, RecurNN *confab_net, Ventropy *v,
       temporal_ppm_add_row(input_ppm, net->input_layer);
     }
 
-    if ((net->generation & 1023) == 0){
+    if (report_counter >= opt_report_interval){
+      report_counter = 0;
       float ventropy = calc_ventropy(v, 1);
       report_on_progress(net, confab_net, ventropy, &correct, &error, &entropy,
-          1.0f / (1024.0f * n_nets));
+          1.0f / (opt_report_interval * n_nets));
       if (opt_save_net && opt_filename){
         rnn_save_net(net, opt_filename);
       }
