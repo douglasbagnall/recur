@@ -275,6 +275,39 @@ rnn_randomise_weights(RecurNN *net, float variance, int shape, double perforatio
   }
 }
 
+static inline void
+randomise_weights_fan_in(rand_ctx *rng, float *weights, int width, int height, int stride,
+    float sum, float kurtosis, float margin){
+  int x, y, i;
+  /*Each node gets input that adds, approximately, to <sum> */
+  for (x = 0; x < width; x++){
+    float remainder = sum + margin;
+    for (i = 0; i < height * 2 && remainder > margin; i++){
+      y = rand_small_int(rng, height);
+      if (weights[y * stride + x] == 0){
+        float w = (rand_double(rng) * 2 - 1) * remainder * kurtosis;
+        weights[y * stride + x] += w;
+        remainder -= fabsf(w);
+      }
+    }
+  }
+}
+
+void
+rnn_randomise_weights_fan_in(RecurNN *net, float sum, float kurtosis, float margin){
+  memset(net->ih_weights, 0, net->ih_size * sizeof(float));
+  memset(net->ho_weights, 0, net->ho_size * sizeof(float));
+
+  int hsize = net->bias + net->hidden_size;
+  randomise_weights_fan_in(&net->rng, net->ih_weights + net->bias,
+      net->hidden_size, hsize, net->h_size, sum, kurtosis, margin);
+  randomise_weights_fan_in(&net->rng, net->ih_weights + hsize * net->h_size + net->bias,
+      net->hidden_size,
+      net->input_size, net->h_size, sum, kurtosis, margin);
+  randomise_weights_fan_in(&net->rng, net->ho_weights, net->output_size, net->hidden_size,
+      net->o_size, sum, kurtosis, margin);
+}
+
 void rnn_perforate_weights(RecurNN *net, float p){
   dropout_array(net->ih_weights, net->ih_size, p, &net->rng);
   dropout_array(net->ho_weights, net->ho_size, p, &net->rng);

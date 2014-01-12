@@ -170,6 +170,8 @@ void rnn_set_log_file(RecurNN *net, const char * log_file, int append_dont_trunc
 
 void rnn_randomise_weights(RecurNN *net, float variance, int power, double perforation);
 void rnn_scale_initial_weights(RecurNN *net, float factor);
+void rnn_randomise_weights_fan_in(RecurNN *net, float sum, float kurtosis, float margin);
+
 
 void rnn_delete_net(RecurNN *net);
 
