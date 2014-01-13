@@ -294,16 +294,24 @@ randomise_weights_fan_in(rand_ctx *rng, float *weights, int width, int height, i
 }
 
 void
-rnn_randomise_weights_fan_in(RecurNN *net, float sum, float kurtosis, float margin){
+rnn_randomise_weights_fan_in(RecurNN *net, float sum, float kurtosis,
+    float margin, int initialise_inputs_separately){
   memset(net->ih_weights, 0, net->ih_size * sizeof(float));
   memset(net->ho_weights, 0, net->ho_size * sizeof(float));
 
   int hsize = net->bias + net->hidden_size;
-  randomise_weights_fan_in(&net->rng, net->ih_weights + net->bias,
-      net->hidden_size, hsize, net->h_size, sum, kurtosis, margin);
-  randomise_weights_fan_in(&net->rng, net->ih_weights + hsize * net->h_size + net->bias,
-      net->hidden_size,
-      net->input_size, net->h_size, sum, kurtosis, margin);
+  if (initialise_inputs_separately){
+    randomise_weights_fan_in(&net->rng, net->ih_weights + net->bias,
+        net->hidden_size, hsize, net->h_size, sum, kurtosis, margin);
+    randomise_weights_fan_in(&net->rng, net->ih_weights + hsize * net->h_size + net->bias,
+        net->hidden_size,
+        net->input_size, net->h_size, sum, kurtosis, margin);
+  }
+  else {
+    randomise_weights_fan_in(&net->rng, net->ih_weights + net->bias,
+        net->hidden_size, hsize + net->input_size, net->hidden_size,
+        sum, kurtosis, margin);
+  }
   randomise_weights_fan_in(&net->rng, net->ho_weights, net->output_size, net->hidden_size,
       net->o_size, sum, kurtosis, margin);
 }

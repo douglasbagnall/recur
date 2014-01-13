@@ -706,6 +706,8 @@ load_or_create_net(void){
         opt_logfile, opt_bptt_depth, opt_learn_rate,
         opt_momentum, opt_bptt_batch_size, opt_weight_sparsity,
         opt_perforate_weights);
+    rnn_randomise_weights_fan_in(net, 2.0f, 0.3f, 0.1f, 1);
+
     net->bptt->momentum_weight = opt_momentum_weight;
     if (opt_weight_scale_factor > 0){
       rnn_scale_initial_weights(net, opt_weight_scale_factor);
