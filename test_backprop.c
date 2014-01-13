@@ -712,6 +712,9 @@ load_or_create_net(void){
     if (opt_weight_scale_factor > 0){
       rnn_scale_initial_weights(net, opt_weight_scale_factor);
     }
+    if (opt_periodic_pgm_dump){
+      rnn_multi_pgm_dump(net, "ihw how");
+    }
   }
   else if (opt_override){
     RecurNNBPTT *bptt = net->bptt;
