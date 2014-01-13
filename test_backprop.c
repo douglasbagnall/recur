@@ -51,6 +51,7 @@
 #define DEFAULT_MOMENTUM_STYLE RNN_MOMENTUM_WEIGHTED
 #define DEFAULT_WEIGHT_SCALE_FACTOR 0
 #define DEFAULT_REPORT_INTERVAL 1024
+#define DEFAULT_CONFAB_ONLY 0
 
 #define BELOW_QUIET_LEVEL(quiet) if (opt_quiet < quiet)
 
@@ -104,6 +105,7 @@ static uint opt_multi_tap = DEFAULT_MULTI_TAP;
 static int opt_momentum_style = DEFAULT_MOMENTUM_STYLE;
 static float opt_weight_scale_factor = DEFAULT_WEIGHT_SCALE_FACTOR;
 static uint opt_report_interval = DEFAULT_REPORT_INTERVAL;
+static uint opt_confab_only = DEFAULT_CONFAB_ONLY;
 
 
 /* Following ccan/opt/helpers.c opt_set_longval, etc */
@@ -212,6 +214,9 @@ static struct opt_table options[] = {
       &opt_weight_scale_factor, "scale newly initialised weights (try ~0.5)"),
   OPT_WITH_ARG("--report-interval=<n>", opt_set_uintval_bi, opt_show_uintval_bi,
       &opt_report_interval, "how often to validate and report"),
+  OPT_WITH_ARG("--confab-only=<chars>", opt_set_uintval, opt_show_uintval,
+      &opt_confab_only, "no training, only confabulate this many characters"),
+
 
   OPT_WITHOUT_ARG("-h|--help", opt_usage_and_exit,
       ": Rnn modelling of text at the character level",
@@ -744,6 +749,11 @@ main(int argc, char *argv[]){
   opt_multi_tap = MAX(opt_multi_tap, 1);
   RecurNN *nets[opt_multi_tap];
   RecurNN *net = load_or_create_net();
+  if (opt_confab_only){
+    long_confab(net, opt_confab_only, 1);
+    exit(0);
+  }
+
   nets[0] = net;
 
   if (opt_multi_tap > 1){
