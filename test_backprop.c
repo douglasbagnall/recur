@@ -568,18 +568,19 @@ finish(RecurNN *net, Ventropy *v){
 
 static inline void
 report_on_progress(RecurNN *net, RecurNN *confab_net, float ventropy,
-    int *correct, float *error, float *entropy, float scale){
+    int *correct, float *error, float *entropy, double elapsed, float scale){
   char confab[CONFAB_SIZE + 1];
   confab[CONFAB_SIZE] = 0;
   int k = net->generation >> 10;
   *entropy *= -scale;
   *error *= scale;
   float accuracy = *correct * scale;
+  double per_sec = 1.0 / scale / elapsed;
   BELOW_QUIET_LEVEL(1){
     confabulate(confab_net, confab, CONFAB_SIZE, opt_deterministic_confab);
-    Q_DEBUG(1, "%5dk e.%02d t%.2f v%.2f a.%02d |%s|", k, (int)(*error * 100 + 0.5),
+    Q_DEBUG(1, "%5dk e.%02d t%.2f v%.2f a.%02d %.0f/s |%s|", k, (int)(*error * 100 + 0.5),
         *entropy, ventropy,
-        (int)(accuracy * 100 + 0.5), confab);
+        (int)(accuracy * 100 + 0.5), per_sec + 0.5, confab);
   }
   rnn_log_float(net, "error", *error);
   rnn_log_float(net, "t_entropy", *entropy);
@@ -587,6 +588,7 @@ report_on_progress(RecurNN *net, RecurNN *confab_net, float ventropy,
   rnn_log_float(net, "momentum", net->bptt->momentum);
   rnn_log_float(net, "accuracy", accuracy);
   rnn_log_float(net, "learn-rate", net->bptt->learn_rate);
+  rnn_log_float(net, "per_second", per_sec);
   *correct = 0;
   *error = 0.0f;
   *entropy = 0.0f;
@@ -606,6 +608,10 @@ epoch(RecurNN **nets, int n_nets, RecurNN *confab_net, Ventropy *v,
   int spacing = (len - 1) / n_nets;
   RecurNN *net = nets[0];
   uint report_counter = net->generation % opt_report_interval;
+  struct timespec timers[2];
+  struct timespec *time_start = timers;
+  struct timespec *time_end = timers + 1;
+  clock_gettime(CLOCK_MONOTONIC, time_start);
   for(i = start; i < len - 1; i++){
     if (opt_momentum_soft_start){
       adjust_momentum_soft_start(net);
@@ -643,9 +649,16 @@ epoch(RecurNN **nets, int n_nets, RecurNN *confab_net, Ventropy *v,
     report_counter++;
     if (report_counter >= opt_report_interval){
       report_counter = 0;
+      clock_gettime(CLOCK_MONOTONIC, time_end);
+      s64 secs = time_end->tv_sec - time_start->tv_sec;
+      s64 nano = time_end->tv_nsec - time_start->tv_nsec;
+      double elapsed = secs + 1e-9 * nano;
+      struct timespec *tmp = time_end;
+      time_end = time_start;
+      time_start = tmp;
       float ventropy = calc_ventropy(v, 1);
       report_on_progress(net, confab_net, ventropy, &correct, &error, &entropy,
-          1.0f / (opt_report_interval * n_nets));
+          elapsed, 1.0f / (opt_report_interval * n_nets));
       if (opt_save_net && opt_filename){
         rnn_save_net(net, opt_filename);
       }
