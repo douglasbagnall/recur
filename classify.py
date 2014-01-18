@@ -387,8 +387,8 @@ class Trainer(BaseClassifier):
 def lr_steps(*args):
     args = list(args)
     while len(args) > 2:
-        rate = args.pop(0)
-        n = args.pop(0)
+        rate = float(args.pop(0))
+        n = int(args.pop(0))
         for i in xrange(n):
             yield rate
     #odd number of args --> repeat forever
