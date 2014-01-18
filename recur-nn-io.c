@@ -10,10 +10,11 @@ int
 rnn_save_net(RecurNN *net, const char *filename){
   MAYBE_DEBUG("saving net at generation %d", net->generation);
   struct cdb_make cdbm;
-  int fd;
+  int fd = -1;
   char tmpfn[] = "tmp_net_XXXXXX";
   int ret = 0;
-
+  if (net == NULL || filename == NULL)
+    goto early_error;
   fd = mkostemp(tmpfn, O_RDWR | O_CREAT);
   if (fd == -1)
     goto early_error;
@@ -89,7 +90,8 @@ rnn_save_net(RecurNN *net, const char *filename){
   cdb_make_finish(&cdbm);
   close(fd);
  early_error:
-  DEBUG("failed to save net with fd %d ret %d errno %d", fd, ret, errno);
+  DEBUG("failed to save net %p with fd %d ret %d errno %d filename '%s'",
+      net, fd, ret, errno, filename ? filename : "(nil, which is the problem)");
   return -1;
 }
 
