@@ -740,11 +740,13 @@ gst_classify_set_property (GObject * object, guint prop_id, const GValue * value
 
     case PROP_SAVE_NET:
       strvalue = g_value_get_string(value);
-      if (strvalue && strvalue[0] != 0){
-        rnn_save_net(self->net, strvalue);
-      }
-      else {
-        rnn_save_net(self->net, self->net_filename);
+      if (self->net){
+        if (strvalue && strvalue[0] != 0){
+          rnn_save_net(self->net, strvalue);
+        }
+        else {
+          rnn_save_net(self->net, self->net_filename);
+        }
       }
       break;
 
