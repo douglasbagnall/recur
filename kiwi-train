@@ -154,7 +154,7 @@ def main():
 
     c = KiwiTrainer(mfccs=MFCCS,
                     hsize=args.hidden_size,
-                    channels=72,
+                    channels=384,
                     classes=CLASSES,
                     window_size=WINDOW_SIZE,
                     basename=BASENAME)
