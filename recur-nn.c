@@ -49,7 +49,7 @@ new_bptt(RecurNN *net, int depth, float learn_rate, float momentum,
 RecurNN *
 rnn_new(uint input_size, uint hidden_size, uint output_size, int flags,
     u64 rng_seed, const char *log_file, int bptt_depth, float learn_rate,
-    float momentum, int batch_size, int weight_shape, float weight_perforation){
+    float momentum, int batch_size){
   RecurNN *net = calloc(1, sizeof(RecurNN));
   int bias = !! (flags & RNN_NET_FLAG_BIAS);
   float *fm;
@@ -90,10 +90,6 @@ rnn_new(uint input_size, uint hidden_size, uint output_size, int flags,
   if (flags & RNN_NET_FLAG_OWN_WEIGHTS){
     SET_ATTR_SIZE(ih_weights, ih_size);
     SET_ATTR_SIZE(ho_weights, ho_size);
-    if (weight_shape >= 0){
-      rnn_randomise_weights(net, RNN_INITIAL_WEIGHT_VARIANCE_FACTOR / net->h_size,
-          weight_shape, weight_perforation);
-    }
   }
 #undef SET_ATTR_SIZE
   MAYBE_DEBUG("allocated %lu floats, used %lu", alloc_bytes / 4, fm - net->mem);
@@ -201,7 +197,7 @@ rnn_clone(RecurNN *parent, int flags,
 
   net = rnn_new(parent->input_size, parent->hidden_size, parent->output_size,
       flags, rng_seed, log_file, bptt_depth, learn_rate, momentum,
-      batch_size, -1, 0.5);
+      batch_size);
 
   if (parent->bptt && (flags & RNN_NET_FLAG_OWN_BPTT)){
     net->bptt->momentum_weight = parent->bptt->momentum_weight;

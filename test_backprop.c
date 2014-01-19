@@ -43,7 +43,7 @@
 #define DEFAULT_LOG_FILE "bptt.log"
 #define DEFAULT_START_CHAR -1
 #define DEFAULT_HIDDEN_SIZE 199
-#define DEFAULT_WEIGHT_SPARSITY 1
+#define DEFAULT_DENSE_WEIGHTS 0
 #define DEFAULT_PERFORATE_WEIGHTS 0.0f
 #define DEFAULT_LEARN_CAPITALS 0
 #define DEFAULT_DUMP_COLLAPSED_TEXT NULL
@@ -94,7 +94,7 @@ static int opt_start_char = DEFAULT_START_CHAR;
 static bool opt_override = DEFAULT_OVERRIDE;
 static bool opt_bptt_adaptive_min = DEFAULT_BPTT_ADAPTIVE_MIN;
 static uint opt_bptt_batch_size = DEFAULT_BPTT_BATCH_SIZE;
-static uint opt_weight_sparsity = DEFAULT_WEIGHT_SPARSITY;
+static uint opt_dense_weights = DEFAULT_DENSE_WEIGHTS;
 static float opt_perforate_weights = DEFAULT_PERFORATE_WEIGHTS;
 static bool opt_temporal_pgm_dump = DEFAULT_TEMPORAL_PGM_DUMP;
 static bool opt_periodic_pgm_dump = DEFAULT_PERIODIC_PGM_DUMP;
@@ -140,8 +140,8 @@ static struct opt_table options[] = {
       &opt_stop, "Stop at generation n (0: no stop, negative means relative)"),
   OPT_WITH_ARG("--bptt-batch-size=<n>", opt_set_uintval_bi, opt_show_uintval_bi,
       &opt_bptt_batch_size, "bptt minibatch size"),
-  OPT_WITH_ARG("--weight-sparsity=<n>", opt_set_uintval_bi, opt_show_uintval_bi,
-      &opt_weight_sparsity, "higher for more initial weights near zero"),
+  OPT_WITH_ARG("--dense-weights=<n>", opt_set_uintval_bi, opt_show_uintval_bi,
+      &opt_dense_weights, "no initial zero weights; > 1 for many near zero"),
   OPT_WITH_ARG("--perforate-weights=<0-1>", opt_set_floatval, opt_show_floatval,
       &opt_perforate_weights, "Zero this portion of weights"),
   OPT_WITH_ARG("-V|--validate-chars=<n>", opt_set_intval_bi, opt_show_intval_bi,
@@ -722,10 +722,14 @@ load_or_create_net(void){
     net = rnn_new(input_size, opt_hidden_size,
         output_size, flags, 1,
         opt_logfile, opt_bptt_depth, opt_learn_rate,
-        opt_momentum, opt_bptt_batch_size, opt_weight_sparsity,
-        opt_perforate_weights);
-    rnn_randomise_weights_fan_in(net, 2.0f, 0.3f, 0.1f, 1);
-
+        opt_momentum, opt_bptt_batch_size);
+    if (opt_dense_weights){
+      rnn_randomise_weights(net, RNN_INITIAL_WEIGHT_VARIANCE_FACTOR / net->h_size,
+          opt_dense_weights, opt_perforate_weights);
+    }
+    else {
+      rnn_randomise_weights_fan_in(net, 2.0f, 0.3f, 0.1f, 1.0);
+    }
     net->bptt->momentum_weight = opt_momentum_weight;
     if (opt_weight_scale_factor > 0){
       rnn_scale_initial_weights(net, opt_weight_scale_factor);
