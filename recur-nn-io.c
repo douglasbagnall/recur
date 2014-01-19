@@ -41,9 +41,13 @@ rnn_save_net(RecurNN *net, const char *filename, int backup){
       DEBUG("error %d saving '%s'", ret, QUOTE(attr));                  \
       goto error;                                                       \
     }} while (0)
-  //not saving bptt->scale
-  //not saving pointers net->real_inputs or net->bptt
-  // not saving net->log, bptt->mem
+  /* not saved:
+        bptt->ih_scale (temporary)
+        net->real_inputs (pointer)
+        net->bptt (pointer)
+        net->log (file handle)
+        bptt->mem (pointer for deallocation)
+  */
   SAVE_SCALAR(net, i_size);
   SAVE_SCALAR(net, h_size);
   SAVE_SCALAR(net, o_size);
@@ -63,22 +67,23 @@ rnn_save_net(RecurNN *net, const char *filename, int backup){
   SAVE_ARRAY(net, ih_weights, net->ih_size);
   SAVE_ARRAY(net, ho_weights, net->ho_size);
 
-  SAVE_SCALAR(net->bptt, depth);
-  SAVE_SCALAR(net->bptt, index);
-  SAVE_SCALAR(net->bptt, learn_rate);
-  SAVE_SCALAR(net->bptt, ho_scale);   /*version 2 and above*/
-  SAVE_SCALAR(net->bptt, momentum);
-  SAVE_SCALAR(net->bptt, momentum_weight);
-  SAVE_SCALAR(net->bptt, batch_size);
-  SAVE_SCALAR(net->bptt, min_error_factor);   /*version 3 and above*/
-  SAVE_ARRAY(net->bptt, i_error, net->i_size);
-  SAVE_ARRAY(net->bptt, h_error, net->h_size);
-  SAVE_ARRAY(net->bptt, o_error, net->o_size);
-  SAVE_ARRAY(net->bptt, ih_momentum, net->ih_size);
-  SAVE_ARRAY(net->bptt, ho_momentum, net->ho_size);
-  SAVE_ARRAY(net->bptt, history, net->bptt->depth * net->i_size);
-  SAVE_ARRAY(net->bptt, ih_delta, net->ih_size);
-
+  if ((net->flags & RNN_NET_FLAG_OWN_BPTT) && net->bptt){
+    SAVE_SCALAR(net->bptt, depth);
+    SAVE_SCALAR(net->bptt, index);
+    SAVE_SCALAR(net->bptt, learn_rate);
+    SAVE_SCALAR(net->bptt, ho_scale);   /*version 2 and above*/
+    SAVE_SCALAR(net->bptt, momentum);
+    SAVE_SCALAR(net->bptt, momentum_weight);
+    SAVE_SCALAR(net->bptt, batch_size);
+    SAVE_SCALAR(net->bptt, min_error_factor);   /*version 3 and above*/
+    SAVE_ARRAY(net->bptt, i_error, net->i_size);
+    SAVE_ARRAY(net->bptt, h_error, net->h_size);
+    SAVE_ARRAY(net->bptt, o_error, net->o_size);
+    SAVE_ARRAY(net->bptt, ih_momentum, net->ih_size);
+    SAVE_ARRAY(net->bptt, ho_momentum, net->ho_size);
+    SAVE_ARRAY(net->bptt, history, net->bptt->depth * net->i_size);
+    SAVE_ARRAY(net->bptt, ih_delta, net->ih_size);
+  }
 #undef SAVE_SCALAR
 #undef SAVE_ARRAY
 
