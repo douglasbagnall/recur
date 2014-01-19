@@ -267,8 +267,7 @@ load_or_create_net(GstParrot *self){
         PARROT_N_FEATURES, PARROT_RNN_FLAGS, PARROT_RNG_SEED,
         NULL, PARROT_BPTT_DEPTH, self->learn_rate, MOMENTUM,
         PARROT_BATCH_SIZE);
-    rnn_randomise_weights(net, RNN_INITIAL_WEIGHT_VARIANCE_FACTOR / net->h_size,
-        0, 0.5);
+    rnn_randomise_weights_auto(net);
   }
   else {
     rnn_set_log_file(net, NULL, 0);

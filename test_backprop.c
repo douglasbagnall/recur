@@ -728,7 +728,8 @@ load_or_create_net(void){
           opt_dense_weights, opt_perforate_weights);
     }
     else {
-      rnn_randomise_weights_fan_in(net, 2.0f, 0.3f, 0.1f, 1.0);
+      rnn_randomise_weights_auto(net);
+      //rnn_randomise_weights_fan_in(net, 2.0f, 0.3f, 0.1f, 1.0);
     }
     net->bptt->momentum_weight = opt_momentum_weight;
     if (opt_weight_scale_factor > 0){

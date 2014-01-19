@@ -95,8 +95,7 @@ recur_setup_nets(RecurContext *context, const char *log_file)
         RECUR_N_HIDDEN, RECUR_OUTPUT_SIZE, RNN_NET_FLAG_STANDARD, RECUR_RNG_SEED,
         NULL, RECUR_BPTT_DEPTH, LEARN_RATE, MOMENTUM,
         RECUR_BATCH_SIZE);
-    rnn_randomise_weights(net, RNN_INITIAL_WEIGHT_VARIANCE_FACTOR / net->h_size,
-        0, 0.5);
+    rnn_randomise_weights_auto(net);
     }
   }
   context->net = net;

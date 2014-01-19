@@ -218,6 +218,15 @@ rnn_clone(RecurNN *parent, int flags,
   return net;
 }
 
+
+void
+rnn_randomise_weights_auto(RecurNN *net){
+  /*heuristically choose an initialisation scheme for the size of net */
+  /*initial heuristic is very simple*/
+  float ratio = net->input_size  * 1.0f / net->hidden_size;
+  rnn_randomise_weights_fan_in(net, 2.0, 0.3, 0.1, ratio);
+}
+
 static inline float
 gaussian_power(rand_ctx *rng, float a, int power){
   for (int i = 0; i < power; i++){
@@ -225,16 +234,6 @@ gaussian_power(rand_ctx *rng, float a, int power){
   }
   return a;
 }
-
-/*XXX Glorot and Bengio suggest
-
-  sqrt(6.0 / (inputs + outputs)) * uniform(-1, 1)
-
-  for tanh networks.
-
-  Sutskever recommends sparsely populated weights scaled so that the maximum
-  eigenvalue is 1.2.
- */
 
 void
 rnn_randomise_weights(RecurNN *net, float variance, int shape, double perforation){
