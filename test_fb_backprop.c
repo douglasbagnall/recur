@@ -9,19 +9,19 @@
 #include <ctype.h>
 
 #define NET_LOG_FILE "bptt.log"
-#define BPTT_DEPTH 11
+#define BPTT_DEPTH 30
 #define CONFAB_SIZE 70
-#define LEARN_RATE 0.003
+#define LEARN_RATE 0.002
 #define BIAS 1
-#define HIDDEN_SIZE 19
+#define HIDDEN_SIZE 39
 #define INPUT_SIZE 2
 #define BPTT_BATCH_SIZE 1
 
 #define MOMENTUM 0.95
 #define MOMENTUM_WEIGHT RNN_MOMENTUM_WEIGHT
-#define FB1 7
+#define FB1 5
 #define FB2 3
-#define K_STOP 200
+#define K_STOP 2000
 
 static const char CONFAB_LUT[] = " |S$";
 //static const char CONFAB_LUT[] = " /\\X";
