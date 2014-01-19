@@ -180,8 +180,7 @@ gst_classify_finalize (GObject * obj){
     rnn_delete_net(self->net);
   }
   for (int i = 0; i < PROP_LAST; i++){
-    if (self->pending_properties[i])
-      free(self->pending_properties[i]);
+    g_value_unset(&self->pending_properties[i]);
   }
   free(self->pending_properties);
 }
@@ -361,7 +360,7 @@ gst_classify_init (GstClassify * self)
   self->mfcc_factory = NULL;
   self->incoming_queue = NULL;
   self->net_filename = NULL;
-  self->pending_properties = calloc(PROP_LAST, sizeof(char*));
+  self->pending_properties = calloc(PROP_LAST - 1, sizeof(GValue));
   self->class_events = NULL;
   self->class_events_index = 0;
   self->n_class_events = 0;
@@ -589,30 +588,50 @@ reset_channel_targets(GstClassify *self){
 
 static inline void
 free_pending_property(GstClassify *self, uint prop){
-  free(self->pending_properties[prop]);
-  self->pending_properties[prop] = NULL;
+  g_value_unset(self->pending_properties + prop);
 }
 
 static inline void
 set_pending_property(GstClassify *self, uint prop, const GValue *value)
 {
-  if (self->pending_properties[prop]){
-    free(self->pending_properties[prop]);
-  }
-  char *s = g_value_dup_string(value);
-  self->pending_properties[prop] = s;
+  GValue *v = &self->pending_properties[prop];
+  g_value_unset(v);
+  g_value_init(v, G_VALUE_TYPE(value));
+  g_value_copy(value, v);
+  gchar *s = g_strdup_value_contents(v);
   GST_DEBUG("pending property %d is '%s'", prop, s);
+  free(s);
 }
 
+static inline const char *
+get_pending_string_property(GstClassify *self, const uint prop){
+  GValue *v = self->pending_properties + prop;
+  if (! G_VALUE_HOLDS_STRING(v)){
+    return NULL;
+  }
+  return g_value_get_string(v);
+}
+
+static inline char *
+steal_pending_string_property(GstClassify *self, const uint prop){
+  GValue *v = self->pending_properties + prop;
+  if (! G_VALUE_HOLDS_STRING(v)){
+    return NULL;
+  }
+  char *s = g_value_dup_string(v);
+  g_value_unset(v);
+  return s;
+}
 
 static void
 maybe_parse_target_string(GstClassify *self){
-  char *s = self->pending_properties[PROP_TARGET];
+  char *target_string = steal_pending_string_property(self, PROP_TARGET);
+  char *s = target_string;
   if (s == NULL || self->channels == NULL){
     GST_DEBUG("not parsing target string (%p); channels is %p",
         s, self->channels);
-     return;
-   }
+    return;
+  }
   GST_DEBUG("parsing target '%s'", s);
   if (*s == 0){
     reset_channel_targets(self);
@@ -629,14 +648,14 @@ maybe_parse_target_string(GstClassify *self){
       self->mode = (result == 0) ? TRAINING_MODE : CLASSIFY_MODE;
     }
   }
-  free_pending_property(self, PROP_TARGET);
+  free(target_string);
   self->window_no = 0;
 }
 
 static void
 maybe_parse_error_weight_string(GstClassify *self){
-  char *orig, *s, *e;
-  s = e = orig = self->pending_properties[PROP_ERROR_WEIGHT];
+  char *orig, *e, *s;
+  e = orig = s = steal_pending_string_property(self, PROP_ERROR_WEIGHT);
   int i;
   if (s == NULL || self->channels == NULL){
     GST_DEBUG("not parsing error_weight string:"
@@ -664,12 +683,12 @@ maybe_parse_error_weight_string(GstClassify *self){
           "found %d numbers, wanted %d in '%s'", i, len, orig);
     }
   }
-  free_pending_property(self, PROP_ERROR_WEIGHT);
+  free(orig);
 }
 
 static void
 maybe_start_logging(GstClassify *self){
-  const char *s = self->pending_properties[PROP_LOG_FILE];
+  const char *s = get_pending_string_property(self, PROP_LOG_FILE);
   GST_DEBUG("pending log '%s'; subnets is %p", s, self->subnets);
   if (s && self->subnets){
     if (s[0] == 0){

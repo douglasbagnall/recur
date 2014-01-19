@@ -103,7 +103,6 @@ struct _GstClassify
   ClassifyClassEvent *class_events;
   int n_class_events;
   int class_events_index;
-  char **pending_properties;
   int log_class_numbers;
   int window_size;
   int window_no;
@@ -114,6 +113,7 @@ struct _GstClassify
   float dropout;
   float *error_weight;
   u32 pending_net_flags;
+  GValue *pending_properties;
 };
 
 
