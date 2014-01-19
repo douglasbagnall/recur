@@ -7,7 +7,7 @@
 const char *FORMAT_VERSION = "save_format_version";
 
 int
-rnn_save_net(RecurNN *net, const char *filename){
+rnn_save_net(RecurNN *net, const char *filename, int backup){
   MAYBE_DEBUG("saving net at generation %d", net->generation);
   struct cdb_make cdbm;
   int fd = -1;
@@ -84,6 +84,17 @@ rnn_save_net(RecurNN *net, const char *filename){
 
   cdb_make_finish(&cdbm);
   close(fd);
+  if (backup){
+    char *backup_filename;
+    int size = asprintf(&backup_filename, "%s~", filename);
+    if (size != -1){
+      if (size == (int)strlen(filename + 2)){
+        rename(filename, backup_filename);
+      }
+      free(backup_filename);
+    }
+  }
+  /*XXX should check the rename errors */
   rename(tmpfn, filename);
   return 0;
  error:

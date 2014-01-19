@@ -180,7 +180,7 @@ gst_classify_finalize (GObject * obj){
   }
   free(self->incoming_queue);
   if (self->net){
-    rnn_save_net(self->net, self->net_filename);
+    rnn_save_net(self->net, self->net_filename, 1);
     rnn_delete_net(self->net);
   }
   for (int i = 0; i < PROP_LAST; i++){
@@ -798,10 +798,10 @@ gst_classify_set_property (GObject * object, guint prop_id, const GValue * value
       strvalue = g_value_get_string(value);
       if (self->net){
         if (strvalue && strvalue[0] != 0){
-          rnn_save_net(self->net, strvalue);
+          rnn_save_net(self->net, strvalue, 1);
         }
         else {
-          rnn_save_net(self->net, self->net_filename);
+          rnn_save_net(self->net, self->net_filename, 1);
         }
       }
       break;
@@ -973,7 +973,7 @@ possibly_save_net(RecurNN *net, char *filename)
 {
   GST_LOG("possibly saving to %s", filename);
   if (PERIODIC_SAVE_NET && (net->generation & 511) == 0){
-    rnn_save_net(net, filename);
+    rnn_save_net(net, filename, 1);
   }
 }
 

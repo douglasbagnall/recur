@@ -556,7 +556,7 @@ calc_ventropy(Ventropy *v, int lap)
 static inline void
 finish(RecurNN *net, Ventropy *v){
   if (opt_filename && opt_save_net){
-    rnn_save_net(net, opt_filename);
+    rnn_save_net(net, opt_filename, 1);
   }
   BELOW_QUIET_LEVEL(2){
     float ventropy = calc_ventropy(v, 0);
@@ -660,7 +660,7 @@ epoch(RecurNN **nets, int n_nets, RecurNN *confab_net, Ventropy *v,
       report_on_progress(net, confab_net, ventropy, &correct, &error, &entropy,
           elapsed, 1.0f / (opt_report_interval * n_nets));
       if (opt_save_net && opt_filename){
-        rnn_save_net(net, opt_filename);
+        rnn_save_net(net, opt_filename, 1);
       }
       if (opt_periodic_pgm_dump){
         rnn_multi_pgm_dump(net, "ihw how");

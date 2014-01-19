@@ -175,7 +175,7 @@ possibly_save_state(RecurContext *context)
 {
   RecurNN *net = context->net;
   if (PERIODIC_SAVE_NET && (net->generation & 1023) == 0){
-    rnn_save_net(net, NET_FILENAME);
+    rnn_save_net(net, NET_FILENAME, 1);
     DEBUG("in possibly_save_state with generation %d", context->net->generation);
   }
   if (PERIODIC_PGM_DUMP && net->generation % PERIODIC_PGM_DUMP == 0){

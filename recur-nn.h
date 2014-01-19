@@ -182,7 +182,7 @@ float *rnn_opinion_with_dropout(RecurNN *net, const float *inputs, float dropout
 void rnn_multi_pgm_dump(RecurNN *net, const char *dumpees);
 
 RecurNN* rnn_load_net(const char *filename);
-int rnn_save_net(RecurNN *net, const char *filename);
+int rnn_save_net(RecurNN *net, const char *filename, int backup);
 
 void rnn_bptt_advance(RecurNN *net);
 void rnn_bptt_calculate(RecurNN *net);

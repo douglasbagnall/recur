@@ -769,7 +769,7 @@ maybe_learn(GstRnnca *self){
   self->net->generation = net->generation;
   rnn_condition_net(net);
   if (PERIODIC_SAVE_NET && (self->net->generation & PERIODIC_SAVE_NET) == 0){
-    rnn_save_net(self->net, self->net_filename);
+    rnn_save_net(self->net, self->net_filename, 1);
   }
   if (PERIODIC_SHUFFLE_TRAINERS &&
       (net->generation & PERIODIC_SHUFFLE_TRAINERS) == 0){
