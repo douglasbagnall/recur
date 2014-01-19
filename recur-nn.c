@@ -291,17 +291,17 @@ randomise_weights_fan_in(rand_ctx *rng, float *weights, int width, int height, i
 
 void
 rnn_randomise_weights_fan_in(RecurNN *net, float sum, float kurtosis,
-    float margin, int initialise_inputs_separately){
+    float margin, float inputs_weight_ratio){
   memset(net->ih_weights, 0, net->ih_size * sizeof(float));
   memset(net->ho_weights, 0, net->ho_size * sizeof(float));
 
   int hsize = net->bias + net->hidden_size;
-  if (initialise_inputs_separately){
+  if (inputs_weight_ratio > 0){
     randomise_weights_fan_in(&net->rng, net->ih_weights + net->bias,
         net->hidden_size, hsize, net->h_size, sum, kurtosis, margin);
     randomise_weights_fan_in(&net->rng, net->ih_weights + hsize * net->h_size + net->bias,
         net->hidden_size,
-        net->input_size, net->h_size, sum, kurtosis, margin);
+        net->input_size, net->h_size, sum * inputs_weight_ratio, kurtosis, margin);
   }
   else {
     randomise_weights_fan_in(&net->rng, net->ih_weights + net->bias,

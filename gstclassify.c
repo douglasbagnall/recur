@@ -51,6 +51,8 @@ enum
   PROP_ERROR_WEIGHT,
   PROP_BPTT_DEPTH,
   PROP_WEIGHT_SPARSITY,
+  PROP_WEIGHT_FAN_IN_SUM,
+  PROP_WEIGHT_FAN_IN_KURTOSIS,
   PROP_LAWN_MOWER,
 
   PROP_LAST
@@ -93,6 +95,13 @@ enum
 #define MOMENTUM_STYLE_MAX 2
 #define WEIGHT_SPARSITY_MIN 0
 #define WEIGHT_SPARSITY_MAX 10
+#define DEFAULT_PROP_WEIGHT_FAN_IN_SUM 0
+#define DEFAULT_PROP_WEIGHT_FAN_IN_KURTOSIS 0.3
+#define PROP_WEIGHT_FAN_IN_SUM_MAX 99.0
+#define PROP_WEIGHT_FAN_IN_SUM_MIN 0.0
+#define PROP_WEIGHT_FAN_IN_KURTOSIS_MAX 1.5
+#define PROP_WEIGHT_FAN_IN_KURTOSIS_MIN 0.0
+
 #define DROPOUT_MIN 0.0
 #define DROPOUT_MAX 1.0
 #define MIN_PROP_MFCCS 0
@@ -113,6 +122,8 @@ static inline gboolean get_pending_property_boolean(GstClassify *self, const uin
     const gboolean _default);
 static inline int get_pending_property_int(GstClassify *self, const uint prop,
     const int _default);
+static inline float get_pending_property_float(GstClassify *self, const uint prop,
+    const float _default);
 
 
 #define gst_classify_parent_class parent_class
@@ -303,6 +314,22 @@ gst_classify_class_init (GstClassifyClass * klass)
           DEFAULT_PROP_DROPOUT,
           G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
+  g_object_class_install_property (gobject_class, PROP_WEIGHT_FAN_IN_SUM,
+      g_param_spec_float("weight-fan-in-sum", "weight-fan-in-sum",
+          "If non-zero, initialise weights fan in to this sum (try 2)",
+          PROP_WEIGHT_FAN_IN_SUM_MIN,
+          PROP_WEIGHT_FAN_IN_SUM_MAX,
+          DEFAULT_PROP_WEIGHT_FAN_IN_SUM,
+          G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
+
+  g_object_class_install_property (gobject_class, PROP_WEIGHT_FAN_IN_KURTOSIS,
+      g_param_spec_float("weight-fan-in-kurtosis", "weight-fan-in-kurtosis",
+          "degree of concentration of fan-in weights",
+          PROP_WEIGHT_FAN_IN_KURTOSIS_MIN,
+          PROP_WEIGHT_FAN_IN_KURTOSIS_MAX,
+          DEFAULT_PROP_WEIGHT_FAN_IN_KURTOSIS,
+          G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
+
   g_object_class_install_property (gobject_class, PROP_MOMENTUM_SOFT_START,
       g_param_spec_float("momentum-soft-start", "momentum-soft-start",
           "Ease into momentum over many generations",
@@ -421,12 +448,24 @@ load_or_create_net(GstClassify *self){
         DEFAULT_PROP_WEIGHT_SPARSITY);
     int bptt_depth = get_pending_property_int(self, PROP_BPTT_DEPTH,
         DEFAULT_PROP_BPTT_DEPTH);
+    float fan_in_sum = get_pending_property_float(self,
+        PROP_WEIGHT_FAN_IN_SUM,
+        DEFAULT_PROP_WEIGHT_FAN_IN_SUM);
+    float fan_in_kurtosis = get_pending_property_float(self,
+        PROP_WEIGHT_FAN_IN_KURTOSIS,
+        DEFAULT_PROP_WEIGHT_FAN_IN_KURTOSIS);
 
     net = rnn_new(n_features, hidden_size,
         self->n_classes, flags, CLASSIFY_RNG_SEED,
         NULL, bptt_depth, self->learn_rate, self->momentum,
-        CLASSIFY_BATCH_SIZE, weight_sparsity, 0.5);
-    rnn_randomise_weights_fan_in(net, 2.0f, 0.2f, 0.1f, 0);
+        CLASSIFY_BATCH_SIZE);
+    if (fan_in_sum){
+      rnn_randomise_weights_fan_in(net, fan_in_sum, fan_in_kurtosis, 0.1f, 0);
+    }
+    else {
+      rnn_randomise_weights(net, RNN_INITIAL_WEIGHT_VARIANCE_FACTOR / net->h_size,
+          weight_sparsity, 0.5);
+    }
   }
   else {
     rnn_set_log_file(net, NULL, 0);
@@ -649,6 +688,16 @@ get_pending_property_int(GstClassify *self, const uint prop,
   return g_value_get_int(v);
 }
 
+static inline float
+get_pending_property_float(GstClassify *self, const uint prop,
+    const float _default){
+  GValue *v = self->pending_properties + prop;
+  if (! G_VALUE_HOLDS_FLOAT(v)){
+    return _default;
+  }
+  return g_value_get_float(v);
+}
+
 static inline char *
 steal_pending_string_property(GstClassify *self, const uint prop){
   GValue *v = self->pending_properties + prop;
@@ -860,6 +909,8 @@ gst_classify_set_property (GObject * object, guint prop_id, const GValue * value
     case PROP_BPTT_DEPTH:
     case PROP_LAWN_MOWER:
     case PROP_WEIGHT_SPARSITY:
+    case PROP_WEIGHT_FAN_IN_SUM:
+    case PROP_WEIGHT_FAN_IN_KURTOSIS:
       if (self->net == NULL){
         set_pending_property(self, prop_id, value);
       }
