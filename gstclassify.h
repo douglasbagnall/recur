@@ -95,8 +95,6 @@ struct _GstClassify
   char *basename;
   int queue_size;
   int mfccs;
-
-  int hidden_size;
   float learn_rate;
   float momentum_soft_start;
   float momentum;
@@ -107,12 +105,9 @@ struct _GstClassify
   int window_size;
   int window_no;
   int mode;
-  int bptt_depth;
-  int weight_sparsity;
   int momentum_style;
   float dropout;
   float *error_weight;
-  u32 pending_net_flags;
   GValue *pending_properties;
 };
 

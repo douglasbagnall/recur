@@ -109,6 +109,10 @@ static GstFlowReturn gst_classify_transform_ip(GstBaseTransform *base, GstBuffer
 static gboolean gst_classify_setup(GstAudioFilter * filter, const GstAudioInfo * info);
 static void maybe_parse_target_string(GstClassify *self);
 static void maybe_start_logging(GstClassify *self);
+static inline gboolean get_pending_property_boolean(GstClassify *self, const uint prop,
+    const gboolean _default);
+static inline int get_pending_property_int(GstClassify *self, const uint prop,
+    const int _default);
 
 
 #define gst_classify_parent_class parent_class
@@ -250,7 +254,7 @@ gst_classify_class_init (GstClassifyClass * klass)
           "Backprop through time to this depth",
           MIN_PROP_BPTT_DEPTH, MAX_PROP_BPTT_DEPTH,
           DEFAULT_PROP_BPTT_DEPTH,
-          G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+          G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class, PROP_MFCCS,
       g_param_spec_int("mfccs", "mfccs",
@@ -325,7 +329,7 @@ gst_classify_class_init (GstClassifyClass * klass)
           "Size of the RNN hidden layer",
           MIN_HIDDEN_SIZE, MAX_HIDDEN_SIZE,
           DEFAULT_HIDDEN_SIZE,
-          G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+          G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class, PROP_WINDOW_SIZE,
       g_param_spec_int("window-size", "window-size",
@@ -344,7 +348,7 @@ gst_classify_class_init (GstClassifyClass * klass)
       g_param_spec_boolean("lawn-mower", "lawn-mower",
           "Don't let any weight grow bigger than " QUOTE(RNN_LAWN_MOWER_THRESHOLD),
           DEFAULT_PROP_LAWN_MOWER,
-          G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+          G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
 
   trans_class->transform_ip = GST_DEBUG_FUNCPTR (gst_classify_transform_ip);
@@ -364,27 +368,23 @@ gst_classify_init (GstClassify * self)
   self->class_events = NULL;
   self->class_events_index = 0;
   self->n_class_events = 0;
-  self->bptt_depth = DEFAULT_PROP_BPTT_DEPTH;
   self->learn_rate = DEFAULT_LEARN_RATE;
-  self->hidden_size = DEFAULT_HIDDEN_SIZE;
   self->window_size = DEFAULT_WINDOW_SIZE;
   self->momentum_soft_start = DEFAULT_PROP_MOMENTUM_SOFT_START;
   self->dropout = DEFAULT_PROP_DROPOUT;
   self->momentum = DEFAULT_PROP_MOMENTUM;
   self->basename = strdup(DEFAULT_BASENAME);
-  self->weight_sparsity = DEFAULT_PROP_WEIGHT_SPARSITY;
   self->error_weight = NULL;
-  self->pending_net_flags = CLASSIFY_RNN_FLAGS;
   GST_INFO("gst classify init\n");
 }
 
 
 static void
-reset_net_filename(GstClassify *self){
+reset_net_filename(GstClassify *self, int hidden_size){
   char s[200];
   int n_features = self->mfccs ? self->mfccs : CLASSIFY_N_FFT_BINS;
   snprintf(s, sizeof(s), "%s-i%d-h%d-o%d-b%d-%dHz-w%d.net",
-      self->basename, n_features, self->hidden_size, self->n_classes,
+      self->basename, n_features, hidden_size, self->n_classes,
       CLASSIFY_BIAS, CLASSIFY_RATE, self->window_size);
   if (self->net_filename){
     free(self->net_filename);
@@ -395,7 +395,10 @@ reset_net_filename(GstClassify *self){
 
 static RecurNN *
 load_or_create_net(GstClassify *self){
-  reset_net_filename(self);
+  int hidden_size = get_pending_property_int(self, PROP_HIDDEN_SIZE,
+      DEFAULT_HIDDEN_SIZE);
+  if (self->net_filename == NULL)
+    reset_net_filename(self, hidden_size);
   RecurNN *net = TRY_RELOAD ? rnn_load_net(self->net_filename) : NULL;
   if (net){
     if (net->output_size != self->n_classes){
@@ -406,10 +409,24 @@ load_or_create_net(GstClassify *self){
   }
   if (net == NULL){
     int n_features = self->mfccs ? self->mfccs : CLASSIFY_N_FFT_BINS;
-    net = rnn_new(n_features, self->hidden_size,
-        self->n_classes, self->pending_net_flags, CLASSIFY_RNG_SEED,
-        NULL, self->bptt_depth, self->learn_rate, self->momentum,
-        CLASSIFY_BATCH_SIZE, self->weight_sparsity, 0.5);
+    u32 flags = CLASSIFY_RNN_FLAGS;
+    if (get_pending_property_boolean(self, PROP_LAWN_MOWER,
+            DEFAULT_PROP_LAWN_MOWER)){
+      flags |= RNN_COND_USE_LAWN_MOWER;
+    }
+    else {
+      flags &= ~RNN_COND_USE_LAWN_MOWER;
+    }
+    int weight_sparsity = get_pending_property_int(self, PROP_WEIGHT_SPARSITY,
+        DEFAULT_PROP_WEIGHT_SPARSITY);
+    int bptt_depth = get_pending_property_int(self, PROP_BPTT_DEPTH,
+        DEFAULT_PROP_BPTT_DEPTH);
+
+    net = rnn_new(n_features, hidden_size,
+        self->n_classes, flags, CLASSIFY_RNG_SEED,
+        NULL, bptt_depth, self->learn_rate, self->momentum,
+        CLASSIFY_BATCH_SIZE, weight_sparsity, 0.5);
+    rnn_randomise_weights_fan_in(net, 2.0f, 0.2f, 0.1f, 0);
   }
   else {
     rnn_set_log_file(net, NULL, 0);
@@ -604,12 +621,32 @@ set_pending_property(GstClassify *self, uint prop, const GValue *value)
 }
 
 static inline const char *
-get_pending_string_property(GstClassify *self, const uint prop){
+get_pending_property_string(GstClassify *self, const uint prop){
   GValue *v = self->pending_properties + prop;
   if (! G_VALUE_HOLDS_STRING(v)){
     return NULL;
   }
   return g_value_get_string(v);
+}
+
+static inline gboolean
+get_pending_property_boolean(GstClassify *self, const uint prop,
+    const gboolean _default){
+  GValue *v = self->pending_properties + prop;
+  if (! G_VALUE_HOLDS_BOOLEAN(v)){
+    return _default;
+  }
+  return g_value_get_boolean(v);
+}
+
+static inline int
+get_pending_property_int(GstClassify *self, const uint prop,
+    const int _default){
+  GValue *v = self->pending_properties + prop;
+  if (! G_VALUE_HOLDS_INT(v)){
+    return _default;
+  }
+  return g_value_get_int(v);
 }
 
 static inline char *
@@ -688,7 +725,7 @@ maybe_parse_error_weight_string(GstClassify *self){
 
 static void
 maybe_start_logging(GstClassify *self){
-  const char *s = get_pending_string_property(self, PROP_LOG_FILE);
+  const char *s = get_pending_property_string(self, PROP_LOG_FILE);
   GST_DEBUG("pending log '%s'; subnets is %p", s, self->subnets);
   if (s && self->subnets){
     if (s[0] == 0){
@@ -785,20 +822,6 @@ gst_classify_set_property (GObject * object, guint prop_id, const GValue * value
       }
       break;
 
-    case PROP_LAWN_MOWER:
-      {
-        gboolean bit = g_value_get_boolean(value);
-        u32 mask = RNN_COND_USE_LAWN_MOWER;
-        u32 flags = (self->net) ? self->net->flags : self->pending_net_flags;
-        if (bit){
-          flags |= mask;
-        }
-        else {
-          flags &= ~mask;
-        }
-      }
-      break;
-
     case PROP_LOG_CLASS_NUMBERS:
       self->log_class_numbers = g_value_get_boolean(value);
       break;
@@ -833,6 +856,18 @@ gst_classify_set_property (GObject * object, guint prop_id, const GValue * value
       self->momentum_style = g_value_get_int(value);
       break;
 
+    case PROP_HIDDEN_SIZE:
+    case PROP_BPTT_DEPTH:
+    case PROP_LAWN_MOWER:
+    case PROP_WEIGHT_SPARSITY:
+      if (self->net == NULL){
+        set_pending_property(self, prop_id, value);
+      }
+      else {
+        GST_WARNING("it is TOO LATE to set %s.", pspec->name);
+      }
+      break;
+
       /*CLASSES, MFCCS, BPTT_DEPTH,
         and HIDDEN_SIZE have no effect if set late (after net creation)
        */
@@ -854,20 +889,8 @@ gst_classify_set_property (GObject * object, guint prop_id, const GValue * value
       SET_INT_IF_NOT_TOO_LATE(mfccs, "number of MFCCs");
       break;
 
-    case PROP_WEIGHT_SPARSITY:
-      SET_INT_IF_NOT_TOO_LATE(weight_sparsity, "weight_sparsity");
-      break;
-
     case PROP_CLASSES:
       SET_INT_IF_NOT_TOO_LATE(n_classes, "number of classes");
-      break;
-
-    case PROP_BPTT_DEPTH:
-      SET_INT_IF_NOT_TOO_LATE(bptt_depth, "bptt depth");
-      break;
-
-    case PROP_HIDDEN_SIZE:
-      SET_INT_IF_NOT_TOO_LATE(hidden_size, "hidden layer size");
       break;
 
 #undef SET_INT_IF_NOT_TOO_LATE
@@ -904,9 +927,6 @@ gst_classify_get_property (GObject * object, guint prop_id, GValue * value,
   case PROP_CLASSES:
     g_value_set_int(value, self->n_classes);
     break;
-  case PROP_BPTT_DEPTH:
-    g_value_set_int(value, self->bptt_depth);
-    break;
   case PROP_MFCCS:
     g_value_set_int(value, self->mfccs);
     break;
@@ -925,16 +945,20 @@ gst_classify_get_property (GObject * object, guint prop_id, GValue * value,
   case PROP_MOMENTUM_STYLE:
     g_value_set_int(value, self->momentum_style);
     break;
-  case PROP_HIDDEN_SIZE:
-    g_value_set_int(value, self->hidden_size);
-    break;
   case PROP_WINDOW_SIZE:
     g_value_set_int(value, self->window_size);
     break;
   case PROP_LAWN_MOWER:
     {
-      u32 flags = (self->net) ? self->net->flags : self->pending_net_flags;
-      g_value_set_boolean(value, !! (flags & RNN_COND_USE_LAWN_MOWER));
+      gboolean x;
+      if (self->net){
+        x = !! (self->net->flags & RNN_COND_USE_LAWN_MOWER);
+      }
+      else {
+        x = get_pending_property_boolean(self, PROP_LAWN_MOWER,
+            DEFAULT_PROP_LAWN_MOWER);
+      }
+      g_value_set_boolean(value, x);
     }
     break;
 
