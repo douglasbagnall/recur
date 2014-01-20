@@ -95,7 +95,6 @@ struct _GstClassify
   int mfccs;
   float learn_rate;
   float momentum_soft_start;
-  float momentum;
   ClassifyClassEvent *class_events;
   int n_class_events;
   int class_events_index;

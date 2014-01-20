@@ -343,7 +343,7 @@ gst_classify_class_init (GstClassifyClass * klass)
           "(eventual) momentum",
           MOMENTUM_MIN, MOMENTUM_MAX,
           DEFAULT_PROP_MOMENTUM,
-          G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+          G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class, PROP_MOMENTUM_STYLE,
       g_param_spec_int("momentum-style", "momentum-style",
@@ -406,7 +406,6 @@ gst_classify_init (GstClassify * self)
   self->window_size = DEFAULT_WINDOW_SIZE;
   self->momentum_soft_start = DEFAULT_PROP_MOMENTUM_SOFT_START;
   self->dropout = DEFAULT_PROP_DROPOUT;
-  self->momentum = DEFAULT_PROP_MOMENTUM;
   self->basename = strdup(DEFAULT_BASENAME);
   self->error_weight = NULL;
   GST_INFO("gst classify init\n");
@@ -455,6 +454,9 @@ load_or_create_net(GstClassify *self){
         DEFAULT_PROP_WEIGHT_SPARSITY);
     int bptt_depth = get_gvalue_int(PENDING_PROP(self, PROP_BPTT_DEPTH),
         DEFAULT_PROP_BPTT_DEPTH);
+    float momentum = get_gvalue_float(PENDING_PROP(self, PROP_MOMENTUM),
+        DEFAULT_PROP_MOMENTUM);
+
     float fan_in_sum = get_gvalue_float(PENDING_PROP(self,
             PROP_WEIGHT_FAN_IN_SUM),
         DEFAULT_PROP_WEIGHT_FAN_IN_SUM);
@@ -467,7 +469,7 @@ load_or_create_net(GstClassify *self){
 
     net = rnn_new(n_features, hidden_size,
         self->n_classes, flags, rng_seed,
-        NULL, bptt_depth, self->learn_rate, self->momentum,
+        NULL, bptt_depth, self->learn_rate, momentum,
         CLASSIFY_BATCH_SIZE);
     if (fan_in_sum){
       rnn_randomise_weights_fan_in(net, fan_in_sum, fan_in_kurtosis, 0.1f, 0);
@@ -840,10 +842,6 @@ gst_classify_set_property (GObject * object, guint prop_id, const GValue * value
       self->momentum_soft_start = g_value_get_float(value);
       break;
 
-    case PROP_MOMENTUM:
-      self->momentum = g_value_get_float(value);
-      break;
-
     case PROP_MOMENTUM_STYLE:
       self->momentum_style = g_value_get_int(value);
       break;
@@ -851,6 +849,7 @@ gst_classify_set_property (GObject * object, guint prop_id, const GValue * value
     /*properties that only need to be stored until net creation, and can't
       be changed afterwards go here.
     */
+    case PROP_MOMENTUM:
     case PROP_HIDDEN_SIZE:
     case PROP_BPTT_DEPTH:
     case PROP_LAWN_MOWER:
@@ -930,9 +929,6 @@ gst_classify_get_property (GObject * object, guint prop_id, GValue * value,
     break;
   case PROP_LEARN_RATE:
     g_value_set_float(value, self->learn_rate);
-    break;
-  case PROP_MOMENTUM:
-    g_value_set_float(value, self->momentum);
     break;
   case PROP_DROPOUT:
     g_value_set_float(value, self->dropout);
