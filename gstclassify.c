@@ -779,8 +779,10 @@ gst_classify_set_property (GObject * object, guint prop_id, const GValue * value
       break;
 
     case PROP_PGM_DUMP:
-      strvalue = g_value_get_string(value);
-      rnn_multi_pgm_dump(self->net, strvalue);
+      if (self->net){
+        strvalue = g_value_get_string(value);
+        rnn_multi_pgm_dump(self->net, strvalue);
+      }
       break;
 
     case PROP_BASENAME:
