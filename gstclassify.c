@@ -54,6 +54,7 @@ enum
   PROP_WEIGHT_FAN_IN_SUM,
   PROP_WEIGHT_FAN_IN_KURTOSIS,
   PROP_LAWN_MOWER,
+  PROP_RNG_SEED,
 
   PROP_LAST
 };
@@ -109,6 +110,8 @@ enum
 #define MOMENTUM_SOFT_START_MAX 1e9
 #define MOMENTUM_SOFT_START_MIN 0
 
+#define DEFAULT_RNG_SEED 11
+
 /* static_functions */
 static void gst_classify_class_init(GstClassifyClass *g_class);
 static void gst_classify_init(GstClassify *self);
@@ -124,6 +127,8 @@ static inline int get_pending_property_int(GstClassify *self, const uint prop,
     const int _default);
 static inline float get_pending_property_float(GstClassify *self, const uint prop,
     const float _default);
+static inline u64 get_pending_property_u64(GstClassify *self, const uint prop,
+    const u64 _default);
 
 
 #define gst_classify_parent_class parent_class
@@ -195,7 +200,10 @@ gst_classify_finalize (GObject * obj){
     rnn_delete_net(self->net);
   }
   for (int i = 0; i < PROP_LAST; i++){
-    g_value_unset(&self->pending_properties[i]);
+    GValue *v = &self->pending_properties[i];
+    if (G_IS_VALUE(v)){
+      g_value_unset(v);
+    }
   }
   free(self->pending_properties);
 }
@@ -377,6 +385,12 @@ gst_classify_class_init (GstClassifyClass * klass)
           DEFAULT_PROP_LAWN_MOWER,
           G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
+  g_object_class_install_property (gobject_class, PROP_RNG_SEED,
+      g_param_spec_uint64("rng-seed", "rng-seed",
+          "RNG seed (only settable at start)",
+          0, G_MAXUINT64,
+          DEFAULT_RNG_SEED,
+          G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
   trans_class->transform_ip = GST_DEBUG_FUNCPTR (gst_classify_transform_ip);
   af_class->setup = GST_DEBUG_FUNCPTR (gst_classify_setup);
@@ -455,8 +469,11 @@ load_or_create_net(GstClassify *self){
         PROP_WEIGHT_FAN_IN_KURTOSIS,
         DEFAULT_PROP_WEIGHT_FAN_IN_KURTOSIS);
 
+    u64 rng_seed = get_pending_property_u64(self, PROP_RNG_SEED, DEFAULT_RNG_SEED);
+    STDERR_DEBUG("rng seed %lu", rng_seed);
+
     net = rnn_new(n_features, hidden_size,
-        self->n_classes, flags, CLASSIFY_RNG_SEED,
+        self->n_classes, flags, rng_seed,
         NULL, bptt_depth, self->learn_rate, self->momentum,
         CLASSIFY_BATCH_SIZE);
     if (fan_in_sum){
@@ -651,8 +668,12 @@ static inline void
 set_pending_property(GstClassify *self, uint prop, const GValue *value)
 {
   GValue *v = &self->pending_properties[prop];
-  g_value_unset(v);
-  g_value_init(v, G_VALUE_TYPE(value));
+  if (G_IS_VALUE(v)){
+    g_value_reset(v);
+  }
+  else {
+    g_value_init(v, G_VALUE_TYPE(value));
+  }
   g_value_copy(value, v);
   gchar *s = g_strdup_value_contents(v);
   GST_DEBUG("pending property %d is '%s'", prop, s);
@@ -685,7 +706,18 @@ get_pending_property_int(GstClassify *self, const uint prop,
   if (! G_VALUE_HOLDS_INT(v)){
     return _default;
   }
+  GST_DEBUG("getting property %u, value %d", prop, g_value_get_int(v));
   return g_value_get_int(v);
+}
+
+static inline u64
+get_pending_property_u64(GstClassify *self, const uint prop,
+    const u64 _default){
+  GValue *v = self->pending_properties + prop;
+  if (! G_VALUE_HOLDS_UINT64(v)){
+    return _default;
+  }
+  return g_value_get_uint64(v);
 }
 
 static inline float
@@ -905,12 +937,16 @@ gst_classify_set_property (GObject * object, guint prop_id, const GValue * value
       self->momentum_style = g_value_get_int(value);
       break;
 
+    /*properties that only need to be stored until net creation, and can't
+      be changed afterwards go here.
+    */
     case PROP_HIDDEN_SIZE:
     case PROP_BPTT_DEPTH:
     case PROP_LAWN_MOWER:
     case PROP_WEIGHT_SPARSITY:
     case PROP_WEIGHT_FAN_IN_SUM:
     case PROP_WEIGHT_FAN_IN_KURTOSIS:
+    case PROP_RNG_SEED:
       if (self->net == NULL){
         set_pending_property(self, prop_id, value);
       }
@@ -919,9 +955,9 @@ gst_classify_set_property (GObject * object, guint prop_id, const GValue * value
       }
       break;
 
-      /*CLASSES, MFCCS, BPTT_DEPTH,
-        and HIDDEN_SIZE have no effect if set late (after net creation)
+      /*these next ones have no effect if set late (after net creation)
        */
+
 #define SET_INT_IF_NOT_TOO_LATE(attr, name) do {                        \
         if (self->net == NULL){                                         \
           self->attr = g_value_get_int(value);                          \

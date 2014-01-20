@@ -54,6 +54,8 @@ def main(argv):
                 learn_rate=lr, log_file=NET_LOG_FILE,
                 properties=(('momentum-soft-start', 4000),
                             ('momentum', 0.95),
+                            #('rng-seed', '-1ULL'),
+                            #('hidden-size', 299),
                             ))
     finally:
         c.classifier.set_property('save-net', '')
