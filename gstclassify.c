@@ -11,6 +11,8 @@
 GST_DEBUG_CATEGORY_STATIC (classify_debug);
 #define GST_CAT_DEFAULT classify_debug
 
+#include "pending_properties.h"
+
 /* GstClassify signals and args */
 enum
 {
@@ -121,15 +123,6 @@ static GstFlowReturn gst_classify_transform_ip(GstBaseTransform *base, GstBuffer
 static gboolean gst_classify_setup(GstAudioFilter * filter, const GstAudioInfo * info);
 static void maybe_parse_target_string(GstClassify *self);
 static void maybe_start_logging(GstClassify *self);
-static inline gboolean get_pending_property_boolean(GstClassify *self, const uint prop,
-    const gboolean _default);
-static inline int get_pending_property_int(GstClassify *self, const uint prop,
-    const int _default);
-static inline float get_pending_property_float(GstClassify *self, const uint prop,
-    const float _default);
-static inline u64 get_pending_property_u64(GstClassify *self, const uint prop,
-    const u64 _default);
-
 
 #define gst_classify_parent_class parent_class
 G_DEFINE_TYPE (GstClassify, gst_classify, GST_TYPE_AUDIO_FILTER)
@@ -200,7 +193,7 @@ gst_classify_finalize (GObject * obj){
     rnn_delete_net(self->net);
   }
   for (int i = 0; i < PROP_LAST; i++){
-    GValue *v = &self->pending_properties[i];
+    GValue *v = PENDING_PROP(self, i);
     if (G_IS_VALUE(v)){
       g_value_unset(v);
     }
@@ -436,7 +429,7 @@ reset_net_filename(GstClassify *self, int hidden_size){
 
 static RecurNN *
 load_or_create_net(GstClassify *self){
-  int hidden_size = get_pending_property_int(self, PROP_HIDDEN_SIZE,
+  int hidden_size = get_gvalue_int(PENDING_PROP(self, PROP_HIDDEN_SIZE),
       DEFAULT_HIDDEN_SIZE);
   if (self->net_filename == NULL)
     reset_net_filename(self, hidden_size);
@@ -451,25 +444,25 @@ load_or_create_net(GstClassify *self){
   if (net == NULL){
     int n_features = self->mfccs ? self->mfccs : CLASSIFY_N_FFT_BINS;
     u32 flags = CLASSIFY_RNN_FLAGS;
-    if (get_pending_property_boolean(self, PROP_LAWN_MOWER,
+    if (get_gvalue_boolean(PENDING_PROP(self, PROP_LAWN_MOWER),
             DEFAULT_PROP_LAWN_MOWER)){
       flags |= RNN_COND_USE_LAWN_MOWER;
     }
     else {
       flags &= ~RNN_COND_USE_LAWN_MOWER;
     }
-    int weight_sparsity = get_pending_property_int(self, PROP_WEIGHT_SPARSITY,
+    int weight_sparsity = get_gvalue_int(PENDING_PROP(self, PROP_WEIGHT_SPARSITY),
         DEFAULT_PROP_WEIGHT_SPARSITY);
-    int bptt_depth = get_pending_property_int(self, PROP_BPTT_DEPTH,
+    int bptt_depth = get_gvalue_int(PENDING_PROP(self, PROP_BPTT_DEPTH),
         DEFAULT_PROP_BPTT_DEPTH);
-    float fan_in_sum = get_pending_property_float(self,
-        PROP_WEIGHT_FAN_IN_SUM,
+    float fan_in_sum = get_gvalue_float(PENDING_PROP(self,
+            PROP_WEIGHT_FAN_IN_SUM),
         DEFAULT_PROP_WEIGHT_FAN_IN_SUM);
-    float fan_in_kurtosis = get_pending_property_float(self,
-        PROP_WEIGHT_FAN_IN_KURTOSIS,
+    float fan_in_kurtosis = get_gvalue_float(PENDING_PROP(self,
+            PROP_WEIGHT_FAN_IN_KURTOSIS),
         DEFAULT_PROP_WEIGHT_FAN_IN_KURTOSIS);
 
-    u64 rng_seed = get_pending_property_u64(self, PROP_RNG_SEED, DEFAULT_RNG_SEED);
+    u64 rng_seed = get_gvalue_u64(PENDING_PROP(self, PROP_RNG_SEED), DEFAULT_RNG_SEED);
     STDERR_DEBUG("rng seed %lu", rng_seed);
 
     net = rnn_new(n_features, hidden_size,
@@ -659,91 +652,9 @@ reset_channel_targets(GstClassify *self){
   }
 }
 
-static inline void
-free_pending_property(GstClassify *self, uint prop){
-  g_value_unset(self->pending_properties + prop);
-}
-
-static inline void
-set_pending_property(GstClassify *self, uint prop, const GValue *value)
-{
-  GValue *v = &self->pending_properties[prop];
-  if (G_IS_VALUE(v)){
-    g_value_reset(v);
-  }
-  else {
-    g_value_init(v, G_VALUE_TYPE(value));
-  }
-  g_value_copy(value, v);
-  gchar *s = g_strdup_value_contents(v);
-  GST_DEBUG("pending property %d is '%s'", prop, s);
-  free(s);
-}
-
-static inline const char *
-get_pending_property_string(GstClassify *self, const uint prop){
-  GValue *v = self->pending_properties + prop;
-  if (! G_VALUE_HOLDS_STRING(v)){
-    return NULL;
-  }
-  return g_value_get_string(v);
-}
-
-static inline gboolean
-get_pending_property_boolean(GstClassify *self, const uint prop,
-    const gboolean _default){
-  GValue *v = self->pending_properties + prop;
-  if (! G_VALUE_HOLDS_BOOLEAN(v)){
-    return _default;
-  }
-  return g_value_get_boolean(v);
-}
-
-static inline int
-get_pending_property_int(GstClassify *self, const uint prop,
-    const int _default){
-  GValue *v = self->pending_properties + prop;
-  if (! G_VALUE_HOLDS_INT(v)){
-    return _default;
-  }
-  GST_DEBUG("getting property %u, value %d", prop, g_value_get_int(v));
-  return g_value_get_int(v);
-}
-
-static inline u64
-get_pending_property_u64(GstClassify *self, const uint prop,
-    const u64 _default){
-  GValue *v = self->pending_properties + prop;
-  if (! G_VALUE_HOLDS_UINT64(v)){
-    return _default;
-  }
-  return g_value_get_uint64(v);
-}
-
-static inline float
-get_pending_property_float(GstClassify *self, const uint prop,
-    const float _default){
-  GValue *v = self->pending_properties + prop;
-  if (! G_VALUE_HOLDS_FLOAT(v)){
-    return _default;
-  }
-  return g_value_get_float(v);
-}
-
-static inline char *
-steal_pending_string_property(GstClassify *self, const uint prop){
-  GValue *v = self->pending_properties + prop;
-  if (! G_VALUE_HOLDS_STRING(v)){
-    return NULL;
-  }
-  char *s = g_value_dup_string(v);
-  g_value_unset(v);
-  return s;
-}
-
 static void
 maybe_parse_target_string(GstClassify *self){
-  char *target_string = steal_pending_string_property(self, PROP_TARGET);
+  char *target_string = steal_gvalue_string(PENDING_PROP(self, PROP_TARGET));
   char *s = target_string;
   if (s == NULL || self->channels == NULL){
     GST_DEBUG("not parsing target string (%p); channels is %p",
@@ -773,7 +684,7 @@ maybe_parse_target_string(GstClassify *self){
 static void
 maybe_parse_error_weight_string(GstClassify *self){
   char *orig, *e, *s;
-  e = orig = s = steal_pending_string_property(self, PROP_ERROR_WEIGHT);
+  e = orig = s = steal_gvalue_string(PENDING_PROP(self, PROP_ERROR_WEIGHT));
   int i;
   if (s == NULL || self->channels == NULL){
     GST_DEBUG("not parsing error_weight string:"
@@ -806,7 +717,7 @@ maybe_parse_error_weight_string(GstClassify *self){
 
 static void
 maybe_start_logging(GstClassify *self){
-  const char *s = get_pending_property_string(self, PROP_LOG_FILE);
+  const char *s = get_gvalue_string(PENDING_PROP(self, PROP_LOG_FILE));
   GST_DEBUG("pending log '%s'; subnets is %p", s, self->subnets);
   if (s && self->subnets){
     if (s[0] == 0){
@@ -815,7 +726,7 @@ maybe_start_logging(GstClassify *self){
     else {
       rnn_set_log_file(self->subnets[0], s, 1);
     }
-    free_pending_property(self, PROP_LOG_FILE);
+    g_value_unset(PENDING_PROP(self, PROP_LOG_FILE));
   }
 }
 
@@ -856,12 +767,12 @@ gst_classify_set_property (GObject * object, guint prop_id, const GValue * value
     const char *strvalue;
     switch (prop_id) {
     case PROP_TARGET:
-      set_pending_property(self, prop_id, value);
+      set_gvalue(PENDING_PROP(self, prop_id), value);
       maybe_parse_target_string(self);
       break;
 
     case PROP_ERROR_WEIGHT:
-      set_pending_property(self, prop_id, value);
+      set_gvalue(PENDING_PROP(self, prop_id), value);
       maybe_parse_error_weight_string(self);
       break;
 
@@ -889,7 +800,7 @@ gst_classify_set_property (GObject * object, guint prop_id, const GValue * value
 
     case PROP_LOG_FILE:
       /*defer setting the actual log file, in case the nets aren't ready yet*/
-      set_pending_property(self, prop_id, value);
+      set_gvalue(PENDING_PROP(self, prop_id), value);
       maybe_start_logging(self);
       break;
 
@@ -948,7 +859,7 @@ gst_classify_set_property (GObject * object, guint prop_id, const GValue * value
     case PROP_WEIGHT_FAN_IN_KURTOSIS:
     case PROP_RNG_SEED:
       if (self->net == NULL){
-        set_pending_property(self, prop_id, value);
+        set_gvalue(PENDING_PROP(self, prop_id), value);
       }
       else {
         GST_WARNING("it is TOO LATE to set %s.", pspec->name);
@@ -1042,7 +953,7 @@ gst_classify_get_property (GObject * object, guint prop_id, GValue * value,
         x = !! (self->net->flags & RNN_COND_USE_LAWN_MOWER);
       }
       else {
-        x = get_pending_property_boolean(self, PROP_LAWN_MOWER,
+        x = get_gvalue_boolean(PENDING_PROP(self, PROP_LAWN_MOWER),
             DEFAULT_PROP_LAWN_MOWER);
       }
       g_value_set_boolean(value, x);
