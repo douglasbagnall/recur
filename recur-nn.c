@@ -97,7 +97,7 @@ rnn_new(uint input_size, uint hidden_size, uint output_size, int flags,
   /* bptt */
   if (flags & RNN_NET_FLAG_OWN_BPTT){
     net->bptt = new_bptt(net, bptt_depth, learn_rate, momentum, batch_size,
-        flags);
+        !(flags & RNN_NET_FLAG_NO_MOMENTUMS));
     rnn_bptt_advance(net);
   }
   else {
