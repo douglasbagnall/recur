@@ -793,8 +793,8 @@ rnn_prepare_nesterov_momentum(RecurNN *net){
 /*with standard Nesterov momentum, the momentum has previously been scaled and
   added to the weights.*/
 static void
-apply_learning_with_nesterov_momentum(float *restrict momentums,
-    const float *restrict delta, float *restrict weights,
+apply_learning_with_nesterov_momentum(float *restrict weights,
+    const float *restrict delta, float *restrict momentums,
     int size, const float rate){
   ASSUME_ALIGNED(momentums);
   ASSUME_ALIGNED(delta);
@@ -873,8 +873,8 @@ void rnn_consolidate_many_nets(RecurNN **nets, int n, int momentum_style,
   }
   switch (momentum_style){
   case RNN_MOMENTUM_NESTEROV:
-    apply_learning_with_nesterov_momentum(bptt->ho_momentum, ho_gradient,
-        net->ho_weights, net->ho_size, bptt->learn_rate * bptt->ho_scale);
+    apply_learning_with_nesterov_momentum(net->ho_weights, ho_gradient,
+        bptt->ho_momentum, net->ho_size, bptt->learn_rate * bptt->ho_scale);
     break;
   default:
     apply_learning_with_momentum(net->ho_weights, ho_gradient, bptt->ho_momentum,
@@ -894,8 +894,8 @@ void rnn_consolidate_many_nets(RecurNN **nets, int n, int momentum_style,
 
   switch (momentum_style){
   case RNN_MOMENTUM_NESTEROV:
-    apply_learning_with_nesterov_momentum(bptt->ih_momentum, ih_gradient,
-        net->ih_weights, net->ih_size, bptt->learn_rate);
+    apply_learning_with_nesterov_momentum(net->ih_weights, ih_gradient,
+        bptt->ih_momentum, net->ih_size, bptt->learn_rate);
     break;
   default:
     apply_learning_with_momentum(net->ih_weights, ih_gradient, bptt->ih_momentum,
