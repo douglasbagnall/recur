@@ -15,7 +15,7 @@
 #define BIAS 1
 #define HIDDEN_SIZE 39
 #define INPUT_SIZE 2
-#define BPTT_BATCH_SIZE 1
+#define BATCH_SIZE 1
 
 #define MOMENTUM 0.95
 #define MOMENTUM_WEIGHT RNN_MOMENTUM_WEIGHT
@@ -44,11 +44,11 @@ net_error_bptt(RecurNN *net, float *error, int c, int next){
 }
 
 static float
-sgd_one(RecurNN *net, const int current, const int next){
+sgd_one(RecurNN *net, const int current, const int next, uint batch_size){
   RecurNNBPTT *bptt = net->bptt;
   rnn_bptt_advance(net);
   float sum = net_error_bptt(net, bptt->o_error, current, next);
-  rnn_bptt_calculate(net);
+  rnn_bptt_calculate(net, batch_size);
   return sum;
 }
 
@@ -83,7 +83,7 @@ epoch(RecurNN *net, const int len){
   for(i = 1; i < len; i++){
     current = next;
     next = FIZZBUZZ(i, FB1, FB2);
-    float error = sgd_one(net, current, next);
+    float error = sgd_one(net, current, next, BATCH_SIZE);
     net->bptt->learn_rate *= 0.999999;
     if ((i & 1023) == 0){
       int k = i >> 10;
@@ -129,8 +129,7 @@ main(void){
   feenableexcept(FE_DIVBYZERO | FE_INVALID | FE_OVERFLOW);
   RecurNN *net = rnn_new(INPUT_SIZE, HIDDEN_SIZE,
       INPUT_SIZE, BIAS ? RNN_NET_FLAG_STANDARD : RNN_NET_FLAG_NO_BIAS,
-      1, NET_LOG_FILE, BPTT_DEPTH, LEARN_RATE, MOMENTUM,
-      BPTT_BATCH_SIZE);
+      1, NET_LOG_FILE, BPTT_DEPTH, LEARN_RATE, MOMENTUM);
   rnn_randomise_weights_auto(net);
   START_TIMER(epoch);
   epoch(net, 5000000);

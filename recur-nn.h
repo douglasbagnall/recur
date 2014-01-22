@@ -153,7 +153,6 @@ struct _RecurNNBPTT {
   float ho_scale;
   float momentum;
   float momentum_weight;
-  int batch_size;
   float min_error_factor;
 };
 
@@ -161,7 +160,7 @@ struct _RecurNNBPTT {
 
 RecurNN * rnn_new(uint input_size, uint hidden_size, uint output_size,
     int flags, u64 rng_seed, const char *log_file, int depth, float learn_rate,
-    float momentum, int batch_size);
+    float momentum);
 
 RecurNN * rnn_clone(RecurNN *parent, int flags,
     u64 rng_seed, const char *log_file);
@@ -187,7 +186,7 @@ RecurNN* rnn_load_net(const char *filename);
 int rnn_save_net(RecurNN *net, const char *filename, int backup);
 
 void rnn_bptt_advance(RecurNN *net);
-void rnn_bptt_calculate(RecurNN *net);
+void rnn_bptt_calculate(RecurNN *net, uint batch_size);
 void rnn_apply_learning(RecurNN *net, int momentum_style,
     float momentum_soft_start, float *ih_gradient, float *ho_gradient);
 

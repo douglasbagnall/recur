@@ -2,16 +2,13 @@
 #include "recur-nn-helpers.h"
 
 static RecurNNBPTT *
-new_bptt(RecurNN *net, int depth, float learn_rate, float momentum,
-    int batch_size, int use_momentum){
+new_bptt(RecurNN *net, int depth, float learn_rate, float momentum, int use_momentum){
   RecurNNBPTT *bptt = calloc(sizeof(RecurNNBPTT), 1);
   MAYBE_DEBUG("allocated bptt %p", bptt);
   bptt->depth = depth;
   bptt->learn_rate = learn_rate;
   bptt->momentum = momentum;
   bptt->momentum_weight = RNN_MOMENTUM_WEIGHT;
-  batch_size = MAX(1, batch_size);
-  bptt->batch_size = batch_size;
   size_t vlen = net->i_size * 2 + net->h_size * 0 + net->o_size * 1;
   vlen += net->ih_size + net->ho_size;
   if (use_momentum){
@@ -49,7 +46,7 @@ new_bptt(RecurNN *net, int depth, float learn_rate, float momentum,
 RecurNN *
 rnn_new(uint input_size, uint hidden_size, uint output_size, int flags,
     u64 rng_seed, const char *log_file, int bptt_depth, float learn_rate,
-    float momentum, int batch_size){
+    float momentum){
   RecurNN *net = calloc(1, sizeof(RecurNN));
   int bias = !! (flags & RNN_NET_FLAG_BIAS);
   float *fm;
@@ -96,7 +93,7 @@ rnn_new(uint input_size, uint hidden_size, uint output_size, int flags,
   MAYBE_DEBUG("flags is %d including bptt %d", flags, flags & RNN_NET_FLAG_OWN_BPTT);
   /* bptt */
   if (flags & RNN_NET_FLAG_OWN_BPTT){
-    net->bptt = new_bptt(net, bptt_depth, learn_rate, momentum, batch_size,
+    net->bptt = new_bptt(net, bptt_depth, learn_rate, momentum,
         !(flags & RNN_NET_FLAG_NO_MOMENTUMS));
     rnn_bptt_advance(net);
   }
@@ -178,7 +175,6 @@ rnn_clone(RecurNN *parent, int flags,
   float learn_rate;
   int bptt_depth;
   float momentum;
-  int batch_size;
 
   /*XXXX It would be nice to have a half bptt state -- with shared momentum
     but separate deltas, history */
@@ -186,18 +182,15 @@ rnn_clone(RecurNN *parent, int flags,
     learn_rate = parent->bptt->learn_rate;
     bptt_depth = parent->bptt->depth;
     momentum = parent->bptt->momentum;
-    batch_size = parent->bptt->batch_size;
   }
   else { /*doesn't matter what these are */
     learn_rate = 0;
     bptt_depth = 0;
     momentum = 0;
-    batch_size = 0;
   }
 
   net = rnn_new(parent->input_size, parent->hidden_size, parent->output_size,
-      flags, rng_seed, log_file, bptt_depth, learn_rate, momentum,
-      batch_size);
+      flags, rng_seed, log_file, bptt_depth, learn_rate, momentum);
 
   if (parent->bptt && (flags & RNN_NET_FLAG_OWN_BPTT)){
     net->bptt->momentum_weight = parent->bptt->momentum_weight;

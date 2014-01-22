@@ -776,7 +776,7 @@ apply_sgd_with_bptt(RecurNN *net, float top_error_sum){
 }
 
 static inline float
-apply_sgd_with_bptt_batch(RecurNN *net, float top_error_sum){
+apply_sgd_with_bptt_batch(RecurNN *net, float top_error_sum, uint batch_size){
   RecurNNBPTT *bptt = net->bptt;
   float rate = bptt->learn_rate;
   float *gradient = zalloc_aligned_or_die(net->ih_size * sizeof(float));
@@ -786,7 +786,7 @@ apply_sgd_with_bptt_batch(RecurNN *net, float top_error_sum){
 
   free(gradient);
 
-  if ((net->generation % bptt->batch_size) == 0){
+  if ((net->generation % batch_size) == 0){
     apply_learning_with_momentum(net->ih_weights, bptt->ih_delta, bptt->ih_momentum,
         net->ih_size, rate, bptt->momentum, bptt->momentum_weight);
     zero_aligned_array(bptt->ih_delta, net->ih_size);
@@ -795,14 +795,14 @@ apply_sgd_with_bptt_batch(RecurNN *net, float top_error_sum){
 }
 
 void
-rnn_bptt_calculate(RecurNN *net){
+rnn_bptt_calculate(RecurNN *net, uint batch_size){
   float bptt_error_sum;
   float top_error_sum = apply_sgd_top_layer(net);
   float top_error_scaled = softclip_scale(top_error_sum,
       net->h_size * MAX_TOP_ERROR_FACTOR, net->bptt->h_error, net->h_size);
 
-  if (net->bptt->batch_size > 1)
-    bptt_error_sum = apply_sgd_with_bptt_batch(net, top_error_scaled);
+  if (batch_size > 1)
+    bptt_error_sum = apply_sgd_with_bptt_batch(net, top_error_scaled, batch_size);
   else
     bptt_error_sum = apply_sgd_with_bptt(net, top_error_scaled);
   net->generation++;

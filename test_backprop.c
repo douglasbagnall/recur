@@ -33,7 +33,7 @@
 #define DEFAULT_BIAS 1
 #define DEFAULT_RNG_SEED 1
 #define DEFAULT_STOP 0
-#define DEFAULT_BPTT_BATCH_SIZE 1
+#define DEFAULT_BATCH_SIZE 1
 #define DEFAULT_VALIDATE_CHARS 0
 #define DEFAULT_VALIDATION_OVERLAP 1
 #define DEFAULT_DROPOUT 0
@@ -93,7 +93,7 @@ static int opt_validation_overlap = DEFAULT_VALIDATION_OVERLAP;
 static int opt_start_char = DEFAULT_START_CHAR;
 static bool opt_override = DEFAULT_OVERRIDE;
 static bool opt_bptt_adaptive_min = DEFAULT_BPTT_ADAPTIVE_MIN;
-static uint opt_bptt_batch_size = DEFAULT_BPTT_BATCH_SIZE;
+static uint opt_batch_size = DEFAULT_BATCH_SIZE;
 static uint opt_dense_weights = DEFAULT_DENSE_WEIGHTS;
 static float opt_perforate_weights = DEFAULT_PERFORATE_WEIGHTS;
 static bool opt_temporal_pgm_dump = DEFAULT_TEMPORAL_PGM_DUMP;
@@ -138,8 +138,8 @@ static struct opt_table options[] = {
       &opt_rng_seed, "RNG seed (-1 for auto)"),
   OPT_WITH_ARG("-s|--stop-after=<n>", opt_set_intval_bi, opt_show_intval_bi,
       &opt_stop, "Stop at generation n (0: no stop, negative means relative)"),
-  OPT_WITH_ARG("--bptt-batch-size=<n>", opt_set_uintval_bi, opt_show_uintval_bi,
-      &opt_bptt_batch_size, "bptt minibatch size"),
+  OPT_WITH_ARG("--batch-size=<n>", opt_set_uintval_bi, opt_show_uintval_bi,
+      &opt_batch_size, "bptt minibatch size"),
   OPT_WITH_ARG("--dense-weights=<n>", opt_set_uintval_bi, opt_show_uintval_bi,
       &opt_dense_weights, "no initial zero weights; > 1 for many near zero"),
   OPT_WITH_ARG("--perforate-weights=<0-1>", opt_set_floatval, opt_show_floatval,
@@ -373,11 +373,11 @@ net_error_bptt(RecurNN *net, float *restrict error, int c, int next, int *correc
 
 static void
 sgd_one(RecurNN *net, int current, int next,
-    float *error, int *correct){
+    float *error, int *correct, uint batch_size){
   RecurNNBPTT *bptt = net->bptt;
   rnn_bptt_advance(net);
   *error = net_error_bptt(net, bptt->o_error, current, next, correct);
-  rnn_bptt_calculate(net);
+  rnn_bptt_calculate(net, batch_size);
 }
 
 
@@ -654,7 +654,7 @@ epoch(RecurNN **nets, int n_nets, RecurNN *confab_net, Ventropy *v,
           ih_gradient, ho_gradient);
     }
     else {
-      sgd_one(net, text[i], text[i + 1], &e, &c);
+      sgd_one(net, text[i], text[i + 1], &e, &c, opt_batch_size);
       correct += c;
       error += e;
       entropy += capped_log2f(1.0f - e);
@@ -706,9 +706,9 @@ construct_net_filename(void){
   for (uint i = 0; i < len; i++){
     sig ^= ROTATE(sig - s[i], 13) + s[i];
   }
-  snprintf(s, sizeof(s), "text-s%0x-i%d-h%d-o%d-b%d-B%d-c%d.net",
+  snprintf(s, sizeof(s), "text-s%0x-i%d-h%d-o%d-b%d-c%d.net",
       sig, input_size, opt_hidden_size, output_size,
-      opt_bias, opt_bptt_batch_size, opt_learn_capitals);
+      opt_bias, opt_learn_capitals);
   DEBUG("filename: %s", s);
   return strdup(s);
 }
@@ -739,7 +739,7 @@ load_or_create_net(void){
     net = rnn_new(input_size, opt_hidden_size,
         output_size, flags, 1,
         opt_logfile, opt_bptt_depth, opt_learn_rate,
-        opt_momentum, opt_bptt_batch_size);
+        opt_momentum);
     if (opt_dense_weights){
       rnn_randomise_weights(net, RNN_INITIAL_WEIGHT_VARIANCE_FACTOR / net->h_size,
           opt_dense_weights, opt_perforate_weights);
