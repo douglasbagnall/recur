@@ -530,64 +530,6 @@ backprop_top_layer(RecurNN *net)
   return error_sum;
 }
 
-/*apply_sgd_top_layer backpropagates error, calculates updates via gradient
-  descent, and alters the weights accordingly.
-
-It is more efficient than calc_sgd_top_layer (with subsequent weight
-adjustment) when the top layer synchronic batch size is one.
-*/
-
-static float
-apply_sgd_top_layer(RecurNN *net){
-  //cblas_ger
-  RecurNNBPTT *bptt = net->bptt;
-  const float *restrict o_error = bptt->o_error;
-  float *restrict hiddens = net->hidden_layer;
-  float *restrict weights = net->ho_weights;
-  float *restrict momentums = bptt->ho_momentum;
-  float rate = bptt->learn_rate;
-  float momentum = bptt->momentum;
-  float momentum_weight = bptt->momentum_weight;
-  float error_sum;
-  ASSUME_ALIGNED(hiddens);
-  ASSUME_ALIGNED(o_error);
-  ASSUME_ALIGNED(weights);
-  ASSUME_ALIGNED(momentums);
-
-  int y, x;
-
-  if (net->bias){
-    hiddens[0] = 1.0f;
-  }
-
-  error_sum = backprop_top_layer(net);
-
-  for (y = 0; y < net->h_size; y++){
-    float *restrict momentum_row = momentums + y * net->o_size;
-    float *restrict row = weights + y * net->o_size;
-    ASSUME_ALIGNED(row);
-    ASSUME_ALIGNED(momentum_row);
-
-    if (hiddens[y]){
-      float m = hiddens[y] * rate;
-      for (x = 0; x < net->o_size; x++){
-        float d = o_error[x] * m;
-        float mm = momentum_row[x];
-        row[x] += d + mm * momentum_weight;
-        mm += d;
-        momentum_row[x] = mm * momentum;
-      }
-    }
-    else {
-      for (x = 0; x < net->o_size; x++){
-        float mm = momentum_row[x];
-        row[x] += mm * momentum_weight;
-        momentum_row[x] = mm * momentum;
-      }
-    }
-  }
-  return error_sum;
-}
 
 /*calc_sgd_top_layer backpropagates error, and calculates weight updates via
   gradient descent, which get put in the net->bptt->ho_delta array.
@@ -807,37 +749,6 @@ apply_learning_with_nesterov_momentum(float *restrict weights,
 }
 
 
-static inline float
-apply_sgd_with_bptt(RecurNN *net, float top_error_sum){
-  RecurNNBPTT *bptt = net->bptt;
-  zero_aligned_array(bptt->ih_delta, net->ih_size);
-  float error_sum = bptt_and_accumulate_error(net, bptt->ih_delta, top_error_sum);
-  float rate = bptt->learn_rate * bptt->ih_scale;
-
-  apply_learning_with_momentum(net->ih_weights, bptt->ih_delta, bptt->ih_momentum,
-      net->ih_size, rate, bptt->momentum, bptt->momentum_weight);
-  return error_sum;
-}
-
-static inline float
-apply_sgd_with_bptt_batch(RecurNN *net, float top_error_sum){
-  RecurNNBPTT *bptt = net->bptt;
-  float rate = bptt->learn_rate;
-  float *gradient = zalloc_aligned_or_die(net->ih_size * sizeof(float));
-  float error_sum = bptt_and_accumulate_error(net, gradient, top_error_sum);
-
-  add_aligned_arrays(bptt->ih_delta, net->ih_size, gradient, bptt->ih_scale);
-
-  free(gradient);
-
-  if ((net->generation % bptt->batch_size) == 0){
-    apply_learning_with_momentum(net->ih_weights, bptt->ih_delta, bptt->ih_momentum,
-        net->ih_size, rate, bptt->momentum, bptt->momentum_weight);
-    zero_aligned_array(bptt->ih_delta, net->ih_size);
-  }
-  return error_sum;
-}
-
 void
 rnn_apply_learning(RecurNN *net, int momentum_style,
     float momentum_soft_start, float *ih_gradient, float *ho_gradient){
@@ -990,27 +901,6 @@ rnn_bptt_calc_deltas(RecurNN *net, float *ih_accumulator, float *ho_accumulator)
   }
 }
 
-void
-rnn_bptt_calculate(RecurNN *net){
-  float bptt_error_sum;
-  float top_error_sum = apply_sgd_top_layer(net);
-  float top_error_scaled = softclip_scale(top_error_sum,
-      net->h_size * MAX_TOP_ERROR_FACTOR, net->bptt->h_error, net->h_size);
-
-  if (net->bptt->batch_size > 1)
-    bptt_error_sum = apply_sgd_with_bptt_batch(net, top_error_scaled);
-  else
-    bptt_error_sum = apply_sgd_with_bptt(net, top_error_scaled);
-  net->generation++;
-  if (net->log){
-    rnn_log_float(net, "top_error_scaled", top_error_scaled);
-    rnn_log_float(net, "top_error_raw", top_error_sum);
-    rnn_log_float(net, "error_sum", bptt_error_sum);
-    rnn_log_float(net, "error_gain", bptt_error_sum / (top_error_scaled + 1e-6));
-    rnn_log_int(net, "generation", net->generation);
-  }
-  rnn_condition_net(net);
-}
 
 /*rnn_condition_nets performs various periodic operations to keep the numbers
   in good order (not too big, not too small). The different operations occur
@@ -1189,4 +1079,122 @@ rnn_scale_initial_weights(RecurNN *net, float factor){
   DEBUG("ho sum was %.1f, now %.1f; ratio %.2g",
       ho_sum, abs_sum_aligned_array(net->ho_weights, net->ho_size),
       ho_ratio);
+}
+
+
+/************************************************************************/
+/*Simplified and optimised pathways for the case of a single net, possibly
+  using diachronic batching.
+ */
+
+/*apply_sgd_top_layer backpropagates error, calculates updates via gradient
+  descent, and alters the weights accordingly.
+
+It is more efficient than calc_sgd_top_layer (with subsequent weight
+adjustment) when the top layer synchronic batch size is one.
+*/
+
+static float
+apply_sgd_top_layer(RecurNN *net){
+  //cblas_ger
+  RecurNNBPTT *bptt = net->bptt;
+  const float *restrict o_error = bptt->o_error;
+  float *restrict hiddens = net->hidden_layer;
+  float *restrict weights = net->ho_weights;
+  float *restrict momentums = bptt->ho_momentum;
+  float rate = bptt->learn_rate;
+  float momentum = bptt->momentum;
+  float momentum_weight = bptt->momentum_weight;
+  float error_sum;
+  ASSUME_ALIGNED(hiddens);
+  ASSUME_ALIGNED(o_error);
+  ASSUME_ALIGNED(weights);
+  ASSUME_ALIGNED(momentums);
+
+  int y, x;
+
+  if (net->bias){
+    hiddens[0] = 1.0f;
+  }
+
+  error_sum = backprop_top_layer(net);
+
+  for (y = 0; y < net->h_size; y++){
+    float *restrict momentum_row = momentums + y * net->o_size;
+    float *restrict row = weights + y * net->o_size;
+    ASSUME_ALIGNED(row);
+    ASSUME_ALIGNED(momentum_row);
+
+    if (hiddens[y]){
+      float m = hiddens[y] * rate;
+      for (x = 0; x < net->o_size; x++){
+        float d = o_error[x] * m;
+        float mm = momentum_row[x];
+        row[x] += d + mm * momentum_weight;
+        mm += d;
+        momentum_row[x] = mm * momentum;
+      }
+    }
+    else {
+      for (x = 0; x < net->o_size; x++){
+        float mm = momentum_row[x];
+        row[x] += mm * momentum_weight;
+        momentum_row[x] = mm * momentum;
+      }
+    }
+  }
+  return error_sum;
+}
+
+static inline float
+apply_sgd_with_bptt(RecurNN *net, float top_error_sum){
+  RecurNNBPTT *bptt = net->bptt;
+  zero_aligned_array(bptt->ih_delta, net->ih_size);
+  float error_sum = bptt_and_accumulate_error(net, bptt->ih_delta, top_error_sum);
+  float rate = bptt->learn_rate * bptt->ih_scale;
+
+  apply_learning_with_momentum(net->ih_weights, bptt->ih_delta, bptt->ih_momentum,
+      net->ih_size, rate, bptt->momentum, bptt->momentum_weight);
+  return error_sum;
+}
+
+static inline float
+apply_sgd_with_bptt_batch(RecurNN *net, float top_error_sum){
+  RecurNNBPTT *bptt = net->bptt;
+  float rate = bptt->learn_rate;
+  float *gradient = zalloc_aligned_or_die(net->ih_size * sizeof(float));
+  float error_sum = bptt_and_accumulate_error(net, gradient, top_error_sum);
+
+  add_aligned_arrays(bptt->ih_delta, net->ih_size, gradient, bptt->ih_scale);
+
+  free(gradient);
+
+  if ((net->generation % bptt->batch_size) == 0){
+    apply_learning_with_momentum(net->ih_weights, bptt->ih_delta, bptt->ih_momentum,
+        net->ih_size, rate, bptt->momentum, bptt->momentum_weight);
+    zero_aligned_array(bptt->ih_delta, net->ih_size);
+  }
+  return error_sum;
+}
+
+void
+rnn_bptt_calculate(RecurNN *net){
+  float bptt_error_sum;
+  float top_error_sum = apply_sgd_top_layer(net);
+  float top_error_scaled = softclip_scale(top_error_sum,
+      net->h_size * MAX_TOP_ERROR_FACTOR, net->bptt->h_error, net->h_size);
+
+  if (net->bptt->batch_size > 1)
+    bptt_error_sum = apply_sgd_with_bptt_batch(net, top_error_scaled);
+  else
+    bptt_error_sum = apply_sgd_with_bptt(net, top_error_scaled);
+  net->generation++;
+  if (net->log){
+    rnn_log_float(net, "top_error_scaled", top_error_scaled);
+    rnn_log_float(net, "top_error_raw", top_error_sum);
+    rnn_log_float(net, "error_sum", bptt_error_sum);
+    rnn_log_float(net, "error_gain", bptt_error_sum / (top_error_scaled + 1e-6));
+    rnn_log_int(net, "generation", net->generation);
+  }
+  rnn_condition_net(net);
 }
