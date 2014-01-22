@@ -97,7 +97,7 @@ NN_SPECIAL_FLAGS =  -fprefetch-loop-arrays
 recur-nn.o: recur-nn.c
 	$(CC)  -c -MMD $(ALL_CFLAGS) $(CPPFLAGS) $(NN_SPECIAL_FLAGS) -o $@ $<
 
-RNN_OBJECTS =  recur-nn.o recur-nn-io.o
+RNN_OBJECTS =  recur-nn.o recur-nn-io.o recur-nn-init.o
 
 RECUR_OBJECTS = gstrecur_manager.o gstrecur_audio.o gstrecur_video.o \
 	recur-context.o context-recurse.o
