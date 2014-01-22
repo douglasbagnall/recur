@@ -634,6 +634,7 @@ epoch(RecurNN **nets, int n_nets, RecurNN *confab_net, Ventropy *v,
         error += e;
         entropy += capped_log2f(1.0 - e);
       }
+      /* Not doing softstart here, because it happens above (XXX stupid)*/
       rnn_consolidate_many_nets(nets, n_nets, opt_momentum_style, 0);
     }
     else {
