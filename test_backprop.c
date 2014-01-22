@@ -620,8 +620,21 @@ epoch(RecurNN **nets, int n_nets, RecurNN *confab_net, Ventropy *v,
       if (opt_momentum_style == RNN_MOMENTUM_NESTEROV){
         rnn_prepare_nesterov_momentum(net);
       }
-      for (j = 0; j < n_nets; j++){
-        RecurNN *n = nets[j];
+      RecurNN *n = nets[0];
+      float *ih_gradient = n->bptt->ih_delta;
+      float *ho_gradient = n->bptt->ho_delta;
+      rnn_bptt_advance(n);
+      e = net_error_bptt(n, n->bptt->o_error,
+          text[i], text[i + 1], &c);
+      rnn_bptt_calc_deltas(n, NULL, NULL);
+      correct += c;
+      error += e;
+      entropy += capped_log2f(1.0 - e);
+      if (n->bptt->ih_scale != 1.0f){
+        scale_aligned_array(ih_gradient, n->ih_size, n->bptt->ih_scale);
+      }
+      for (j = 1; j < n_nets; j++){
+        n = nets[j];
         int offset = i + j * spacing;
         if (offset >= len - 1){
           offset -= len - 1;
@@ -629,13 +642,16 @@ epoch(RecurNN **nets, int n_nets, RecurNN *confab_net, Ventropy *v,
         rnn_bptt_advance(n);
         e = net_error_bptt(n, n->bptt->o_error,
             text[offset], text[offset + 1], &c);
-        rnn_bptt_calc_deltas(n);
+        rnn_bptt_calc_deltas(n, ih_gradient, ho_gradient);
         correct += c;
         error += e;
         entropy += capped_log2f(1.0 - e);
       }
       /* Not doing softstart here, because it happens above (XXX stupid)*/
-      rnn_consolidate_many_nets(nets, n_nets, opt_momentum_style, 0);
+      //rnn_consolidate_many_nets(nets, n_nets, 0,
+      //    opt_momentum_soft_start);
+      rnn_apply_learning(nets[0], opt_momentum_style, 0,
+          ih_gradient, ho_gradient);
     }
     else {
       sgd_one(net, text[i], text[i + 1], &e, &c);

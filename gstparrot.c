@@ -474,7 +474,7 @@ train_net(RecurNN *net, float *features, float *target){
     float a = answer[i];
     net->bptt->o_error[i] = (1 - a * a) * (target[i] - a);
   }
-  rnn_bptt_calc_deltas(net);
+  rnn_bptt_calc_deltas(net, NULL, NULL);
   return answer;
 }
 

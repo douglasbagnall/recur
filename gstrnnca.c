@@ -745,7 +745,7 @@ train_net(GstRnnca *self, RnncaTrainer *t, RnncaFrame *prev,  RnncaFrame *now){
     GST_LOG("target %.2g a %.2g diff %.2g slope %.2g",
         target, a, target - a, slope);
   }
-  rnn_bptt_calc_deltas(net);
+  rnn_bptt_calc_deltas(net, NULL, NULL);
 }
 
 static inline void

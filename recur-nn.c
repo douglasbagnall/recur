@@ -838,6 +838,51 @@ apply_sgd_with_bptt_batch(RecurNN *net, float top_error_sum){
   return error_sum;
 }
 
+void
+rnn_apply_learning(RecurNN *net, int momentum_style,
+    float momentum_soft_start, float *ih_gradient, float *ho_gradient){
+  RecurNNBPTT *bptt = net->bptt;
+
+  float momentum = bptt->momentum;
+  if (momentum_soft_start){
+    /*XXX keeps doing the calculation long after soft_start is over. */
+    float x = momentum_soft_start;
+    momentum = MIN(momentum, 1.0f - x / (1 + net->generation + 2 * x));
+  }
+  float momentum_weight;
+
+  switch (momentum_style){
+  case RNN_MOMENTUM_SIMPLIFIED_NESTEROV:
+    momentum_weight = momentum / (1.0 + momentum);
+    break;
+  case RNN_MOMENTUM_CLASSICAL:
+    momentum_weight = 1.0f;
+    break;
+  default:
+    momentum_weight = bptt->momentum_weight;
+    break;
+  }
+
+  switch (momentum_style){
+  case RNN_MOMENTUM_NESTEROV:
+    apply_learning_with_nesterov_momentum(net->ho_weights, ho_gradient,
+        bptt->ho_momentum, net->ho_size, bptt->learn_rate * bptt->ho_scale);
+    apply_learning_with_nesterov_momentum(net->ih_weights, ih_gradient,
+        bptt->ih_momentum, net->ih_size, bptt->learn_rate);
+    break;
+  default:
+    apply_learning_with_momentum(net->ho_weights, ho_gradient, bptt->ho_momentum,
+        net->ho_size, bptt->learn_rate * bptt->ho_scale,
+        momentum, momentum_weight);
+    apply_learning_with_momentum(net->ih_weights, ih_gradient, bptt->ih_momentum,
+        net->ih_size, bptt->learn_rate, momentum, momentum_weight);
+    break;
+  }
+  rnn_log_float(net, "momentum", momentum);
+  rnn_log_float(net, "momentum_weight", momentum_weight);
+}
+
+
 void rnn_consolidate_many_nets(RecurNN **nets, int n, int momentum_style,
     float momentum_soft_start){
   RecurNN *net = nets[0];
@@ -918,14 +963,24 @@ rnn_bptt_advance(RecurNN *net){
 }
 
 void
-rnn_bptt_calc_deltas(RecurNN *net){
+rnn_bptt_calc_deltas(RecurNN *net, float *ih_accumulator, float *ho_accumulator){
+  RecurNNBPTT *bptt = net->bptt;
   float top_error_sum = calc_sgd_top_layer(net);
   float top_error_scaled = softclip_scale(top_error_sum,
-      net->h_size * MAX_TOP_ERROR_FACTOR, net->bptt->h_error, net->h_size);
+      net->h_size * MAX_TOP_ERROR_FACTOR, bptt->h_error, net->h_size);
 
-  zero_aligned_array(net->bptt->ih_delta, net->ih_size);
+  if (ho_accumulator){
+    add_aligned_arrays(ho_accumulator, net->ho_size, bptt->ho_delta, 1.0f);
+  }
+
+  zero_aligned_array(bptt->ih_delta, net->ih_size);
   float bptt_error_sum = bptt_and_accumulate_error(net,
-      net->bptt->ih_delta, top_error_scaled);
+      bptt->ih_delta, top_error_scaled);
+
+  if (ih_accumulator){
+    add_aligned_arrays(ih_accumulator, net->ih_size, bptt->ih_delta,
+        bptt->ih_scale);
+  }
   net->generation++;
   if (net->log){
     rnn_log_float(net, "error_gain", bptt_error_sum / (top_error_scaled + 1e-6));

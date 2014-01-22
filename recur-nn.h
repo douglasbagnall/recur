@@ -188,6 +188,8 @@ int rnn_save_net(RecurNN *net, const char *filename, int backup);
 
 void rnn_bptt_advance(RecurNN *net);
 void rnn_bptt_calculate(RecurNN *net);
+void rnn_apply_learning(RecurNN *net, int momentum_style,
+    float momentum_soft_start, float *ih_gradient, float *ho_gradient);
 
 void rnn_consolidate_many_nets(RecurNN **nets, int n, int nesterov,
     float momentum_soft_start);
@@ -195,7 +197,8 @@ void rnn_consolidate_many_nets(RecurNN **nets, int n, int nesterov,
 void
 rnn_prepare_nesterov_momentum(RecurNN *net);
 
-void rnn_bptt_calc_deltas(RecurNN *net);
+void rnn_bptt_calc_deltas(RecurNN *net, float *ih_accumulator, float *ho_accumulator);
+
 
 void rnn_condition_net(RecurNN *net);
 void rnn_log_net(RecurNN *net);
