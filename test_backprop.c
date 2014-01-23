@@ -621,21 +621,12 @@ epoch(RecurNN **nets, int n_nets, RecurNN *confab_net, Ventropy *v,
         rnn_prepare_nesterov_momentum(net);
       }
       RecurNN *n = nets[0];
-      float *ih_gradient = n->bptt->ih_delta;
-      float *ho_gradient = n->bptt->ho_delta;
-      float *ih_delta = nets[1]->bptt->ih_delta;
-      float *ho_delta = nets[1]->bptt->ho_delta;
-      rnn_bptt_advance(n);
-      e = net_error_bptt(n, n->bptt->o_error,
-          text[i], text[i + 1], &c);
-      rnn_bptt_calc_deltas(n, ih_gradient, ho_gradient, NULL, NULL);
-      correct += c;
-      error += e;
-      entropy += capped_log2f(1.0 - e);
-      if (n->bptt->ih_scale != 1.0f){
-        scale_aligned_array(ih_gradient, n->ih_size, n->bptt->ih_scale);
-      }
-      for (j = 1; j < n_nets; j++){
+      float *ih_delta = n->bptt->ih_delta;
+      float *ho_delta = n->bptt->ho_delta;
+      float *ih_accumulator = n->bptt->ih_accumulator;
+      float *ho_accumulator = n->bptt->ho_accumulator;
+
+      for (j = 0; j < n_nets; j++){
         n = nets[j];
         int offset = i + j * spacing;
         if (offset >= len - 1){
@@ -644,17 +635,24 @@ epoch(RecurNN **nets, int n_nets, RecurNN *confab_net, Ventropy *v,
         rnn_bptt_advance(n);
         e = net_error_bptt(n, n->bptt->o_error,
             text[offset], text[offset + 1], &c);
-        rnn_bptt_calc_deltas(n, ih_delta, ho_delta,
-            ih_gradient, ho_gradient);
         correct += c;
         error += e;
         entropy += capped_log2f(1.0 - e);
+
+        if (j == 0){
+          rnn_bptt_calc_deltas(n, ih_accumulator, ho_accumulator, NULL, NULL);
+          if (n->bptt->ih_scale != 1.0f){
+            scale_aligned_array(ih_accumulator, n->ih_size, n->bptt->ih_scale);
+          }
+        }
+        else {
+          rnn_bptt_calc_deltas(n, ih_delta, ho_delta,
+              ih_accumulator, ho_accumulator);
+        }
       }
       /* Not doing softstart here, because it happens above (XXX stupid)*/
-      //rnn_consolidate_many_nets(nets, n_nets, 0,
-      //    opt_momentum_soft_start);
       rnn_apply_learning(nets[0], opt_momentum_style, 0,
-          ih_gradient, ho_gradient);
+          ih_accumulator, ho_accumulator);
     }
     else {
       sgd_one(net, text[i], text[i + 1], &e, &c, opt_batch_size);
@@ -772,6 +770,7 @@ load_or_create_net(void){
 
 int
 main(int argc, char *argv[]){
+  //feclearexcept(FE_ALL_EXCEPT);
   feenableexcept(FE_DIVBYZERO | FE_INVALID | FE_OVERFLOW);
   opt_register_table(options, NULL);
   if (!opt_parse(&argc, argv, opt_log_stderr)){
@@ -785,22 +784,19 @@ main(int argc, char *argv[]){
     opt_usage(argv[0], NULL);
   }
   opt_multi_tap = MAX(opt_multi_tap, 1);
-  RecurNN *nets[opt_multi_tap];
   RecurNN *net = load_or_create_net();
   if (opt_confab_only){
     long_confab(net, opt_confab_only, 1);
     exit(0);
   }
 
-  nets[0] = net;
+  RecurNN **nets;
 
   if (opt_multi_tap > 1){
-    for (uint i = 1; i < opt_multi_tap; i++){
-      nets[i] = rnn_clone(net,
-          (net->flags & ~RNN_NET_FLAG_OWN_WEIGHTS) | RNN_NET_FLAG_NO_MOMENTUMS,
-          RECUR_RNG_SUBSEED,
-          NULL);
-    }
+    nets = rnn_new_training_set(net, opt_multi_tap);
+  }
+  else{
+    nets = &net;
   }
 
   RecurNN *confab_net = rnn_clone(net,
@@ -876,6 +872,14 @@ main(int argc, char *argv[]){
   }
 
   free(text);
-  rnn_delete_net(net);
+  if (opt_multi_tap < 2){
+    rnn_delete_net(net);
+  }
+  else {
+    rnn_delete_training_set(nets, opt_multi_tap, 0);
+  }
+  rnn_delete_net(confab_net);
+  rnn_delete_net(validate_net);
+
   temporal_ppm_free(input_ppm);
 }
