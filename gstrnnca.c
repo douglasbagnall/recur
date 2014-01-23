@@ -114,6 +114,10 @@ gst_rnnca_finalize (GObject * obj){
   if (self->history){
     free(self->history);
   }
+  if (self->train_nets){
+    rnn_delete_training_set(self->train_nets, self->n_trainers, 0);
+  }
+  //XXX not clearing confab nets
 }
 
 static void
@@ -301,20 +305,16 @@ construct_trainers(GstRnnca *self, int n_requested)
 {
   int i, j;
   RecurNN *net = self->net;
-  u32 flags = self->net->flags & ~RNN_NET_FLAG_OWN_WEIGHTS;
   const int w = RNNCA_WIDTH;
   const int h = RNNCA_HEIGHT;
   u8* mask = zalloc_aligned_or_die(w * h);
   self->training_map = mask;
   self->trainers = malloc_aligned_or_die(n_requested * sizeof(RnncaTrainer));
-  self->train_nets = malloc_aligned_or_die(n_requested * sizeof(RecurNN*));
+  self->train_nets = rnn_new_training_set(net, n_requested);
   for (j = 0, i = 0; i < n_requested * 2; i++) {
     RnncaTrainer *t = &self->trainers[j];
     if(!randomly_place_trainer(t, &net->rng, mask)){
-      RecurNN *clone = rnn_clone(net, flags, RECUR_RNG_SUBSEED, NULL);
-      self->trainers[j].net = clone;
-      self->train_nets[j] = clone;
-      GST_LOG("net %d is %p", j, clone);
+      self->trainers[j].net = self->train_nets[j];
       j++;
       if (j == n_requested){
         goto done;
@@ -342,8 +342,7 @@ load_or_create_net(GstRnnca *self){
     int input_size = self->len_Y  + self->len_C * 2 + self->len_pos;
     net = rnn_new(input_size, self->hidden_size, 3,
         RNNCA_RNN_FLAGS, RNNCA_RNG_SEED,
-        NULL, RNNCA_BPTT_DEPTH, DEFAULT_LEARN_RATE, self->momentum,
-        RNNCA_BATCH_SIZE);
+        NULL, RNNCA_BPTT_DEPTH, DEFAULT_LEARN_RATE, self->momentum);
     rnn_randomise_weights_auto(net);
     //net->bptt->ho_scale = 0.25;
   }
@@ -358,10 +357,10 @@ static void
 maybe_start_logging(GstRnnca *self){
   if (self->pending_logfile && self->trainers){
     if (self->pending_logfile[0] == 0){
-      rnn_set_log_file(self->trainers[0].net, NULL, 0);
+      rnn_set_log_file(self->net, NULL, 0);
     }
     else {
-      rnn_set_log_file(self->trainers[0].net, self->pending_logfile, 1);
+      rnn_set_log_file(self->net, self->pending_logfile, 1);
     }
     free(self->pending_logfile);
     self->pending_logfile = NULL;
@@ -371,7 +370,7 @@ maybe_start_logging(GstRnnca *self){
 static void
 maybe_start_temporal_ppms(GstRnnca *self){
   if (self->temporal_ppms == NULL && RNNCA_DO_TEMPORAL_LOGGING){
-    RecurNN *net = self->train_nets[0];
+    RecurNN *net = self->net;
     TemporalPPM **p = malloc(8 * sizeof(TemporalPPM*));
     self->temporal_ppms = p;
     p[0] = temporal_ppm_alloc(net->i_size, 150, "inputs", 0,
@@ -515,11 +514,6 @@ maybe_set_learn_rate(GstRnnca *self){
     if (self->net){
       self->net->bptt->learn_rate = lr;
       self->pending_learn_rate = 0;
-      if (self->trainers){
-        for (int i = 0; i < self->n_trainers; i++){
-          self->trainers[i].net->bptt->learn_rate = lr;
-        }
-      }
     }
   }
 }
@@ -586,8 +580,8 @@ gst_rnnca_set_property (GObject * object, guint prop_id, const GValue * value,
 
     case PROP_MOMENTUM:
       self->momentum = g_value_get_float(value);
-      if (self->train_nets && self->train_nets[0]){
-        self->train_nets[0]->bptt->momentum = self->momentum;
+      if (self->net){
+        self->net->bptt->momentum = self->momentum;
       }
       break;
 
@@ -610,8 +604,8 @@ gst_rnnca_get_property (GObject * object, guint prop_id, GValue * value,
 
   switch (prop_id) {
   case PROP_LEARN_RATE:
-    if (self->train_nets){
-      g_value_set_float(value, self->train_nets[0]->bptt->learn_rate);
+    if (self->net){
+      g_value_set_float(value, self->net->bptt->learn_rate);
     }
     break;
   case PROP_DROPOUT:
@@ -745,18 +739,20 @@ train_net(GstRnnca *self, RnncaTrainer *t, RnncaFrame *prev,  RnncaFrame *now){
     GST_LOG("target %.2g a %.2g diff %.2g slope %.2g",
         target, a, target - a, slope);
   }
-  rnn_bptt_calc_deltas(net, net->bptt->ih_delta, net->bptt->ho_delta, NULL, NULL);
+  rnn_bptt_calc_deltas(net, net->bptt->ih_delta, net->bptt->ho_delta,
+      net->bptt->ih_accumulator, net->bptt->ho_accumulator);
 }
 
 static inline void
 maybe_learn(GstRnnca *self){
   int i;
-  RecurNN *net = self->train_nets[0];
+  RecurNN *net = self->net;
   for (i = 0; i < self->n_trainers; i++){
     train_net(self, &self->trainers[i], self->frame_prev, self->frame_now);
   }
-  rnn_consolidate_many_nets(self->train_nets, self->n_trainers, 0,
-      self->momentum_soft_start);
+  rnn_apply_learning(net, 0, self->momentum_soft_start,
+      net->bptt->ih_accumulator, net->bptt->ho_accumulator);
+
   if (PERIODIC_PGM_DUMP && (net->generation & PERIODIC_PGM_DUMP) == 0){
     rnn_multi_pgm_dump(net, "how ihw");
   }
@@ -766,7 +762,6 @@ maybe_learn(GstRnnca *self){
   }
 #endif
   rnn_log_net(net);
-  self->net->generation = net->generation;
   rnn_condition_net(net);
   if (PERIODIC_SAVE_NET && (self->net->generation & PERIODIC_SAVE_NET) == 0){
     rnn_save_net(self->net, self->net_filename, 1);

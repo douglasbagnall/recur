@@ -37,7 +37,6 @@ typedef s16 audio_sample;
 #define RECUR_N_HIDDEN 199
 #define RECUR_BIAS 1
 #define RECUR_BPTT_DEPTH 20
-#define RECUR_BATCH_SIZE 1
 #define RECUR_RNG_SEED -1
 
 #define NET_FILENAME "recur-" QUOTE(RECUR_N_HIDDEN) "-" QUOTE(RECUR_BIAS) ".net"
@@ -122,6 +121,7 @@ struct _RecurContext {
   GQueue audio_queue;
   RecurAudioBinner *audio_binner;
   RecurNN *net;
+  RecurNN **training_nets;
   RecurFrame *frame_queue;
   int current_frame;
   int video_lag;

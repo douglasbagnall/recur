@@ -2,35 +2,60 @@
 #include "recur-nn-helpers.h"
 
 static RecurNNBPTT *
-new_bptt(RecurNN *net, int depth, float learn_rate, float momentum, int use_momentum){
+new_bptt(RecurNN *net, int depth, float learn_rate, float momentum, u32 flags){
   RecurNNBPTT *bptt = calloc(sizeof(RecurNNBPTT), 1);
+  int own_momentums = ! (flags & RNN_NET_FLAG_NO_MOMENTUMS);
+  int own_deltas = ! (flags & RNN_NET_FLAG_NO_DELTAS);
+  int own_accumulators = ! (flags & RNN_NET_FLAG_OWN_ACCUMULATORS);
   MAYBE_DEBUG("allocated bptt %p", bptt);
   bptt->depth = depth;
   bptt->learn_rate = learn_rate;
   bptt->momentum = momentum;
   bptt->momentum_weight = RNN_MOMENTUM_WEIGHT;
   size_t vlen = net->i_size * 2 + net->h_size * 0 + net->o_size * 1;
-  vlen += net->ih_size + net->ho_size;
-  if (use_momentum){
+  if (own_deltas){
+    vlen += net->ih_size + net->ho_size + 32 * sizeof(float);
+  }
+  if (own_accumulators){
+    vlen += net->ih_size + net->ho_size + 64 * sizeof(float);
+  }
+  if (own_momentums){
     vlen += net->ih_size + net->ho_size;
   }
   vlen += depth * net->i_size;
 
   float *fm = zalloc_aligned_or_die(vlen * sizeof(float));
   bptt->mem = fm;
-  /*haphazard arrangement of arrays has a point, see comment in rnn_new*/
+  /*The haphazard arrangement of arrays is to avoid overly aligning the
+    matrices, which has negative effects due to cache associativity*/
 #define SET_ATTR_SIZE(attr, size) bptt->attr = fm; fm += (size);
   SET_ATTR_SIZE(o_error,           net->o_size);
-  if (use_momentum){
-    SET_ATTR_SIZE(ih_momentum,       net->ih_size);
-    SET_ATTR_SIZE(ho_momentum,       net->ho_size);
+  if (own_momentums){
+    SET_ATTR_SIZE(ih_momentum,     net->ih_size);
+    SET_ATTR_SIZE(ho_momentum,     net->ho_size);
   }
   /*h_error uses strictly larger i_size, facilitating switching between the 2*/
   SET_ATTR_SIZE(i_error,           net->i_size);
-  SET_ATTR_SIZE(history,           depth * net->i_size);
   SET_ATTR_SIZE(h_error,           net->i_size);
-  SET_ATTR_SIZE(ih_delta,          net->ih_size);
-  SET_ATTR_SIZE(ho_delta,          net->ho_size);
+  if (own_deltas){
+    /*just to be sure of cache-line misalignment */
+    if (((((size_t)fm ^ (size_t)bptt->ih_momentum) & 0x3ff)) == 0){
+      fm += 32;
+    }
+    SET_ATTR_SIZE(ih_delta,        net->ih_size);
+    SET_ATTR_SIZE(ho_delta,        net->ho_size);
+  }
+  SET_ATTR_SIZE(history,           depth * net->i_size);
+  if (own_accumulators){
+    /*just to be sure of cache-line misalignment */
+    while ((((size_t)fm ^ (size_t)bptt->ih_delta) & 0x3ff) == 0 ||
+        (((size_t)fm ^ (size_t)net->ih_weights) & 0x3ff) == 0){
+      fm += 32;
+    }
+    SET_ATTR_SIZE(ih_accumulator,  net->ih_size);
+    SET_ATTR_SIZE(ho_accumulator,  net->ho_size);
+  }
+
 #undef SET_ATTR_SIZE
   MAYBE_DEBUG("allocated %lu floats, used %lu", vlen, fm - bptt->mem);
 
@@ -44,7 +69,7 @@ new_bptt(RecurNN *net, int depth, float learn_rate, float momentum, int use_mome
 }
 
 RecurNN *
-rnn_new(uint input_size, uint hidden_size, uint output_size, int flags,
+rnn_new(uint input_size, uint hidden_size, uint output_size, u32 flags,
     u64 rng_seed, const char *log_file, int bptt_depth, float learn_rate,
     float momentum){
   RecurNN *net = calloc(1, sizeof(RecurNN));
@@ -93,8 +118,7 @@ rnn_new(uint input_size, uint hidden_size, uint output_size, int flags,
   MAYBE_DEBUG("flags is %d including bptt %d", flags, flags & RNN_NET_FLAG_OWN_BPTT);
   /* bptt */
   if (flags & RNN_NET_FLAG_OWN_BPTT){
-    net->bptt = new_bptt(net, bptt_depth, learn_rate, momentum,
-        !(flags & RNN_NET_FLAG_NO_MOMENTUMS));
+    net->bptt = new_bptt(net, bptt_depth, learn_rate, momentum, flags);
     rnn_bptt_advance(net);
   }
   else {
@@ -117,6 +141,52 @@ rnn_delete_net(RecurNN *net){
     fclose(net->log);
   free(net->mem);
   free(net);
+}
+
+RecurNN **
+rnn_new_training_set(RecurNN *prototype, int n_nets){
+  int i;
+  if (n_nets < 1){ //XXX or is (n_nets < 2) better?
+    DEBUG("A training set of size %u is not possible", n_nets);
+    return NULL;
+  }
+  if (! prototype->bptt->ih_accumulator ||
+      ! prototype->bptt->ho_accumulator){
+    DEBUG("The training set prototype lacks delta accumulators");
+    return NULL;
+  }
+
+  RecurNN **nets = malloc_aligned_or_die(n_nets * sizeof(RecurNN *));
+  nets[0] = prototype;
+  u32 flags = prototype->flags;
+
+  flags &= ~RNN_NET_FLAG_OWN_WEIGHTS;
+  flags &= ~RNN_NET_FLAG_OWN_ACCUMULATORS;
+  flags |= RNN_NET_FLAG_NO_MOMENTUMS;
+  flags |= RNN_NET_FLAG_NO_DELTAS;
+
+  for (i = 1; i < n_nets; i++){
+    nets[i] = rnn_clone(prototype, flags, RECUR_RNG_SUBSEED, NULL);
+    nets[i]->bptt->ih_delta = prototype->bptt->ih_delta;
+    nets[i]->bptt->ho_delta = prototype->bptt->ho_delta;
+    nets[i]->bptt->ih_accumulator = prototype->bptt->ih_accumulator;
+    nets[i]->bptt->ho_accumulator = prototype->bptt->ho_accumulator;
+  }
+  return nets;
+}
+
+void
+rnn_delete_training_set(RecurNN** nets, int n_nets, int leave_prototype)
+{
+  /*If leave_prototype is true, the initial net that was not created by
+    rnn_new_training_set() -- that is, nets[0] -- is not deleted.
+  */
+  int i = !! leave_prototype;
+  for (; i < n_nets; i++){
+    if (nets[i])
+      rnn_delete_net(nets[i]);
+  }
+  free(nets);
 }
 
 /*to start logging, use
@@ -158,7 +228,7 @@ rnn_set_log_file(RecurNN *net, const char *log_file, int append_dont_truncate){
  */
 
 RecurNN *
-rnn_clone(RecurNN *parent, int flags,
+rnn_clone(RecurNN *parent, u32 flags,
     u64 rng_seed, const char *log_file){
   RecurNN *net;
   if (parent->bias)
@@ -197,6 +267,10 @@ rnn_clone(RecurNN *parent, int flags,
     if (flags & RNN_NET_FLAG_NO_MOMENTUMS){
       net->bptt->ih_momentum = parent->bptt->ih_momentum;
       net->bptt->ho_momentum = parent->bptt->ho_momentum;
+    }
+    if (flags & RNN_NET_FLAG_NO_DELTAS){
+      net->bptt->ih_delta = parent->bptt->ih_delta;
+      net->bptt->ho_delta = parent->bptt->ho_delta;
     }
   }
   if (flags & RNN_NET_FLAG_OWN_WEIGHTS){

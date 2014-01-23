@@ -63,13 +63,12 @@ G_DEFINE_TYPE (GstParrot, gst_parrot, GST_TYPE_AUDIO_FILTER)
   " ] , layout = (string) interleaved"/*", channel-mask = (bitmask)0x0"*/
 
 static inline void
-init_channel(ParrotChannel *c, RecurNN *net, int id, float learn_rate)
+init_channel(ParrotChannel *c, RecurNN *train_net, int id, float learn_rate)
 {
-  u32 train_flags = net->flags & ~RNN_NET_FLAG_OWN_WEIGHTS;
-  u32 dream_flags = net->flags & ~(RNN_NET_FLAG_OWN_WEIGHTS | RNN_NET_FLAG_OWN_BPTT);
-  c->train_net = rnn_clone(net, train_flags, RECUR_RNG_SUBSEED, NULL);
-  c->dream_net = rnn_clone(net, dream_flags, RECUR_RNG_SUBSEED, NULL);
-  c->train_net->bptt->learn_rate = learn_rate;
+  u32 dream_flags = train_net->flags & ~(RNN_NET_FLAG_OWN_WEIGHTS | \
+      RNN_NET_FLAG_OWN_BPTT);
+  c->train_net = train_net;
+  c->dream_net = rnn_clone(train_net, dream_flags, RECUR_RNG_SUBSEED, NULL);
   c->pcm_now = zalloc_aligned_or_die(PARROT_WINDOW_SIZE * sizeof(float));
   c->pcm_prev = zalloc_aligned_or_die(PARROT_WINDOW_SIZE * sizeof(float));
   c->play_now = zalloc_aligned_or_die(PARROT_WINDOW_SIZE * sizeof(float));
@@ -100,7 +99,6 @@ init_channel(ParrotChannel *c, RecurNN *net, int id, float learn_rate)
 static inline void
 finalise_channel(ParrotChannel *c)
 {
-  rnn_delete_net(c->train_net);
   rnn_delete_net(c->dream_net);
   free(c->pcm_prev);
   free(c->pcm_now);
@@ -128,19 +126,20 @@ gst_parrot_finalize (GObject * obj){
   if (self->channels){
     for (int i = 0; i < self->n_channels; i++){
       finalise_channel(&self->channels[i]);
-      self->training_nets[i] = NULL;
     }
     free(self->channels);
     self->channels = NULL;
-    free(self->training_nets);
+    rnn_delete_training_set(self->training_nets, self->n_channels, 0);
   }
+  else if (self->net){
+    rnn_delete_net(self->net);
+  }
+  self->net = NULL;
+
   free(self->incoming_queue);
   free(self->outgoing_queue);
 
   mdct_clear(&self->mdct_lut);
-  if (self->net){
-    rnn_delete_net(self->net);
-  }
 }
 
 static void
@@ -265,8 +264,7 @@ load_or_create_net(GstParrot *self){
   if (net == NULL){
     net = rnn_new(PARROT_N_FEATURES, self->hidden_size,
         PARROT_N_FEATURES, PARROT_RNN_FLAGS, PARROT_RNG_SEED,
-        NULL, PARROT_BPTT_DEPTH, self->learn_rate, MOMENTUM,
-        PARROT_BATCH_SIZE);
+        NULL, PARROT_BPTT_DEPTH, self->learn_rate, MOMENTUM);
     rnn_randomise_weights_auto(net);
   }
   else {
@@ -307,12 +305,13 @@ gst_parrot_setup(GstAudioFilter *base, const GstAudioInfo *info){
   if (self->net == NULL){
     self->net = load_or_create_net(self);
   }
+  if (self->training_nets == NULL){
+    self->training_nets = rnn_new_training_set(self->net, self->n_channels);
+  }
   if (self->channels == NULL){
     self->channels = malloc_aligned_or_die(self->n_channels * sizeof(ParrotChannel));
-    self->training_nets = malloc_aligned_or_die(self->n_channels * sizeof(RecurNN *));
     for (int i = 0; i < self->n_channels; i++){
-      init_channel(&self->channels[i], self->net, i, self->learn_rate);
-      self->training_nets[i] = self->channels[i].train_net;
+      init_channel(&self->channels[i], self->training_nets[i], i, self->learn_rate);
     }
   }
   maybe_start_logging(self);
@@ -543,7 +542,8 @@ maybe_learn(GstParrot *self){
     if (PERIODIC_PGM_DUMP && net->generation % PERIODIC_PGM_DUMP == 0){
       rnn_multi_pgm_dump(net, "how ihw");
     }
-    rnn_consolidate_many_nets(self->training_nets, self->n_channels, 1, 0);
+    rnn_apply_learning(self->net, RNN_MOMENTUM_WEIGHTED, 0,
+        self->net->bptt->ih_accumulator, self->net->bptt->ho_accumulator);
     rnn_condition_net(self->net);
     self->net->generation = net->generation;
     possibly_save_net(self->net, self->net_filename);

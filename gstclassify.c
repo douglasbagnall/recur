@@ -136,9 +136,7 @@ G_DEFINE_TYPE (GstClassify, gst_classify, GST_TYPE_AUDIO_FILTER)
 static inline void
 init_channel(ClassifyChannel *c, RecurNN *net, int window_size, int id, float learn_rate)
 {
-  u32 flags = net->flags & ~RNN_NET_FLAG_OWN_WEIGHTS;
-  c->net = rnn_clone(net, flags, RECUR_RNG_SUBSEED, NULL);
-  c->net->bptt->learn_rate = learn_rate;
+  c->net = net;
   c->pcm_next = zalloc_aligned_or_die(window_size * sizeof(float));
   c->pcm_now = zalloc_aligned_or_die(window_size * sizeof(float));
   c->features = zalloc_aligned_or_die(net->input_size * sizeof(float));
@@ -159,8 +157,6 @@ init_channel(ClassifyChannel *c, RecurNN *net, int window_size, int id, float le
 static inline void
 finalise_channel(ClassifyChannel *c)
 {
-  if (c->net)
-    rnn_delete_net(c->net);
   free(c->pcm_next);
   free(c->pcm_now);
   free(c->features);
@@ -185,13 +181,21 @@ gst_classify_finalize (GObject * obj){
     }
     free(self->channels);
     self->channels = NULL;
-    free(self->subnets);
   }
-  free(self->incoming_queue);
+  if (self->subnets){
+    rnn_delete_training_set(self->subnets, self->n_channels, 1);
+    self->subnets = NULL;
+  }
   if (self->net){
     rnn_save_net(self->net, self->net_filename, 1);
     rnn_delete_net(self->net);
+    self->net = NULL;
   }
+  if (self->incoming_queue){
+    free(self->incoming_queue);
+    self->incoming_queue = NULL;
+  }
+
   for (int i = 0; i < PROP_LAST; i++){
     GValue *v = PENDING_PROP(self, i);
     if (G_IS_VALUE(v)){
@@ -469,8 +473,7 @@ load_or_create_net(GstClassify *self){
 
     net = rnn_new(n_features, hidden_size,
         self->n_classes, flags, rng_seed,
-        NULL, bptt_depth, self->learn_rate, momentum,
-        CLASSIFY_BATCH_SIZE);
+        NULL, bptt_depth, self->learn_rate, momentum);
     if (fan_in_sum){
       rnn_randomise_weights_fan_in(net, fan_in_sum, fan_in_kurtosis, 0.1f, 0);
     }
@@ -520,11 +523,10 @@ gst_classify_setup(GstAudioFilter *base, const GstAudioInfo *info){
     if (self->subnets){
       free(self->subnets);
     }
-    self->subnets = malloc_aligned_or_die(self->n_channels * sizeof(RecurNN *));
+    self->subnets = rnn_new_training_set(self->net, self->n_channels);
     for (int i = 0; i < self->n_channels; i++){
-      init_channel(&self->channels[i], self->net, self->window_size,
+      init_channel(&self->channels[i], self->subnets[i], self->window_size,
           i, self->learn_rate);
-      self->subnets[i] = self->channels[i].net;
     }
   }
   maybe_start_logging(self);
@@ -723,10 +725,10 @@ maybe_start_logging(GstClassify *self){
   GST_DEBUG("pending log '%s'; subnets is %p", s, self->subnets);
   if (s && self->subnets){
     if (s[0] == 0){
-      rnn_set_log_file(self->subnets[0], NULL, 0);
+      rnn_set_log_file(self->net, NULL, 0);
     }
     else {
-      rnn_set_log_file(self->subnets[0], s, 1);
+      rnn_set_log_file(self->net, s, 1);
     }
     g_value_unset(PENDING_PROP(self, PROP_LOG_FILE));
   }
@@ -833,10 +835,7 @@ gst_classify_set_property (GObject * object, guint prop_id, const GValue * value
     case PROP_LEARN_RATE:
       self->learn_rate = g_value_get_float(value);
       if (self->net){
-        float learn_rate = g_value_get_float(value);
-        for (int i = 0; i < self->n_channels; i++){
-          self->channels[i].net->bptt->learn_rate = learn_rate;
-        }
+        self->net->bptt->learn_rate = g_value_get_float(value);
       }
       break;
 
@@ -964,6 +963,7 @@ gst_classify_get_property (GObject * object, guint prop_id, GValue * value,
   }
 }
 
+/*XXX shared with parrot and possibly others */
 static inline void
 possibly_save_net(RecurNN *net, char *filename)
 {
@@ -1068,7 +1068,8 @@ train_channel(ClassifyChannel *c, float dropout, float *error_weights){
       net->bptt->o_error[i] *= error_weights[i];
     }
   }
-  rnn_bptt_calc_deltas(net, net->bptt->ih_delta, net->bptt->ho_delta, NULL, NULL);
+  rnn_bptt_calc_deltas(net, net->bptt->ih_delta, net->bptt->ho_delta,
+      net->bptt->ih_accumulator, net->bptt->ho_accumulator);
   rnn_bptt_advance(net);
   return net->bptt->o_error[c->current_target];
 }
@@ -1129,15 +1130,15 @@ maybe_learn(GstClassify *self){
       class_counts[c->current_target]++;
     }
 
-    RecurNN *net = self->subnets[0];
+    RecurNN *net = self->net;
     /*XXX periodic_pgm_dump and image string should be gst properties */
     if (PERIODIC_PGM_DUMP && net->generation % PERIODIC_PGM_DUMP == 0){
       rnn_multi_pgm_dump(net, "how ihw");
     }
-    rnn_consolidate_many_nets(self->subnets, self->n_channels, self->momentum_style,
-        self->momentum_soft_start);
-    rnn_condition_net(self->net);
-    possibly_save_net(self->net, self->net_filename);
+    rnn_apply_learning(net, self->momentum_style, self->momentum_soft_start,
+        net->bptt->ih_accumulator, net->bptt->ho_accumulator);
+    rnn_condition_net(net);
+    possibly_save_net(net, self->net_filename);
     rnn_log_net(net);
     if (self->log_class_numbers){
       for (i = 0; i < self->n_classes; i++){
@@ -1148,7 +1149,6 @@ maybe_learn(GstClassify *self){
     }
     rnn_log_float(net, "error", err_sum / self->n_channels);
     rnn_log_float(net, "correct", winners / self->n_channels);
-    self->net->generation = net->generation;
   }
 }
 

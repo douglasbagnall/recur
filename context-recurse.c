@@ -37,23 +37,23 @@ fill_mask(u8* mask, int stride, int xpos, int ypos, int w, int h, uint colour){
 }
 
 static void
-setup_trainers(RecurContext *context, const char *log_file){
+setup_trainers(RecurContext *context){
   /* just plonk trainers around randomly for now, using a mask to prevent
      overlaps */
-  RecurNN *net = context->net;
   int m_width = RECUR_WORKING_WIDTH;
   int m_height = RECUR_WORKING_HEIGHT;
-  u32 flags = net->flags & ~RNN_NET_FLAG_OWN_WEIGHTS;
   u8* mask = calloc(m_width * m_height, 1);
   int scale_max;
+  rand_ctx *rng = &context->net->rng;
+  context->training_nets = rnn_new_training_set(context->net, RECUR_N_TRAINERS);
   for (scale_max = 5; scale_max; scale_max--){
     for (int j = 0, i = 0; i < RECUR_N_TRAINERS * 10; i++) {
-      int scale = rand_small_int(&net->rng, scale_max) + 1;
+      int scale = rand_small_int(rng, scale_max) + 1;
       int h = scale * RECUR_OUTPUT_HEIGHT;
       int w = scale * RECUR_OUTPUT_WIDTH;
       int margin = 2 * scale;
-      int x = margin + rand_small_int(&net->rng, m_width - w - 2 * margin);
-      int y = margin + rand_small_int(&net->rng, m_height - h - 2 * margin);
+      int x = margin + rand_small_int(rng, m_width - w - 2 * margin);
+      int y = margin + rand_small_int(rng, m_height - h - 2 * margin);
       if (scan_mask(mask, m_width, x, y, w, h)){
         GST_LOG("x %d, y %d, w %d, h %d, scale %d, i %d, j %d",
             x, y, w, h, scale, i, j);
@@ -61,7 +61,7 @@ setup_trainers(RecurContext *context, const char *log_file){
         context->trainers[j].x = x;
         context->trainers[j].y = y;
         context->trainers[j].scale = scale;
-        context->trainers[j].net = rnn_clone(net, flags, RECUR_RNG_SUBSEED, NULL);
+        context->trainers[j].net = context->training_nets[j];
         j++;
         if (j == RECUR_N_TRAINERS){
           goto done;
@@ -74,7 +74,6 @@ setup_trainers(RecurContext *context, const char *log_file){
 
   GST_ERROR("Couldn't fit in training nets AT ALL!");/*XXX error handling*/
  done:
-  rnn_set_log_file(context->trainers[0].net, log_file, flags & RNN_NET_FLAG_LOG_APPEND);
   pgm_dump(mask, m_width, m_height, IMAGE_DIR "mask.pgm");
   free(mask);
 }
@@ -84,7 +83,7 @@ void
 recur_setup_nets(RecurContext *context, const char *log_file)
 {
   RecurNN *net = NULL;
-  u32 flags;
+  u32 flags = RNN_NET_FLAG_STANDARD | RNN_NET_FLAG_OWN_ACCUMULATORS;
 #if TRY_RELOAD
   net = rnn_load_net(NET_FILENAME);
   DEBUG("net is %p", net);
@@ -92,14 +91,12 @@ recur_setup_nets(RecurContext *context, const char *log_file)
 
   if (net == NULL){
     net = rnn_new(RECUR_N_MFCCS + RECUR_N_VIDEO_FEATURES,
-        RECUR_N_HIDDEN, RECUR_OUTPUT_SIZE, RNN_NET_FLAG_STANDARD, RECUR_RNG_SEED,
-        NULL, RECUR_BPTT_DEPTH, LEARN_RATE, MOMENTUM,
-        RECUR_BATCH_SIZE);
+        RECUR_N_HIDDEN, RECUR_OUTPUT_SIZE, flags, RECUR_RNG_SEED,
+        log_file, RECUR_BPTT_DEPTH, LEARN_RATE, MOMENTUM);
     rnn_randomise_weights_auto(net);
-    }
   }
   context->net = net;
-  setup_trainers(context, log_file);
+  setup_trainers(context);
 
   flags = net->flags & ~(RNN_NET_FLAG_OWN_WEIGHTS | RNN_NET_FLAG_OWN_BPTT);
   for (int i = 0; i < RECUR_N_CONSTRUCTORS; i++){
@@ -126,11 +123,8 @@ fill_video_nodes(float *dest, RecurFrame *frame, int w, int h,
 static void
 consolidate_and_apply_learning(RecurContext *context){
   /*XXX nets doesn't change, should be set at start up */
-  RecurNN *nets[RECUR_N_TRAINERS];
-  for (int j = 0; j < RECUR_N_TRAINERS; j++){
-    nets[j] = context->trainers[j].net;
-  }
-  rnn_consolidate_many_nets(nets, RECUR_N_TRAINERS, 0, 0);
+  rnn_apply_learning(context->net, RNN_MOMENTUM_WEIGHTED, 0,
+      context->net->bptt->ih_accumulator, context->net->bptt->ho_accumulator);
 }
 
 void

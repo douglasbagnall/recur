@@ -79,7 +79,9 @@ enum {
   RNN_NET_FLAG_LOG_HIDDEN_SUM = 16, /*log the hidden sum */
   RNN_NET_FLAG_LOG_WEIGHT_SUM = 32, /*log the weight sum (can be expensive)*/
   RNN_NET_FLAG_BPTT_ADAPTIVE_MIN_ERROR = 64, /*min error threshold auto-adjusts*/
-  RNN_NET_FLAG_NO_MOMENTUMS = 128, /*no momentum arrays are allocated (borrow parent's)*/
+  RNN_NET_FLAG_NO_MOMENTUMS = 128, /*allocate no momentum arrays (borrow parent's)*/
+  RNN_NET_FLAG_NO_DELTAS = 256, /* allocated no delta array (borrow parent's)*/
+  RNN_NET_FLAG_OWN_ACCUMULATORS = 512, /*allocate delta accumulators (if BPTT) */
 
   /*conditioning flags start at 1 << 16 (65536) */
   RNN_COND_USE_SCALE = (1 << (RNN_COND_BIT_SCALE + RNN_COND_USE_OFFSET)),
@@ -147,6 +149,8 @@ struct _RecurNNBPTT {
   float *history;
   float *ih_delta;
   float *ho_delta;
+  float *ih_accumulator;
+  float *ho_accumulator;
   float *mem;
   float learn_rate;
   float ih_scale;
@@ -159,10 +163,10 @@ struct _RecurNNBPTT {
 /* functions */
 
 RecurNN * rnn_new(uint input_size, uint hidden_size, uint output_size,
-    int flags, u64 rng_seed, const char *log_file, int depth, float learn_rate,
+    u32 flags, u64 rng_seed, const char *log_file, int depth, float learn_rate,
     float momentum);
 
-RecurNN * rnn_clone(RecurNN *parent, int flags,
+RecurNN * rnn_clone(RecurNN *parent, u32 flags,
     u64 rng_seed, const char *log_file);
 
 void rnn_set_log_file(RecurNN *net, const char * log_file, int append_dont_truncate);
@@ -176,6 +180,9 @@ void rnn_randomise_weights_fan_in(RecurNN *net, float sum, float kurtosis, float
 
 
 void rnn_delete_net(RecurNN *net);
+RecurNN ** rnn_new_training_set(RecurNN *prototype, int n_nets);
+void rnn_delete_training_set(RecurNN **nets, int n_nets, int leave_prototype);
+
 
 float *rnn_opinion(RecurNN *net, const float *inputs);
 float *rnn_opinion_with_dropout(RecurNN *net, const float *inputs, float dropout);
@@ -189,9 +196,6 @@ void rnn_bptt_advance(RecurNN *net);
 void rnn_bptt_calculate(RecurNN *net, uint batch_size);
 void rnn_apply_learning(RecurNN *net, int momentum_style,
     float momentum_soft_start, float *ih_gradient, float *ho_gradient);
-
-void rnn_consolidate_many_nets(RecurNN **nets, int n, int nesterov,
-    float momentum_soft_start);
 
 void
 rnn_prepare_nesterov_momentum(RecurNN *net);
