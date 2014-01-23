@@ -1068,7 +1068,7 @@ train_channel(ClassifyChannel *c, float dropout, float *error_weights){
       net->bptt->o_error[i] *= error_weights[i];
     }
   }
-  rnn_bptt_calc_deltas(net, NULL, NULL);
+  rnn_bptt_calc_deltas(net, net->bptt->ih_delta, net->bptt->ho_delta, NULL, NULL);
   rnn_bptt_advance(net);
   return net->bptt->o_error[c->current_target];
 }

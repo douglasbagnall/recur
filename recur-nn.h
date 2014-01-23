@@ -196,8 +196,8 @@ void rnn_consolidate_many_nets(RecurNN **nets, int n, int nesterov,
 void
 rnn_prepare_nesterov_momentum(RecurNN *net);
 
-void rnn_bptt_calc_deltas(RecurNN *net, float *ih_accumulator, float *ho_accumulator);
-
+void rnn_bptt_calc_deltas(RecurNN *net, float *ih_delta, float *ho_delta,
+    float *ih_accumulator, float *ho_accumulator);
 
 void rnn_condition_net(RecurNN *net);
 void rnn_log_net(RecurNN *net);

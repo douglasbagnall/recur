@@ -218,16 +218,15 @@ backprop_top_layer(RecurNN *net)
 
 
 /*calc_sgd_top_layer backpropagates error, and calculates weight updates via
-  gradient descent, which get put in the net->bptt->ho_delta array.
+  gradient descent, which get put in the delta array.
 */
 
 static float
-calc_sgd_top_layer(RecurNN *net){
+calc_sgd_top_layer(RecurNN *net, float *restrict delta){
   //cblas_ger
   RecurNNBPTT *bptt = net->bptt;
   const float *restrict o_error = bptt->o_error;
   float *restrict hiddens = net->hidden_layer;
-  float *restrict delta = bptt->ho_delta;
   float error_sum = 0;
   ASSUME_ALIGNED(hiddens);
   ASSUME_ALIGNED(o_error);
@@ -260,7 +259,8 @@ calc_sgd_top_layer(RecurNN *net){
 
 
 static float
-bptt_and_accumulate_error(RecurNN *net, float *ih_delta, const float top_error_sum)
+bptt_and_accumulate_error(RecurNN *net, float *restrict ih_delta,
+    const float top_error_sum)
 {
   RecurNNBPTT *bptt = net->bptt;
   int y, x;
@@ -560,22 +560,23 @@ rnn_bptt_advance(RecurNN *net){
 }
 
 void
-rnn_bptt_calc_deltas(RecurNN *net, float *ih_accumulator, float *ho_accumulator){
+rnn_bptt_calc_deltas(RecurNN *net, float *ih_delta, float *ho_delta,
+    float *ih_accumulator, float *ho_accumulator){
   RecurNNBPTT *bptt = net->bptt;
-  float top_error_sum = calc_sgd_top_layer(net);
+  float top_error_sum = calc_sgd_top_layer(net, ho_delta);
   float top_error_scaled = softclip_scale(top_error_sum,
       net->h_size * MAX_TOP_ERROR_FACTOR, bptt->h_error, net->h_size);
 
   if (ho_accumulator){
-    add_aligned_arrays(ho_accumulator, net->ho_size, bptt->ho_delta, 1.0f);
+    add_aligned_arrays(ho_accumulator, net->ho_size, ho_delta, 1.0f);
   }
 
-  zero_aligned_array(bptt->ih_delta, net->ih_size);
+  zero_aligned_array(ih_delta, net->ih_size);
   float bptt_error_sum = bptt_and_accumulate_error(net,
-      bptt->ih_delta, top_error_scaled);
+      ih_delta, top_error_scaled);
 
   if (ih_accumulator){
-    add_aligned_arrays(ih_accumulator, net->ih_size, bptt->ih_delta,
+    add_aligned_arrays(ih_accumulator, net->ih_size, ih_delta,
         bptt->ih_scale);
   }
   net->generation++;

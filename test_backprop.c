@@ -623,10 +623,12 @@ epoch(RecurNN **nets, int n_nets, RecurNN *confab_net, Ventropy *v,
       RecurNN *n = nets[0];
       float *ih_gradient = n->bptt->ih_delta;
       float *ho_gradient = n->bptt->ho_delta;
+      float *ih_delta = nets[1]->bptt->ih_delta;
+      float *ho_delta = nets[1]->bptt->ho_delta;
       rnn_bptt_advance(n);
       e = net_error_bptt(n, n->bptt->o_error,
           text[i], text[i + 1], &c);
-      rnn_bptt_calc_deltas(n, NULL, NULL);
+      rnn_bptt_calc_deltas(n, ih_gradient, ho_gradient, NULL, NULL);
       correct += c;
       error += e;
       entropy += capped_log2f(1.0 - e);
@@ -642,7 +644,8 @@ epoch(RecurNN **nets, int n_nets, RecurNN *confab_net, Ventropy *v,
         rnn_bptt_advance(n);
         e = net_error_bptt(n, n->bptt->o_error,
             text[offset], text[offset + 1], &c);
-        rnn_bptt_calc_deltas(n, ih_gradient, ho_gradient);
+        rnn_bptt_calc_deltas(n, ih_delta, ho_delta,
+            ih_gradient, ho_gradient);
         correct += c;
         error += e;
         entropy += capped_log2f(1.0 - e);
