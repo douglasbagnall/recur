@@ -98,7 +98,7 @@ recur_setup_nets(RecurContext *context, const char *log_file)
   context->net = net;
   setup_trainers(context);
 
-  flags = net->flags & ~(RNN_NET_FLAG_OWN_WEIGHTS | RNN_NET_FLAG_OWN_BPTT);
+  flags &= ~(RNN_NET_FLAG_OWN_WEIGHTS | RNN_NET_FLAG_OWN_BPTT);
   for (int i = 0; i < RECUR_N_CONSTRUCTORS; i++){
     context->constructors[i] = rnn_clone(net, flags, RECUR_RNG_SUBSEED, NULL);
   }
@@ -160,10 +160,8 @@ recur_train_nets(RecurContext *context, RecurFrame *src_frame,
   }
   consolidate_and_apply_learning(context);
 
-  /*keep main net up to date */
-  context->net->generation = context->trainers[0].net->generation;
   rnn_condition_net(context->net);
-  rnn_log_net(context->trainers[0].net);
+  rnn_log_net(context->net);
 }
 
 void
