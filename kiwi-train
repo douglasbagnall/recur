@@ -170,7 +170,7 @@ def main():
                         ('momentum-soft-start', 15000),
                         ('momentum', 0.95),
                         #('lawn-mower', 1),
-                        ('weight-sparsity', 2),
+                        ('weight-fan-in-sum', 2),
                         ('error-weight', '5:3'),
                         ))
 
