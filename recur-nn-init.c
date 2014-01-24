@@ -14,10 +14,10 @@ new_bptt(RecurNN *net, int depth, float learn_rate, float momentum, u32 flags){
   bptt->momentum_weight = RNN_MOMENTUM_WEIGHT;
   size_t vlen = net->i_size * 2 + net->h_size * 0 + net->o_size * 1;
   if (own_deltas){
-    vlen += net->ih_size + net->ho_size + 32 * sizeof(float);
+    vlen += net->ih_size + net->ho_size + 32;
   }
   if (own_accumulators){
-    vlen += net->ih_size + net->ho_size + 64 * sizeof(float);
+    vlen += net->ih_size + net->ho_size + 64;
   }
   if (own_momentums){
     vlen += net->ih_size + net->ho_size;
@@ -153,7 +153,18 @@ rnn_new_training_set(RecurNN *prototype, int n_nets){
   if (! prototype->bptt->ih_accumulator ||
       ! prototype->bptt->ho_accumulator){
     DEBUG("The training set prototype lacks delta accumulators");
-    return NULL;
+    DEBUG("Adding delta accumulators. This memory will not be reclaimed!");
+    DEBUG("Also adding the RNN_NET_FLAG_OWN_ACCUMULATORS flag,");
+    DEBUG("so everything should be right after the next save/load cycle");
+    size_t accum_size = (prototype->ih_size + prototype->ho_size + 64) * sizeof(float);
+    float *fm = malloc_aligned_or_die(accum_size);
+    while ((((size_t)fm ^ (size_t)prototype->bptt->ih_delta) & 0x3ff) == 0 ||
+        (((size_t)fm ^ (size_t)prototype->ih_weights) & 0x3ff) == 0){
+      fm += 32;
+    }
+    prototype->bptt->ih_accumulator = fm;
+    prototype->bptt->ho_accumulator = fm + prototype->ih_size;
+    prototype->flags |= RNN_NET_FLAG_OWN_ACCUMULATORS;
   }
 
   RecurNN **nets = malloc_aligned_or_die(n_nets * sizeof(RecurNN *));
