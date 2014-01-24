@@ -355,10 +355,13 @@ bptt_and_accumulate_error(RecurNN *net, float *restrict ih_delta,
     rnn_log_float(net, "min_error_factor", bptt->min_error_factor);
     if (net->flags & RNN_NET_FLAG_LOG_HIDDEN_SUM){
       float hidden_sum = 0;
+      int hidden_zeros = 0;
       for (int i = 0; i < net->h_size; i++){
         hidden_sum += net->hidden_layer[i];
+        hidden_zeros += !! net->hidden_layer[i];
       }
       rnn_log_float(net, "hidden_sum", hidden_sum);
+      rnn_log_float(net, "hidden_zeros", hidden_zeros / (float)net->hidden_size);
     }
     if (net->flags & RNN_NET_FLAG_LOG_WEIGHT_SUM){
       float weight_sum = abs_sum_aligned_array(weights, net->ih_size);
@@ -620,13 +623,6 @@ void rnn_log_net(RecurNN *net)
     rnn_log_float(net, "output_error", top_error);
     rnn_log_float(net, "hidden_error", hidden_error);
   }
-#if 0
-  float hidden_sum = 0;
-  for (i = 0; i < net->h_size; i++){
-    hidden_sum += net->hidden_layer[i];
-  }
-  rnn_log_float(net, "hidden_sum", hidden_sum);
-#endif
 }
 
 
