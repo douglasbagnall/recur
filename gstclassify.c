@@ -658,11 +658,14 @@ reset_channel_targets(GstClassify *self){
 
 static void
 maybe_parse_target_string(GstClassify *self){
+  if (self->channels == NULL){
+    GST_DEBUG("not parsing target string because channels is NULL");
+    return;
+  }
   char *target_string = steal_gvalue_string(PENDING_PROP(self, PROP_TARGET));
   char *s = target_string;
-  if (s == NULL || self->channels == NULL){
-    GST_DEBUG("not parsing target string (%p); channels is %p",
-        s, self->channels);
+  if (s == NULL){
+    GST_DEBUG("not parsing NULL target string");
     return;
   }
   GST_DEBUG("parsing target '%s'", s);
@@ -688,14 +691,16 @@ maybe_parse_target_string(GstClassify *self){
 static void
 maybe_parse_error_weight_string(GstClassify *self){
   char *orig, *e, *s;
-  e = orig = s = steal_gvalue_string(PENDING_PROP(self, PROP_ERROR_WEIGHT));
   int i;
-  if (s == NULL || self->channels == NULL){
-    GST_DEBUG("not parsing error_weight string:"
-        "either it (%p) or channels (%p) is NULL",
-        s, self->channels);
-     return;
-   }
+  if (self->channels == NULL){
+    GST_DEBUG("not parsing target string because channels is NULL");
+    return;
+  }
+  e = orig = s = steal_gvalue_string(PENDING_PROP(self, PROP_ERROR_WEIGHT));
+  if (s == NULL){
+    GST_DEBUG("not parsing error_weight string because it is  NULL");
+    return;
+  }
   GST_DEBUG("parsing error weights '%s'", s);
   if (*s == 0){
     if (self->error_weight){
