@@ -6,7 +6,7 @@ new_bptt(RecurNN *net, int depth, float learn_rate, float momentum, u32 flags){
   RecurNNBPTT *bptt = calloc(sizeof(RecurNNBPTT), 1);
   int own_momentums = ! (flags & RNN_NET_FLAG_NO_MOMENTUMS);
   int own_deltas = ! (flags & RNN_NET_FLAG_NO_DELTAS);
-  int own_accumulators = ! (flags & RNN_NET_FLAG_OWN_ACCUMULATORS);
+  int own_accumulators = flags & RNN_NET_FLAG_OWN_ACCUMULATORS;
   MAYBE_DEBUG("allocated bptt %p", bptt);
   bptt->depth = depth;
   bptt->learn_rate = learn_rate;
