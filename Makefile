@@ -188,7 +188,6 @@ VID_FILE_SRC_2 = uridecodebin name=src uri=$(VID_URI_2) ! $(VID_LINE)
 VID_FILE_SRC_3 = uridecodebin name=src uri=$(VID_URI_3) ! $(VID_LINE)
 VID_FILE_SRC_4 = uridecodebin name=src uri=$(VID_URI_4) ! $(VID_LINE)
 VID_FILE_SRC_5 = uridecodebin name=src uri=$(VID_URI_5) ! $(VID_LINE)
-VID_FILE_SRC_6 = uridecodebin name=src uri=$(VID_URI_6) ! $(VID_LINE)
 VID_FILE_SRC_TUBBIES = uridecodebin name=src uri=$(VID_URI_TUBBIES) ! $(VID_LINE)
 VID_FILE_SRC_BRUGES = uridecodebin name=src uri=$(VID_URI_7) ! $(VID_LINE)
 VID_FILE_SRC_ZION = uridecodebin name=src uri=$(VID_URI_ZION) ! $(VID_LINE)
@@ -287,7 +286,7 @@ test-pipeline: libgstrecur.so
 %-recur.ogv: libgstrecur.so
 	timeout 30 gst-launch-1.0  \
 	  --gst-plugin-path=$(CURDIR) \
-	$(VID_FILE_SRC_6) ! recur_manager name=recur ! videoconvert ! queue ! theoraenc ! oggmux ! filesink location="$@" \
+	$(VID_FILE_SRC_LAGOS_SMALL) ! recur_manager name=recur ! videoconvert ! queue ! theoraenc ! oggmux ! filesink location="$@" \
 	recur. ! fakesink \
 	src. ! $(AUD_LINE) ! recur.
 
@@ -301,12 +300,12 @@ test-pipeline-kcachegrind: libgstrecur.so
 train-pipeline:
 	gst-launch-1.0  \
 	  --gst-plugin-path=$(CURDIR) \
-	$(VID_FILE_SRC_6) ! recur_manager name=recur ! videoconvert ! fakesink \
+	$(VID_FILE_SRC_LAGOS_SMALL) ! recur_manager name=recur ! videoconvert ! fakesink \
 	recur. ! fakesink \
 	src. ! $(AUD_LINE) ! recur.
 	gst-launch-1.0  \
 	  --gst-plugin-path=$(CURDIR) \
-	$(VID_FILE_SRC_6) ! recur_manager name=recur ! videoconvert ! fakesink \
+	$(VID_FILE_SRC_LAGOS_SMALL) ! recur_manager name=recur ! videoconvert ! fakesink \
 	recur. ! fakesink \
 	src. ! $(AUD_LINE) ! recur.
 
