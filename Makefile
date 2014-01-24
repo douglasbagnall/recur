@@ -273,7 +273,7 @@ record-rnnca: libgstrnnca.so
 
 TEST_PIPELINE_CORE = gst-launch-1.0  \
 	  --gst-plugin-path=$(CURDIR) \
-	$(VID_FILE_SRC_LAGOS) ! recur_manager name=recur osdebug=0 ! videoconvert \
+	$(VID_FILE_SRC_3) ! recur_manager name=recur osdebug=0 ! videoconvert \
 	! xvimagesink force-aspect-ratio=false \
 	recur. ! autoaudiosink \
 	src. ! $(AUD_LINE) ! recur.
@@ -286,7 +286,7 @@ test-pipeline: libgstrecur.so
 %-recur.ogv: libgstrecur.so
 	timeout 30 gst-launch-1.0  \
 	  --gst-plugin-path=$(CURDIR) \
-	$(VID_FILE_SRC_LAGOS_SMALL) ! recur_manager name=recur ! videoconvert ! queue ! theoraenc ! oggmux ! filesink location="$@" \
+	$(VID_FILE_SRC_3) ! recur_manager name=recur ! videoconvert ! queue ! theoraenc ! oggmux ! filesink location="$@" \
 	recur. ! fakesink \
 	src. ! $(AUD_LINE) ! recur.
 
@@ -300,12 +300,12 @@ test-pipeline-kcachegrind: libgstrecur.so
 train-pipeline:
 	gst-launch-1.0  \
 	  --gst-plugin-path=$(CURDIR) \
-	$(VID_FILE_SRC_LAGOS_SMALL) ! recur_manager name=recur ! videoconvert ! fakesink \
+	$(VID_FILE_SRC_3) ! recur_manager name=recur ! videoconvert ! fakesink \
 	recur. ! fakesink \
 	src. ! $(AUD_LINE) ! recur.
 	gst-launch-1.0  \
 	  --gst-plugin-path=$(CURDIR) \
-	$(VID_FILE_SRC_LAGOS_SMALL) ! recur_manager name=recur ! videoconvert ! fakesink \
+	$(VID_FILE_SRC_3) ! recur_manager name=recur ! videoconvert ! fakesink \
 	recur. ! fakesink \
 	src. ! $(AUD_LINE) ! recur.
 
