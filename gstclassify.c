@@ -1123,7 +1123,7 @@ maybe_learn(GstClassify *self){
   s16 *buffer;
   while ((buffer = prepare_next_chunk(self))){
     float err_sum = 0.0f;
-    float winners = 0.0f;
+    int winners = 0;
     int class_counts[self->n_classes];
     for (i = 0; i < self->n_classes; i++){
       class_counts[i] = 0;
@@ -1153,7 +1153,7 @@ maybe_learn(GstClassify *self){
       }
     }
     rnn_log_float(net, "error", err_sum / self->n_channels);
-    rnn_log_float(net, "correct", winners / self->n_channels);
+    rnn_log_float(net, "correct", winners * 1.0 / self->n_channels);
   }
 }
 
