@@ -734,6 +734,9 @@ load_or_create_net(void){
       output_size += 2;
     }
     u32 flags = opt_bias ? RNN_NET_FLAG_STANDARD : RNN_NET_FLAG_NO_BIAS;
+    if (opt_multi_tap){
+      flags |= RNN_NET_FLAG_OWN_ACCUMULATORS;
+    }
     if (opt_bptt_adaptive_min){/*on by default*/
       flags |= RNN_NET_FLAG_BPTT_ADAPTIVE_MIN_ERROR;
     }
