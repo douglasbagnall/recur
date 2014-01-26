@@ -150,17 +150,17 @@ rnn_opinion_with_dropout(RecurNN *net, const float *inputs, float dropout){
   /*copy in hiddens */
   memcpy(net->input_layer, net->hidden_layer, hsize * sizeof(float));
 
+  maybe_scale_inputs(net);
+  dropout_array(net->input_layer, hsize, dropout, &net->rng);
   if (net->bias){
     net->input_layer[0] = 1.0f;
   }
-  maybe_scale_inputs(net);
-  dropout_array(net->input_layer, hsize, dropout, &net->rng);
 
   calculate_interlayer(net->input_layer, net->i_size,
       net->hidden_layer, net->h_size, net->ih_weights);
 
   float s = hsize + isize;
-  float dropout_scale = s / (s - hsize * dropout);
+  float dropout_scale = s / (s - net->hidden_size * dropout);
 
   ASSUME_ALIGNED(net->hidden_layer);
   for (int i = 0; i < net->h_size; i++){
