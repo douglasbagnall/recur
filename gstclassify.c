@@ -1128,6 +1128,8 @@ maybe_learn(GstClassify *self){
     for (i = 0; i < self->n_classes; i++){
       class_counts[i] = 0;
     }
+    memset(self->net->bptt->ih_accumulator, 0, self->net->ih_size * sizeof(float));
+    memset(self->net->bptt->ho_accumulator, 0, self->net->ho_size * sizeof(float));
     for (j = 0; j < self->n_channels; j++){
       ClassifyChannel *c = prepare_channel_features(self, buffer, j);
       err_sum += train_channel(c, self->dropout, self->error_weight);
