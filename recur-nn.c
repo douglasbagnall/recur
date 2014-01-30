@@ -412,21 +412,13 @@ apply_learning_with_momentum(float *restrict weights,
       momentums[0], momentums[3], momentums[6], momentums[10], momentums[11]);
 }
 
-
-void
-rnn_prepare_nesterov_momentum(RecurNN *net){
-  scale_aligned_array(net->bptt->ih_momentum, net->ih_size, net->bptt->momentum);
-  add_aligned_arrays(net->ih_weights, net->ih_size, net->bptt->ih_momentum, 1.0f);
-  scale_aligned_array(net->bptt->ho_momentum, net->ho_size, net->bptt->momentum);
-  add_aligned_arrays(net->ho_weights, net->ho_size, net->bptt->ho_momentum, 1.0f);
-}
-
 /*with standard Nesterov momentum, the momentum has previously been scaled and
-  added to the weights.*/
+  added to the weights. Here we do it in the reverse order, so the scaling and
+  adding happens at the end in preparation for the next round.*/
 static void
 apply_learning_with_nesterov_momentum(float *restrict weights,
     const float *restrict delta, float *restrict momentums,
-    int size, const float rate){
+    int size, const float rate, const float momentum){
   ASSUME_ALIGNED(momentums);
   ASSUME_ALIGNED(delta);
   ASSUME_ALIGNED(weights);
@@ -435,6 +427,9 @@ apply_learning_with_nesterov_momentum(float *restrict weights,
     weights[i] += t;
     momentums[i] += t;
   }
+
+  scale_aligned_array(momentums, size, momentum);
+  add_aligned_arrays(weights, size, momentums, 1.0f);
 }
 
 
@@ -466,9 +461,9 @@ rnn_apply_learning(RecurNN *net, int momentum_style,
   switch (momentum_style){
   case RNN_MOMENTUM_NESTEROV:
     apply_learning_with_nesterov_momentum(net->ho_weights, ho_gradient,
-        bptt->ho_momentum, net->ho_size, bptt->learn_rate * bptt->ho_scale);
+        bptt->ho_momentum, net->ho_size, bptt->learn_rate * bptt->ho_scale, momentum);
     apply_learning_with_nesterov_momentum(net->ih_weights, ih_gradient,
-        bptt->ih_momentum, net->ih_size, bptt->learn_rate);
+        bptt->ih_momentum, net->ih_size, bptt->learn_rate, momentum);
     break;
   default:
     apply_learning_with_momentum(net->ho_weights, ho_gradient, bptt->ho_momentum,

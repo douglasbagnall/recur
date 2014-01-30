@@ -617,9 +617,6 @@ epoch(RecurNN **nets, int n_nets, RecurNN *confab_net, Ventropy *v,
       adjust_momentum_soft_start(net);
     }
     if (n_nets > 1 || opt_momentum_style != RNN_MOMENTUM_WEIGHTED){
-      if (opt_momentum_style == RNN_MOMENTUM_NESTEROV){
-        rnn_prepare_nesterov_momentum(net);
-      }
       RecurNN *n = nets[0];
       float *ih_delta = n->bptt->ih_delta;
       float *ho_delta = n->bptt->ho_delta;
