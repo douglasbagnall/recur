@@ -740,7 +740,7 @@ train_net(GstRnnca *self, RnncaTrainer *t, RnncaFrame *prev,  RnncaFrame *now){
         target, a, target - a, slope);
   }
   rnn_bptt_calc_deltas(net, net->bptt->ih_delta, net->bptt->ho_delta,
-      net->bptt->ih_accumulator, net->bptt->ho_accumulator);
+      net->bptt->ih_accumulator, net->bptt->ho_accumulator, NULL);
 }
 
 static inline void

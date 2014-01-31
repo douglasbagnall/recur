@@ -489,7 +489,7 @@ rnn_bptt_advance(RecurNN *net){
 
 void
 rnn_bptt_calc_deltas(RecurNN *net, float *ih_delta, float *ho_delta,
-    float *ih_accumulator, float *ho_accumulator){
+    float *ih_accumulator, float *ho_accumulator, float *bottom_delta){
   RecurNNBPTT *bptt = net->bptt;
   float top_error_sum = calc_sgd_top_layer(net, ho_delta);
   float top_error_scaled = softclip_scale(top_error_sum,
@@ -501,7 +501,7 @@ rnn_bptt_calc_deltas(RecurNN *net, float *ih_delta, float *ho_delta,
 
   zero_aligned_array(ih_delta, net->ih_size);
   float bptt_error_sum = bptt_and_accumulate_error(net,
-      ih_delta, top_error_scaled);
+      ih_delta, bottom_delta, top_error_scaled);
 
   if (ih_accumulator){
     add_aligned_arrays(ih_accumulator, net->ih_size, ih_delta,
@@ -689,7 +689,7 @@ static inline float
 apply_sgd_with_bptt(RecurNN *net, float top_error_sum){
   RecurNNBPTT *bptt = net->bptt;
   zero_aligned_array(bptt->ih_delta, net->ih_size);
-  float error_sum = bptt_and_accumulate_error(net, bptt->ih_delta, top_error_sum);
+  float error_sum = bptt_and_accumulate_error(net, bptt->ih_delta, NULL, top_error_sum);
   float rate = bptt->learn_rate * bptt->ih_scale;
 
   apply_learning_with_momentum(net->ih_weights, bptt->ih_delta, bptt->ih_momentum,
@@ -702,7 +702,7 @@ apply_sgd_with_bptt_batch(RecurNN *net, float top_error_sum, uint batch_size){
   RecurNNBPTT *bptt = net->bptt;
   float rate = bptt->learn_rate;
   float *gradient = zalloc_aligned_or_die(net->ih_size * sizeof(float));
-  float error_sum = bptt_and_accumulate_error(net, gradient, top_error_sum);
+  float error_sum = bptt_and_accumulate_error(net, gradient, NULL, top_error_sum);
 
   add_aligned_arrays(bptt->ih_delta, net->ih_size, gradient, bptt->ih_scale);
 

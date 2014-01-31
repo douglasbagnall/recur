@@ -637,14 +637,14 @@ epoch(RecurNN **nets, int n_nets, RecurNN *confab_net, Ventropy *v,
         entropy += capped_log2f(1.0 - e);
 
         if (j == 0){
-          rnn_bptt_calc_deltas(n, ih_accumulator, ho_accumulator, NULL, NULL);
+          rnn_bptt_calc_deltas(n, ih_accumulator, ho_accumulator, NULL, NULL, NULL);
           if (n->bptt->ih_scale != 1.0f){
             scale_aligned_array(ih_accumulator, n->ih_size, n->bptt->ih_scale);
           }
         }
         else {
           rnn_bptt_calc_deltas(n, ih_delta, ho_delta,
-              ih_accumulator, ho_accumulator);
+              ih_accumulator, ho_accumulator, NULL);
         }
       }
       /* Not doing softstart here, because it happens above (XXX stupid)*/

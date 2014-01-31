@@ -199,7 +199,7 @@ void rnn_apply_learning(RecurNN *net, int momentum_style,
 
 
 void rnn_bptt_calc_deltas(RecurNN *net, float *ih_delta, float *ho_delta,
-    float *ih_accumulator, float *ho_accumulator);
+    float *ih_accumulator, float *ho_accumulator, float *bottom_delta);
 
 void rnn_condition_net(RecurNN *net);
 void rnn_log_net(RecurNN *net);
