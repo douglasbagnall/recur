@@ -185,6 +185,22 @@ rnn_opinion_with_dropout(RecurNN *net, const float *inputs, float dropout){
   return net->output_layer;
 }
 
+float *
+rnn_calculate_extra_layer(RecurExtraLayer *layer, const float *inputs){
+  int bias = (layer->flags & RNN_NET_FLAG_BIAS) ? 1 : 0;
+  if (bias){
+    layer->inputs[0] = 1.0f;
+  }
+  if (inputs){
+    memcpy(layer->inputs + bias, inputs, layer->input_size * sizeof(float));
+  }
+  calculate_interlayer(layer->inputs, layer->i_size, layer->outputs, layer->o_size,
+      layer->weights);
+  return layer->outputs;
+}
+
+
+
 
 static inline float
 backprop_top_layer(RecurNN *net)

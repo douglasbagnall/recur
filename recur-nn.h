@@ -110,6 +110,7 @@ enum {
 
 typedef struct _RecurNN RecurNN;
 typedef struct _RecurNNBPTT RecurNNBPTT;
+typedef struct _RecurExtraLayer RecurExtraLayer;
 
 struct _RecurNN {
   /*aligned sizes, for quick calculation */
@@ -160,6 +161,28 @@ struct _RecurNNBPTT {
   float min_error_factor;
 };
 
+struct _RecurExtraLayer {
+  float *mem;
+  float *weights;
+  float *momentums;
+  float *delta;
+  float *accumulator;
+  float *inputs;
+  float *outputs;
+  float *i_error;
+  float *o_error;
+  float momentum;
+  float momentum_weight;
+  float learn_rate;
+  int input_size;
+  int output_size;
+  int matrix_size;
+  int i_size;
+  int o_size;
+  u32 flags;
+  int overlap;
+};
+
 /* functions */
 
 RecurNN * rnn_new(uint input_size, uint hidden_size, uint output_size,
@@ -169,6 +192,9 @@ RecurNN * rnn_new(uint input_size, uint hidden_size, uint output_size,
 RecurNN * rnn_clone(RecurNN *parent, u32 flags,
     u64 rng_seed, const char *log_file);
 
+RecurExtraLayer *rnn_new_extra_layer(int input_size, int output_size, int overlap,
+    u32 flags, float momentum, float learn_rate);
+
 void rnn_set_log_file(RecurNN *net, const char * log_file, int append_dont_truncate);
 
 void rnn_randomise_weights_auto(RecurNN *net);
@@ -177,7 +203,8 @@ void rnn_scale_initial_weights(RecurNN *net, float factor);
 void rnn_randomise_weights_fan_in(RecurNN *net, float sum, float kurtosis, float margin,
     float inputs_weight_ratio);
 
-
+void rnn_randomise_extra_layer_fan_in(RecurExtraLayer *layer, rand_ctx *rng,
+    float sum, float kurtosis, float margin);
 
 void rnn_delete_net(RecurNN *net);
 RecurNN ** rnn_new_training_set(RecurNN *prototype, int n_nets);
@@ -187,6 +214,7 @@ void rnn_delete_training_set(RecurNN **nets, int n_nets, int leave_prototype);
 float *rnn_opinion(RecurNN *net, const float *inputs);
 float *rnn_opinion_with_dropout(RecurNN *net, const float *inputs, float dropout);
 
+float *rnn_calculate_extra_layer(RecurExtraLayer *layer, const float *inputs);
 void rnn_multi_pgm_dump(RecurNN *net, const char *dumpees);
 
 RecurNN* rnn_load_net(const char *filename);

@@ -143,6 +143,52 @@ rnn_delete_net(RecurNN *net){
   free(net);
 }
 
+
+RecurExtraLayer *
+rnn_new_extra_layer(int input_size, int output_size, int overlap,
+    u32 flags, float momentum, float learn_rate)
+{
+  RecurExtraLayer *layer = zalloc_aligned_or_die(sizeof(RecurExtraLayer));
+  int bias = !! (flags & RNN_NET_FLAG_BIAS);
+  layer->input_size = input_size;
+  layer->output_size = output_size;
+  layer->input_size = input_size;
+  layer->output_size = output_size;
+  layer->overlap = overlap;
+  layer->flags = flags;
+  layer->i_size = ALIGNED_VECTOR_LEN(input_size + bias, float);
+  layer->o_size = ALIGNED_VECTOR_LEN(output_size, float);
+  layer->matrix_size = layer->i_size * layer->o_size;
+
+  size_t floats = layer->matrix_size * 3; /* weights, delta, momentums */
+  if (flags & RNN_NET_FLAG_OWN_ACCUMULATORS){
+    floats += layer->matrix_size;
+  }
+  floats += (layer->i_size + layer->o_size) * 2; /* nodes and errors */
+  layer->mem = malloc_aligned_or_die(floats * sizeof(float));
+  float *fm = layer->mem;
+#define SET_ATTR_SIZE(attr, size) do {layer->attr = fm; fm += (size);   \
+    if (fm > layer->mem + floats) {                                     \
+      DEBUG("Extra layer ran out of memory on " QUOTE(attr)             \
+          " fm %p mem %p floats %zu allocating %d",                       \
+          fm, layer->mem, floats, size);}} while(0)
+  SET_ATTR_SIZE(momentums, layer->matrix_size);
+  SET_ATTR_SIZE(inputs, layer->i_size);
+  SET_ATTR_SIZE(weights, layer->matrix_size);
+  SET_ATTR_SIZE(outputs, layer->o_size);
+  SET_ATTR_SIZE(delta, layer->matrix_size);
+  SET_ATTR_SIZE(i_error, layer->i_size);
+  if (flags & RNN_NET_FLAG_OWN_ACCUMULATORS){
+    SET_ATTR_SIZE(accumulator, layer->matrix_size);
+  }
+  SET_ATTR_SIZE(o_error, layer->o_size);
+#undef SET_ATTR_SIZE
+  layer->momentum = momentum;
+  layer->learn_rate = learn_rate;
+  return layer;
+}
+
+
 RecurNN **
 rnn_new_training_set(RecurNN *prototype, int n_nets){
   int i;
@@ -364,6 +410,16 @@ randomise_weights_fan_in(rand_ctx *rng, float *weights, int width, int height, i
       }
     }
   }
+}
+
+void
+rnn_randomise_extra_layer_fan_in(RecurExtraLayer *layer, rand_ctx *rng,
+    float sum, float kurtosis, float margin){
+  memset(layer->weights, 0, layer->matrix_size * sizeof(float));
+  int bias = !! (layer->flags & RNN_NET_FLAG_BIAS);
+  randomise_weights_fan_in(rng, layer->weights,
+      layer->output_size, layer->input_size + bias, layer->o_size,
+      sum, kurtosis, margin);
 }
 
 void
