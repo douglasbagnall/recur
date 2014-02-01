@@ -200,75 +200,89 @@ rnn_calculate_extra_layer(RecurExtraLayer *layer, const float *inputs){
 }
 
 
+static inline float
+backprop_single_layer(
+    const float *restrict weights,
+    const float *restrict inputs,
+    float *restrict i_error,
+    int i_size,
+    const float *restrict o_error,
+    int o_size,
+    int bias)
+{
+  int x, y;
+  float error_sum = 0.0f;
+  ASSUME_ALIGNED(inputs);
+  ASSUME_ALIGNED(i_error);
+  ASSUME_ALIGNED(o_error);
+  ASSUME_ALIGNED(weights);
+
+  for (y = bias; y < i_size; y++){
+    float e = 0.0f;
+    if (inputs[y]){
+      const float *restrict row = weights + y * o_size;
+      ASSUME_ALIGNED(row);
+      for (x = 0; x < o_size; x++){
+        e += row[x] * o_error[x];
+      }
+      error_sum += fabsf(e);
+    }
+    i_error[y] = e;
+  }
+  return error_sum;
+}
+
 
 
 static inline float
 backprop_top_layer(RecurNN *net)
 {
-  int x, y;
-  float error_sum = 0.0f;
-
-  const float *restrict hiddens = net->hidden_layer;
-  float *restrict h_error = net->bptt->h_error;
-  const float *restrict o_error = net->bptt->o_error;
-  const float *restrict weights = net->ho_weights;
-  ASSUME_ALIGNED(hiddens);
-  ASSUME_ALIGNED(h_error);
-  ASSUME_ALIGNED(o_error);
-  ASSUME_ALIGNED(weights);
-
-  for (y = net->bias; y < net->h_size; y++){
-    float e = 0.0f;
-    if (hiddens[y]){
-      const float *restrict row = weights + y * net->o_size;
-      ASSUME_ALIGNED(row);
-      for (x = 0; x < net->o_size; x++){
-        e += row[x] * o_error[x];
-      }
-      error_sum += fabsf(e);
-    }
-    h_error[y] = e;
-  }
-  return error_sum;
+  return backprop_single_layer(
+      net->ho_weights,
+      net->hidden_layer,
+      net->bptt->h_error,
+      net->h_size,
+      net->bptt->o_error,
+      net->o_size,
+      net->bias);
 }
 
+/*single_layer_sgd does gradient descent for a sinlge layer (i.e., top layer
+  or extra bottom layers */
+
+static inline void
+single_layer_sgd(float const *restrict inputs, int i_size, const float *restrict o_error,
+    int o_size, float *restrict deltas){
+  ASSUME_ALIGNED(inputs);
+  ASSUME_ALIGNED(o_error);
+  ASSUME_ALIGNED(deltas);
+  int x, y;
+  for (y = 0; y < i_size; y++){
+    float input = inputs[y];
+    if (input){
+      float *restrict drow = deltas + y * o_size;
+      ASSUME_ALIGNED(drow);
+      for (x = 0; x < o_size; x++){
+        drow[x] = o_error[x] * input;
+      }
+    }
+  }
+}
 
 /*calc_sgd_top_layer backpropagates error, and calculates weight updates via
   gradient descent, which get put in the delta array.
 */
 
 static float
-calc_sgd_top_layer(RecurNN *net, float *restrict delta){
-  //cblas_ger
-  RecurNNBPTT *bptt = net->bptt;
-  const float *restrict o_error = bptt->o_error;
-  float *restrict hiddens = net->hidden_layer;
-  float error_sum = 0;
-  ASSUME_ALIGNED(hiddens);
-  ASSUME_ALIGNED(o_error);
-  ASSUME_ALIGNED(delta);
-
-  int y, x;
-
+calc_sgd_top_layer(RecurNN *net, float *delta){
+  float error_sum;
   if (net->bias){
-    hiddens[0] = 1.0f;
+    net->hidden_layer[0] = 1.0f;
   }
-  MAYBE_DEBUG("top error:[0] %g, [1] %g", o_error[0], o_error[1]);
   error_sum = backprop_top_layer(net);
   zero_aligned_array(delta, net->ho_size);
-  for (y = 0; y < net->h_size; y++){
-    if (hiddens[y]){
-      float *restrict drow = delta + y * net->o_size;
-      ASSUME_ALIGNED(drow);
-      for (x = 0; x < net->o_size; x++){
-        drow[x] = o_error[x] * hiddens[y];
-      }
-    }
-    MAYBE_DEBUG("y: %d drow[0] %g [1] %g", y,
-        *(delta + y * net->o_size),
-        *(delta + y * net->o_size + 1));
-  }
-
+  single_layer_sgd(net->hidden_layer, net->h_size, net->bptt->o_error, net->o_size,
+      delta);
   return error_sum;
 }
 
@@ -752,4 +766,22 @@ rnn_bptt_calculate(RecurNN *net, uint batch_size){
     rnn_log_int(net, "generation", net->generation);
   }
   rnn_condition_net(net);
+}
+
+
+
+void
+rnn_extra_layer_calc_deltas(RecurExtraLayer *layer, float *error_sum){
+  if (layer->flags & RNN_NET_FLAG_BIAS){
+    layer->inputs[0] = 1.0f;
+  }
+
+  if(error_sum){
+    *error_sum = backprop_single_layer(layer->weights,
+        layer->inputs, layer->i_error, layer->i_size,
+        layer->o_error, layer->o_size,
+        (layer->flags & RNN_NET_FLAG_BIAS) ? 1: 0);
+  }
+  single_layer_sgd(layer->inputs, layer->i_size, layer->o_error, layer->o_size,
+      layer->delta);
 }

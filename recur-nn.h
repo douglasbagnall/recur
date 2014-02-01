@@ -215,6 +215,8 @@ float *rnn_opinion(RecurNN *net, const float *inputs);
 float *rnn_opinion_with_dropout(RecurNN *net, const float *inputs, float dropout);
 
 float *rnn_calculate_extra_layer(RecurExtraLayer *layer, const float *inputs);
+void rnn_extra_layer_calc_deltas(RecurExtraLayer *layer, float *error_sum);
+
 void rnn_multi_pgm_dump(RecurNN *net, const char *dumpees);
 
 RecurNN* rnn_load_net(const char *filename);
