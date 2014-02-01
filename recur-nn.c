@@ -335,15 +335,17 @@ bptt_and_accumulate_error(RecurNN *net, float *restrict ih_delta,
         v4ss *restrict vd = (v4ss*)delta_row;
         v4ss *restrict vw = (v4ss*)w_row;
         for (x = 0; x < vhsize; x++){
-          vd[x] += vh_error[x] * inv;
-          ve += vw[x] * vh_error[x];
+          v4ss vex = vh_error[x];
+          vd[x] += vex * inv;
+          ve += vw[x] * vex;
         }
         e = ve[0] + ve[1] + ve[2] + ve[3];
 #else
         e = 0.0f;
         for (x = 0; x < net->h_size; x++){
-          delta_row[x] += h_error[x] * inputs[y];
-          e += w_row[x] * h_error[x];
+          float ex = h_error[x];
+          delta_row[x] += ex * inputs[y];
+          e += w_row[x] * ex;
         }
 #endif
         i_error[y] = e;
