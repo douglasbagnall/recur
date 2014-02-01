@@ -28,7 +28,7 @@ new_bptt(RecurNN *net, int depth, float learn_rate, float momentum, u32 flags){
   bptt->mem = fm;
   /*The haphazard arrangement of arrays is to avoid overly aligning the
     matrices, which has negative effects due to cache associativity*/
-#define SET_ATTR_SIZE(attr, size) bptt->attr = fm; fm += (size);
+#define SET_ATTR_SIZE(attr, size) bptt->attr = fm; fm += (size)
   SET_ATTR_SIZE(o_error,           net->o_size);
   if (own_momentums){
     SET_ATTR_SIZE(ih_momentum,     net->ih_size);
@@ -101,7 +101,7 @@ rnn_new(uint input_size, uint hidden_size, uint output_size, u32 flags,
     alloc_bytes += (ih_size + ho_size) * sizeof(float);
   net->mem = fm = zalloc_aligned_or_die(alloc_bytes);
 
-#define SET_ATTR_SIZE(attr, size) net->attr = fm; fm += (size);
+#define SET_ATTR_SIZE(attr, size) net->attr = fm; fm += (size)
   /*nodes and weights are shuffled around to (hopefully) break up page-wise
     alignment of co-accessed arrays (e.g. weights and momentums), because
     page-alignment allegedly works badly with the cache.
@@ -444,6 +444,7 @@ rnn_randomise_weights_fan_in(RecurNN *net, float sum, float kurtosis,
   randomise_weights_fan_in(&net->rng, net->ho_weights, net->output_size, net->hidden_size,
       net->o_size, sum, kurtosis, margin);
 }
+
 
 void rnn_perforate_weights(RecurNN *net, float p){
   dropout_array(net->ih_weights, net->ih_size, p, &net->rng);
