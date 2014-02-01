@@ -181,6 +181,7 @@ def main():
                         #('weight-fan-in-sum', 2),
                         ('weight-sparsity', 2),
                         ('error-weight', '5:3'),
+                        ('bottom-layer', 50)
                         ))
 
 main()

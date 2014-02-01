@@ -100,7 +100,6 @@ maybe_scale_inputs(RecurNN *net){
 }
 
 
-
 /*raw opinion does the core calculation */
 static void
 rnn_raw_opinion(RecurNN *net){
@@ -290,7 +289,7 @@ calc_sgd_top_layer(RecurNN *net, float *delta){
 
 static float
 bptt_and_accumulate_error(RecurNN *net, float *restrict ih_delta,
-    const float top_error_sum)
+    float *restrict cumulative_input_error, const float top_error_sum)
 {
   RecurNNBPTT *bptt = net->bptt;
   int y, x;
@@ -354,6 +353,12 @@ bptt_and_accumulate_error(RecurNN *net, float *restrict ih_delta,
         i_error[y] = 0;
       }
     }
+    if (cumulative_input_error){
+      float *input_error = i_error + net->hidden_size + net->bias;
+      for (y = 0; y < net->input_size; y++){
+        cumulative_input_error[y] += input_error[y];
+      }
+    }
     float *tmp = h_error;
     h_error = i_error;
     i_error = tmp;
@@ -364,6 +369,11 @@ bptt_and_accumulate_error(RecurNN *net, float *restrict ih_delta,
 
   if (error_sum > max_error_sum){
     bptt->ih_scale = soft_clip(error_sum, max_error_sum);
+    if (cumulative_input_error){
+      for (y = 0; y < net->input_size; y++){
+        cumulative_input_error[y] *= bptt->ih_scale;
+      }
+    }
   }
   else {
     bptt->ih_scale = 1.0f;
@@ -506,6 +516,16 @@ rnn_apply_learning(RecurNN *net, int momentum_style,
   rnn_log_float(net, "momentum", momentum);
   rnn_log_float(net, "momentum_weight", momentum_weight);
 }
+
+
+void
+rnn_apply_extra_layer_learning(RecurExtraLayer *layer){
+  apply_learning_with_momentum(layer->weights, layer->delta, layer->momentums,
+      layer->matrix_size, layer->learn_rate, layer->momentum, layer->momentum_weight);
+
+  /*XXX nothing here*/
+}
+
 
 void
 rnn_bptt_advance(RecurNN *net){

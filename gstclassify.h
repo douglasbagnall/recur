@@ -73,6 +73,7 @@ typedef struct _ClassifyChannel
   int current_target;
   int current_winner;
   TemporalPPM *mfcc_image;
+  RecurExtraLayer *bottom_layer;
 } ClassifyChannel;
 
 struct _GstClassify
@@ -105,6 +106,7 @@ struct _GstClassify
   float dropout;
   float *error_weight;
   GValue *pending_properties;
+  RecurExtraLayer *bottom_layer;
 };
 
 

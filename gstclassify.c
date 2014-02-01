@@ -57,6 +57,7 @@ enum
   PROP_WEIGHT_FAN_IN_KURTOSIS,
   PROP_LAWN_MOWER,
   PROP_RNG_SEED,
+  PROP_BOTTOM_LAYER,
 
   PROP_LAST
 };
@@ -77,6 +78,7 @@ enum
 #define DEFAULT_PROP_CLASSES 2
 #define DEFAULT_PROP_BPTT_DEPTH 30
 #define DEFAULT_PROP_FORGET 0
+#define DEFAULT_PROP_BOTTOM_LAYER 0
 #define DEFAULT_PROP_WEIGHT_SPARSITY 1
 #define DEFAULT_WINDOW_SIZE 256
 #define DEFAULT_HIDDEN_SIZE 199
@@ -104,6 +106,9 @@ enum
 #define PROP_WEIGHT_FAN_IN_SUM_MIN 0.0
 #define PROP_WEIGHT_FAN_IN_KURTOSIS_MAX 1.5
 #define PROP_WEIGHT_FAN_IN_KURTOSIS_MIN 0.0
+#define PROP_BOTTOM_LAYER_MIN 0
+#define PROP_BOTTOM_LAYER_MAX 1000000
+
 
 #define DROPOUT_MIN 0.0
 #define DROPOUT_MAX 1.0
@@ -134,9 +139,11 @@ G_DEFINE_TYPE (GstClassify, gst_classify, GST_TYPE_AUDIO_FILTER)
 
 
 static inline void
-init_channel(ClassifyChannel *c, RecurNN *net, int window_size, int id, float learn_rate)
+init_channel(ClassifyChannel *c, RecurNN *net, RecurExtraLayer *bottom_layer,
+    int window_size, int id, float learn_rate)
 {
   c->net = net;
+  c->bottom_layer = bottom_layer;
   c->pcm_next = zalloc_aligned_or_die(window_size * sizeof(float));
   c->pcm_now = zalloc_aligned_or_die(window_size * sizeof(float));
   c->features = zalloc_aligned_or_die(net->input_size * sizeof(float));
@@ -292,6 +299,14 @@ gst_classify_class_init (GstClassifyClass * klass)
           DEFAULT_PROP_FORGET,
           G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
+  g_object_class_install_property (gobject_class, PROP_BOTTOM_LAYER,
+      g_param_spec_int("bottom-layer", "bottom-layer",
+          "Use a bottom layer",
+          PROP_BOTTOM_LAYER_MIN,
+          PROP_BOTTOM_LAYER_MAX,
+          DEFAULT_PROP_BOTTOM_LAYER,
+          G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
+
   g_object_class_install_property (gobject_class, PROP_LOG_CLASS_NUMBERS,
       g_param_spec_boolean("log-class-numbers", "log-class-numbers",
           "Log counts of each class in training",
@@ -402,7 +417,7 @@ gst_classify_init (GstClassify * self)
   self->mfcc_factory = NULL;
   self->incoming_queue = NULL;
   self->net_filename = NULL;
-  self->pending_properties = calloc(PROP_LAST - 1, sizeof(GValue));
+  self->pending_properties = calloc(PROP_LAST, sizeof(GValue));
   self->class_events = NULL;
   self->class_events_index = 0;
   self->n_class_events = 0;
@@ -417,12 +432,19 @@ gst_classify_init (GstClassify * self)
 
 
 static void
-reset_net_filename(GstClassify *self, int hidden_size){
+reset_net_filename(GstClassify *self, int hidden_size, int bottom_layer){
   char s[200];
   int n_features = self->mfccs ? self->mfccs : CLASSIFY_N_FFT_BINS;
-  snprintf(s, sizeof(s), "%s-i%d-h%d-o%d-b%d-%dHz-w%d.net",
-      self->basename, n_features, hidden_size, self->n_classes,
-      CLASSIFY_BIAS, CLASSIFY_RATE, self->window_size);
+  if (bottom_layer > 0){
+    snprintf(s, sizeof(s), "%s-i%d-b%d-h%d-o%d-b%d-%dHz-w%d.net",
+        self->basename, n_features, bottom_layer, hidden_size, self->n_classes,
+        CLASSIFY_BIAS, CLASSIFY_RATE, self->window_size);
+  }
+  else {
+    snprintf(s, sizeof(s), "%s-i%d-h%d-o%d-b%d-%dHz-w%d.net",
+        self->basename, n_features, hidden_size, self->n_classes,
+        CLASSIFY_BIAS, CLASSIFY_RATE, self->window_size);
+  }
   if (self->net_filename){
     free(self->net_filename);
   }
@@ -434,8 +456,10 @@ static RecurNN *
 load_or_create_net(GstClassify *self){
   int hidden_size = get_gvalue_int(PENDING_PROP(self, PROP_HIDDEN_SIZE),
       DEFAULT_HIDDEN_SIZE);
-  if (self->net_filename == NULL)
-    reset_net_filename(self, hidden_size);
+  int bottom_layer_size = get_gvalue_int(PENDING_PROP(self, PROP_BOTTOM_LAYER), 0);
+  if (self->net_filename == NULL){
+    reset_net_filename(self, hidden_size, bottom_layer_size);
+  }
   RecurNN *net = TRY_RELOAD ? rnn_load_net(self->net_filename) : NULL;
   if (net){
     if (net->output_size != self->n_classes){
@@ -471,9 +495,19 @@ load_or_create_net(GstClassify *self){
     u64 rng_seed = get_gvalue_u64(PENDING_PROP(self, PROP_RNG_SEED), DEFAULT_RNG_SEED);
     STDERR_DEBUG("rng seed %lu", rng_seed);
 
-    net = rnn_new(n_features, hidden_size,
+    if (bottom_layer_size > 0){
+      net = rnn_new(bottom_layer_size, hidden_size,
         self->n_classes, flags, rng_seed,
         NULL, bptt_depth, self->learn_rate, momentum);
+      self->bottom_layer = rnn_new_extra_layer(n_features, bottom_layer_size, 0, net->flags,
+          self->learn_rate, momentum);
+      rnn_randomise_extra_layer_fan_in(self->bottom_layer, &net->rng, 2.0, 0.2, 0.1f);
+    }
+    else {
+      net = rnn_new(n_features, hidden_size,
+          self->n_classes, flags, rng_seed,
+          NULL, bptt_depth, self->learn_rate, momentum);
+    }
     if (fan_in_sum){
       rnn_randomise_weights_fan_in(net, fan_in_sum, fan_in_kurtosis, 0.1f, 0);
     }
@@ -525,8 +559,8 @@ gst_classify_setup(GstAudioFilter *base, const GstAudioInfo *info){
     }
     self->subnets = rnn_new_training_set(self->net, self->n_channels);
     for (int i = 0; i < self->n_channels; i++){
-      init_channel(&self->channels[i], self->subnets[i], self->window_size,
-          i, self->learn_rate);
+      init_channel(&self->channels[i], self->subnets[i], self->bottom_layer,
+          self->window_size, i, self->learn_rate);
     }
   }
   maybe_start_logging(self);
@@ -856,6 +890,7 @@ gst_classify_set_property (GObject * object, guint prop_id, const GValue * value
       be changed afterwards go here.
     */
     case PROP_MOMENTUM:
+    case PROP_BOTTOM_LAYER:
     case PROP_HIDDEN_SIZE:
     case PROP_BPTT_DEPTH:
     case PROP_LAWN_MOWER:
@@ -1058,11 +1093,18 @@ static inline float
 train_channel(ClassifyChannel *c, float dropout, float *error_weights){
   RecurNN *net = c->net;
   float *answer;
-  if (dropout){
-    answer = rnn_opinion_with_dropout(net, c->features, dropout);
+  float *recurrent_inputs;
+  if (c->bottom_layer){
+    recurrent_inputs = rnn_calculate_extra_layer(c->bottom_layer, c->features);
   }
   else {
-    answer = rnn_opinion(net, c->features);
+    recurrent_inputs = c->features;
+  }
+  if (dropout){
+    answer = rnn_opinion_with_dropout(net, recurrent_inputs, dropout);
+  }
+  else {
+    answer = rnn_opinion(net, recurrent_inputs);
   }
   c->current_winner = softmax_best_guess(net->bptt->o_error, answer,
       net->output_size);
@@ -1073,8 +1115,15 @@ train_channel(ClassifyChannel *c, float dropout, float *error_weights){
       net->bptt->o_error[i] *= error_weights[i];
     }
   }
+  if (c->bottom_layer){
+    rnn_bptt_calc_deltas(net, net->bptt->ih_delta, net->bptt->ho_delta,
+        net->bptt->ih_accumulator, net->bptt->ho_accumulator, c->bottom_layer->o_error);
+    rnn_extra_layer_calc_deltas(c->bottom_layer, NULL);
+  }
+  else{
     rnn_bptt_calc_deltas(net, net->bptt->ih_delta, net->bptt->ho_delta,
         net->bptt->ih_accumulator, net->bptt->ho_accumulator, NULL);
+  }
   rnn_bptt_advance(net);
   return net->bptt->o_error[c->current_target];
 }
@@ -1144,6 +1193,9 @@ maybe_learn(GstClassify *self){
     }
     rnn_apply_learning(net, self->momentum_style, self->momentum_soft_start,
         net->bptt->ih_accumulator, net->bptt->ho_accumulator);
+    if (self->bottom_layer){
+      rnn_apply_extra_layer_learning(self->bottom_layer);
+    }
     rnn_condition_net(net);
     possibly_save_net(net, self->net_filename);
     rnn_log_net(net);
@@ -1169,7 +1221,15 @@ emit_opinions(GstClassify *self, GstClockTime pts){
     for (j = 0; j < self->n_channels; j++){
       ClassifyChannel *c = prepare_channel_features(self, buffer, j);
       RecurNN *net = c->net;
-      float *answer = rnn_opinion(net, c->features);
+
+      float *recurrent_inputs;
+      if (c->bottom_layer){
+        recurrent_inputs = rnn_calculate_extra_layer(c->bottom_layer, c->features);
+      }
+      else {
+        recurrent_inputs = c->features;
+      }
+      float *answer = rnn_opinion(net, recurrent_inputs);
       c->current_winner = softmax_best_guess(net->bptt->o_error, answer,
           net->output_size);
       int valid_target = c->current_target >= 0 && c->current_target < self->n_classes;
