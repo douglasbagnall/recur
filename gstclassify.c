@@ -148,9 +148,9 @@ init_channel(ClassifyChannel *c, RecurNN *net, RecurExtraLayer *bottom_layer,
   c->pcm_now = zalloc_aligned_or_die(window_size * sizeof(float));
   c->features = zalloc_aligned_or_die(net->input_size * sizeof(float));
   if (PGM_DUMP_FEATURES && id == 0){
-#if 0
-    c->mfcc_image = temporal_ppm_alloc(net->i_size * net->bptt->depth, 300, "mfcc", id,
-        PGM_DUMP_COLOUR, &c->net->bptt->history);
+#if 1
+    c->mfcc_image = temporal_ppm_alloc(net->bottom_layer->o_size, 300, "bottom_error", id,
+        PGM_DUMP_COLOUR, &net->bottom_layer->o_error);
 #else
     c->mfcc_image = temporal_ppm_alloc(net->input_size, 300, "mfcc", id,
         PGM_DUMP_COLOUR, &c->features);
