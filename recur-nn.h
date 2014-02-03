@@ -224,7 +224,9 @@ int rnn_save_net(RecurNN *net, const char *filename, int backup);
 
 void rnn_bptt_advance(RecurNN *net);
 void rnn_bptt_calculate(RecurNN *net, uint batch_size);
-void rnn_apply_learning(RecurNN *net, int momentum_style, float momentum_soft_start);
+void rnn_apply_learning(RecurNN *net, int momentum_style, float momentum);
+float rnn_calculate_momentum_soft_start(float generation, float momentum,
+    float momentum_soft_start);
 
 void rnn_bptt_calc_deltas(RecurNN *net, float *ih_delta, float *ho_delta,
     float *ih_accumulator, float *ho_accumulator, float *bottom_delta);

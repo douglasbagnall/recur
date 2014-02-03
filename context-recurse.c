@@ -120,12 +120,6 @@ fill_video_nodes(float *dest, RecurFrame *frame, int w, int h,
 }
 
 
-static void
-consolidate_and_apply_learning(RecurContext *context){
-  /*XXX nets doesn't change, should be set at start up */
-  rnn_apply_learning(context->net, RNN_MOMENTUM_WEIGHTED, 0);
-}
-
 void
 recur_train_nets(RecurContext *context, RecurFrame *src_frame,
     RecurFrame *target_frame){
@@ -157,8 +151,8 @@ recur_train_nets(RecurContext *context, RecurFrame *src_frame,
     }
     rnn_bptt_calc_deltas(net, net->bptt->ih_delta, net->bptt->ho_delta, NULL, NULL, NULL);
   }
-  consolidate_and_apply_learning(context);
-
+  rnn_apply_learning(context->net, RNN_MOMENTUM_WEIGHTED,
+      context->net->bptt->momentum);
   rnn_condition_net(context->net);
   rnn_log_net(context->net);
 }

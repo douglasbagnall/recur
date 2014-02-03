@@ -474,17 +474,16 @@ apply_learning_with_nesterov_momentum(float *restrict weights,
   add_aligned_arrays(weights, size, momentums, 1.0f);
 }
 
+float
+rnn_calculate_momentum_soft_start(float generation, float max_momentum, float x)
+{
+  return MIN(max_momentum, 1.0f - x / (1.0f + generation + 2.0f * x));
+}
+
 void
 rnn_apply_learning(RecurNN *net, int momentum_style,
-    float momentum_soft_start){
+    float momentum){
   RecurNNBPTT *bptt = net->bptt;
-  float momentum = bptt->momentum;
-  if (momentum_soft_start){
-    /*XXX keeps doing the calculation long after soft_start is over. */
-    float x = momentum_soft_start;
-    momentum = MIN(momentum, 1.0f - x / (1 + net->generation + 2 * x));
-  }
-
   if (momentum_style == RNN_MOMENTUM_NESTEROV){
     apply_learning_with_nesterov_momentum(net->ho_weights, bptt->ho_accumulator,
         bptt->ho_momentum, net->ho_size, bptt->learn_rate * bptt->ho_scale, momentum);

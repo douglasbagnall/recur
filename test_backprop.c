@@ -493,16 +493,6 @@ long_confab(RecurNN *net, int len, int rows){
   Q_DEBUG(1, "%s", confab);
 }
 
-static inline void
-adjust_momentum_soft_start(RecurNN *net){
-  float x = opt_momentum_soft_start;
-  net->bptt->momentum = MIN(1.0f - x / (1 + net->generation + 2 * x), opt_momentum);
-  //DEBUG("momentum is %f, generation %d", net->bptt->momentum, net->generation);
-  if (net->bptt->momentum == opt_momentum){
-    opt_momentum_soft_start = 0;
-  }
-}
-
 typedef struct _Ventropy {
   RecurNN *net;
   int counter;
@@ -613,9 +603,8 @@ epoch(RecurNN **nets, int n_nets, RecurNN *confab_net, Ventropy *v,
   struct timespec *time_end = timers + 1;
   clock_gettime(CLOCK_MONOTONIC, time_start);
   for(i = start; i < len - 1; i++){
-    if (opt_momentum_soft_start){
-      adjust_momentum_soft_start(net);
-    }
+    float momentum = rnn_calculate_momentum_soft_start(net->generation,
+        opt_momentum, opt_momentum_soft_start);
     if (n_nets > 1 || opt_momentum_style != RNN_MOMENTUM_WEIGHTED){
       for (j = 0; j < n_nets; j++){
         RecurNN *n = nets[j];
@@ -642,10 +631,10 @@ epoch(RecurNN **nets, int n_nets, RecurNN *confab_net, Ventropy *v,
               n->bptt->ih_accumulator, n->bptt->ho_accumulator, NULL);
         }
       }
-      /* Not doing softstart here, because it happens above (XXX stupid)*/
-      rnn_apply_learning(nets[0], opt_momentum_style, 0);
+      rnn_apply_learning(nets[0], opt_momentum_style, momentum);
     }
     else {
+      net->bptt->momentum = momentum;
       sgd_one(net, text[i], text[i + 1], &e, &c, opt_batch_size);
       correct += c;
       error += e;
