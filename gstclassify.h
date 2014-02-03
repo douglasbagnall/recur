@@ -38,7 +38,7 @@ typedef s16 audio_sample;
 #define PERIODIC_SAVE_NET 0
 #define TRY_RELOAD 1
 
-#define PERIODIC_PGM_DUMP 511
+#define PERIODIC_PGM_DUMP 255
 #define PGM_DUMP_FEATURES 0
 
 #define CLASSIFY_QUEUE_FACTOR 30
@@ -73,7 +73,6 @@ typedef struct _ClassifyChannel
   int current_target;
   int current_winner;
   TemporalPPM *mfcc_image;
-  RecurExtraLayer *bottom_layer;
 } ClassifyChannel;
 
 struct _GstClassify

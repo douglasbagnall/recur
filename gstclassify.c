@@ -143,7 +143,7 @@ init_channel(ClassifyChannel *c, RecurNN *net, RecurExtraLayer *bottom_layer,
     int window_size, int id, float learn_rate)
 {
   c->net = net;
-  c->bottom_layer = bottom_layer;
+  net->bottom_layer = bottom_layer;
   c->pcm_next = zalloc_aligned_or_die(window_size * sizeof(float));
   c->pcm_now = zalloc_aligned_or_die(window_size * sizeof(float));
   c->features = zalloc_aligned_or_die(net->input_size * sizeof(float));
@@ -243,7 +243,7 @@ gst_classify_class_init (GstClassifyClass * klass)
 
   g_object_class_install_property (gobject_class, PROP_PGM_DUMP,
       g_param_spec_string("pgm-dump", "pgm-dump",
-          "Dump weight images (space separated \"ih* hh* ho*\", *one of \"wdm\")",
+          "Dump weight images (space separated \"ih* hh* ho* bi*\", *one of \"wdma\")",
           DEFAULT_PROP_PGM_DUMP,
           G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
@@ -501,6 +501,7 @@ load_or_create_net(GstClassify *self){
         NULL, bptt_depth, self->learn_rate, momentum);
       self->bottom_layer = rnn_new_extra_layer(n_features, bottom_layer_size, 0, net->flags,
           self->learn_rate, momentum);
+      net->bottom_layer = self->bottom_layer;
       rnn_randomise_extra_layer_fan_in(self->bottom_layer, &net->rng, 2.0, 0.2, 0.1f);
     }
     else {
@@ -1094,8 +1095,8 @@ train_channel(ClassifyChannel *c, float dropout, float *error_weights){
   RecurNN *net = c->net;
   float *answer;
   float *recurrent_inputs;
-  if (c->bottom_layer){
-    recurrent_inputs = rnn_calculate_extra_layer(c->bottom_layer, c->features);
+  if (c->net->bottom_layer){
+    recurrent_inputs = rnn_calculate_extra_layer(c->net->bottom_layer, c->features);
   }
   else {
     recurrent_inputs = c->features;
@@ -1115,10 +1116,10 @@ train_channel(ClassifyChannel *c, float dropout, float *error_weights){
       net->bptt->o_error[i] *= error_weights[i];
     }
   }
-  if (c->bottom_layer){
+  if (c->net->bottom_layer){
     rnn_bptt_calc_deltas(net, net->bptt->ih_delta, net->bptt->ho_delta,
-        net->bptt->ih_accumulator, net->bptt->ho_accumulator, c->bottom_layer->o_error);
-    rnn_extra_layer_calc_deltas(c->bottom_layer, NULL);
+        net->bptt->ih_accumulator, net->bptt->ho_accumulator, c->net->bottom_layer->o_error);
+    rnn_extra_layer_calc_deltas(c->net->bottom_layer, NULL);
   }
   else{
     rnn_bptt_calc_deltas(net, net->bptt->ih_delta, net->bptt->ho_delta,
@@ -1189,7 +1190,7 @@ maybe_learn(GstClassify *self){
     RecurNN *net = self->net;
     /*XXX periodic_pgm_dump and image string should be gst properties */
     if (PERIODIC_PGM_DUMP && net->generation % PERIODIC_PGM_DUMP == 0){
-      rnn_multi_pgm_dump(net, "how ihw");
+      rnn_multi_pgm_dump(net, "how ihw iha biw bid");
     }
     float momentum = rnn_calculate_momentum_soft_start(net->generation,
         net->bptt->momentum, self->momentum_soft_start);
@@ -1225,8 +1226,8 @@ emit_opinions(GstClassify *self, GstClockTime pts){
       RecurNN *net = c->net;
 
       float *recurrent_inputs;
-      if (c->bottom_layer){
-        recurrent_inputs = rnn_calculate_extra_layer(c->bottom_layer, c->features);
+      if (c->net->bottom_layer){
+        recurrent_inputs = rnn_calculate_extra_layer(c->net->bottom_layer, c->features);
       }
       else {
         recurrent_inputs = c->features;

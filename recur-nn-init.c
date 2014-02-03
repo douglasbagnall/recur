@@ -500,6 +500,8 @@ rnn_multi_pgm_dump(RecurNN *net, const char *dumpees){
         array = bptt->ih_momentum;
       else if (v == 'd')
         array = bptt->ih_delta;
+      else if (v == 'a')
+        array = bptt->ih_accumulator;
       else
         continue;
     }
@@ -512,6 +514,25 @@ rnn_multi_pgm_dump(RecurNN *net, const char *dumpees){
         array = bptt->ho_momentum;
       else if (v == 'd')
         array = bptt->ho_delta;
+      else if (v == 'a')
+        array = bptt->ho_accumulator;
+      else
+        continue;
+    }
+    else if (in == 'b' && out == 'i'){
+      RecurExtraLayer *b = net->bottom_layer;
+      if (!b)
+        continue;
+      x = b->o_size;
+      y = b->i_size;
+      if (v == 'w')
+        array = b->weights;
+      else if (v == 'm')
+        array = b->momentums;
+      else if (v == 'd')
+        array = b->delta;
+      else if (v == 'a')
+        array = b->accumulator;
       else
         continue;
     }

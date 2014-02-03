@@ -136,6 +136,7 @@ struct _RecurNN {
   float *real_inputs;
   rand_ctx rng;
   RecurNNBPTT *bptt; /*training struct*/
+  RecurExtraLayer *bottom_layer;
   u32 generation;
 };
 
