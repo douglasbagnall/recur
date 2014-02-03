@@ -617,14 +617,8 @@ epoch(RecurNN **nets, int n_nets, RecurNN *confab_net, Ventropy *v,
       adjust_momentum_soft_start(net);
     }
     if (n_nets > 1 || opt_momentum_style != RNN_MOMENTUM_WEIGHTED){
-      RecurNN *n = nets[0];
-      float *ih_delta = n->bptt->ih_delta;
-      float *ho_delta = n->bptt->ho_delta;
-      float *ih_accumulator = n->bptt->ih_accumulator;
-      float *ho_accumulator = n->bptt->ho_accumulator;
-
       for (j = 0; j < n_nets; j++){
-        n = nets[j];
+        RecurNN *n = nets[j];
         int offset = i + j * spacing;
         if (offset >= len - 1){
           offset -= len - 1;
@@ -637,19 +631,19 @@ epoch(RecurNN **nets, int n_nets, RecurNN *confab_net, Ventropy *v,
         entropy += capped_log2f(1.0 - e);
 
         if (j == 0){
-          rnn_bptt_calc_deltas(n, ih_accumulator, ho_accumulator, NULL, NULL, NULL);
+          rnn_bptt_calc_deltas(n, n->bptt->ih_accumulator, n->bptt->ho_accumulator,
+              NULL, NULL, NULL);
           if (n->bptt->ih_scale != 1.0f){
-            scale_aligned_array(ih_accumulator, n->ih_size, n->bptt->ih_scale);
+            scale_aligned_array(n->bptt->ih_accumulator, n->ih_size, n->bptt->ih_scale);
           }
         }
         else {
-          rnn_bptt_calc_deltas(n, ih_delta, ho_delta,
-              ih_accumulator, ho_accumulator, NULL);
+          rnn_bptt_calc_deltas(n, n->bptt->ih_delta, n->bptt->ho_delta,
+              n->bptt->ih_accumulator, n->bptt->ho_accumulator, NULL);
         }
       }
       /* Not doing softstart here, because it happens above (XXX stupid)*/
-      rnn_apply_learning(nets[0], opt_momentum_style, 0,
-          ih_accumulator, ho_accumulator);
+      rnn_apply_learning(nets[0], opt_momentum_style, 0);
     }
     else {
       sgd_one(net, text[i], text[i + 1], &e, &c, opt_batch_size);

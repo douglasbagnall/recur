@@ -750,8 +750,7 @@ maybe_learn(GstRnnca *self){
   for (i = 0; i < self->n_trainers; i++){
     train_net(self, &self->trainers[i], self->frame_prev, self->frame_now);
   }
-  rnn_apply_learning(net, 0, self->momentum_soft_start,
-      net->bptt->ih_accumulator, net->bptt->ho_accumulator);
+  rnn_apply_learning(net, 0, self->momentum_soft_start);
 
   if (PERIODIC_PGM_DUMP && (net->generation & PERIODIC_PGM_DUMP) == 0){
     rnn_multi_pgm_dump(net, "how ihw");

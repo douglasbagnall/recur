@@ -476,9 +476,8 @@ apply_learning_with_nesterov_momentum(float *restrict weights,
 
 void
 rnn_apply_learning(RecurNN *net, int momentum_style,
-    float momentum_soft_start, float *ih_gradient, float *ho_gradient){
+    float momentum_soft_start){
   RecurNNBPTT *bptt = net->bptt;
-
   float momentum = bptt->momentum;
   if (momentum_soft_start){
     /*XXX keeps doing the calculation long after soft_start is over. */
@@ -487,9 +486,9 @@ rnn_apply_learning(RecurNN *net, int momentum_style,
   }
 
   if (momentum_style == RNN_MOMENTUM_NESTEROV){
-    apply_learning_with_nesterov_momentum(net->ho_weights, ho_gradient,
+    apply_learning_with_nesterov_momentum(net->ho_weights, bptt->ho_accumulator,
         bptt->ho_momentum, net->ho_size, bptt->learn_rate * bptt->ho_scale, momentum);
-    apply_learning_with_nesterov_momentum(net->ih_weights, ih_gradient,
+    apply_learning_with_nesterov_momentum(net->ih_weights, bptt->ih_accumulator,
         bptt->ih_momentum, net->ih_size, bptt->learn_rate, momentum);
   }
   else {
@@ -500,14 +499,14 @@ rnn_apply_learning(RecurNN *net, int momentum_style,
     else if (momentum_style == RNN_MOMENTUM_CLASSICAL){
       momentum_weight = 1.0f;
     }
-    else{
+    else {
       momentum_weight = bptt->momentum_weight;
     }
-    apply_learning_with_momentum(net->ho_weights, ho_gradient, bptt->ho_momentum,
-        net->ho_size, bptt->learn_rate * bptt->ho_scale,
+    apply_learning_with_momentum(net->ho_weights, bptt->ho_accumulator,
+        bptt->ho_momentum, net->ho_size, bptt->learn_rate * bptt->ho_scale,
         momentum, momentum_weight);
-    apply_learning_with_momentum(net->ih_weights, ih_gradient, bptt->ih_momentum,
-        net->ih_size, bptt->learn_rate, momentum, momentum_weight);
+    apply_learning_with_momentum(net->ih_weights, bptt->ih_accumulator,
+        bptt->ih_momentum, net->ih_size, bptt->learn_rate, momentum, momentum_weight);
 
     rnn_log_float(net, "momentum_weight", momentum_weight);
   }

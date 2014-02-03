@@ -1191,8 +1191,7 @@ maybe_learn(GstClassify *self){
     if (PERIODIC_PGM_DUMP && net->generation % PERIODIC_PGM_DUMP == 0){
       rnn_multi_pgm_dump(net, "how ihw");
     }
-    rnn_apply_learning(net, self->momentum_style, self->momentum_soft_start,
-        net->bptt->ih_accumulator, net->bptt->ho_accumulator);
+    rnn_apply_learning(net, self->momentum_style, self->momentum_soft_start);
     if (self->bottom_layer){
       rnn_apply_extra_layer_learning(self->bottom_layer);
     }

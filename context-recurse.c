@@ -123,8 +123,7 @@ fill_video_nodes(float *dest, RecurFrame *frame, int w, int h,
 static void
 consolidate_and_apply_learning(RecurContext *context){
   /*XXX nets doesn't change, should be set at start up */
-  rnn_apply_learning(context->net, RNN_MOMENTUM_WEIGHTED, 0,
-      context->net->bptt->ih_accumulator, context->net->bptt->ho_accumulator);
+  rnn_apply_learning(context->net, RNN_MOMENTUM_WEIGHTED, 0);
 }
 
 void
