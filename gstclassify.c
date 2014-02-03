@@ -1095,8 +1095,9 @@ train_channel(ClassifyChannel *c, float dropout, float *error_weights){
   RecurNN *net = c->net;
   float *answer;
   float *recurrent_inputs;
-  if (c->net->bottom_layer){
-    recurrent_inputs = rnn_calculate_extra_layer(c->net->bottom_layer, c->features);
+  RecurExtraLayer *bottom_layer = c->net->bottom_layer;
+  if (bottom_layer){
+    recurrent_inputs = rnn_calculate_extra_layer(bottom_layer, c->features);
   }
   else {
     recurrent_inputs = c->features;
@@ -1116,10 +1117,12 @@ train_channel(ClassifyChannel *c, float dropout, float *error_weights){
       net->bptt->o_error[i] *= error_weights[i];
     }
   }
-  if (c->net->bottom_layer){
+  if (bottom_layer){
+    memset(bottom_layer->o_error, 0, bottom_layer->o_size * sizeof(float));
     rnn_bptt_calc_deltas(net, net->bptt->ih_delta, net->bptt->ho_delta,
-        net->bptt->ih_accumulator, net->bptt->ho_accumulator, c->net->bottom_layer->o_error);
-    rnn_extra_layer_calc_deltas(c->net->bottom_layer, NULL);
+        net->bptt->ih_accumulator, net->bptt->ho_accumulator,
+        bottom_layer->o_error);
+    rnn_extra_layer_calc_deltas(bottom_layer, NULL);
   }
   else{
     rnn_bptt_calc_deltas(net, net->bptt->ih_delta, net->bptt->ho_delta,
