@@ -474,7 +474,6 @@ apply_learning_with_nesterov_momentum(float *restrict weights,
   add_aligned_arrays(weights, size, momentums, 1.0f);
 }
 
-
 void
 rnn_apply_learning(RecurNN *net, int momentum_style,
     float momentum_soft_start, float *ih_gradient, float *ho_gradient){
@@ -486,37 +485,33 @@ rnn_apply_learning(RecurNN *net, int momentum_style,
     float x = momentum_soft_start;
     momentum = MIN(momentum, 1.0f - x / (1 + net->generation + 2 * x));
   }
-  float momentum_weight;
 
-  switch (momentum_style){
-  case RNN_MOMENTUM_SIMPLIFIED_NESTEROV:
-    momentum_weight = momentum / (1.0 + momentum);
-    break;
-  case RNN_MOMENTUM_CLASSICAL:
-    momentum_weight = 1.0f;
-    break;
-  default:
-    momentum_weight = bptt->momentum_weight;
-    break;
-  }
-
-  switch (momentum_style){
-  case RNN_MOMENTUM_NESTEROV:
+  if (momentum_style == RNN_MOMENTUM_NESTEROV){
     apply_learning_with_nesterov_momentum(net->ho_weights, ho_gradient,
         bptt->ho_momentum, net->ho_size, bptt->learn_rate * bptt->ho_scale, momentum);
     apply_learning_with_nesterov_momentum(net->ih_weights, ih_gradient,
         bptt->ih_momentum, net->ih_size, bptt->learn_rate, momentum);
-    break;
-  default:
+  }
+  else {
+    float momentum_weight;
+    if (momentum_style == RNN_MOMENTUM_SIMPLIFIED_NESTEROV){
+      momentum_weight = momentum / (1.0 + momentum);
+    }
+    else if (momentum_style == RNN_MOMENTUM_CLASSICAL){
+      momentum_weight = 1.0f;
+    }
+    else{
+      momentum_weight = bptt->momentum_weight;
+    }
     apply_learning_with_momentum(net->ho_weights, ho_gradient, bptt->ho_momentum,
         net->ho_size, bptt->learn_rate * bptt->ho_scale,
         momentum, momentum_weight);
     apply_learning_with_momentum(net->ih_weights, ih_gradient, bptt->ih_momentum,
         net->ih_size, bptt->learn_rate, momentum, momentum_weight);
-    break;
+
+    rnn_log_float(net, "momentum_weight", momentum_weight);
   }
   rnn_log_float(net, "momentum", momentum);
-  rnn_log_float(net, "momentum_weight", momentum_weight);
 }
 
 
@@ -524,8 +519,6 @@ void
 rnn_apply_extra_layer_learning(RecurExtraLayer *layer){
   apply_learning_with_momentum(layer->weights, layer->delta, layer->momentums,
       layer->matrix_size, layer->learn_rate, layer->momentum, layer->momentum_weight);
-
-  /*XXX nothing here*/
 }
 
 
