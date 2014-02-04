@@ -114,6 +114,8 @@ def main():
                         help="how many file cycles to run for")
     parser.add_argument('-H', '--hidden-size', type=int,
                         help="number of hidden neurons")
+    parser.add_argument('-B', '--bottom-layer', type=int,
+                        help="number of bottom layer output nodes")
     parser.add_argument('-N', '--no-save-net', action='store_true',
                         help="don't save the net, periodically or otherwise")
 
@@ -168,6 +170,8 @@ def main():
     c.quiet = not args.verbose
     timings = load_all_timings_binary(args.timings)
     c.timings = {x: timings[x] for x in timed_files}
+    if args.bottom_layer:
+        c.classifier.set_property('bottom-layer', args.bottom_layer)
 
     c.train(training_streams, validate_streams, iterations=args.iterations,
             learn_rate=lr, dropout=dropout, log_file=NET_LOG_FILE,
@@ -178,7 +182,6 @@ def main():
                         #('weight-fan-in-sum', 2),
                         ('weight-sparsity', 2),
                         ('error-weight', '5:3'),
-                        ('bottom-layer', 50)
                         ))
 
 main()

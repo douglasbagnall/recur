@@ -248,6 +248,8 @@ def main():
                         help="how many file cycles to run for")
     parser.add_argument('-H', '--hidden-size', type=int,
                         help="number of hidden neurons")
+    parser.add_argument('-B', '--bottom-layer', type=int,
+                        help="number of bottom layer output nodes")
 
     args = parser.parse_args()
 
@@ -260,6 +262,8 @@ def main():
                        window_size=WINDOW_SIZE,
                        basename=BASENAME)
     c.quiet = QUIET
+    if args.bottom_layer:
+        c.classifier.set_property('bottom-layer', args.bottom_layer)
 
     timed_files = []
     for d in args.dir_with_timings:
