@@ -82,6 +82,7 @@ enum {
   RNN_NET_FLAG_NO_MOMENTUMS = 128, /*allocate no momentum arrays (borrow parent's)*/
   RNN_NET_FLAG_NO_DELTAS = 256, /* allocated no delta array (borrow parent's)*/
   RNN_NET_FLAG_OWN_ACCUMULATORS = 512, /*allocate delta accumulators (if BPTT) */
+  RNN_NET_FLAG_BOTTOM_LAYER = 1024, /*network has a layer below RNN*/
 
   /*conditioning flags start at 1 << 16 (65536) */
   RNN_COND_USE_SCALE = (1 << (RNN_COND_BIT_SCALE + RNN_COND_USE_OFFSET)),
@@ -177,11 +178,10 @@ struct _RecurExtraLayer {
   float learn_rate;
   int input_size;
   int output_size;
-  int matrix_size;
   int i_size;
   int o_size;
-  u32 flags;
   int overlap;
+  u32 flags;
 };
 
 /* functions */
@@ -194,7 +194,13 @@ RecurNN * rnn_clone(RecurNN *parent, u32 flags,
     u64 rng_seed, const char *log_file);
 
 RecurExtraLayer *rnn_new_extra_layer(int input_size, int output_size, int overlap,
-    u32 flags, float momentum, float learn_rate);
+    u32 flags, float learn_rate, float momentum);
+
+RecurNN *rnn_new_with_bottom_layer(int n_inputs, int r_input_size,
+    int hidden_size, int output_size, u32 flags, u64 rng_seed,
+    const char *log_file, int bptt_depth, float learn_rate,
+    float momentum, int convolutional_overlap);
+
 
 void rnn_set_log_file(RecurNN *net, const char * log_file, int append_dont_truncate);
 

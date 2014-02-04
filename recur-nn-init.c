@@ -146,7 +146,7 @@ rnn_delete_net(RecurNN *net){
 
 RecurExtraLayer *
 rnn_new_extra_layer(int input_size, int output_size, int overlap,
-    u32 flags, float momentum, float learn_rate)
+    u32 flags, float learn_rate, float momentum)
 {
   RecurExtraLayer *layer = zalloc_aligned_or_die(sizeof(RecurExtraLayer));
   int bias = !! (flags & RNN_NET_FLAG_BIAS);
@@ -158,11 +158,11 @@ rnn_new_extra_layer(int input_size, int output_size, int overlap,
   layer->flags = flags;
   layer->i_size = ALIGNED_VECTOR_LEN(input_size + bias, float);
   layer->o_size = ALIGNED_VECTOR_LEN(output_size, float);
-  layer->matrix_size = layer->i_size * layer->o_size;
+  int matrix_size = layer->i_size * layer->o_size;
 
-  size_t floats = layer->matrix_size * 3; /* weights, delta, momentums */
+  size_t floats = matrix_size * 3; /* weights, delta, momentums */
   if (flags & RNN_NET_FLAG_OWN_ACCUMULATORS){
-    floats += layer->matrix_size;
+    floats += matrix_size;
   }
   floats += (layer->i_size + layer->o_size) * 2; /* nodes and errors */
   layer->mem = malloc_aligned_or_die(floats * sizeof(float));
@@ -172,14 +172,14 @@ rnn_new_extra_layer(int input_size, int output_size, int overlap,
       DEBUG("Extra layer ran out of memory on " QUOTE(attr)             \
           " fm %p mem %p floats %zu allocating %d",                       \
           fm, layer->mem, floats, size);}} while(0)
-  SET_ATTR_SIZE(momentums, layer->matrix_size);
+  SET_ATTR_SIZE(momentums, matrix_size);
   SET_ATTR_SIZE(inputs, layer->i_size);
-  SET_ATTR_SIZE(weights, layer->matrix_size);
+  SET_ATTR_SIZE(weights, matrix_size);
   SET_ATTR_SIZE(outputs, layer->o_size);
-  SET_ATTR_SIZE(delta, layer->matrix_size);
+  SET_ATTR_SIZE(delta, matrix_size);
   SET_ATTR_SIZE(i_error, layer->i_size);
   if (flags & RNN_NET_FLAG_OWN_ACCUMULATORS){
-    SET_ATTR_SIZE(accumulator, layer->matrix_size);
+    SET_ATTR_SIZE(accumulator, matrix_size);
   }
   SET_ATTR_SIZE(o_error, layer->o_size);
 #undef SET_ATTR_SIZE
@@ -188,6 +188,29 @@ rnn_new_extra_layer(int input_size, int output_size, int overlap,
   return layer;
 }
 
+RecurNN *rnn_new_with_bottom_layer(int n_inputs, int r_input_size,
+    int hidden_size, int output_size, u32 flags, u64 rng_seed,
+    const char *log_file, int bptt_depth, float learn_rate,
+    float momentum, int convolutional_overlap)
+{
+  RecurNN *net;
+  if (r_input_size == 0){
+    DEBUG("rnn_new_with_bottom_layer returning bottomless net, "
+        "due to zero internal size");
+    flags &= ~RNN_NET_FLAG_BOTTOM_LAYER;
+    net = rnn_new(r_input_size, hidden_size, output_size,
+        flags, rng_seed, log_file, bptt_depth, learn_rate, momentum);
+  }
+  else {
+    flags |= RNN_NET_FLAG_BOTTOM_LAYER;
+    net = rnn_new(r_input_size, hidden_size, output_size,
+        flags, rng_seed, log_file, bptt_depth, learn_rate, momentum);
+
+    net->bottom_layer = rnn_new_extra_layer(n_inputs, r_input_size,
+        convolutional_overlap, net->flags, learn_rate, momentum);
+  }
+  return net;
+}
 
 RecurNN **
 rnn_new_training_set(RecurNN *prototype, int n_nets){
@@ -415,7 +438,7 @@ randomise_weights_fan_in(rand_ctx *rng, float *weights, int width, int height, i
 void
 rnn_randomise_extra_layer_fan_in(RecurExtraLayer *layer, rand_ctx *rng,
     float sum, float kurtosis, float margin){
-  memset(layer->weights, 0, layer->matrix_size * sizeof(float));
+  memset(layer->weights, 0, layer->i_size * layer->o_size * sizeof(float));
   int bias = !! (layer->flags & RNN_NET_FLAG_BIAS);
   randomise_weights_fan_in(rng, layer->weights,
       layer->output_size, layer->input_size + bias, layer->o_size,

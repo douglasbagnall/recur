@@ -516,7 +516,8 @@ rnn_apply_learning(RecurNN *net, int momentum_style,
 void
 rnn_apply_extra_layer_learning(RecurExtraLayer *layer){
   apply_learning_with_momentum(layer->weights, layer->delta, layer->momentums,
-      layer->matrix_size, layer->learn_rate, layer->momentum, layer->momentum_weight);
+      layer->i_size * layer->o_size, layer->learn_rate,
+      layer->momentum, layer->momentum_weight);
 }
 
 

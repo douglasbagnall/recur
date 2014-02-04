@@ -139,25 +139,24 @@ G_DEFINE_TYPE (GstClassify, gst_classify, GST_TYPE_AUDIO_FILTER)
 
 
 static inline void
-init_channel(ClassifyChannel *c, RecurNN *net, RecurExtraLayer *bottom_layer,
+init_channel(ClassifyChannel *c, RecurNN *net,
     int window_size, int id, float learn_rate)
 {
   c->net = net;
-  net->bottom_layer = bottom_layer;
   c->pcm_next = zalloc_aligned_or_die(window_size * sizeof(float));
   c->pcm_now = zalloc_aligned_or_die(window_size * sizeof(float));
   c->features = zalloc_aligned_or_die(net->input_size * sizeof(float));
+  c->mfcc_image = NULL;
+
   if (PGM_DUMP_FEATURES && id == 0){
 #if 1
-    c->mfcc_image = temporal_ppm_alloc(net->bottom_layer->o_size, 300, "bottom_error", id,
-        PGM_DUMP_COLOUR, &net->bottom_layer->o_error);
+    if (net->bottom_layer)
+      c->mfcc_image = temporal_ppm_alloc(net->bottom_layer->o_size, 300, "bottom_error",
+          id, PGM_DUMP_COLOUR, &net->bottom_layer->o_error);
 #else
     c->mfcc_image = temporal_ppm_alloc(net->input_size, 300, "mfcc", id,
         PGM_DUMP_COLOUR, &c->features);
 #endif
-  }
-  else {
-    c->mfcc_image = NULL;
   }
 }
 
@@ -496,13 +495,10 @@ load_or_create_net(GstClassify *self){
     STDERR_DEBUG("rng seed %lu", rng_seed);
 
     if (bottom_layer_size > 0){
-      net = rnn_new(bottom_layer_size, hidden_size,
+      net = rnn_new_with_bottom_layer(n_features, bottom_layer_size, hidden_size,
         self->n_classes, flags, rng_seed,
-        NULL, bptt_depth, self->learn_rate, momentum);
-      self->bottom_layer = rnn_new_extra_layer(n_features, bottom_layer_size, 0, net->flags,
-          self->learn_rate, momentum);
-      net->bottom_layer = self->bottom_layer;
-      rnn_randomise_extra_layer_fan_in(self->bottom_layer, &net->rng, 2.0, 0.2, 0.1f);
+          NULL, bptt_depth, self->learn_rate, momentum, 0);
+      rnn_randomise_extra_layer_fan_in(net->bottom_layer, &net->rng, 2.0, 0.2, 0.1f);
     }
     else {
       net = rnn_new(n_features, hidden_size,
@@ -560,7 +556,7 @@ gst_classify_setup(GstAudioFilter *base, const GstAudioInfo *info){
     }
     self->subnets = rnn_new_training_set(self->net, self->n_channels);
     for (int i = 0; i < self->n_channels; i++){
-      init_channel(&self->channels[i], self->subnets[i], self->bottom_layer,
+      init_channel(&self->channels[i], self->subnets[i],
           self->window_size, i, self->learn_rate);
     }
   }
@@ -1199,8 +1195,8 @@ maybe_learn(GstClassify *self){
         net->bptt->momentum, self->momentum_soft_start);
 
     rnn_apply_learning(net, self->momentum_style, momentum);
-    if (self->bottom_layer){
-      rnn_apply_extra_layer_learning(self->bottom_layer);
+    if (self->net->bottom_layer){
+      rnn_apply_extra_layer_learning(self->net->bottom_layer);
     }
     rnn_condition_net(net);
     possibly_save_net(net, self->net_filename);

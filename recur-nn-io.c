@@ -22,23 +22,32 @@ rnn_save_net(RecurNN *net, const char *filename, int backup){
   if (ret)
     goto error;
 
-  /*save a version number*/
-  const int version = 3;
+  /* save a version number                */
+  /* none (or 0,1): original version      */
+  /* 2: saves ho_scale                    */
+  /* 3: saves BPTT min_error_factor       */
+  /* 4: saves bottom layer if applicable, using more qualified keys
+     ("net->X", "bptt->X", "bottom_layer->X") */
+  const int version = 4;
   cdb_make_add(&cdbm, FORMAT_VERSION, strlen(FORMAT_VERSION), &version, sizeof(version));
 
 #define SAVE_SCALAR(obj, attr) do {                                     \
-    ret = cdb_make_add(&cdbm, QUOTE(attr), strlen(QUOTE(attr)),         \
+    char *key = (version >= 4) ? QUOTE(obj) "." QUOTE(attr) :          \
+      QUOTE(attr);                                                      \
+    ret = cdb_make_add(&cdbm, key, strlen(key),                         \
         &obj->attr, sizeof(obj->attr));                                 \
     if (ret){                                                           \
-      DEBUG("error %d saving '%s'", ret, QUOTE(attr));                  \
+      DEBUG("error %d saving '%s'", ret, key);                          \
       goto error;                                                       \
     }} while (0)
 
 #define SAVE_ARRAY(obj, attr, len) do {                                 \
-    ret = cdb_make_add(&cdbm, QUOTE(attr), strlen(QUOTE(attr)),         \
+    char *key = (version >= 4) ? QUOTE(obj) "." QUOTE(attr) :          \
+      QUOTE(attr);                                                      \
+    ret = cdb_make_add(&cdbm, key, strlen(key),                         \
         obj->attr, sizeof(*obj->attr) * len);                           \
     if (ret){                                                           \
-      DEBUG("error %d saving '%s'", ret, QUOTE(attr));                  \
+      DEBUG("error %d saving '%s'", ret, key);                          \
       goto error;                                                       \
     }} while (0)
   /* not saved:
@@ -68,20 +77,36 @@ rnn_save_net(RecurNN *net, const char *filename, int backup){
   SAVE_ARRAY(net, ho_weights, net->ho_size);
 
   if ((net->flags & RNN_NET_FLAG_OWN_BPTT) && net->bptt){
-    SAVE_SCALAR(net->bptt, depth);
-    SAVE_SCALAR(net->bptt, index);
-    SAVE_SCALAR(net->bptt, learn_rate);
-    SAVE_SCALAR(net->bptt, ho_scale);   /*version 2 and above*/
-    SAVE_SCALAR(net->bptt, momentum);
-    SAVE_SCALAR(net->bptt, momentum_weight);
-    SAVE_SCALAR(net->bptt, min_error_factor);   /*version 3 and above*/
-    SAVE_ARRAY(net->bptt, i_error, net->i_size);
-    SAVE_ARRAY(net->bptt, h_error, net->h_size);
-    SAVE_ARRAY(net->bptt, o_error, net->o_size);
-    SAVE_ARRAY(net->bptt, ih_momentum, net->ih_size);
-    SAVE_ARRAY(net->bptt, ho_momentum, net->ho_size);
-    SAVE_ARRAY(net->bptt, history, net->bptt->depth * net->i_size);
-    SAVE_ARRAY(net->bptt, ih_delta, net->ih_size);
+    RecurNNBPTT *bptt = net->bptt;
+    SAVE_SCALAR(bptt, depth);
+    SAVE_SCALAR(bptt, index);
+    SAVE_SCALAR(bptt, learn_rate);
+    SAVE_SCALAR(bptt, ho_scale);   /*version 2 and above*/
+    SAVE_SCALAR(bptt, momentum);
+    SAVE_SCALAR(bptt, momentum_weight);
+    SAVE_SCALAR(bptt, min_error_factor);   /*version 3 and above*/
+    SAVE_ARRAY(bptt, i_error, net->i_size);
+    SAVE_ARRAY(bptt, h_error, net->h_size);
+    SAVE_ARRAY(bptt, o_error, net->o_size);
+    SAVE_ARRAY(bptt, ih_momentum, net->ih_size);
+    SAVE_ARRAY(bptt, ho_momentum, net->ho_size);
+    SAVE_ARRAY(bptt, history, net->bptt->depth * net->i_size);
+    SAVE_ARRAY(bptt, ih_delta, net->ih_size);
+  }
+  if (net->bottom_layer){
+    /*version 4+ */
+    RecurExtraLayer *bottom_layer = net->bottom_layer;
+    int matrix_size = bottom_layer->i_size * bottom_layer->o_size;
+    SAVE_SCALAR(bottom_layer, input_size);
+    SAVE_SCALAR(bottom_layer, output_size);
+    SAVE_SCALAR(bottom_layer, i_size);
+    SAVE_SCALAR(bottom_layer, o_size);
+    SAVE_SCALAR(bottom_layer, flags);
+    SAVE_SCALAR(bottom_layer, learn_rate);
+    SAVE_SCALAR(bottom_layer, momentum);
+    SAVE_SCALAR(bottom_layer, momentum_weight);
+    SAVE_SCALAR(bottom_layer, overlap);
+    SAVE_ARRAY(bottom_layer, weights, matrix_size);
   }
 #undef SAVE_SCALAR
 #undef SAVE_ARRAY
@@ -117,7 +142,10 @@ rnn_load_net(const char *filename){
   int ret = 0;
   RecurNN tmpnet;
   RecurNNBPTT tmpbptt;
-  RecurNN *net;
+  RecurExtraLayer tmpbl;
+  RecurNN *net = &tmpnet;
+  RecurNNBPTT *bptt = &tmpbptt;
+  RecurExtraLayer *bottom_layer = &tmpbl;
 
   fd = open(filename, O_RDONLY);
 
@@ -127,69 +155,90 @@ rnn_load_net(const char *filename){
       cdb_bread(fd, &version, vlen);
     }
   }
-
-#define READ_SCALAR(obj, attr) do { ret = cdb_seek(fd, QUOTE(attr),     \
-        strlen(QUOTE(attr)), &vlen);                                    \
-    if (ret < 1){ DEBUG("error %d loading '%s'", ret, QUOTE(attr));     \
-      goto pre_alloc_error;}                                                      \
-    if (vlen != sizeof(obj.attr)) {                                    \
-      DEBUG("size mismatch on '%s->%s' want %u, found %lu",              \
-          QUOTE(obj), QUOTE(attr), vlen, sizeof(obj.attr));            \
+  /*gather up scalar values in tmpnet/tmpbptt*/
+#define READ_SCALAR(obj, attr) do {\
+    char *key = (version >= 4) ? QUOTE(obj) "." QUOTE(attr) : QUOTE(attr); \
+    ret = cdb_seek(fd, key, strlen(key), &vlen);                        \
+    if (ret < 1){ DEBUG("error %d loading '%s'", ret, key);             \
+      goto pre_alloc_error;}                                            \
+    if (vlen != sizeof(obj->attr)) {                                    \
+      DEBUG("size mismatch on '%s->%s' want %u, found %lu",             \
+          QUOTE(obj), QUOTE(attr), vlen, sizeof(obj->attr));            \
       goto pre_alloc_error;                                             \
     }                                                                   \
-    cdb_bread(fd, &obj.attr, vlen);                                    \
+    cdb_bread(fd, &obj->attr, vlen);                                    \
   } while (0)
 
-  READ_SCALAR(tmpnet, i_size);
-  READ_SCALAR(tmpnet, h_size);
-  READ_SCALAR(tmpnet, o_size);
+  READ_SCALAR(net, i_size);
+  READ_SCALAR(net, h_size);
+  READ_SCALAR(net, o_size);
 
-  READ_SCALAR(tmpnet, input_size);
-  READ_SCALAR(tmpnet, hidden_size);
-  READ_SCALAR(tmpnet, output_size);
+  READ_SCALAR(net, input_size);
+  READ_SCALAR(net, hidden_size);
+  READ_SCALAR(net, output_size);
 
-  READ_SCALAR(tmpnet, ih_size);
-  READ_SCALAR(tmpnet, ho_size);
-  READ_SCALAR(tmpnet, bias);
-  READ_SCALAR(tmpnet, rng);
-  READ_SCALAR(tmpnet, generation);
-  READ_SCALAR(tmpnet, flags);
+  READ_SCALAR(net, ih_size);
+  READ_SCALAR(net, ho_size);
+  READ_SCALAR(net, bias);
+  READ_SCALAR(net, rng);
+  READ_SCALAR(net, generation);
+  READ_SCALAR(net, flags);
   if (tmpnet.flags & RNN_NET_FLAG_OWN_BPTT){
-    READ_SCALAR(tmpbptt, depth);
-    READ_SCALAR(tmpbptt, learn_rate);
-    READ_SCALAR(tmpbptt, index);
-    READ_SCALAR(tmpbptt, momentum);
-    READ_SCALAR(tmpbptt, momentum_weight);
+    READ_SCALAR(bptt, depth);
+    READ_SCALAR(bptt, learn_rate);
+    READ_SCALAR(bptt, index);
+    READ_SCALAR(bptt, momentum);
+    READ_SCALAR(bptt, momentum_weight);
     if (version >= 2){
-      READ_SCALAR(tmpbptt, ho_scale);
+      READ_SCALAR(bptt, ho_scale);
     }
     if (version >= 3){
-      READ_SCALAR(tmpbptt, min_error_factor);
+      READ_SCALAR(bptt, min_error_factor);
     }
+  }
+  if (tmpnet.flags & RNN_NET_FLAG_BOTTOM_LAYER){
+    READ_SCALAR(bottom_layer, momentum);
+    READ_SCALAR(bottom_layer, momentum_weight);
+    READ_SCALAR(bottom_layer, learn_rate);
+    READ_SCALAR(bottom_layer, input_size);
+    READ_SCALAR(bottom_layer, output_size);
+    READ_SCALAR(bottom_layer, i_size);
+    READ_SCALAR(bottom_layer, o_size);
+    READ_SCALAR(bottom_layer, flags);
+    READ_SCALAR(bottom_layer, overlap);
   }
 #undef READ_SCALAR
 
-  net = rnn_new(tmpnet.input_size, tmpnet.hidden_size,
+  if (tmpnet.flags & RNN_NET_FLAG_BOTTOM_LAYER){
+    net = rnn_new_with_bottom_layer(tmpbl.input_size, tmpbl.output_size,
+        tmpnet.hidden_size, tmpnet.output_size, tmpnet.flags, 0, NULL,
+        tmpbptt.depth, tmpbptt.learn_rate, tmpbptt.momentum, tmpbl.overlap);
+  }
+  else {
+    net = rnn_new(tmpnet.input_size, tmpnet.hidden_size,
       tmpnet.output_size, tmpnet.flags, 0, NULL,
       tmpbptt.depth, tmpbptt.learn_rate, tmpbptt.momentum);
-
+  }
+  bptt = net->bptt;
+  bottom_layer = net->bottom_layer;
   net->rng = tmpnet.rng;
   net->generation = tmpnet.generation;
-  net->bptt->index = tmpbptt.index;
-  if (net->bptt){
-    net->bptt->momentum_weight = tmpbptt.momentum_weight;
+
+  if (bptt){
+    bptt->index = tmpbptt.index;
+    bptt->momentum_weight = tmpbptt.momentum_weight;
     if (version >= 2){
-      net->bptt->ho_scale = tmpbptt.ho_scale;
+      bptt->ho_scale = tmpbptt.ho_scale;
     }
     if (version >= 3){
-      net->bptt->min_error_factor = tmpbptt.min_error_factor;
+      bptt->min_error_factor = tmpbptt.min_error_factor;
     }
   }
-#define CHECK_SCALAR(new, tmp, attr) do {                                   \
-  if (new->attr != tmp.attr){                                              \
-    DEBUG("attribute '%s' differs %f vs %f", QUOTE(attr),               \
-        (float)new->attr, (float)tmp.attr);                                \
-    goto error;}                                                        \
+#define CHECK_SCALAR(new, tmp, attr) do {                               \
+    if (new->attr != tmp.attr){                                         \
+      DEBUG("attribute '%s' differs %f vs %f", QUOTE(attr),             \
+          (float)new->attr, (float)tmp.attr);                           \
+      goto error;}                                                      \
   } while (0)
 
   CHECK_SCALAR(net, tmpnet, i_size);
@@ -211,32 +260,45 @@ rnn_load_net(const char *filename){
 
   CHECK_SCALAR(net, tmpnet, generation);
   CHECK_SCALAR(net, tmpnet, flags);
-  if (net->bptt){
-    CHECK_SCALAR(net->bptt, tmpbptt, depth);
-    CHECK_SCALAR(net->bptt, tmpbptt, index);
+  if (bptt){
+    CHECK_SCALAR(bptt, tmpbptt, depth);
+    CHECK_SCALAR(bptt, tmpbptt, index);
     if (version >= 2){
-      CHECK_SCALAR(net->bptt, tmpbptt, ho_scale);
+      CHECK_SCALAR(bptt, tmpbptt, ho_scale);
     }
     else {
       /*ho_scale wasn't originally saved. But it was always set as follows. */
-      net->bptt->ho_scale = ((float)tmpnet.output_size) / tmpnet.hidden_size;
+      bptt->ho_scale = ((float)tmpnet.output_size) / tmpnet.hidden_size;
     }
     if (version >= 3){
-      CHECK_SCALAR(net->bptt, tmpbptt, min_error_factor);
+      CHECK_SCALAR(bptt, tmpbptt, min_error_factor);
     }
     else {
-      net->bptt->min_error_factor = BASE_MIN_ERROR_FACTOR * net->h_size;
+      bptt->min_error_factor = BASE_MIN_ERROR_FACTOR * net->h_size;
     }
+  }
+
+  if (net->bottom_layer){
+    CHECK_SCALAR(net->bottom_layer, tmpbl, input_size);
+    CHECK_SCALAR(net->bottom_layer, tmpbl, output_size);
+    CHECK_SCALAR(net->bottom_layer, tmpbl, i_size);
+    CHECK_SCALAR(net->bottom_layer, tmpbl, o_size);
+    CHECK_SCALAR(net->bottom_layer, tmpbl, learn_rate);
+    CHECK_SCALAR(net->bottom_layer, tmpbl, momentum);
+    CHECK_SCALAR(net->bottom_layer, tmpbl, momentum_weight);
+    CHECK_SCALAR(net->bottom_layer, tmpbl, flags);
+    CHECK_SCALAR(net->bottom_layer, tmpbl, overlap);
   }
 #undef CHECK_SCALAR
 
   /* so presumably all the arrays are all allocate and the right size. */
-#define READ_ARRAY(obj, attr, size) do { ret = cdb_seek(fd, QUOTE(attr), \
-        strlen(QUOTE(attr)), &vlen);                                    \
-    if (ret < 1){ DEBUG("error %d loading '%s'", ret, QUOTE(attr));     \
+#define READ_ARRAY(obj, attr, size) do {                                \
+    char *key = (version >= 4) ? QUOTE(obj) "." QUOTE(attr) : QUOTE(attr); \
+    ret = cdb_seek(fd, key, strlen(key), &vlen);                        \
+    if (ret < 1){ DEBUG("error %d loading '%s'", ret, key);             \
       goto error;}                                                      \
     if (vlen != size) {                                                 \
-      DEBUG("array size mismatch on '%s->%s' saved %u, calculated %lu",  \
+      DEBUG("array size mismatch on '%s->%s' saved %u, calculated %lu", \
           QUOTE(obj), QUOTE(attr), vlen, size);                         \
       goto error;                                                       \
     }                                                                   \
@@ -249,14 +311,18 @@ rnn_load_net(const char *filename){
   READ_ARRAY(net, ih_weights, net->ih_size * sizeof(float));
   READ_ARRAY(net, ho_weights, net->ho_size * sizeof(float));
 
-  if(net->bptt){
-    READ_ARRAY(net->bptt, i_error, net->i_size * sizeof(float));
-    READ_ARRAY(net->bptt, h_error, net->h_size * sizeof(float));
-    READ_ARRAY(net->bptt, o_error, net->o_size * sizeof(float));
-    READ_ARRAY(net->bptt, ih_momentum, net->ih_size * sizeof(float));
-    READ_ARRAY(net->bptt, ho_momentum, net->ho_size * sizeof(float));
-    READ_ARRAY(net->bptt, history, net->bptt->depth * net->i_size * sizeof(float));
-    READ_ARRAY(net->bptt, ih_delta, net->ih_size * sizeof(float));
+  if(bptt){
+    READ_ARRAY(bptt, i_error, net->i_size * sizeof(float));
+    READ_ARRAY(bptt, h_error, net->h_size * sizeof(float));
+    READ_ARRAY(bptt, o_error, net->o_size * sizeof(float));
+    READ_ARRAY(bptt, ih_momentum, net->ih_size * sizeof(float));
+    READ_ARRAY(bptt, ho_momentum, net->ho_size * sizeof(float));
+    READ_ARRAY(bptt, history, bptt->depth * net->i_size * sizeof(float));
+    READ_ARRAY(bptt, ih_delta, net->ih_size * sizeof(float));
+  }
+  if (bottom_layer){
+    READ_ARRAY(bottom_layer, weights, bottom_layer->i_size * bottom_layer->o_size * sizeof(float));
+    /*not restoring full state (momentums etc) */
   }
 #undef READ_ARRAY
   close(fd);
