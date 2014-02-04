@@ -6,11 +6,8 @@ import time
 import argparse
 
 from classify import gst_init, TRAINING, TESTING, Gst
-from classify import KIWI_MFCCS as MFCCS
-from classify import KIWI_CLASSES as CLASSES
-from classify import KIWI_HIDDEN_SIZE as HIDDEN_SIZE
-from classify import KIWI_WINDOW_SIZE as WINDOW_SIZE
-from classify import KIWI_BASENAME as BASENAME
+from classify_kiwi import MFCCS, CLASSES, WINDOW_SIZE, BASENAME
+
 from classify import COLOURS, recursive_wav_finder, load_all_timings_binary
 from classify import BaseClassifier, load_timings
 
@@ -249,7 +246,7 @@ def main():
                         help="use this directory without timings")
     parser.add_argument('-i', '--iterations', type=int, default=10000,
                         help="how many file cycles to run for")
-    parser.add_argument('-H', '--hidden-size', type=int, default=HIDDEN_SIZE,
+    parser.add_argument('-H', '--hidden-size', type=int,
                         help="number of hidden neurons")
 
     args = parser.parse_args()
