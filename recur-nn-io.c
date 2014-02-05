@@ -101,10 +101,7 @@ rnn_save_net(RecurNN *net, const char *filename, int backup){
     SAVE_SCALAR(bottom_layer, output_size);
     SAVE_SCALAR(bottom_layer, i_size);
     SAVE_SCALAR(bottom_layer, o_size);
-    SAVE_SCALAR(bottom_layer, flags);
-    SAVE_SCALAR(bottom_layer, learn_rate);
-    SAVE_SCALAR(bottom_layer, momentum);
-    SAVE_SCALAR(bottom_layer, momentum_weight);
+    SAVE_SCALAR(bottom_layer, learn_rate_scale);
     SAVE_SCALAR(bottom_layer, overlap);
     SAVE_ARRAY(bottom_layer, weights, matrix_size);
   }
@@ -197,14 +194,11 @@ rnn_load_net(const char *filename){
     }
   }
   if (tmpnet.flags & RNN_NET_FLAG_BOTTOM_LAYER){
-    READ_SCALAR(bottom_layer, momentum);
-    READ_SCALAR(bottom_layer, momentum_weight);
-    READ_SCALAR(bottom_layer, learn_rate);
+    READ_SCALAR(bottom_layer, learn_rate_scale);
     READ_SCALAR(bottom_layer, input_size);
     READ_SCALAR(bottom_layer, output_size);
     READ_SCALAR(bottom_layer, i_size);
     READ_SCALAR(bottom_layer, o_size);
-    READ_SCALAR(bottom_layer, flags);
     READ_SCALAR(bottom_layer, overlap);
   }
 #undef READ_SCALAR
@@ -278,15 +272,12 @@ rnn_load_net(const char *filename){
     }
   }
 
-  if (net->bottom_layer){
+  if (net->bottom_layer && 0){
     CHECK_SCALAR(net->bottom_layer, tmpbl, input_size);
     CHECK_SCALAR(net->bottom_layer, tmpbl, output_size);
     CHECK_SCALAR(net->bottom_layer, tmpbl, i_size);
     CHECK_SCALAR(net->bottom_layer, tmpbl, o_size);
-    CHECK_SCALAR(net->bottom_layer, tmpbl, learn_rate);
-    CHECK_SCALAR(net->bottom_layer, tmpbl, momentum);
-    CHECK_SCALAR(net->bottom_layer, tmpbl, momentum_weight);
-    CHECK_SCALAR(net->bottom_layer, tmpbl, flags);
+    CHECK_SCALAR(net->bottom_layer, tmpbl, learn_rate_scale);
     CHECK_SCALAR(net->bottom_layer, tmpbl, overlap);
   }
 #undef CHECK_SCALAR

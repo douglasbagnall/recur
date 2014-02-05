@@ -494,17 +494,10 @@ load_or_create_net(GstClassify *self){
     u64 rng_seed = get_gvalue_u64(PENDING_PROP(self, PROP_RNG_SEED), DEFAULT_RNG_SEED);
     STDERR_DEBUG("rng seed %lu", rng_seed);
 
-    if (bottom_layer_size > 0){
-      net = rnn_new_with_bottom_layer(n_features, bottom_layer_size, hidden_size,
+
+    net = rnn_new_with_bottom_layer(n_features, bottom_layer_size, hidden_size,
         self->n_classes, flags, rng_seed,
-          NULL, bptt_depth, self->learn_rate, momentum, 0);
-      rnn_randomise_extra_layer_fan_in(net->bottom_layer, &net->rng, 2.0, 0.2, 0.1f);
-    }
-    else {
-      net = rnn_new(n_features, hidden_size,
-          self->n_classes, flags, rng_seed,
-          NULL, bptt_depth, self->learn_rate, momentum);
-    }
+        NULL, bptt_depth, self->learn_rate, momentum, 0);
     if (fan_in_sum){
       rnn_randomise_weights_fan_in(net, fan_in_sum, fan_in_kurtosis, 0.1f, 0);
     }
@@ -1100,17 +1093,8 @@ train_channel(ClassifyChannel *c, float dropout, float *error_weights){
       net->bptt->o_error[i] *= error_weights[i];
     }
   }
-  if (bottom_layer){
-    memset(bottom_layer->o_error, 0, bottom_layer->o_size * sizeof(float));
-    rnn_bptt_calc_deltas(net, net->bptt->ih_delta, net->bptt->ho_delta,
-        net->bptt->ih_accumulator, net->bptt->ho_accumulator,
-        bottom_layer->o_error);
-    rnn_extra_layer_calc_deltas(bottom_layer, NULL);
-  }
-  else{
-    rnn_bptt_calc_deltas(net, net->bptt->ih_delta, net->bptt->ho_delta,
-        net->bptt->ih_accumulator, net->bptt->ho_accumulator, NULL);
-  }
+  rnn_bptt_calc_deltas(net, net->bptt->ih_delta, net->bptt->ho_delta,
+      net->bptt->ih_accumulator, net->bptt->ho_accumulator);
   rnn_bptt_advance(net);
   return net->bptt->o_error[c->current_target];
 }
@@ -1166,6 +1150,10 @@ maybe_learn(GstClassify *self){
     }
     memset(self->net->bptt->ih_accumulator, 0, self->net->ih_size * sizeof(float));
     memset(self->net->bptt->ho_accumulator, 0, self->net->ho_size * sizeof(float));
+    if (self->net->bottom_layer){
+      memset(self->net->bottom_layer->o_error, 0,
+          self->net->bottom_layer->o_size * sizeof(float));
+    }
     for (j = 0; j < self->n_channels; j++){
       ClassifyChannel *c = prepare_channel_features(self, buffer, j);
       err_sum += train_channel(c, self->dropout, self->error_weight);
@@ -1182,9 +1170,6 @@ maybe_learn(GstClassify *self){
         net->bptt->momentum, self->momentum_soft_start);
 
     rnn_apply_learning(net, self->momentum_style, momentum);
-    if (self->net->bottom_layer){
-      rnn_apply_extra_layer_learning(self->net->bottom_layer);
-    }
     rnn_condition_net(net);
     possibly_save_net(net, self->net_filename);
     rnn_log_net(net);

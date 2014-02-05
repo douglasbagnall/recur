@@ -173,15 +173,12 @@ struct _RecurExtraLayer {
   float *outputs;
   float *i_error;
   float *o_error;
-  float momentum;
-  float momentum_weight;
-  float learn_rate;
+  float learn_rate_scale;
   int input_size;
   int output_size;
   int i_size;
   int o_size;
   int overlap;
-  u32 flags;
 };
 
 /* functions */
@@ -194,7 +191,7 @@ RecurNN * rnn_clone(RecurNN *parent, u32 flags,
     u64 rng_seed, const char *log_file);
 
 RecurExtraLayer *rnn_new_extra_layer(int input_size, int output_size, int overlap,
-    u32 flags, float learn_rate, float momentum);
+    u32 flags);
 
 RecurNN *rnn_new_with_bottom_layer(int n_inputs, int r_input_size,
     int hidden_size, int output_size, u32 flags, u64 rng_seed,
@@ -210,17 +207,11 @@ void rnn_scale_initial_weights(RecurNN *net, float factor);
 void rnn_randomise_weights_fan_in(RecurNN *net, float sum, float kurtosis, float margin,
     float inputs_weight_ratio);
 
-void rnn_randomise_extra_layer_fan_in(RecurExtraLayer *layer, rand_ctx *rng,
-    float sum, float kurtosis, float margin);
-
 void rnn_delete_net(RecurNN *net);
 RecurNN ** rnn_new_training_set(RecurNN *prototype, int n_nets);
 void rnn_delete_training_set(RecurNN **nets, int n_nets, int leave_prototype);
 
 float *rnn_opinion(RecurNN *net, const float *inputs, float dropout);
-
-float *rnn_calculate_extra_layer(RecurExtraLayer *layer, const float *inputs);
-void rnn_extra_layer_calc_deltas(RecurExtraLayer *layer, float *error_sum);
 
 void rnn_multi_pgm_dump(RecurNN *net, const char *dumpees);
 
@@ -234,7 +225,7 @@ float rnn_calculate_momentum_soft_start(float generation, float momentum,
     float momentum_soft_start);
 
 void rnn_bptt_calc_deltas(RecurNN *net, float *ih_delta, float *ho_delta,
-    float *ih_accumulator, float *ho_accumulator, float *bottom_delta);
+    float *ih_accumulator, float *ho_accumulator);
 
 void rnn_condition_net(RecurNN *net);
 void rnn_log_net(RecurNN *net);

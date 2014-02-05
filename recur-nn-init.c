@@ -146,7 +146,7 @@ rnn_delete_net(RecurNN *net){
 
 RecurExtraLayer *
 rnn_new_extra_layer(int input_size, int output_size, int overlap,
-    u32 flags, float learn_rate, float momentum)
+    u32 flags)
 {
   RecurExtraLayer *layer = zalloc_aligned_or_die(sizeof(RecurExtraLayer));
   int bias = !! (flags & RNN_NET_FLAG_BIAS);
@@ -155,7 +155,7 @@ rnn_new_extra_layer(int input_size, int output_size, int overlap,
   layer->input_size = input_size;
   layer->output_size = output_size;
   layer->overlap = overlap;
-  layer->flags = flags;
+  layer->learn_rate_scale = 1.0;
   layer->i_size = ALIGNED_VECTOR_LEN(input_size + bias, float);
   layer->o_size = ALIGNED_VECTOR_LEN(output_size, float);
   int matrix_size = layer->i_size * layer->o_size;
@@ -165,7 +165,7 @@ rnn_new_extra_layer(int input_size, int output_size, int overlap,
     floats += matrix_size;
   }
   floats += (layer->i_size + layer->o_size) * 2; /* nodes and errors */
-  layer->mem = malloc_aligned_or_die(floats * sizeof(float));
+  layer->mem = zalloc_aligned_or_die(floats * sizeof(float));
   float *fm = layer->mem;
 #define SET_ATTR_SIZE(attr, size) do {layer->attr = fm; fm += (size);   \
     if (fm > layer->mem + floats) {                                     \
@@ -183,8 +183,6 @@ rnn_new_extra_layer(int input_size, int output_size, int overlap,
   }
   SET_ATTR_SIZE(o_error, layer->o_size);
 #undef SET_ATTR_SIZE
-  layer->momentum = momentum;
-  layer->learn_rate = learn_rate;
   return layer;
 }
 
@@ -207,7 +205,7 @@ RecurNN *rnn_new_with_bottom_layer(int n_inputs, int r_input_size,
         flags, rng_seed, log_file, bptt_depth, learn_rate, momentum);
 
     net->bottom_layer = rnn_new_extra_layer(n_inputs, r_input_size,
-        convolutional_overlap, net->flags, learn_rate, momentum);
+        convolutional_overlap, net->flags);
   }
   return net;
 }
@@ -361,6 +359,8 @@ rnn_clone(RecurNN *parent, u32 flags,
     net->ih_weights = parent->ih_weights;
     net->ho_weights = parent->ho_weights;
   }
+  /*for now, the bottom layers can be shared */
+  net->bottom_layer = parent->bottom_layer;
   net->generation = parent->generation;
   return net;
 }
@@ -415,6 +415,18 @@ rnn_randomise_weights(RecurNN *net, float variance, int shape, double perforatio
       }
     }
   }
+  if (net->bottom_layer){
+    RecurExtraLayer *bl = net->bottom_layer;
+    memset(bl->weights, 0, bl->i_size * bl->o_size * sizeof(float));
+    for (y = 0; y < bl->input_size; y++){
+      for (x = 0; x < bl->output_size; x++){
+        if (rand_double(&net->rng) > perforation){
+          bl->weights[y * bl->o_size + x] = gaussian_power(&net->rng,
+              variance, shape);
+        }
+      }
+    }
+  }
 }
 
 static inline void
@@ -436,21 +448,10 @@ randomise_weights_fan_in(rand_ctx *rng, float *weights, int width, int height, i
 }
 
 void
-rnn_randomise_extra_layer_fan_in(RecurExtraLayer *layer, rand_ctx *rng,
-    float sum, float kurtosis, float margin){
-  memset(layer->weights, 0, layer->i_size * layer->o_size * sizeof(float));
-  int bias = !! (layer->flags & RNN_NET_FLAG_BIAS);
-  randomise_weights_fan_in(rng, layer->weights,
-      layer->output_size, layer->input_size + bias, layer->o_size,
-      sum, kurtosis, margin);
-}
-
-void
 rnn_randomise_weights_fan_in(RecurNN *net, float sum, float kurtosis,
     float margin, float inputs_weight_ratio){
   memset(net->ih_weights, 0, net->ih_size * sizeof(float));
   memset(net->ho_weights, 0, net->ho_size * sizeof(float));
-
   int hsize = net->bias + net->hidden_size;
   if (inputs_weight_ratio > 0){
     randomise_weights_fan_in(&net->rng, net->ih_weights + net->bias,
@@ -461,11 +462,19 @@ rnn_randomise_weights_fan_in(RecurNN *net, float sum, float kurtosis,
   }
   else {
     randomise_weights_fan_in(&net->rng, net->ih_weights + net->bias,
-        net->hidden_size, hsize + net->input_size, net->hidden_size,
+        net->hidden_size, hsize + net->input_size, net->h_size,
         sum, kurtosis, margin);
   }
   randomise_weights_fan_in(&net->rng, net->ho_weights, net->output_size, net->hidden_size,
       net->o_size, sum, kurtosis, margin);
+
+  if (net->bottom_layer){
+    RecurExtraLayer *bl = net->bottom_layer;
+    memset(bl->weights, 0, bl->i_size * bl->o_size * sizeof(float));
+    randomise_weights_fan_in(&net->rng, bl->weights, bl->output_size,
+        bl->input_size + net->bias, bl->o_size,
+        sum, kurtosis, margin);
+  }
 }
 
 
