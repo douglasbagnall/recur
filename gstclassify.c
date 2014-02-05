@@ -143,20 +143,22 @@ init_channel(ClassifyChannel *c, RecurNN *net,
     int window_size, int id, float learn_rate)
 {
   c->net = net;
+  int n_inputs;
+  if (net->bottom_layer){
+    n_inputs = net->bottom_layer->input_size;
+  }
+  else {
+    n_inputs = net->input_size;
+  }
+
   c->pcm_next = zalloc_aligned_or_die(window_size * sizeof(float));
   c->pcm_now = zalloc_aligned_or_die(window_size * sizeof(float));
-  c->features = zalloc_aligned_or_die(net->input_size * sizeof(float));
+  c->features = zalloc_aligned_or_die(n_inputs * sizeof(float));
   c->mfcc_image = NULL;
 
   if (PGM_DUMP_FEATURES && id == 0){
-#if 1
-    if (net->bottom_layer)
-      c->mfcc_image = temporal_ppm_alloc(net->bottom_layer->o_size, 300, "bottom_error",
-          id, PGM_DUMP_COLOUR, &net->bottom_layer->o_error);
-#else
-    c->mfcc_image = temporal_ppm_alloc(net->input_size, 300, "mfcc", id,
+    c->mfcc_image = temporal_ppm_alloc(n_inputs, 300, "features", id,
         PGM_DUMP_COLOUR, &c->features);
-#endif
   }
 }
 
@@ -200,6 +202,10 @@ gst_classify_finalize (GObject * obj){
   if (self->incoming_queue){
     free(self->incoming_queue);
     self->incoming_queue = NULL;
+  }
+  if (self->error_image){
+    temporal_ppm_free(self->error_image);
+    self->error_image = NULL;
   }
 
   for (int i = 0; i < PROP_LAST; i++){
@@ -505,9 +511,16 @@ load_or_create_net(GstClassify *self){
       rnn_randomise_weights(net, RNN_INITIAL_WEIGHT_VARIANCE_FACTOR / net->h_size,
           weight_sparsity, 0.5);
     }
+    if (PERIODIC_PGM_DUMP){
+      rnn_multi_pgm_dump(net, "how ihw iha biw bid");
+    }
   }
   else {
     rnn_set_log_file(net, NULL, 0);
+  }
+  if (net->bottom_layer){
+    self->error_image = temporal_ppm_alloc(net->bottom_layer->o_size, 300, "bottom_error",
+        0, PGM_DUMP_COLOUR, &net->bottom_layer->o_error);
   }
   return net;
 }
@@ -1180,6 +1193,10 @@ maybe_learn(GstClassify *self){
         rnn_log_int(net, s, class_counts[i]);
       }
     }
+    if (self->error_image){
+      temporal_ppm_row_from_source(self->error_image);
+    }
+
     rnn_log_float(net, "error", err_sum / self->n_channels);
     rnn_log_float(net, "correct", winners * 1.0 / self->n_channels);
   }

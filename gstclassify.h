@@ -105,6 +105,7 @@ struct _GstClassify
   float dropout;
   float *error_weight;
   GValue *pending_properties;
+  TemporalPPM *error_image;
 };
 
 
