@@ -44,7 +44,7 @@ recur_bin_complex(RecurAudioBinner *ab, GstFFTF32Complex *f)
     sum_right += (1.0f - mul) * power;
 
     if (i){
-      ab->fft_bins[i - 1] = logf(sum_right + 0.01f) - slope->log_scale;
+      ab->fft_bins[i - 1] = logf(sum_right + 1e-6f) - slope->log_scale;
     }
   }
   return ab->fft_bins;
