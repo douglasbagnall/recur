@@ -338,14 +338,7 @@ one_hot_opinion(RecurNN *net, const int hot){
     net->real_inputs[net->input_size - 1] = 1.0f;
   }
   net->real_inputs[hot & 0x7f] = 1.0f;
-  float *answer;
-  if (opt_dropout){
-    answer = rnn_opinion_with_dropout(net, NULL, opt_dropout);
-  }
-  else {
-    answer = rnn_opinion(net, NULL);
-  }
-  return answer;
+  return rnn_opinion(net, NULL, opt_dropout);
 }
 
 static inline float

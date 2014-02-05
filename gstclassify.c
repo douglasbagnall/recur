@@ -1089,21 +1089,8 @@ prepare_channel_features(GstClassify *self, s16 *buffer_i, int j){
 static inline float
 train_channel(ClassifyChannel *c, float dropout, float *error_weights){
   RecurNN *net = c->net;
-  float *answer;
-  float *recurrent_inputs;
-  RecurExtraLayer *bottom_layer = c->net->bottom_layer;
-  if (bottom_layer){
-    recurrent_inputs = rnn_calculate_extra_layer(bottom_layer, c->features);
-  }
-  else {
-    recurrent_inputs = c->features;
-  }
-  if (dropout){
-    answer = rnn_opinion_with_dropout(net, recurrent_inputs, dropout);
-  }
-  else {
-    answer = rnn_opinion(net, recurrent_inputs);
-  }
+  float *answer = rnn_opinion(net, c->features, dropout);
+
   c->current_winner = softmax_best_guess(net->bptt->o_error, answer,
       net->output_size);
   net->bptt->o_error[c->current_target] += 1.0f;
@@ -1223,15 +1210,7 @@ emit_opinions(GstClassify *self, GstClockTime pts){
     for (j = 0; j < self->n_channels; j++){
       ClassifyChannel *c = prepare_channel_features(self, buffer, j);
       RecurNN *net = c->net;
-
-      float *recurrent_inputs;
-      if (c->net->bottom_layer){
-        recurrent_inputs = rnn_calculate_extra_layer(c->net->bottom_layer, c->features);
-      }
-      else {
-        recurrent_inputs = c->features;
-      }
-      float *answer = rnn_opinion(net, recurrent_inputs);
+      float *answer = rnn_opinion(net, c->features, 0);
       c->current_winner = softmax_best_guess(net->bptt->o_error, answer,
           net->output_size);
       int valid_target = c->current_target >= 0 && c->current_target < self->n_classes;

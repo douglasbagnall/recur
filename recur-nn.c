@@ -99,82 +99,72 @@ maybe_scale_inputs(RecurNN *net){
   }
 }
 
-
-/*raw opinion does the core calculation */
-static void
-rnn_raw_opinion(RecurNN *net){
-  if (net->bias)
-    net->input_layer[0] = 1.0f;
-
-  maybe_scale_inputs(net);
-
-  calculate_interlayer(net->input_layer, net->i_size,
-      net->hidden_layer, net->h_size, net->ih_weights);
-
-  ASSUME_ALIGNED(net->hidden_layer);
-  for (int i = 0; i < net->h_size; i++){
-    net->hidden_layer[i] -= RNN_HIDDEN_PENALTY;
-    net->hidden_layer[i] = MAX(net->hidden_layer[i], 0.0);
-  }
-  maybe_scale_hiddens(net);
-
-  if (net->bias)
-    net->hidden_layer[0] = 1.0f;
-  for (int i = net->hidden_size + net->bias; i < net->h_size; i++){
-    net->hidden_layer[i] = 0;
-  }
-  calculate_interlayer(net->hidden_layer, net->h_size,
-      net->output_layer, net->o_size, net->ho_weights);
-}
-
 float *
-rnn_opinion(RecurNN *net, const float *inputs){
-  if (inputs){
+rnn_opinion(RecurNN *net, const float *inputs, float dropout){
+  /*If inputs is NULL, assume the inputs have already been set. If dropout is
+    non-zero, dropout that many recurrent nodes. If there is a bottom layer,
+    it is not dropped out.*/
+  int bias = net->bias;
+
+  if (net->bottom_layer){
+    /*possible bottom layer */
+    RecurExtraLayer *layer = net->bottom_layer;
+    if (bias){
+      layer->inputs[0] = 1.0f;
+    }
+    if (inputs){
+      memcpy(layer->inputs + bias, inputs, layer->input_size * sizeof(float));
+    }
+    calculate_interlayer(layer->inputs, layer->i_size, layer->outputs, layer->o_size,
+        layer->weights);
+    memcpy(net->real_inputs, layer->outputs, net->input_size * sizeof(float));
+  }
+  else if (inputs){
     memcpy(net->real_inputs, inputs, net->input_size * sizeof(float));
   }
+
   /*copy in hiddens */
   int hsize = net->hidden_size + net->bias;
   memcpy(net->input_layer, net->hidden_layer, hsize * sizeof(float));
-  rnn_raw_opinion(net);
-  return net->output_layer;
-}
 
-float *
-rnn_opinion_with_dropout(RecurNN *net, const float *inputs, float dropout){
-  int hsize = net->hidden_size + net->bias;
-  int isize = net->input_size;
-  if (inputs){
-    memcpy(net->real_inputs, inputs, isize * sizeof(float));
+  /* possibly dropout */
+  if (dropout){
+    dropout_array(net->input_layer, hsize, dropout, &net->rng);
   }
-  /*copy in hiddens */
-  memcpy(net->input_layer, net->hidden_layer, hsize * sizeof(float));
 
-  maybe_scale_inputs(net);
-  dropout_array(net->input_layer, hsize, dropout, &net->rng);
-  if (net->bias){
+  if (bias)
     net->input_layer[0] = 1.0f;
-  }
+
+  /* in emergencies, clamp the scale of the input vector */
+  maybe_scale_inputs(net);
 
   calculate_interlayer(net->input_layer, net->i_size,
       net->hidden_layer, net->h_size, net->ih_weights);
 
-  float s = hsize + isize;
-  float dropout_scale = s / (s - net->hidden_size * dropout);
-
   ASSUME_ALIGNED(net->hidden_layer);
-  for (int i = 0; i < net->h_size; i++){
-    net->hidden_layer[i] -= RNN_HIDDEN_PENALTY;
-    if (net->hidden_layer[i] > 0){
-      net->hidden_layer[i] *= dropout_scale;
-    }
-    else{
-      net->hidden_layer[i] = 0.0f;
+
+  if (dropout){
+    float s = hsize + net->input_size;
+    float dropout_scale = s / (s - net->hidden_size * dropout);
+    for (int i = 0; i < net->h_size; i++){
+      float h = net->hidden_layer[i] - RNN_HIDDEN_PENALTY;
+      net->hidden_layer[i] = (h > 0.0f) ? h * dropout_scale : 0.0f;
     }
   }
+  else {
+    for (int i = 0; i < net->h_size; i++){
+      float h = net->hidden_layer[i] - RNN_HIDDEN_PENALTY;
+      net->hidden_layer[i] = (h > 0.0f) ? h : 0.0f;
+    }
+  }
+
   maybe_scale_hiddens(net);
 
-  if (net->bias)
+  if (net->bias){
     net->hidden_layer[0] = 1.0f;
+  }
+  /*wipe any left over inputs from the previous generation (up to 3, depending
+    on alignment) */
   for (int i = net->hidden_size + net->bias; i < net->h_size; i++){
     net->hidden_layer[i] = 0;
   }
@@ -183,21 +173,6 @@ rnn_opinion_with_dropout(RecurNN *net, const float *inputs, float dropout){
 
   return net->output_layer;
 }
-
-float *
-rnn_calculate_extra_layer(RecurExtraLayer *layer, const float *inputs){
-  int bias = (layer->flags & RNN_NET_FLAG_BIAS) ? 1 : 0;
-  if (bias){
-    layer->inputs[0] = 1.0f;
-  }
-  if (inputs){
-    memcpy(layer->inputs + bias, inputs, layer->input_size * sizeof(float));
-  }
-  calculate_interlayer(layer->inputs, layer->i_size, layer->outputs, layer->o_size,
-      layer->weights);
-  return layer->outputs;
-}
-
 
 static inline float
 backprop_single_layer(

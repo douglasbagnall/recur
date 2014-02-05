@@ -217,9 +217,7 @@ void rnn_delete_net(RecurNN *net);
 RecurNN ** rnn_new_training_set(RecurNN *prototype, int n_nets);
 void rnn_delete_training_set(RecurNN **nets, int n_nets, int leave_prototype);
 
-
-float *rnn_opinion(RecurNN *net, const float *inputs);
-float *rnn_opinion_with_dropout(RecurNN *net, const float *inputs, float dropout);
+float *rnn_opinion(RecurNN *net, const float *inputs, float dropout);
 
 float *rnn_calculate_extra_layer(RecurExtraLayer *layer, const float *inputs);
 void rnn_extra_layer_calc_deltas(RecurExtraLayer *layer, float *error_sum);

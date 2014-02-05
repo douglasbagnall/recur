@@ -37,7 +37,7 @@ load_char_input(RecurNN *net, int c){
 static inline float
 net_error_bptt(RecurNN *net, float *error, int c, int next){
   load_char_input(net, c);
-  float *answer = rnn_opinion(net, NULL);
+  float *answer = rnn_opinion(net, NULL, 0);
   error[0] = (next & 1) - (answer[0] > 0);
   error[1] = (!!(next & 2)) - (answer[1] > 0);
   return (fabsf(error[0]) + fabsf(error[1])) * 0.5;
@@ -55,7 +55,7 @@ sgd_one(RecurNN *net, const int current, const int next, uint batch_size){
 static inline int
 char_opinion(RecurNN *net, int c){
   load_char_input(net, c);
-  float * answer = rnn_opinion(net, NULL);
+  float * answer = rnn_opinion(net, NULL, 0);
   int a = ((answer[1] > 0) << 1) | (answer[0] > 0);
   return a;
 }

@@ -719,12 +719,7 @@ train_net(GstRnnca *self, RnncaTrainer *t, RnncaFrame *prev,  RnncaFrame *now){
   /*trainers are not on edges, so edge condition doesn't much matter */
   fill_net_inputs(self, net, prev, t->x, t->y, 1);
   float *answer;
-  if (self->dropout){
-    answer = rnn_opinion_with_dropout(net, NULL, self->dropout);
-  }
-  else {
-    answer = rnn_opinion(net, NULL);
-  }
+  answer = rnn_opinion(net, NULL, self->dropout);
   fast_sigmoid_array(answer, answer, 3);
   offset = t->y * RNNCA_WIDTH + t->x;
   GST_DEBUG("x %d, y %d, offset %d", t->x, t->y, offset);
@@ -839,7 +834,7 @@ fill_frame(GstRnnca *self, GstVideoFrame *frame){
     for (x = 0; x < RNNCA_WIDTH; x++){
       RecurNN *net = self->constructors[y * RNNCA_WIDTH + x];
       fill_net_inputs(self, net, self->play_frame, x, y, self->edges);
-      float *answer = rnn_opinion(net, NULL);
+      float *answer = rnn_opinion(net, NULL, 0);
       fast_sigmoid_array(answer, answer, 3);
       GST_LOG("answer gen %d, x %d y %d, %.2g %.2g %.2g",
           net->generation, x, y, answer[0], answer[1], answer[2]);
