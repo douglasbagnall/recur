@@ -332,8 +332,9 @@ bptt_and_accumulate_error(RecurNN *net, float *restrict ih_delta,
     }
     if (cumulative_input_error){
       float *input_error = i_error + net->hidden_size + net->bias;
+      float mul = bptt->depth + 1 - t;
       for (y = 0; y < net->input_size; y++){
-        cumulative_input_error[y] += input_error[y];
+        cumulative_input_error[y] += input_error[y] * mul;
       }
     }
     float *tmp = h_error;
