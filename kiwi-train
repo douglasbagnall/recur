@@ -125,9 +125,9 @@ def main():
     else:
         lr = lr_steps(
             #1e-4, 200,
-            1e-5, 1,
-            3e-6, 4,
-            1e-6, 16,
+            1e-5, 20,
+            3e-6, 20,
+            1e-6, 40,
             3e-7, 64,
             1e-7, 2000,
             3e-8)
@@ -176,12 +176,13 @@ def main():
     c.train(training_streams, validate_streams, iterations=args.iterations,
             learn_rate=lr, dropout=dropout, log_file=NET_LOG_FILE,
             properties=(('log-class-numbers', 1),
-                        ('momentum-soft-start', 15000),
+                        ('momentum-soft-start', 10000),
                         ('momentum', 0.95),
                         #('lawn-mower', 1),
-                        ('weight-fan-in-sum', 2),
+                        ('weight-fan-in-sum', 3),
+                        ('weight-fan-in-kurtosis', 0.1),
                         #('weight-sparsity', 2),
-                        ('error-weight', '5:3'),
+                        ('error-weight', '7:3'),
                         ))
 
 main()

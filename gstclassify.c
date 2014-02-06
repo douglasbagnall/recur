@@ -511,6 +511,10 @@ load_or_create_net(GstClassify *self){
       rnn_randomise_weights(net, RNN_INITIAL_WEIGHT_VARIANCE_FACTOR / net->h_size,
           weight_sparsity, 0.5);
     }
+    if (net->bottom_layer){
+      net->bottom_layer->learn_rate_scale = 30;
+    }
+
     if (PERIODIC_PGM_DUMP){
       rnn_multi_pgm_dump(net, "how ihw iha biw bid");
     }
