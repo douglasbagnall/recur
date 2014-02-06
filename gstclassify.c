@@ -500,7 +500,6 @@ load_or_create_net(GstClassify *self){
     u64 rng_seed = get_gvalue_u64(PENDING_PROP(self, PROP_RNG_SEED), DEFAULT_RNG_SEED);
     STDERR_DEBUG("rng seed %lu", rng_seed);
 
-
     net = rnn_new_with_bottom_layer(n_features, bottom_layer_size, hidden_size,
         self->n_classes, flags, rng_seed,
         NULL, bptt_depth, self->learn_rate, momentum, 0);
@@ -538,7 +537,7 @@ gst_classify_setup(GstAudioFilter *base, const GstAudioInfo *info){
     self->mfcc_factory = recur_audio_binner_new(self->window_size,
         RECUR_WINDOW_HANN,
         CLASSIFY_N_FFT_BINS,
-        CLASSIFY_MFCC_MIN_FREQ,
+        CLASSIFY_MFCC_MIN_FREQ, /*XXX properties*/
         CLASSIFY_MFCC_MAX_FREQ,
         CLASSIFY_RATE,
         1.0f / 32768,
