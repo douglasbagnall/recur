@@ -349,7 +349,9 @@ bptt_and_accumulate_error(RecurNN *net, float *restrict ih_delta,
     bptt->ih_scale = soft_clip(error_sum, max_error_sum);
     if (cumulative_input_error){
       for (y = 0; y < net->input_size; y++){
-        cumulative_input_error[y] *= bptt->ih_scale;
+        /*doubly shrink cumulative_input_error, to preserve stability in the
+          input features */
+        cumulative_input_error[y] *= bptt->ih_scale * bptt->ih_scale;
       }
     }
   }
