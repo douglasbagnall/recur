@@ -401,14 +401,14 @@ rnn_randomise_weights(RecurNN *net, float variance, int shape, double perforatio
   else if (perforation >= 1.0){
     return; /*perforation of 1 means entirely zeros */
   }
-  for (y = 0; y < net->i_size; y++){
+  for (y = 0; y < net->input_size + net->hidden_size + net->bias; y++){
     for (x = net->bias; x < net->hidden_size + net->bias; x++){
       if (rand_double(&net->rng) > perforation){
         net->ih_weights[y * net->h_size + x] = gaussian_power(&net->rng, variance, shape);
       }
     }
   }
-  for (y = 0; y < net->h_size; y++){
+  for (y = 0; y < net->hidden_size + net->bias; y++){
     for (x = 0; x < net->output_size; x++){
       if (rand_double(&net->rng) > perforation){
         net->ho_weights[y * net->o_size + x] = gaussian_power(&net->rng, variance, shape);
@@ -457,8 +457,8 @@ rnn_randomise_weights_fan_in(RecurNN *net, float sum, float kurtosis,
     randomise_weights_fan_in(&net->rng, net->ih_weights + net->bias,
         net->hidden_size, hsize, net->h_size, sum, kurtosis, margin);
     randomise_weights_fan_in(&net->rng, net->ih_weights + hsize * net->h_size + net->bias,
-        net->hidden_size,
-        net->input_size, net->h_size, sum * inputs_weight_ratio, kurtosis, margin);
+        net->hidden_size, net->input_size, net->h_size,
+        sum * inputs_weight_ratio, kurtosis, margin);
   }
   else {
     randomise_weights_fan_in(&net->rng, net->ih_weights + net->bias,
