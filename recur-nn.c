@@ -408,8 +408,6 @@ apply_learning_with_momentum(float *restrict weights,
     momentums[i] = (m + t) * momentum;
   }
 #endif
-  MAYBE_DEBUG("momentums %.2g %.2g %.2g %.2g %.2g",
-      momentums[0], momentums[3], momentums[6], momentums[10], momentums[11]);
 }
 
 /*with standard Nesterov momentum, the momentum has previously been scaled and
@@ -472,7 +470,6 @@ rnn_apply_learning(RecurNN *net, int momentum_style,
 
     apply_learning_with_momentum(net->ih_weights, bptt->ih_delta,
         bptt->ih_momentum, net->ih_size, bptt->learn_rate, momentum, momentum_weight);
-
 
     if (bl){
       apply_learning_with_momentum(bl->weights, bl->delta, bl->momentums,
