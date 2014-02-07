@@ -94,8 +94,8 @@ config.h: ccan/tools/configurator/configurator
 #recur-nn.o works better with -fprefetch-loop-arrays
 NN_SPECIAL_FLAGS =  -fprefetch-loop-arrays
 
-#recur-nn.o: recur-nn.c
-#	$(CC)  -c -MMD $(ALL_CFLAGS) $(CPPFLAGS) $(NN_SPECIAL_FLAGS) -o $@ $<
+recur-nn.o: recur-nn.c
+	$(CC)  -c -MMD $(ALL_CFLAGS) $(CPPFLAGS) $(NN_SPECIAL_FLAGS) -o $@ $<
 
 RNN_OBJECTS =  recur-nn.o recur-nn-io.o recur-nn-init.o
 
