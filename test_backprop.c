@@ -67,6 +67,7 @@
 
 
 static TemporalPPM *input_ppm;
+static TemporalPPM *error_ppm;
 
 static uint opt_hidden_size = DEFAULT_HIDDEN_SIZE;
 static uint opt_bptt_depth = DEFAULT_BPTT_DEPTH;
@@ -628,6 +629,7 @@ epoch(RecurNN **nets, int n_nets, RecurNN *confab_net, Ventropy *v,
 
     if (opt_temporal_pgm_dump){
       temporal_ppm_add_row(input_ppm, net->input_layer);
+      temporal_ppm_add_row(error_ppm, net->bptt->o_error);
     }
     report_counter++;
     if (report_counter >= opt_report_interval){
@@ -804,7 +806,9 @@ main(int argc, char *argv[]){
   }
 
   if (opt_temporal_pgm_dump){
-    input_ppm = temporal_ppm_alloc(net->i_size, 500, "input_layer", 0, PGM_DUMP_COLOUR,
+    input_ppm = temporal_ppm_alloc(net->i_size, 300, "input_layer", 0, PGM_DUMP_COLOUR,
+        NULL);
+    error_ppm = temporal_ppm_alloc(net->o_size, 300, "output_error", 0, PGM_DUMP_COLOUR,
         NULL);
   }
   Ventropy v;
@@ -847,4 +851,5 @@ main(int argc, char *argv[]){
   rnn_delete_net(validate_net);
 
   temporal_ppm_free(input_ppm);
+  temporal_ppm_free(error_ppm);
 }
