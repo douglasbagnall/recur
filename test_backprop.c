@@ -705,7 +705,7 @@ load_or_create_net(void){
       flags |= RNN_NET_FLAG_BPTT_ADAPTIVE_MIN_ERROR;
     }
     net = rnn_new(input_size, opt_hidden_size,
-        output_size, flags, 1,
+        output_size, flags, opt_rng_seed,
         opt_logfile, opt_bptt_depth, opt_learn_rate,
         opt_momentum);
     if (opt_dense_weights){
