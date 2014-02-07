@@ -199,7 +199,7 @@ static struct opt_table options[] = {
   OPT_WITHOUT_ARG("--temporal-pgm-dump", opt_set_bool,
       &opt_temporal_pgm_dump, "Dump ppm images showing inputs change over time"),
   OPT_WITHOUT_ARG("--periodic-pgm-dump", opt_set_bool,
-      &opt_periodic_pgm_dump, "Dump ppm images of weights, every 1k generations"),
+      &opt_periodic_pgm_dump, "Dump ppm images of weights, every reporting interval"),
   OPT_WITHOUT_ARG("--learn-capitals", opt_set_bool,
       &opt_learn_capitals, "learn to predict capitalisation"),
   OPT_WITHOUT_ARG("--deterministic-confab", opt_set_bool,
@@ -646,7 +646,7 @@ epoch(RecurNN **nets, int n_nets, RecurNN *confab_net, Ventropy *v,
         rnn_save_net(net, opt_filename, 1);
       }
       if (opt_periodic_pgm_dump){
-        rnn_multi_pgm_dump(net, "ihw how");
+        rnn_multi_pgm_dump(net, "ihw how ihd hod ihm hom");
       }
       schedule->eval(schedule, net, ventropy);
     }
