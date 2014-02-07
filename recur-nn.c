@@ -129,7 +129,7 @@ rnn_opinion(RecurNN *net, const float *inputs, float dropout){
 
   /* possibly dropout */
   if (dropout){
-    dropout_array(net->input_layer, hsize, dropout, &net->rng);
+    dropout_array(net->input_layer + bias, net->hidden_size, dropout, &net->rng);
   }
 
   if (bias)
@@ -144,7 +144,7 @@ rnn_opinion(RecurNN *net, const float *inputs, float dropout){
   ASSUME_ALIGNED(net->hidden_layer);
 
   if (dropout){
-    float s = hsize + net->input_size;
+    float s = net->hidden_size + net->bias + net->input_size;
     float dropout_scale = s / (s - net->hidden_size * dropout);
     for (int i = 0; i < net->h_size; i++){
       float h = net->hidden_layer[i] - RNN_HIDDEN_PENALTY;
