@@ -81,8 +81,7 @@ enum {
   RNN_NET_FLAG_BPTT_ADAPTIVE_MIN_ERROR = 64, /*min error threshold auto-adjusts*/
   RNN_NET_FLAG_NO_MOMENTUMS = 128, /*allocate no momentum arrays (borrow parent's)*/
   RNN_NET_FLAG_NO_DELTAS = 256, /* allocated no delta array (borrow parent's)*/
-  RNN_NET_FLAG_OWN_ACCUMULATORS = 512, /*allocate delta accumulators (if BPTT) */
-  RNN_NET_FLAG_BOTTOM_LAYER = 1024, /*network has a layer below RNN*/
+  RNN_NET_FLAG_BOTTOM_LAYER = 512, /*network has a layer below RNN*/
 
   /*conditioning flags start at 1 << 16 (65536) */
   RNN_COND_USE_SCALE = (1 << (RNN_COND_BIT_SCALE + RNN_COND_USE_OFFSET)),
@@ -152,8 +151,7 @@ struct _RecurNNBPTT {
   float *history;
   float *ih_delta;
   float *ho_delta;
-  float *ih_accumulator;
-  float *ho_accumulator;
+  float *ih_delta_tmp;
   float *mem;
   float learn_rate;
   float ih_scale;
@@ -168,7 +166,6 @@ struct _RecurExtraLayer {
   float *weights;
   float *momentums;
   float *delta;
-  float *accumulator;
   float *inputs;
   float *outputs;
   float *i_error;
@@ -218,14 +215,14 @@ void rnn_multi_pgm_dump(RecurNN *net, const char *dumpees);
 RecurNN* rnn_load_net(const char *filename);
 int rnn_save_net(RecurNN *net, const char *filename, int backup);
 
+void rnn_bptt_clear_deltas(RecurNN *net);
 void rnn_bptt_advance(RecurNN *net);
 void rnn_bptt_calculate(RecurNN *net, uint batch_size);
 void rnn_apply_learning(RecurNN *net, int momentum_style, float momentum);
 float rnn_calculate_momentum_soft_start(float generation, float momentum,
     float momentum_soft_start);
 
-void rnn_bptt_calc_deltas(RecurNN *net, float *ih_delta, float *ho_delta,
-    float *ih_accumulator, float *ho_accumulator);
+void rnn_bptt_calc_deltas(RecurNN *net, int accumulate_delta);
 
 void rnn_condition_net(RecurNN *net);
 void rnn_log_net(RecurNN *net);

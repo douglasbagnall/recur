@@ -83,7 +83,7 @@ void
 recur_setup_nets(RecurContext *context, const char *log_file)
 {
   RecurNN *net = NULL;
-  u32 flags = RNN_NET_FLAG_STANDARD | RNN_NET_FLAG_OWN_ACCUMULATORS;
+  u32 flags = RNN_NET_FLAG_STANDARD;
 #if TRY_RELOAD
   net = rnn_load_net(NET_FILENAME);
   DEBUG("net is %p", net);
@@ -149,7 +149,7 @@ recur_train_nets(RecurContext *context, RecurFrame *src_frame,
       float slope = a * (1.0f - a);
       net->bptt->o_error[i] = slope * (target - a);
     }
-    rnn_bptt_calc_deltas(net, net->bptt->ih_delta, net->bptt->ho_delta, NULL, NULL, NULL);
+    rnn_bptt_calc_deltas(net, j ? 1 : 0);
   }
   rnn_apply_learning(context->net, RNN_MOMENTUM_WEIGHTED,
       context->net->bptt->momentum);

@@ -734,14 +734,14 @@ train_net(GstRnnca *self, RnncaTrainer *t, RnncaFrame *prev,  RnncaFrame *now){
     GST_LOG("target %.2g a %.2g diff %.2g slope %.2g",
         target, a, target - a, slope);
   }
-  rnn_bptt_calc_deltas(net, net->bptt->ih_delta, net->bptt->ho_delta,
-      net->bptt->ih_accumulator, net->bptt->ho_accumulator, NULL);
+  rnn_bptt_calc_deltas(net, 1);
 }
 
 static inline void
 maybe_learn(GstRnnca *self){
   int i;
   RecurNN *net = self->net;
+  rnn_bptt_clear_deltas(net);
   for (i = 0; i < self->n_trainers; i++){
     train_net(self, &self->trainers[i], self->frame_prev, self->frame_now);
   }

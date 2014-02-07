@@ -368,15 +368,6 @@ net_error_bptt(RecurNN *net, float *restrict error, int c, int next, int *correc
   return error[next];
 }
 
-static void
-sgd_one(RecurNN *net, int current, int next,
-    float *error, int *correct, uint batch_size){
-  RecurNNBPTT *bptt = net->bptt;
-  rnn_bptt_advance(net);
-  *error = net_error_bptt(net, bptt->o_error, current, next, correct);
-  rnn_bptt_calculate(net, batch_size);
-}
-
 
 static inline int
 opinion_deterministic(RecurNN *net, int hot){
@@ -615,25 +606,21 @@ epoch(RecurNN **nets, int n_nets, RecurNN *confab_net, Ventropy *v,
             text[offset], text[offset + 1], &c);
         correct += c;
         error += e;
-        entropy += capped_log2f(1.0 - e);
-
-        if (j == 0){
-          rnn_bptt_calc_deltas(n, n->bptt->ih_accumulator, n->bptt->ho_accumulator,
-              NULL, NULL, NULL);
-          if (n->bptt->ih_scale != 1.0f){
-            scale_aligned_array(n->bptt->ih_accumulator, n->ih_size, n->bptt->ih_scale);
-          }
-        }
-        else {
-          rnn_bptt_calc_deltas(n, n->bptt->ih_delta, n->bptt->ho_delta,
-              n->bptt->ih_accumulator, n->bptt->ho_accumulator, NULL);
-        }
+        entropy += capped_log2f(1.0f - e);
+        /*Second argument to r_b_c_deltas toggles delta accumulation. Turning
+          it off on the first run avoids expicit zeroing outside of the loop
+          (via rnn_bptt_clear_deltas) and is thus slightly faster.
+         */
+        rnn_bptt_calc_deltas(n, j ? 1 : 0);
       }
-      rnn_apply_learning(nets[0], opt_momentum_style, momentum);
+      rnn_apply_learning(net, opt_momentum_style, momentum);
     }
     else {
-      net->bptt->momentum = momentum;
-      sgd_one(net, text[i], text[i + 1], &e, &c, opt_batch_size);
+      RecurNNBPTT *bptt = net->bptt;
+      bptt->momentum = momentum;
+      rnn_bptt_advance(net);
+      e = net_error_bptt(net, bptt->o_error, text[i], text[i + 1], &c);
+      rnn_bptt_calculate(net, opt_batch_size);
       correct += c;
       error += e;
       entropy += capped_log2f(1.0f - e);
@@ -712,9 +699,6 @@ load_or_create_net(void){
       output_size += 2;
     }
     u32 flags = opt_bias ? RNN_NET_FLAG_STANDARD : RNN_NET_FLAG_NO_BIAS;
-    if (opt_multi_tap){
-      flags |= RNN_NET_FLAG_OWN_ACCUMULATORS;
-    }
     if (opt_bptt_adaptive_min){/*on by default*/
       flags |= RNN_NET_FLAG_BPTT_ADAPTIVE_MIN_ERROR;
     }

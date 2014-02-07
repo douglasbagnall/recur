@@ -221,9 +221,9 @@ backprop_top_layer(RecurNN *net)
       net->bias);
 }
 
-/*single_layer_sgd does gradient descent for a sinlge layer (i.e., top layer
-  or extra bottom layers */
-
+/*single_layer_sgd does gradient descent for a single layer (i.e., top layer
+  or extra bottom layers), but it DOESN'T zero the delta array first. That
+  is, it will accumulate gradient over several runs. */
 static inline void
 single_layer_sgd(float const *restrict inputs, int i_size, const float *restrict o_error,
     int o_size, float *restrict deltas){
@@ -237,30 +237,11 @@ single_layer_sgd(float const *restrict inputs, int i_size, const float *restrict
       float *restrict drow = deltas + y * o_size;
       ASSUME_ALIGNED(drow);
       for (x = 0; x < o_size; x++){
-        drow[x] = o_error[x] * input;
+        drow[x] += o_error[x] * input;
       }
     }
   }
 }
-
-/*calc_sgd_top_layer backpropagates error, and calculates weight updates via
-  gradient descent, which get put in the delta array.
-*/
-
-static float
-calc_sgd_top_layer(RecurNN *net, float *delta){
-  float error_sum;
-  if (net->bias){
-    net->hidden_layer[0] = 1.0f;
-  }
-  error_sum = backprop_top_layer(net);
-  zero_aligned_array(delta, net->ho_size);
-  single_layer_sgd(net->hidden_layer, net->h_size, net->bptt->o_error, net->o_size,
-      delta);
-  return error_sum;
-}
-
-
 
 static float
 bptt_and_accumulate_error(RecurNN *net, float *restrict ih_delta,
@@ -332,9 +313,8 @@ bptt_and_accumulate_error(RecurNN *net, float *restrict ih_delta,
     }
     if (cumulative_input_error){
       float *input_error = i_error + net->hidden_size + net->bias;
-      float mul = bptt->depth + 1 - t;
       for (y = 0; y < net->input_size; y++){
-        cumulative_input_error[y] += input_error[y] * mul;
+        cumulative_input_error[y] += input_error[y];
       }
     }
     float *tmp = h_error;
@@ -464,9 +444,9 @@ rnn_apply_learning(RecurNN *net, int momentum_style,
   RecurNNBPTT *bptt = net->bptt;
   RecurExtraLayer *bl = net->bottom_layer;
   if (momentum_style == RNN_MOMENTUM_NESTEROV){
-    apply_learning_with_nesterov_momentum(net->ho_weights, bptt->ho_accumulator,
+    apply_learning_with_nesterov_momentum(net->ho_weights, bptt->ho_delta,
         bptt->ho_momentum, net->ho_size, bptt->learn_rate * bptt->ho_scale, momentum);
-    apply_learning_with_nesterov_momentum(net->ih_weights, bptt->ih_accumulator,
+    apply_learning_with_nesterov_momentum(net->ih_weights, bptt->ih_delta,
         bptt->ih_momentum, net->ih_size, bptt->learn_rate, momentum);
     if (bl){
       apply_learning_with_nesterov_momentum(bl->weights, bl->delta, bl->momentums,
@@ -485,10 +465,12 @@ rnn_apply_learning(RecurNN *net, int momentum_style,
     else {
       momentum_weight = bptt->momentum_weight;
     }
-    apply_learning_with_momentum(net->ho_weights, bptt->ho_accumulator,
+
+    apply_learning_with_momentum(net->ho_weights, bptt->ho_delta,
         bptt->ho_momentum, net->ho_size, bptt->learn_rate * bptt->ho_scale,
         momentum, momentum_weight);
-    apply_learning_with_momentum(net->ih_weights, bptt->ih_accumulator,
+
+    apply_learning_with_momentum(net->ih_weights, bptt->ih_delta,
         bptt->ih_momentum, net->ih_size, bptt->learn_rate, momentum, momentum_weight);
 
 
@@ -503,6 +485,20 @@ rnn_apply_learning(RecurNN *net, int momentum_style,
 }
 
 
+void
+rnn_bptt_clear_deltas(RecurNN *net)
+{
+  RecurNNBPTT *bptt = net->bptt;
+  zero_aligned_array(bptt->ih_delta, net->ih_size);
+  zero_aligned_array(bptt->ho_delta, net->ho_size);
+  if (net->bottom_layer){
+    zero_aligned_array(net->bottom_layer->o_error,
+        net->bottom_layer->o_size);
+    zero_aligned_array(net->bottom_layer->delta,
+        net->bottom_layer->i_size * net->bottom_layer->o_size);
+  }
+}
+
 
 void
 rnn_bptt_advance(RecurNN *net){
@@ -514,30 +510,49 @@ rnn_bptt_advance(RecurNN *net){
   net->real_inputs = net->input_layer + net->bias + net->hidden_size;
 }
 
+
 void
-rnn_bptt_calc_deltas(RecurNN *net, float *ih_delta, float *ho_delta,
-    float *ih_accumulator, float *ho_accumulator){
+rnn_bptt_calc_deltas(RecurNN *net, int accumulate_delta)
+{
   RecurNNBPTT *bptt = net->bptt;
   RecurExtraLayer *bottom = net->bottom_layer;
   float *bottom_error = (bottom) ? bottom->o_error : NULL;
 
-  float top_error_sum = calc_sgd_top_layer(net, ho_delta);
+  /*top layer */
+  if (! accumulate_delta){
+    zero_aligned_array(bptt->ho_delta, net->ho_size);
+  }
+  float top_error_sum = backprop_top_layer(net);
   float top_error_scaled = softclip_scale(top_error_sum,
       net->h_size * MAX_TOP_ERROR_FACTOR, bptt->h_error, net->h_size);
 
-  if (ho_accumulator){
-    add_aligned_arrays(ho_accumulator, net->ho_size, ho_delta, 1.0f);
-  }
+  single_layer_sgd(net->hidden_layer, net->h_size, bptt->o_error, net->o_size,
+      bptt->ho_delta);
 
-  zero_aligned_array(ih_delta, net->ih_size);
-  float bptt_error_sum = bptt_and_accumulate_error(net,
-      ih_delta, bottom_error, top_error_scaled);
-
-  if (ih_accumulator){
-    add_aligned_arrays(ih_accumulator, net->ih_size, ih_delta,
+  /*recurrent layer. Both accumulating and non-accumulating branches are
+    complicated by emergency scaling requirements.*/
+  float bptt_error_sum;
+  if (accumulate_delta){
+    zero_aligned_array(bptt->ih_delta_tmp, net->ih_size);
+    bptt_error_sum = bptt_and_accumulate_error(net,
+        bptt->ih_delta_tmp, bottom_error, top_error_scaled);
+    add_aligned_arrays(bptt->ih_delta, net->ih_size, bptt->ih_delta_tmp,
         bptt->ih_scale);
   }
+  else {
+    zero_aligned_array(bptt->ih_delta, net->ih_size);
+    bptt_error_sum = bptt_and_accumulate_error(net,
+        bptt->ih_delta, bottom_error, top_error_scaled);
+    if (bptt->ih_scale != 1.0f){
+      scale_aligned_array(bptt->ih_delta, net->ih_size, bptt->ih_scale);
+    }
+  }
+
+  /*bottom layer */
   if (bottom){
+    if (! accumulate_delta){
+      zero_aligned_array(bottom->delta, bottom->i_size * bottom->o_size);
+    }
     single_layer_sgd(bottom->inputs, bottom->i_size, bottom_error, bottom->o_size,
         bottom->delta);
     if (net->log){
@@ -742,12 +757,12 @@ static inline float
 apply_sgd_with_bptt_batch(RecurNN *net, float top_error_sum, uint batch_size){
   RecurNNBPTT *bptt = net->bptt;
   float rate = bptt->learn_rate;
-  float *gradient = zalloc_aligned_or_die(net->ih_size * sizeof(float));
-  float error_sum = bptt_and_accumulate_error(net, gradient, NULL, top_error_sum);
 
-  add_aligned_arrays(bptt->ih_delta, net->ih_size, gradient, bptt->ih_scale);
+  zero_aligned_array(bptt->ih_delta_tmp, net->ih_size);
+  float error_sum = bptt_and_accumulate_error(net, bptt->ih_delta_tmp, NULL,
+      top_error_sum);
 
-  free(gradient);
+  add_aligned_arrays(bptt->ih_delta, net->ih_size, bptt->ih_delta_tmp, bptt->ih_scale);
 
   if ((net->generation % batch_size) == 0){
     apply_learning_with_momentum(net->ih_weights, bptt->ih_delta, bptt->ih_momentum,

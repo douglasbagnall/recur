@@ -1109,8 +1109,7 @@ train_channel(ClassifyChannel *c, float dropout, float *error_weights){
       net->bptt->o_error[i] *= error_weights[i];
     }
   }
-  rnn_bptt_calc_deltas(net, net->bptt->ih_delta, net->bptt->ho_delta,
-      net->bptt->ih_accumulator, net->bptt->ho_accumulator);
+  rnn_bptt_calc_deltas(net, 1);
   rnn_bptt_advance(net);
   return net->bptt->o_error[c->current_target];
 }
@@ -1157,6 +1156,7 @@ static inline void
 maybe_learn(GstClassify *self){
   int i, j;
   s16 *buffer;
+  RecurNN *net = self->net;
   while ((buffer = prepare_next_chunk(self))){
     float err_sum = 0.0f;
     int winners = 0;
@@ -1164,12 +1164,8 @@ maybe_learn(GstClassify *self){
     for (i = 0; i < self->n_classes; i++){
       class_counts[i] = 0;
     }
-    memset(self->net->bptt->ih_accumulator, 0, self->net->ih_size * sizeof(float));
-    memset(self->net->bptt->ho_accumulator, 0, self->net->ho_size * sizeof(float));
-    if (self->net->bottom_layer){
-      memset(self->net->bottom_layer->o_error, 0,
-          self->net->bottom_layer->o_size * sizeof(float));
-    }
+    rnn_bptt_clear_deltas(net);
+
     for (j = 0; j < self->n_channels; j++){
       ClassifyChannel *c = prepare_channel_features(self, buffer, j);
       err_sum += train_channel(c, self->dropout, self->error_weight);
@@ -1177,7 +1173,6 @@ maybe_learn(GstClassify *self){
       class_counts[c->current_target]++;
     }
 
-    RecurNN *net = self->net;
     /*XXX periodic_pgm_dump and image string should be gst properties */
     if (PERIODIC_PGM_DUMP && net->generation % PERIODIC_PGM_DUMP == 0){
       rnn_multi_pgm_dump(net, "how ihw iha biw bid");
