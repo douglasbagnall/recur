@@ -55,7 +55,8 @@ new_bptt(RecurNN *net, int depth, float learn_rate, float momentum, u32 flags){
   MAYBE_DEBUG("allocated %lu floats, used %lu", vlen, fm - bptt->mem);
 
   bptt->index = 0;
-  bptt->ho_scale = sqrtf(((float) net->output_size) / net->hidden_size);
+  bptt->ho_scale = 1.0f;
+  bptt->ih_scale = 1.0f;
   bptt->min_error_factor = BASE_MIN_ERROR_FACTOR * net->h_size;
   MAYBE_DEBUG("weights:   ih %p ho %p", net->ih_weights, net->ho_weights);
   MAYBE_DEBUG("momentum:  ih %p ho %p", bptt->ih_momentum, bptt->ho_momentum);
