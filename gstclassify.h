@@ -92,7 +92,6 @@ struct _GstClassify
   char *basename;
   int queue_size;
   int mfccs;
-  float learn_rate;
   float momentum_soft_start;
   ClassifyClassEvent *class_events;
   int n_class_events;

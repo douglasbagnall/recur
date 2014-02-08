@@ -5,15 +5,15 @@
 #define PENDING_PROP(self, prop) (&(self)->pending_properties[prop])
 
 static inline void
-set_gvalue(GValue *v, const GValue *value)
+set_gvalue(GValue *dest, const GValue *src)
 {
-  if (G_IS_VALUE(v)){
-    g_value_reset(v);
+  if (G_IS_VALUE(dest)){
+    g_value_reset(dest);
   }
   else {
-    g_value_init(v, G_VALUE_TYPE(value));
+    g_value_init(dest, G_VALUE_TYPE(src));
   }
-  g_value_copy(value, v);
+  g_value_copy(src, dest);
 }
 
 static inline const char *
@@ -49,7 +49,7 @@ get_gvalue_u64(GValue *v, const u64 _default){
 }
 
 static inline float
-get_gvalue_float(GValue *v, const float _default){
+get_gvalue_float(const GValue *v, const float _default){
   if (! G_VALUE_HOLDS_FLOAT(v)){
     return _default;
   }

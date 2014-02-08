@@ -37,6 +37,8 @@ enum
   PROP_CLASSES,
   PROP_FORGET,
   PROP_LEARN_RATE,
+  PROP_TOP_LEARN_RATE_SCALE,
+  PROP_BOTTOM_LEARN_RATE_SCALE,
   PROP_HIDDEN_SIZE,
   PROP_MOMENTUM,
   PROP_MOMENTUM_STYLE,
@@ -83,6 +85,8 @@ enum
 #define DEFAULT_WINDOW_SIZE 256
 #define DEFAULT_HIDDEN_SIZE 199
 #define DEFAULT_LEARN_RATE 0.0001
+#define DEFAULT_TOP_LEARN_RATE_SCALE 1.0f
+#define DEFAULT_BOTTOM_LEARN_RATE_SCALE 1.0f
 #define DEFAULT_PROP_DROPOUT 0.0f
 #define MIN_PROP_CLASSES 1
 #define MAX_PROP_CLASSES 1000000
@@ -109,6 +113,8 @@ enum
 #define PROP_BOTTOM_LAYER_MIN 0
 #define PROP_BOTTOM_LAYER_MAX 1000000
 
+#define LEARN_RATE_SCALE_MAX 1e9f
+#define LEARN_RATE_SCALE_MIN 0
 
 #define DROPOUT_MIN 0.0
 #define DROPOUT_MAX 1.0
@@ -140,7 +146,7 @@ G_DEFINE_TYPE (GstClassify, gst_classify, GST_TYPE_AUDIO_FILTER)
 
 static inline void
 init_channel(ClassifyChannel *c, RecurNN *net,
-    int window_size, int id, float learn_rate)
+    int window_size, int id)
 {
   c->net = net;
   int n_inputs;
@@ -282,7 +288,7 @@ gst_classify_class_init (GstClassifyClass * klass)
           "Backprop through time to this depth",
           MIN_PROP_BPTT_DEPTH, MAX_PROP_BPTT_DEPTH,
           DEFAULT_PROP_BPTT_DEPTH,
-          G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
+          G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class, PROP_MFCCS,
       g_param_spec_int("mfccs", "mfccs",
@@ -310,7 +316,7 @@ gst_classify_class_init (GstClassifyClass * klass)
           PROP_BOTTOM_LAYER_MIN,
           PROP_BOTTOM_LAYER_MAX,
           DEFAULT_PROP_BOTTOM_LAYER,
-          G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
+          G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class, PROP_LOG_CLASS_NUMBERS,
       g_param_spec_boolean("log-class-numbers", "log-class-numbers",
@@ -327,9 +333,23 @@ gst_classify_class_init (GstClassifyClass * klass)
 
   g_object_class_install_property (gobject_class, PROP_LEARN_RATE,
       g_param_spec_float("learn-rate", "learn-rate",
-          "Learning rate for the RNN",
+          "Base learning rate for the RNN",
           LEARN_RATE_MIN, LEARN_RATE_MAX,
           DEFAULT_LEARN_RATE,
+          G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+
+  g_object_class_install_property (gobject_class, PROP_TOP_LEARN_RATE_SCALE,
+      g_param_spec_float("top-learn-rate-scale", "top-learn-rate-scale",
+          "learn rate scale for top layer",
+          LEARN_RATE_SCALE_MIN, LEARN_RATE_SCALE_MAX,
+          DEFAULT_TOP_LEARN_RATE_SCALE,
+          G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+
+  g_object_class_install_property (gobject_class, PROP_BOTTOM_LEARN_RATE_SCALE,
+      g_param_spec_float("bottom-learn-rate-scale", "bottom-learn-rate-scale",
+          "learn rate scale for bottom layer (if any)",
+          LEARN_RATE_SCALE_MIN, LEARN_RATE_SCALE_MAX,
+          DEFAULT_BOTTOM_LEARN_RATE_SCALE,
           G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class, PROP_DROPOUT,
@@ -367,7 +387,7 @@ gst_classify_class_init (GstClassifyClass * klass)
           "(eventual) momentum",
           MOMENTUM_MIN, MOMENTUM_MAX,
           DEFAULT_PROP_MOMENTUM,
-          G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
+          G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class, PROP_MOMENTUM_STYLE,
       g_param_spec_int("momentum-style", "momentum-style",
@@ -381,7 +401,7 @@ gst_classify_class_init (GstClassifyClass * klass)
           "Size of the RNN hidden layer",
           MIN_HIDDEN_SIZE, MAX_HIDDEN_SIZE,
           DEFAULT_HIDDEN_SIZE,
-          G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
+          G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class, PROP_WINDOW_SIZE,
       g_param_spec_int("window-size", "window-size",
@@ -426,7 +446,6 @@ gst_classify_init (GstClassify * self)
   self->class_events = NULL;
   self->class_events_index = 0;
   self->n_class_events = 0;
-  self->learn_rate = DEFAULT_LEARN_RATE;
   self->window_size = DEFAULT_WINDOW_SIZE;
   self->momentum_soft_start = DEFAULT_PROP_MOMENTUM_SOFT_START;
   self->dropout = DEFAULT_PROP_DROPOUT;
@@ -483,26 +502,36 @@ load_or_create_net(GstClassify *self){
     else {
       flags &= ~RNN_COND_USE_LAWN_MOWER;
     }
-    int weight_sparsity = get_gvalue_int(PENDING_PROP(self, PROP_WEIGHT_SPARSITY),
-        DEFAULT_PROP_WEIGHT_SPARSITY);
-    int bptt_depth = get_gvalue_int(PENDING_PROP(self, PROP_BPTT_DEPTH),
-        DEFAULT_PROP_BPTT_DEPTH);
-    float momentum = get_gvalue_float(PENDING_PROP(self, PROP_MOMENTUM),
-        DEFAULT_PROP_MOMENTUM);
 
-    float fan_in_sum = get_gvalue_float(PENDING_PROP(self,
-            PROP_WEIGHT_FAN_IN_SUM),
+#define GET_FLOAT(id, _default) get_gvalue_float(PENDING_PROP(self, id), _default)
+#define GET_INT(id, _default) get_gvalue_int(PENDING_PROP(self, id), _default)
+
+    int weight_sparsity = GET_INT(PROP_WEIGHT_SPARSITY, DEFAULT_PROP_WEIGHT_SPARSITY);
+    int bptt_depth = GET_INT(PROP_BPTT_DEPTH, DEFAULT_PROP_BPTT_DEPTH);
+
+    float momentum = GET_FLOAT(PROP_MOMENTUM, DEFAULT_PROP_MOMENTUM);
+    float learn_rate = GET_FLOAT(PROP_LEARN_RATE, DEFAULT_LEARN_RATE);
+
+    float bottom_learn_rate_scale = GET_FLOAT(PROP_BOTTOM_LEARN_RATE_SCALE,
+        DEFAULT_BOTTOM_LEARN_RATE_SCALE);
+    float top_learn_rate_scale = GET_FLOAT(PROP_TOP_LEARN_RATE_SCALE,
+        DEFAULT_TOP_LEARN_RATE_SCALE);
+
+    float fan_in_sum = GET_FLOAT(PROP_WEIGHT_FAN_IN_SUM,
         DEFAULT_PROP_WEIGHT_FAN_IN_SUM);
-    float fan_in_kurtosis = get_gvalue_float(PENDING_PROP(self,
-            PROP_WEIGHT_FAN_IN_KURTOSIS),
+
+    float fan_in_kurtosis = GET_FLOAT(PROP_WEIGHT_FAN_IN_KURTOSIS,
         DEFAULT_PROP_WEIGHT_FAN_IN_KURTOSIS);
 
     u64 rng_seed = get_gvalue_u64(PENDING_PROP(self, PROP_RNG_SEED), DEFAULT_RNG_SEED);
-    STDERR_DEBUG("rng seed %lu", rng_seed);
+    GST_DEBUG("rng seed %lu", rng_seed);
+
+#undef GET_FLOAT
+#undef GET_INT
 
     net = rnn_new_with_bottom_layer(n_features, bottom_layer_size, hidden_size,
         self->n_classes, flags, rng_seed,
-        NULL, bptt_depth, self->learn_rate, momentum, 0);
+        NULL, bptt_depth, learn_rate, momentum, 0);
     if (fan_in_sum){
       rnn_randomise_weights_fan_in(net, fan_in_sum, fan_in_kurtosis, 0.1f, 0);
     }
@@ -510,10 +539,10 @@ load_or_create_net(GstClassify *self){
       rnn_randomise_weights(net, RNN_INITIAL_WEIGHT_VARIANCE_FACTOR / net->h_size,
           weight_sparsity, 0.5);
     }
+    net->bptt->ho_scale = top_learn_rate_scale;
     if (net->bottom_layer){
-      net->bottom_layer->learn_rate_scale = 30;
+      net->bottom_layer->learn_rate_scale = bottom_learn_rate_scale;
     }
-
     if (PERIODIC_PGM_DUMP){
       rnn_multi_pgm_dump(net, "how ihw iha biw bid");
     }
@@ -566,7 +595,7 @@ gst_classify_setup(GstAudioFilter *base, const GstAudioInfo *info){
     self->subnets = rnn_new_training_set(self->net, self->n_channels);
     for (int i = 0; i < self->n_channels; i++){
       init_channel(&self->channels[i], self->subnets[i],
-          self->window_size, i, self->learn_rate);
+          self->window_size, i);
     }
   }
   maybe_start_logging(self);
@@ -807,6 +836,39 @@ maybe_set_mode(GstClassify *self, int t){
 }
 
 static void
+maybe_set_net_scalar(GstClassify *self, guint prop_id, const GValue *value)
+{
+
+#define SET_FLOAT(var) do {var = get_gvalue_float(value, var);} while(0)
+
+  RecurNN *net = self->net;
+  if (net){
+    switch (prop_id){
+    case PROP_LEARN_RATE:
+      SET_FLOAT(net->bptt->learn_rate);
+      break;
+    case PROP_TOP_LEARN_RATE_SCALE:
+      SET_FLOAT(net->bptt->ho_scale);
+      break;
+    case PROP_MOMENTUM:
+      SET_FLOAT(net->bptt->momentum);
+      break;
+    case PROP_BOTTOM_LEARN_RATE_SCALE:
+      if (net->bottom_layer){
+        SET_FLOAT(net->bottom_layer->learn_rate_scale);
+      }
+      break;
+    }
+  }
+  else {
+    set_gvalue(PENDING_PROP(self, prop_id), value);
+  }
+
+#undef SET_FLOAT
+
+}
+
+static void
 gst_classify_set_property (GObject * object, guint prop_id, const GValue * value,
     GParamSpec * pspec)
 {
@@ -877,13 +939,6 @@ gst_classify_set_property (GObject * object, guint prop_id, const GValue * value
       self->dropout = g_value_get_float(value);
       break;
 
-    case PROP_LEARN_RATE:
-      self->learn_rate = g_value_get_float(value);
-      if (self->net){
-        self->net->bptt->learn_rate = g_value_get_float(value);
-      }
-      break;
-
     case PROP_MOMENTUM_SOFT_START:
       self->momentum_soft_start = g_value_get_float(value);
       break;
@@ -892,10 +947,15 @@ gst_classify_set_property (GObject * object, guint prop_id, const GValue * value
       self->momentum_style = g_value_get_int(value);
       break;
 
+    case PROP_TOP_LEARN_RATE_SCALE:
+    case PROP_BOTTOM_LEARN_RATE_SCALE:
+    case PROP_LEARN_RATE:
+    case PROP_MOMENTUM:
+      maybe_set_net_scalar(self, prop_id, value);
+      break;
     /*properties that only need to be stored until net creation, and can't
       be changed afterwards go here.
     */
-    case PROP_MOMENTUM:
     case PROP_BOTTOM_LAYER:
     case PROP_HIDDEN_SIZE:
     case PROP_BPTT_DEPTH:
@@ -946,6 +1006,54 @@ gst_classify_set_property (GObject * object, guint prop_id, const GValue * value
   }
 }
 
+void
+maybe_get_net_scalar(GstClassify *self, guint prop_id, GValue *dest)
+{
+  RecurNN *net = self->net;
+  if (net){
+    switch (prop_id){
+    case PROP_LEARN_RATE:
+      g_value_set_float(dest, net->bptt->learn_rate);
+      break;
+    case PROP_BPTT_DEPTH:
+      g_value_set_int(dest, net->bptt->depth);
+      break;
+    case PROP_MOMENTUM:
+      g_value_set_float(dest, net->bptt->momentum);
+      break;
+    case PROP_HIDDEN_SIZE:
+      g_value_set_int(dest, net->hidden_size);
+      break;
+    case PROP_BOTTOM_LAYER:
+      {
+        int x = (net->bottom_layer) ? net->bottom_layer->output_size : 0;
+        g_value_set_int(dest, x);
+      }
+      break;
+    case PROP_TOP_LEARN_RATE_SCALE:
+      g_value_set_float(dest, net->bptt->ho_scale);
+      break;
+    case PROP_BOTTOM_LEARN_RATE_SCALE:
+      if (net->bottom_layer){
+        g_value_set_float(dest, net->bottom_layer->learn_rate_scale);
+      }
+      else {
+        g_value_set_float(dest, 0);/* there is no right answer */
+      }
+      break;
+    }
+  }
+  else {
+    const GValue *src = PENDING_PROP(self, prop_id);
+    if (G_IS_VALUE(src)){
+      g_value_copy(src, dest);
+    }
+    else {
+      /*now what?*/
+    }
+  }
+}
+
 static void
 gst_classify_get_property (GObject * object, guint prop_id, GValue * value,
     GParamSpec * pspec)
@@ -957,6 +1065,16 @@ gst_classify_get_property (GObject * object, guint prop_id, GValue * value,
   int wrote;
   int i;
   switch (prop_id) {
+    case PROP_LEARN_RATE:
+    case PROP_TOP_LEARN_RATE_SCALE:
+    case PROP_MOMENTUM:
+    case PROP_BOTTOM_LEARN_RATE_SCALE:
+    case PROP_BPTT_DEPTH:
+    case PROP_HIDDEN_SIZE:
+    case PROP_BOTTOM_LAYER:
+      maybe_get_net_scalar(self, prop_id, value);
+      break;
+
   case PROP_TARGET:
     for (i = 0; i < self->n_channels; i++){
       wrote = snprintf(t, remaining, "%d.", self->channels[i].current_target);
@@ -973,9 +1091,6 @@ gst_classify_get_property (GObject * object, guint prop_id, GValue * value,
     break;
   case PROP_MFCCS:
     g_value_set_int(value, self->mfccs);
-    break;
-  case PROP_LEARN_RATE:
-    g_value_set_float(value, self->learn_rate);
     break;
   case PROP_DROPOUT:
     g_value_set_float(value, self->dropout);
