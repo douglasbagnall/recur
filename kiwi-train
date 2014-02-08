@@ -178,11 +178,10 @@ def main():
             properties=(('log-class-numbers', 1),
                         ('momentum-soft-start', 10000),
                         ('momentum', 0.95),
-                        #('lawn-mower', 1),
+                        ('momentum-style', 1),
                         ('weight-fan-in-sum', 3),
                         ('weight-fan-in-kurtosis', 0.1),
-                        #('weight-sparsity', 2),
-                        ('error-weight', '7:3'),
-                        ))
+                        #('error-weight', '3:2'),
+                    ))
 
 main()
