@@ -476,7 +476,6 @@ rnn_apply_learning(RecurNN *net, int momentum_style,
           bl->i_size * bl->o_size, net->bptt->learn_rate * bl->learn_rate_scale,
           momentum, momentum_weight);
     }
-    rnn_log_float(net, "momentum_weight", momentum_weight);
   }
   rnn_log_float(net, "momentum", momentum);
 }
