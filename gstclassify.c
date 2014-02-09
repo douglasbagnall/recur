@@ -1041,6 +1041,9 @@ maybe_get_net_scalar(GstClassify *self, guint prop_id, GValue *dest)
         g_value_set_float(dest, 0);/* there is no right answer */
       }
       break;
+    case PROP_LAWN_MOWER:
+      g_value_set_boolean(dest, !! (self->net->flags & RNN_COND_USE_LAWN_MOWER));
+      break;
     }
   }
   else {
@@ -1065,13 +1068,14 @@ gst_classify_get_property (GObject * object, guint prop_id, GValue * value,
   int wrote;
   int i;
   switch (prop_id) {
-    case PROP_LEARN_RATE:
-    case PROP_TOP_LEARN_RATE_SCALE:
-    case PROP_MOMENTUM:
-    case PROP_BOTTOM_LEARN_RATE_SCALE:
-    case PROP_BPTT_DEPTH:
-    case PROP_HIDDEN_SIZE:
-    case PROP_BOTTOM_LAYER:
+  case PROP_LEARN_RATE:
+  case PROP_TOP_LEARN_RATE_SCALE:
+  case PROP_MOMENTUM:
+  case PROP_BOTTOM_LEARN_RATE_SCALE:
+  case PROP_BPTT_DEPTH:
+  case PROP_HIDDEN_SIZE:
+  case PROP_BOTTOM_LAYER:
+  case PROP_LAWN_MOWER:
       maybe_get_net_scalar(self, prop_id, value);
       break;
 
@@ -1103,19 +1107,6 @@ gst_classify_get_property (GObject * object, guint prop_id, GValue * value,
     break;
   case PROP_WINDOW_SIZE:
     g_value_set_int(value, self->window_size);
-    break;
-  case PROP_LAWN_MOWER:
-    {
-      gboolean x;
-      if (self->net){
-        x = !! (self->net->flags & RNN_COND_USE_LAWN_MOWER);
-      }
-      else {
-        x = get_gvalue_boolean(PENDING_PROP(self, PROP_LAWN_MOWER),
-            DEFAULT_PROP_LAWN_MOWER);
-      }
-      g_value_set_boolean(value, x);
-    }
     break;
 
   default:
