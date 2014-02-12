@@ -138,6 +138,9 @@ test_simple_rescale test_rescale: %: rescale.o %.o
 test_backprop test_fb_backprop: %: $(RNN_OBJECTS) %.o $(OPT_OBJECTS)
 	$(CC) -Iccan/opt/ -Wl,-O1 $(filter %.o,$^)   -I. $(DEFINES)  $(COMMON_LINKS)  -o $@
 
+convert-saved-net: %: $(RNN_OBJECTS) %.o
+	$(CC) -Iccan/opt/ -Wl,-O1 $(filter %.o,$^)   -I. $(DEFINES)  $(COMMON_LINKS)  -o $@
+
 test_mdct: %: recur-nn.o mdct.o window.o %.o
 	$(CC) -Wl,-O1 $^   -I. $(DEFINES)  $(COMMON_LINKS)  -o $@
 
