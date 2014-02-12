@@ -7,6 +7,7 @@
 /junk/
 test_*
 !test_*.[ch]
+convert-saved-net
 /test-images/generated
 /test-images/output
 /test-images/dickens
