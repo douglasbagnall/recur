@@ -20,13 +20,9 @@ enum
   LAST_SIGNAL
 };
 
-/* CLASSIFY_MODE will switch to TRAINING_MODE when valid targets are given.
-   STICKY_CLASSIFY_MODE won't.
-*/
 enum
 {
-  STICKY_CLASSIFY_MODE = -1,
-  CLASSIFY_MODE,
+  CLASSIFY_MODE = 0,
   TRAINING_MODE
 };
 
@@ -326,8 +322,8 @@ gst_classify_class_init (GstClassifyClass * klass)
 
   g_object_class_install_property (gobject_class, PROP_MODE,
       g_param_spec_int("mode", "mode",
-          "toggle training: 0 - no training, 1 training, -1 sticky no training",
-          STICKY_CLASSIFY_MODE, TRAINING_MODE,
+          "toggle training: 0 - no training, 1 training,",
+          CLASSIFY_MODE, TRAINING_MODE,
           DEFAULT_PROP_MODE,
           G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
@@ -696,7 +692,7 @@ reset_channel_targets(GstClassify *self){
     self->channels[i].current_target = -1;
   }
   if (self->mode == TRAINING_MODE){
-    self->mode = CLASSIFY_MODE;
+    self->mode = CLASSIFY_MODE; //XXX ?
   }
 }
 
@@ -724,9 +720,6 @@ maybe_parse_target_string(GstClassify *self){
     else {
       GST_DEBUG("simple training mode is GONE!");
       result = -1;
-    }
-    if (self->mode != STICKY_CLASSIFY_MODE){
-      self->mode = (result == 0) ? TRAINING_MODE : CLASSIFY_MODE;
     }
   }
   free(target_string);
@@ -802,7 +795,7 @@ maybe_set_mode(GstClassify *self, int t){
       }
     }
   }
-  else if (t != CLASSIFY_MODE && t != STICKY_CLASSIFY_MODE){
+  else if (t != CLASSIFY_MODE){
     GST_WARNING("asked for invalid mode %d, using CLASSIFY_MODE instead", t);
     t = CLASSIFY_MODE;
   }
