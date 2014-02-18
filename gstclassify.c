@@ -688,31 +688,6 @@ parse_complex_target_string(GstClassify *self, const char *str){
   return -1;
 }
 
-static inline int
-parse_simple_target_string(GstClassify *self, const char *s){
-  char *e;
-  long x;
-  int i;
-  for (i = 0; i < self->n_channels; i++){
-    x = strtol(s, &e, 10);
-    GST_LOG("channel %d got %ld s is %s, %p  e is %p", i, x, s, s, e);
-    if (s == e){ /*no digits at all */
-      goto parse_error;
-    }
-    self->channels[i].current_target = x;
-    s = e + 1;
-    if (*e == '\0'  && i != self->n_channels - 1){ /*ran out of numbers */
-      goto parse_error;
-    }
-  }
-  GST_LOG("target %d", self->channels[0].current_target);
-  return 0;
- parse_error:
-  GST_WARNING("Can't parse '%s' into %d channels: stopping after %d",
-      s, self->n_channels, i);
-  return 1;
-}
-
 static inline void
 reset_channel_targets(GstClassify *self){
   int i;
@@ -747,7 +722,8 @@ maybe_parse_target_string(GstClassify *self){
       result = parse_complex_target_string(self, s);
     }
     else {
-      result = parse_simple_target_string(self, s);
+      GST_DEBUG("simple training mode is GONE!");
+      result = -1;
     }
     if (self->mode != STICKY_CLASSIFY_MODE){
       self->mode = (result == 0) ? TRAINING_MODE : CLASSIFY_MODE;
