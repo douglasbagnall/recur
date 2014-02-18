@@ -81,7 +81,8 @@ enum {
   RNN_NET_FLAG_BPTT_ADAPTIVE_MIN_ERROR = 64, /*min error threshold auto-adjusts*/
   RNN_NET_FLAG_NO_MOMENTUMS = 128, /*allocate no momentum arrays (borrow parent's)*/
   RNN_NET_FLAG_NO_DELTAS = 256, /* allocated no delta array (borrow parent's)*/
-  RNN_NET_FLAG_BOTTOM_LAYER = 512, /*network has a layer below RNN*/
+  /*XXX accumulators flag is gone */
+  RNN_NET_FLAG_BOTTOM_LAYER = 1024, /*network has a layer below RNN*/
 
   /*conditioning flags start at 1 << 16 (65536) */
   RNN_COND_USE_SCALE = (1 << (RNN_COND_BIT_SCALE + RNN_COND_USE_OFFSET)),

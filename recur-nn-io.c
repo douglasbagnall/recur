@@ -193,7 +193,7 @@ rnn_load_net(const char *filename){
       READ_SCALAR(bptt, min_error_factor);
     }
   }
-  if (tmpnet.flags & RNN_NET_FLAG_BOTTOM_LAYER){
+  if ((tmpnet.flags & RNN_NET_FLAG_BOTTOM_LAYER) && version >= 4){
     READ_SCALAR(bottom_layer, learn_rate_scale);
     READ_SCALAR(bottom_layer, input_size);
     READ_SCALAR(bottom_layer, output_size);
