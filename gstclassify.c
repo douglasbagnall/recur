@@ -43,7 +43,6 @@ enum
   PROP_SAVE_NET,
   PROP_PGM_DUMP,
   PROP_LOG_FILE,
-  PROP_LOG_CLASS_NUMBERS,
   PROP_MODE,
   PROP_WINDOW_SIZE,
   PROP_BASENAME,
@@ -66,7 +65,6 @@ enum
 #define DEFAULT_PROP_ERROR_WEIGHT ""
 #define DEFAULT_BASENAME "classify"
 #define DEFAULT_PROP_SAVE_NET NULL
-#define DEFAULT_PROP_LOG_CLASS_NUMBERS 0
 #define DEFAULT_PROP_LAWN_MOWER 0
 #define DEFAULT_PROP_MODE 0
 #define DEFAULT_PROP_MFCCS 0
@@ -313,12 +311,6 @@ gst_classify_class_init (GstClassifyClass * klass)
           PROP_BOTTOM_LAYER_MAX,
           DEFAULT_PROP_BOTTOM_LAYER,
           G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
-
-  g_object_class_install_property (gobject_class, PROP_LOG_CLASS_NUMBERS,
-      g_param_spec_boolean("log-class-numbers", "log-class-numbers",
-          "Log counts of each class in training",
-          DEFAULT_PROP_LOG_CLASS_NUMBERS,
-          G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class, PROP_MODE,
       g_param_spec_int("mode", "mode",
@@ -896,10 +888,6 @@ gst_classify_set_property (GObject * object, guint prop_id, const GValue * value
       }
       break;
 
-    case PROP_LOG_CLASS_NUMBERS:
-      self->log_class_numbers = g_value_get_boolean(value);
-      break;
-
     case PROP_MODE:
       maybe_set_mode(self, g_value_get_int(value));
       break;
@@ -1235,17 +1223,12 @@ maybe_learn(GstClassify *self){
   while ((buffer = prepare_next_chunk(self))){
     float err_sum = 0.0f;
     int winners = 0;
-    int class_counts[self->n_classes];
-    for (i = 0; i < self->n_classes; i++){
-      class_counts[i] = 0;
-    }
     rnn_bptt_clear_deltas(net);
 
     for (j = 0; j < self->n_channels; j++){
       ClassifyChannel *c = prepare_channel_features(self, buffer, j);
       err_sum += train_channel(c, self->dropout, self->error_weight);
       winners += c->current_winner == c->current_target;
-      class_counts[c->current_target]++;
     }
 
     /*XXX periodic_pgm_dump and image string should be gst properties */
@@ -1259,13 +1242,6 @@ maybe_learn(GstClassify *self){
     rnn_condition_net(net);
     possibly_save_net(net, self->net_filename);
     rnn_log_net(net);
-    if (self->log_class_numbers){
-      for (i = 0; i < self->n_classes; i++){
-        char s[20];
-        snprintf(s, sizeof(s), "class-%d", i);
-        rnn_log_int(net, s, class_counts[i]);
-      }
-    }
     if (self->error_image){
       temporal_ppm_row_from_source(self->error_image);
     }

@@ -96,7 +96,6 @@ struct _GstClassify
   ClassifyClassEvent *class_events;
   int n_class_events;
   int class_events_index;
-  int log_class_numbers;
   int window_size;
   int window_no;
   int mode;
