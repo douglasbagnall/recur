@@ -6,108 +6,22 @@ import time
 import argparse
 
 from classify import gst_init, TRAINING, TESTING
-from classify_kiwi import MFCCS, CLASSES, WINDOW_SIZE, BASENAME
-from classify import COLOURS, recursive_wav_finder
-from classify import Trainer, lr_steps, categorised_files, load_all_timings_binary
+from classify_kiwi import MFCCS, WINDOW_SIZE, BASENAME
+from classify import COLOURS, targeted_wav_finder
+from classify import Trainer, lr_steps, categorised_files, load_binary_timings
 
 NET_LOG_FILE = "kiwi.log"
 
-class KiwiTrainer(Trainer):
-    def next_training_set(self, src=None):
-        targets = []
-        starttime = self.timestamp
-        self.timestamp = time.time()
-        dropout = self.dropout.next()
-        self.classifier.set_property('dropout', dropout)
-        if self.learn_rate is not None:
-            r = self.learn_rate.next() * self.lr_adjust
-            print ("%s/%s learn_rate %.4g dropout %.2g elapsed %.2f" %
-                   (self.counter, self.iterations, r, dropout,
-                    self.timestamp - starttime))
-            self.classifier.set_property('learn_rate', r)
-
-        if src is None:
-            src = self.trainers
-
-        for fs in self.filesrcs:
-            fn = src.next()
-            timings = self.timings.get(fn, [(1, 0)])
-            targets.extend('c%dt%.2f' % x for x in timings)
-            targets.append(' ')
-            fs.set_property('location', fn)
-            if not self.quiet:
-                print fn, timings
-
-        target_string = ''.join(targets) + ' '
-        self.classifier.set_property('target', target_string)
-        self.mode = TRAINING
-
-    def test_set(self):
-        self.test_scores = [0] * len(self.classes)
-        self.test_runs = [0] * len(self.classes)
-        self.classifier.set_property('dropout', 0)
-        self.classifier.set_property('forget', 0)
-        self.next_training_set(iter(self.testset))
-        self.classifier.set_property('mode', 0)
-        self.mode = TESTING
-        self.test_n = 0
-
-    def on_element(self, bus, msg):
-        total = 0
-        s = msg.get_structure()
-        name = s.get_name()
-        if name == 'classify' and self.mode == TESTING:
-            self.test_n += self.channels
-            v = s.get_value
-            for i in range(self.channels):
-                target = v('channel %d target' % i)
-                correct = v('channel %d correct' % i)
-                self.test_scores[target] += correct
-                self.test_runs[target] += 1
-                total += correct
-
-    def evaluate_test(self):
-        #print self.test_scores
-        colours = [COLOURS[x] for x in 'PPrRYYGGgCC']
-        output = []
-        rightness = 0
-        winners = 0
-        good_enough = 10 / len(self.classes)
-        results = zip(self.classes, self.test_scores, self.test_runs)
-        for c, s, r in results:
-            x = float(s) / r
-            i = int(x * 9.99)
-            output.append(colours[i])
-            output.append(c)
-            output.append(' %.2f%s %d/%d ' % (x, COLOURS['Z'], s, r))
-            rightness += x
-            winners += i > good_enough
-        rightness /= len(self.classes)
-        winners /= float(len(self.classes))
-        output += (" %s%.2f%s %.2f%s" %
-                   (colours[int(rightness * 9.99)], rightness,
-                    colours[int(winners * 9.99)], winners,
-                    COLOURS['Z']))
-        print ''.join(output)
-        if winners > 0.9:
-            self.save_named_net(tag='goodness-%d-%d' %
-                                (int(rightness * 100), int(winners * 100)))
-        if rightness > 0.75:
-            self.lr_adjust = 0.1 / (rightness - 0.65)
-        else:
-            self.lr_adjust = 1.0
 
 def main():
     gst_init()
     parser = argparse.ArgumentParser()
     parser.add_argument('-v', '--verbose', action='store_true',
                         help='lots of rubbish output')
-    parser.add_argument('-t', '--timings',
+    parser.add_argument('-t', '--timings', action='append',
                         help='read timings from here')
-    parser.add_argument('-k', '--dir-with-timings', action='append',
-                        help='use this directory with timings')
-    parser.add_argument('-n', '--dir-without-timings', action='append',
-                        help="use this directory without timings")
+    parser.add_argument('-d', '--audio-directory', action='append',
+                        help='find audio in this directory')
     parser.add_argument('-l', '--learn-rate', type=float,
                         help="learning rate")
     parser.add_argument('-i', '--iterations', type=int, default=10000,
@@ -118,6 +32,14 @@ def main():
                         help="number of bottom layer output nodes")
     parser.add_argument('-N', '--no-save-net', action='store_true',
                         help="don't save the net, periodically or otherwise")
+    parser.add_argument('-c', '--classes', default='tf',
+                        help="classes (letter per class, groups separated by '|')")
+    parser.add_argument('-C', '--channels', default=12, type=int,
+                        help="how many channels to use")
+    parser.add_argument('-w', '--window-size', default=WINDOW_SIZE, type=int,
+                        help="size of the FFT window")
+    parser.add_argument('-n', '--basename', default=BASENAME,
+                        help="save nets etc using this basename")
 
     args = parser.parse_args()
     if args.learn_rate:
@@ -141,42 +63,50 @@ def main():
                        )
     else:
         dropout = 0
-    timed_files = []
-    for d in args.dir_with_timings:
-        timed_files.extend(recursive_wav_finder(d))
 
-    untimed_files = []
-    for d in args.dir_without_timings:
-        untimed_files.extend(recursive_wav_finder(d))
+
+
+
+    all_classes = args.classes.split('|')
+    timings = {}
+    for fn in args.timings:
+        timings.update(load_binary_timings(fn, all_classes))
+    #timings = coalesce_timings(timings)
+
+    timed_files = []
+    for d in args.audio_directory:
+        timed_files.extend(targeted_wav_finder(d, timings))
 
     random.seed(1)
     random.shuffle(timed_files)
-    random.shuffle(untimed_files)
-    validate_streams = [timed_files[:36] + untimed_files[:36]]
-    training_streams = [timed_files[36:], timed_files[36:],
-                        timed_files[36:], timed_files[36:],
-                        timed_files[36:], untimed_files[36:]]
+
+    #print timings
+    full_timings = {ffn: timings[fn] for fn, ffn in timed_files}
+
+    n_channels = args.channels
+    validate_streams = [[ffn for fn, ffn in timed_files[:n_channels]]]
+    training_streams = [[ffn for fn, ffn in timed_files[n_channels:]]]
+
     for x in training_streams:
         random.shuffle(x)
 
-    c = KiwiTrainer(mfccs=MFCCS,
-                    hsize=args.hidden_size,
-                    channels=384,
-                    classes=CLASSES,
-                    window_size=WINDOW_SIZE,
-                    basename=BASENAME)
+    c = Trainer(mfccs=MFCCS,
+                hsize=args.hidden_size,
+                channels=n_channels,
+                classes=all_classes,
+                window_size=args.window_size,
+                basename=args.basename)
 
-    c.SAVE_NET = not args.no_save_net
+    c.no_save_net = args.no_save_net
     c.quiet = not args.verbose
-    timings = load_all_timings_binary(args.timings)
-    c.timings = {x: timings[x] for x in timed_files}
+    c.timings = full_timings
+
     if args.bottom_layer:
         c.classifier.set_property('bottom-layer', args.bottom_layer)
 
     c.train(training_streams, validate_streams, iterations=args.iterations,
             learn_rate=lr, dropout=dropout, log_file=NET_LOG_FILE,
-            properties=(('log-class-numbers', 1),
-                        ('momentum-soft-start', 10000),
+            properties=(('momentum-soft-start', 10000),
                         ('momentum', 0.95),
                         ('momentum-style', 1),
                         ('weight-fan-in-sum', 3),

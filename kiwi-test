@@ -9,217 +9,12 @@ from classify import gst_init, TRAINING, TESTING, Gst
 from classify_kiwi import MFCCS, CLASSES, WINDOW_SIZE, BASENAME
 
 from classify import COLOURS, recursive_wav_finder, load_all_timings_binary
-from classify import BaseClassifier, load_timings
+from classify import Classifier, load_timings
 
 TEST_AUDIO_DIR = "/home/douglas/corpora/kiwi/test/"
 KIWI_TIMING_DATA = '/home/douglas/corpora/kiwi/times.txt'
 
 QUIET = False
-
-class KiwiClassifier(BaseClassifier):
-    pending_files = []
-    quiet = False
-    def classify_files_with_timings(self, files, timings):
-        self.all_results = []
-        self.class_results = [[0,0] for x in self.classes]
-        self.pending_files = list(reversed(files))
-        self.pending_timings = list(reversed(timings))
-        self.classifier.set_property('mode', -1)
-        self.kiwi_probabilities = []
-        self.load_next_file()
-        self.mainloop.run()
-        return self.all_results
-
-    def load_next_file(self):
-        self.pipeline.set_state(Gst.State.READY)
-        fn = self.pending_files.pop()
-        timings = self.pending_timings.pop()
-        targets = ''.join('c%dt%.2f' % x for x in timings)
-        self.current_file = fn
-        self.classifier.set_property("forget", 0)
-        self.filesrcs[0].set_property('location', fn)
-        self.classifier.set_property('target', targets)
-        self.file_results = []
-        self.file_class_results = [[0,0] for x in self.classes]
-        self.pipeline.set_state(Gst.State.PLAYING)
-
-
-    def on_element(self, bus, msg):
-        s = msg.get_structure()
-        if s.get_name() != "classify":
-            return
-        v = s.get_value
-        correct = v('channel 0 correct')
-        winner = v('channel 0 winner')
-        target = v('channel 0 target')
-        kiwi_prob = -v('channel 0, output 0')
-        #print s.to_string()
-        self.file_class_results[target][correct] += 1
-        self.class_results[target][correct] += 1
-        self.file_results.append((target, correct))
-        self.kiwi_probabilities.append((kiwi_prob, target == 0))
-
-    def report(self):
-        self.pipeline.set_state(Gst.State.READY)
-        step = len(self.file_results) / 100.0
-        next_stop = 0
-        out = []
-        i = 0
-        #classes = self.classes
-        classes = 'K-'
-        colours = [COLOURS[x] for x in 'PPrrRRYYGgCC']
-        for target, correct in self.file_results:
-            if i >= next_stop:
-                if i:
-                    s = sum(current_targets)
-                    m = max(current_targets)
-                    if m > s * 0.9:
-                        c = classes[current_targets.index(m)]
-                    else:
-                        c = '~'
-                    colour = colours[int(current_correct * 10.01 / s)]
-                    #colour = COLOURS['PRrYgGC'[sum(current_correct > s * x for x in
-                    #                              (0.1, 0.25, 0.5, 0.66,
-                    #                               0.77, 0.88, 0.99)]]]
-                    out.append('%s%s' % (colour, c))
-                next_stop += step
-                current_correct = 0
-                current_targets = [0] * len(self.classes)
-            t, c = self.file_results[i]
-            current_correct += c
-            current_targets[t] += 1
-            i += 1
-        out.extend((COLOURS['Z'],))
-
-        i = 0
-        grand_total = 0
-        total_right = 0
-        for wrong, right in self.file_class_results:
-            total = wrong + right
-            if  total:
-                s = "%s: %d/%d (%.2g)" % (classes[i], right, total, float(right) / total)
-                n = int(right * 60.0 / total)
-                c = colours[right * 10 / total]
-                out.append("\n%-20s %s%s%s%s" %
-                           (s, c, '=' * n,
-                            COLOURS['Z'], '.' * (60 - n)))
-
-            else:
-                out.append("\n%s: %s / 0" % (classes[i], right))
-
-            i += 1
-            grand_total += total
-            total_right += right
-
-
-        print '\nfile://%s%s%s' % (colours[total_right * 10 / grand_total],
-                                 self.current_file, COLOURS['Z'])
-
-        print ''.join(out)
-        #print self.file_class_results
-        #self.show_roc_curve()
-        self.pipeline.set_state(Gst.State.PLAYING)
-
-
-    def show_roc_curve(self):
-        if NO_ROC:
-            return
-        import matplotlib.pyplot as plt
-        kp = sorted(self.kiwi_probabilities)
-        self.kiwi_probabilities = []
-        sum_true = sum(1 for x in kp if x[1])
-        sum_false = len(kp) - sum_true
-
-        tp_scale = 1.0 / (sum_true or 1)
-        fp_scale = 1.0 / (sum_false or 1)
-        tp = []
-        fp = []
-        false_positives = sum_false
-        true_positives = sum_true
-        half = 0
-        ax, ay, ad, ap = 0, 0, 0, 0
-        bx, by, bd, bp = 0, 0, 99, 0
-        cx, cy, cd, cp = 0, 0, 0, 0
-        for prob, truth in kp:
-            false_positives -= not truth
-            true_positives -= truth
-            x = false_positives * fp_scale
-            y = true_positives * tp_scale
-            half += prob < 0.5
-            d = (1 - x) * (1 - x) + y * y
-            if d > ad:
-                ad = d
-                ax = x
-                ay = y
-                ap = prob
-            d = x * x + (1 - y) * (1 - y)
-            if d < bd:
-                bd = d
-                bx = x
-                by = y
-                bp = prob
-            d = y - x
-            if d > cd:
-                cd = d
-                cx = x
-                cy = y
-                cp = prob
-            fp.append(x)
-            tp.append(y)
-
-        if half < len(fp):
-            hx = (fp[half - 1] + fp[half]) * 0.5
-            hy = (tp[half - 1] + tp[half]) * 0.5
-        else:
-            hx = fp[half - 1]
-            hy = tp[half - 1]
-
-
-        fp.reverse()
-        tp.reverse()
-        print "best", bx, by
-        print "half", hx, hy
-        plt.plot(fp, tp)
-        plt.annotate("0.5", (hx, hy), (0.4, 0.4),
-                     arrowprops={'width':1, 'color': '#00cc00'})
-        plt.annotate("furthest from all bad %.2g" % ap, (ax, ay), (0.3, 0.3),
-                     arrowprops={'width':1, 'color': '#00cccc'},
-                     )
-        plt.annotate("closest to all good %.2g" % bp, (bx, by), (0.6, 0.6),
-                     arrowprops={'width':1, 'color': '#cc0000'},
-                     )
-        plt.annotate("furthest from diagonal %.2g" % cp, (cx, cy), (0.5, 0.5),
-                     arrowprops={'width':1, 'color': '#aa6600'},
-                     )
-
-        plt.axes().set_aspect('equal')
-        plt.show()
-
-
-    def on_eos(self, bus, msg):
-        self.report()
-        if not self.pending_files:
-            i = 0
-            gt = 0
-            for wrong, right in self.class_results:
-                t = wrong + right
-                gt += t
-                if t:
-                    print "%s: %s/%s  %.2f" % (self.classes[i], right, t,
-                                               float(right) / t)
-                else:
-                    print "%s: %s/%s  ---" % (self.classes[i], right, t)
-                i += 1
-            print "%s windows == %.2f minutes" % (gt,
-                                                  gt * WINDOW_SIZE / (2.0 * 60 * 8000))
-            self.show_roc_curve()
-
-            self.stop()
-        else:
-            self.load_next_file()
-
-    def on_error(self, bus, msg):
-        pass
 
 def load_files_and_timings(d, classes):
     all_timings = load_timings(KIWI_TIMING_DATA, classes, classes[-1], QUIET)
@@ -255,12 +50,12 @@ def main():
 
     QUIET = not args.verbose
     NO_ROC = args.no_roc
-    c = KiwiClassifier(mfccs=MFCCS,
-                       hsize=args.hidden_size,
-                       channels=1,
-                       classes=CLASSES,
-                       window_size=WINDOW_SIZE,
-                       basename=BASENAME)
+    c = Classifier(mfccs=MFCCS,
+                   hsize=args.hidden_size,
+                   channels=1,
+                   classes=CLASSES,
+                   window_size=WINDOW_SIZE,
+                   basename=BASENAME)
     c.quiet = QUIET
     if args.bottom_layer:
         c.classifier.set_property('bottom-layer', args.bottom_layer)

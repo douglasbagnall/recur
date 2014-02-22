@@ -59,9 +59,16 @@ typedef struct _GstClassifyClass GstClassifyClass;
 
 typedef struct _ClassifyClassEvent {
   int channel;
-  int class;
+  int class_group;
   int window_no;
+  int target;
 } ClassifyClassEvent;
+
+typedef struct _ClassifyClassGroup {
+  int offset;
+  int n_classes;
+  char *classes;
+} ClassifyClassGroup;
 
 
 typedef struct _ClassifyChannel
@@ -70,8 +77,8 @@ typedef struct _ClassifyChannel
   float *features;
   float *pcm_now;
   float *pcm_next;
-  int current_target;
-  int current_winner;
+  int *group_target;
+  int *group_winner;
   TemporalPPM *mfcc_image;
 } ClassifyChannel;
 
@@ -83,7 +90,8 @@ struct _GstClassify
   RecurNN **subnets;
   ClassifyChannel *channels;
   int n_channels;
-  int n_classes;
+  ClassifyClassGroup *class_groups;
+  int n_groups;
   s16 *incoming_queue;
   int incoming_start;
   int incoming_end;

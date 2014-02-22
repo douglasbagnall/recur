@@ -32,7 +32,7 @@ class KiwiClassifier(BaseClassifier):
 
     def classify_files_emitting_timings(self, files):
         self.pending_files = files
-        self.classifier.set_property('mode', -1)
+        self.classifier.set_property('mode', 0)
         self.load_next_file()
         self.mainloop.run()
 
