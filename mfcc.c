@@ -134,8 +134,9 @@ static void
 mfcc_slopes_dump2(RecurAudioBinner *ab){
   int i;
   int wsize = ab->window_size / ab->value_size;
-  TemporalPPM *ppm = temporal_ppm_alloc(ab->n_bins, wsize, "mfcc", 0, PGM_DUMP_GREY, NULL);
-  GstFFTF32Complex *f = calloc(sizeof(float), ab->window_size);
+  TemporalPPM *ppm = temporal_ppm_alloc(ab->n_bins, wsize, "mfcc", 0,
+      PGM_DUMP_GREY, NULL);
+  GstFFTF32Complex *f = calloc(sizeof(float), ab->window_size + 2);
   for (i = 0; i <= wsize; i++){
     f[i].r = 1.0f;
     f[i].i = 1.0f;
