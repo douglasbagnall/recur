@@ -194,9 +194,9 @@ gst_classify_finalize (GObject * obj){
     rnn_delete_net(self->net);
     self->net = NULL;
   }
-  if (self->incoming_queue){
-    free(self->incoming_queue);
-    self->incoming_queue = NULL;
+  if (self->audio_queue){
+    free(self->audio_queue);
+    self->audio_queue = NULL;
   }
   if (self->error_image){
     temporal_ppm_free(self->error_image);
@@ -421,7 +421,7 @@ gst_classify_init (GstClassify * self)
   self->channels = NULL;
   self->n_channels = 0;
   self->mfcc_factory = NULL;
-  self->incoming_queue = NULL;
+  self->audio_queue = NULL;
   self->net_filename = NULL;
   self->pending_properties = calloc(PROP_LAST, sizeof(GValue));
   self->class_events = NULL;
@@ -597,12 +597,12 @@ gst_classify_setup(GstAudioFilter *base, const GstAudioInfo *info){
 
   if (self->n_channels != info->channels){
     DEBUG("given %d channels, previous %d", info->channels, self->n_channels);
-    if (self->incoming_queue){
-      free(self->incoming_queue);
+    if (self->audio_queue){
+      free(self->audio_queue);
     }
     self->n_channels = info->channels;
     self->queue_size = info->channels * self->window_size * CLASSIFY_QUEUE_FACTOR;
-    self->incoming_queue = malloc_aligned_or_die(self->queue_size * sizeof(s16));
+    self->audio_queue = malloc_aligned_or_die(self->queue_size * sizeof(s16));
     if (self->channels){
       free(self->channels);
     }
@@ -1208,6 +1208,9 @@ prepare_channel_features(GstClassify *self, s16 *buffer_i, int j){
   int i, k;
   int half_window = self->window_size / 2;
   ClassifyChannel *c = &self->channels[j];
+  GST_LOG("buffer offset %d, channel %d",
+      self->read_offset, j);
+
   for(i = 0, k = j; i < half_window; i++, k += self->n_channels){
     c->pcm_next[i] = buffer_i[k];
     c->pcm_now[half_window + i] = buffer_i[k];
@@ -1258,19 +1261,20 @@ prepare_next_chunk(GstClassify *self){
   /*change the target classes of channels where necessary*/
   int half_window = self->window_size / 2;
   int chunk_size = half_window * self->n_channels;
-  int len = self->incoming_end - self->incoming_start;
+  int len = self->write_offset - self->read_offset;
   if (len < 0){
     len += self->queue_size;
   }
-  GST_LOG("start %d end %d len %d chunk %d queue_size %d", self->incoming_start,
-      self->incoming_end, len, chunk_size, self->queue_size);
+  GST_LOG("start %d end %d len %d chunk %d queue_size %d", self->read_offset,
+      self->write_offset, len, chunk_size, self->queue_size);
   if (len < chunk_size){
     GST_LOG("returning NULL");
     return NULL;
   }
-  self->incoming_start += chunk_size;
-  if (self->incoming_start >= self->queue_size){
-    self->incoming_start -= self->queue_size;
+  s16 *buffer = self->audio_queue + self->read_offset;
+  self->read_offset += chunk_size;
+  if (self->read_offset >= self->queue_size){
+    self->read_offset -= self->queue_size;
   }
 
   while(self->class_events_index < self->n_class_events){
@@ -1288,9 +1292,9 @@ prepare_next_chunk(GstClassify *self){
   }
 
   self->window_no++;
-  GST_LOG("returning %p", self->incoming_queue + self->incoming_start);
+  GST_LOG("returning %p", buffer);
 
-  return self->incoming_queue + self->incoming_start;
+  return buffer;
 }
 
 static inline void
@@ -1298,11 +1302,15 @@ maybe_learn(GstClassify *self){
   int j;
   s16 *buffer;
   RecurNN *net = self->net;
+  GST_LOG("maybe learn; offset %d",
+      self->read_offset);
+
   while ((buffer = prepare_next_chunk(self))){
     float err_sum = 0.0f;
     int winners = 0;
     rnn_bptt_clear_deltas(net);
-
+    GST_LOG("buffer offset %ld, %d", buffer - self->audio_queue,
+        self->read_offset);
     for (j = 0; j < self->n_channels; j++){
       ClassifyChannel *c = prepare_channel_features(self, buffer, j);
       err_sum += train_channel(self, c, &winners);
@@ -1365,8 +1373,8 @@ gst_classify_transform_ip (GstBaseTransform * base, GstBuffer *buf)
 {
   GstClassify *self = GST_CLASSIFY(base);
   GstFlowReturn ret = GST_FLOW_OK;
-  queue_audio_segment(buf, self->incoming_queue, self->queue_size,
-      &self->incoming_start, &self->incoming_end);
+  queue_audio_segment(buf, self->audio_queue, self->queue_size,
+      &self->read_offset, &self->write_offset);
   if (self->training){
     maybe_learn(self);
   }

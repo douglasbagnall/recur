@@ -92,9 +92,9 @@ struct _GstClassify
   int n_channels;
   ClassifyClassGroup *class_groups;
   int n_groups;
-  s16 *incoming_queue;
-  int incoming_start;
-  int incoming_end;
+  s16 *audio_queue;
+  int read_offset;
+  int write_offset;
   RecurAudioBinner *mfcc_factory;
   char *net_filename;
   char *basename;

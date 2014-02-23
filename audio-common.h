@@ -7,13 +7,13 @@
  */
 static inline void
 queue_audio_segment(GstBuffer *buffer, s16 *const queue, const int queue_size,
-    int *start, int *end)
+    int *read_offset, int *write_offset)
 {
   GstMapInfo map;
   gst_buffer_map(buffer, &map, GST_MAP_READ);
   int len = map.size / sizeof(s16);
 
-  int lag = *end - *start;
+  int lag = *write_offset - *read_offset;
   if (lag < 0){
     lag += queue_size;
   }
@@ -22,17 +22,17 @@ queue_audio_segment(GstBuffer *buffer, s16 *const queue, const int queue_size,
         lag, len, queue_size);
   }
 
-  if (*end + len < queue_size){
-    memcpy(queue + *end, map.data, map.size);
-    *end += len;
+  if (*write_offset + len < queue_size){
+    memcpy(queue + *write_offset, map.data, map.size);
+    *write_offset += len;
   }
   else {
-    int snip = queue_size - *end;
+    int snip = queue_size - *write_offset;
     int snip8 = snip * sizeof(s16);
-    memcpy(queue + *end, map.data, snip8);
+    memcpy(queue + *write_offset, map.data, snip8);
     memcpy(queue, map.data + snip8,
         map.size - snip8);
-    *end = len - snip;
+    *write_offset = len - snip;
   }
 
   GST_LOG("queueing audio starting %" PRIu64  ", ending %" PRIu64,
