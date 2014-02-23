@@ -310,7 +310,7 @@ gst_classify_class_init (GstClassifyClass * klass)
       g_param_spec_boolean("training", "training",
           "set to true to train",
           DEFAULT_PROP_TRAINING,
-          G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
+          G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class, PROP_LEARN_RATE,
       g_param_spec_float("learn-rate", "learn-rate",
@@ -423,6 +423,7 @@ gst_classify_init (GstClassify * self)
   self->mfcc_factory = NULL;
   self->audio_queue = NULL;
   self->net_filename = NULL;
+  self->training = DEFAULT_PROP_TRAINING;
   self->pending_properties = calloc(PROP_LAST, sizeof(GValue));
   self->class_events = NULL;
   self->class_events_index = 0;
