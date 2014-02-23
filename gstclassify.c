@@ -1103,6 +1103,9 @@ gst_classify_get_property (GObject * object, guint prop_id, GValue * value,
       maybe_get_net_scalar(self, prop_id, value);
       break;
 
+  case PROP_TRAINING:
+    g_value_set_boolean(value, self->training);
+
   case PROP_MFCCS:
     g_value_set_int(value, self->mfccs);
     break;
