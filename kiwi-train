@@ -115,6 +115,8 @@ def main():
                         ('momentum-style', 1),
                         ('weight-fan-in-sum', 3),
                         ('weight-fan-in-kurtosis', 0.1),
+                        ('min-frequency', 400),
+                        ('max-frequency', 3800),
                         #('error-weight', '3:2'),
                     ))
 

@@ -30,6 +30,8 @@ enum
   PROP_TOP_LEARN_RATE_SCALE,
   PROP_BOTTOM_LEARN_RATE_SCALE,
   PROP_HIDDEN_SIZE,
+  PROP_MIN_FREQUENCY,
+  PROP_MAX_FREQUENCY,
   PROP_MOMENTUM,
   PROP_MOMENTUM_STYLE,
   PROP_MOMENTUM_SOFT_START,
@@ -66,6 +68,11 @@ enum
 #define DEFAULT_PROP_MOMENTUM 0.95f
 #define DEFAULT_PROP_MOMENTUM_SOFT_START 0.0f
 #define DEFAULT_PROP_MOMENTUM_STYLE 1
+#define DEFAULT_MIN_FREQUENCY 100
+#define DEFAULT_MAX_FREQUENCY (CLASSIFY_RATE * 0.499)
+#define MINIMUM_AUDIO_FREQUENCY 0
+#define MAXIMUM_AUDIO_FREQUENCY (CLASSIFY_RATE * 0.5)
+
 #define DEFAULT_PROP_CLASSES "tf"
 #define DEFAULT_PROP_BPTT_DEPTH 30
 #define DEFAULT_PROP_FORGET 0
@@ -318,6 +325,20 @@ gst_classify_class_init (GstClassifyClass * klass)
       g_param_spec_boolean("training", "training",
           "set to true to train",
           DEFAULT_PROP_TRAINING,
+          G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+
+  g_object_class_install_property (gobject_class, PROP_MIN_FREQUENCY,
+      g_param_spec_float("min-frequency", "min-frequency",
+          "Lowest audio frequency to analyse",
+          MINIMUM_AUDIO_FREQUENCY, MAXIMUM_AUDIO_FREQUENCY,
+          DEFAULT_MIN_FREQUENCY,
+          G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+
+  g_object_class_install_property (gobject_class, PROP_MAX_FREQUENCY,
+      g_param_spec_float("max-frequency", "max-frequency",
+          "Highest audio frequency to analyse",
+          MINIMUM_AUDIO_FREQUENCY, MAXIMUM_AUDIO_FREQUENCY,
+          DEFAULT_MAX_FREQUENCY,
           G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class, PROP_LEARN_RATE,
@@ -587,11 +608,15 @@ gst_classify_setup(GstAudioFilter *base, const GstAudioInfo *info){
   GST_INFO("gst_classify_setup\n");
   GstClassify *self = GST_CLASSIFY(base);
   if (self->mfcc_factory == NULL){
+    float min_freq = get_gvalue_float(PENDING_PROP(self, PROP_MIN_FREQUENCY),
+      DEFAULT_MIN_FREQUENCY);
+    float max_freq = get_gvalue_float(PENDING_PROP(self, PROP_MAX_FREQUENCY),
+      DEFAULT_MIN_FREQUENCY);
+
     self->mfcc_factory = recur_audio_binner_new(self->window_size,
         RECUR_WINDOW_HANN,
         CLASSIFY_N_FFT_BINS,
-        CLASSIFY_MFCC_MIN_FREQ, /*XXX properties*/
-        CLASSIFY_MFCC_MAX_FREQ,
+        min_freq, max_freq,
         CLASSIFY_RATE,
         1.0f / 32768,
         CLASSIFY_VALUE_SIZE
@@ -1011,6 +1036,8 @@ gst_classify_set_property (GObject * object, guint prop_id, const GValue * value
     /*properties that only need to be stored until net creation, and can't
       be changed afterwards go here.
     */
+    case PROP_MIN_FREQUENCY:
+    case PROP_MAX_FREQUENCY:
     case PROP_CLASSES:
     case PROP_BOTTOM_LAYER:
     case PROP_HIDDEN_SIZE:
