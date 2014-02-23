@@ -779,7 +779,7 @@ parse_complex_target_string(GstClassify *self, const char *str){
 #endif
   return 0;
  parse_error:
-  GST_WARNING("Can't parse '%s' into %d events for %d channels: "
+  GST_ERROR("Can't parse '%s' into %d events for %d channels: "
       "stopping after %d events (%ld chars)",
       str, n_events, self->n_channels, i, s - str);
   self->n_class_events = 0;
