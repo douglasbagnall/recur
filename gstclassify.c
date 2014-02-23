@@ -632,8 +632,13 @@ gst_classify_setup(GstAudioFilter *base, const GstAudioInfo *info){
   gst_element_post_message(GST_ELEMENT(self), msg);
   if (self->random_alignment){
     self->write_offset = 0;
-    int offset = rand_small_int(&self->net->rng, self->window_size / 2);
+    int offset = rand_small_int(&self->net->rng, self->window_size) - self->window_size / 2;
     self->read_offset = offset * self->n_channels;
+    if (offset < 0){
+      self->read_offset += self->queue_size;
+      memset(self->audio_queue + self->read_offset, 0, offset * sizeof(s16));
+    }
+
     STDERR_DEBUG("random offset is %d (%d * %d)",
         self->read_offset, offset, self->n_channels);
   }
