@@ -608,7 +608,8 @@ gst_classify_setup(GstAudioFilter *base, const GstAudioInfo *info){
     }
     self->n_channels = info->channels;
     self->queue_size = info->channels * self->window_size * CLASSIFY_QUEUE_FACTOR;
-    self->audio_queue = malloc_aligned_or_die(self->queue_size * sizeof(s16));
+    int alloc_size = self->queue_size + info->channels * self->window_size / 2;
+    self->audio_queue = malloc_aligned_or_die(alloc_size * sizeof(s16));
     if (self->channels){
       free(self->channels);
     }
@@ -1293,6 +1294,13 @@ prepare_next_chunk(GstClassify *self){
   self->read_offset += chunk_size;
   if (self->read_offset >= self->queue_size){
     self->read_offset -= self->queue_size;
+    if (self->read_offset){
+      /*the returned buffer will run beyond the end of the queue, where the
+        memory is allocated but not initialised. So we copy the samples in
+        from the beginning.*/
+      memcpy(self->audio_queue + self->queue_size, self->audio_queue,
+          self->read_offset);
+    }
   }
 
   while(self->class_events_index < self->n_class_events){
