@@ -474,7 +474,7 @@ class Trainer(BaseClassifier):
         self.save_net(fn)
 
     def save_net(self, name=''):
-        if self.no_save_net:
+        if not self.no_save_net:
             self.classifier.set_property('save-net', name)
 
 
@@ -491,10 +491,9 @@ class Trainer(BaseClassifier):
             if self.counter == self.iterations:
                 self.stop()
             elif self.counter % TEST_INTERVAL:
-                self.classifier.set_property('training', True)
                 self.next_training_set()
             else:
-                self.test_set()
+                self.next_test_set()
         self.pipeline.set_state(Gst.State.PLAYING)
 
     def on_error(self, bus, msg):
