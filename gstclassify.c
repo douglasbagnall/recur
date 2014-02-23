@@ -22,12 +22,6 @@ enum
 
 enum
 {
-  CLASSIFY_MODE = 0,
-  TRAINING_MODE
-};
-
-enum
-{
   PROP_0,
   PROP_TARGET,
   PROP_CLASSES,
@@ -43,7 +37,7 @@ enum
   PROP_SAVE_NET,
   PROP_PGM_DUMP,
   PROP_LOG_FILE,
-  PROP_MODE,
+  PROP_TRAINING,
   PROP_WINDOW_SIZE,
   PROP_BASENAME,
   PROP_DROPOUT,
@@ -66,7 +60,7 @@ enum
 #define DEFAULT_BASENAME "classify"
 #define DEFAULT_PROP_SAVE_NET NULL
 #define DEFAULT_PROP_LAWN_MOWER 0
-#define DEFAULT_PROP_MODE 0
+#define DEFAULT_PROP_TRAINING 0
 #define DEFAULT_PROP_MFCCS 0
 #define DEFAULT_PROP_MOMENTUM 0.95f
 #define DEFAULT_PROP_MOMENTUM_SOFT_START 0.0f
@@ -312,11 +306,10 @@ gst_classify_class_init (GstClassifyClass * klass)
           DEFAULT_PROP_BOTTOM_LAYER,
           G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
-  g_object_class_install_property (gobject_class, PROP_MODE,
-      g_param_spec_int("mode", "mode",
-          "toggle training: 0 - no training, 1 training,",
-          CLASSIFY_MODE, TRAINING_MODE,
-          DEFAULT_PROP_MODE,
+  g_object_class_install_property (gobject_class, PROP_TRAINING,
+      g_param_spec_boolean("training", "training",
+          "set to true to train",
+          DEFAULT_PROP_TRAINING,
           G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class, PROP_LEARN_RATE,
@@ -801,9 +794,6 @@ reset_channel_targets(GstClassify *self){
       self->channels[i].group_target[j] = -1;
     }
   }
-  if (self->mode == TRAINING_MODE){
-    self->mode = CLASSIFY_MODE; //XXX ?
-  }
 }
 
 static void
@@ -881,36 +871,6 @@ maybe_start_logging(GstClassify *self){
     }
     g_value_unset(PENDING_PROP(self, PROP_LOG_FILE));
   }
-}
-
-/*maybe_set_mode sets self->mode to the requested boolean value UNLESS true is
-  requested while the targets are invalid. It returns the actually set value.
-*/
-
-static int
-maybe_set_mode(GstClassify *self, int t){
-  if (t == TRAINING_MODE){
-    for (int i = 0; i < self->n_channels; i++){
-      ClassifyChannel *c = &self->channels[i];
-      for (int j = 0; j < self->n_groups; j++){
-        if (c->group_target[j] < 0 ||
-            c->group_target[j] >= self->class_groups[j].n_classes){
-          GST_DEBUG("asked for training mode, but target %d is bad (%d)",
-              i, c->group_target[j]);
-          t = CLASSIFY_MODE;
-          goto set_mode;
-        }
-      }
-    }
-  }
-  else if (t != CLASSIFY_MODE){
-    GST_WARNING("asked for invalid mode %d, using CLASSIFY_MODE instead", t);
-    t = CLASSIFY_MODE;
-  }
- set_mode:
-  GST_DEBUG("Setting mode to %d", t);
-  self->mode = t;
-  return t;
 }
 
 static void
@@ -1005,8 +965,8 @@ gst_classify_set_property (GObject * object, guint prop_id, const GValue * value
       }
       break;
 
-    case PROP_MODE:
-      maybe_set_mode(self, g_value_get_int(value));
+    case PROP_TRAINING:
+      self->training = g_value_get_boolean(value);
       break;
 
     case PROP_DROPOUT:
@@ -1407,7 +1367,7 @@ gst_classify_transform_ip (GstBaseTransform * base, GstBuffer *buf)
   GstFlowReturn ret = GST_FLOW_OK;
   queue_audio_segment(buf, self->incoming_queue, self->queue_size,
       &self->incoming_start, &self->incoming_end);
-  if (self->mode == TRAINING_MODE){
+  if (self->training){
     maybe_learn(self);
   }
   else {

@@ -27,9 +27,6 @@ COLOURS = {
 
 TEST_INTERVAL = 2
 
-TRAINING = 0
-TESTING = 1
-
 SAVE_LOCATION = 'nets/autosave'
 
 def gst_init():
@@ -132,7 +129,7 @@ class Classifier(BaseClassifier):
         self.class_results = self.get_results_counter()
         self.pending_files = list(reversed(files))
         self.pending_timings = list(reversed(timings))
-        self.classifier.set_property('mode', 0)
+        self.classifier.set_property('training', 0)
         self.kiwi_probabilities = []
         self.load_next_file()
         self.mainloop.run()
@@ -393,8 +390,8 @@ class Trainer(BaseClassifier):
         self.classifier.set_property('dropout', 0)
         self.classifier.set_property('forget', 0)
         self.next_training_set(iter(self.testset))
-        self.classifier.set_property('mode', 0)
-        self.mode = TESTING
+        self.classifier.set_property('training', 0)
+        self.training = True
         self.test_n = 0
 
     def evaluate_test(self):
@@ -474,7 +471,7 @@ class Trainer(BaseClassifier):
         target_string = ' '.join(targets)
         print target_string
         self.classifier.set_property('target', target_string)
-        self.mode = TRAINING
+        self.training = True
 
 
     def on_eos(self, bus, msg):
@@ -490,6 +487,7 @@ class Trainer(BaseClassifier):
             if self.counter == self.iterations:
                 self.stop()
             elif self.counter % TEST_INTERVAL:
+                self.classifier.set_property('training', 1)
                 self.next_training_set()
             else:
                 self.test_set()
@@ -503,7 +501,7 @@ class Trainer(BaseClassifier):
         s = msg.get_structure()
         #print s.to_string()
         name = s.get_name()
-        if name == 'classify' and self.mode == TESTING:
+        if name == 'classify' and not self.training:
             self.test_n += self.channels
             v = s.get_value
             for i in range(self.channels):

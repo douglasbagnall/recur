@@ -5,7 +5,7 @@ import itertools
 import time
 import argparse
 
-from classify import gst_init, TRAINING, TESTING, Gst
+from classify import gst_init, Gst
 from classify_kiwi import MFCCS, CLASSES, WINDOW_SIZE, BASENAME
 
 from classify import COLOURS, recursive_wav_finder, load_all_timings_binary
