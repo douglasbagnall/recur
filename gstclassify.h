@@ -107,6 +107,7 @@ struct _GstClassify
   int window_size;
   int window_no;
   int training;
+  int random_alignment;
   int momentum_style;
   float dropout;
   float *error_weight;

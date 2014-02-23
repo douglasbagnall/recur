@@ -49,6 +49,7 @@ enum
   PROP_LAWN_MOWER,
   PROP_RNG_SEED,
   PROP_BOTTOM_LAYER,
+  PROP_RANDOM_ALIGNMENT,
 
   PROP_LAST
 };
@@ -70,6 +71,7 @@ enum
 #define DEFAULT_PROP_FORGET 0
 #define DEFAULT_PROP_BOTTOM_LAYER 0
 #define DEFAULT_PROP_WEIGHT_SPARSITY 1
+#define DEFAULT_PROP_RANDOM_ALIGNMENT 1
 #define DEFAULT_WINDOW_SIZE 256
 #define DEFAULT_HIDDEN_SIZE 199
 #define DEFAULT_LEARN_RATE 0.0001
@@ -296,6 +298,12 @@ gst_classify_class_init (GstClassifyClass * klass)
       g_param_spec_boolean("forget", "forget",
           "Forget the current hidden layer (all channels)",
           DEFAULT_PROP_FORGET,
+          G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
+
+  g_object_class_install_property (gobject_class, PROP_RANDOM_ALIGNMENT,
+      g_param_spec_boolean("random-alignment", "random-alignment",
+          "randomly offset beginning of audio frames",
+          DEFAULT_PROP_RANDOM_ALIGNMENT,
           G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class, PROP_BOTTOM_LAYER,
@@ -621,7 +629,13 @@ gst_classify_setup(GstAudioFilter *base, const GstAudioInfo *info){
   GstStructure *s = gst_structure_new_empty("classify-setup");
   GstMessage *msg = gst_message_new_element(GST_OBJECT(self), s);
   gst_element_post_message(GST_ELEMENT(self), msg);
-
+  if (self->random_alignment){
+    self->write_offset = 0;
+    int offset = rand_small_int(&self->net->rng, self->window_size / 2);
+    self->read_offset = offset * self->n_channels;
+    STDERR_DEBUG("random offset is %d (%d * %d)",
+        self->read_offset, offset, self->n_channels);
+  }
   return TRUE;
 }
 
@@ -962,6 +976,9 @@ gst_classify_set_property (GObject * object, guint prop_id, const GValue * value
         }
       }
       break;
+
+    case PROP_RANDOM_ALIGNMENT:
+      self->random_alignment = g_value_get_boolean(value);
 
     case PROP_TRAINING:
       self->training = g_value_get_boolean(value);

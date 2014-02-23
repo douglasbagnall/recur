@@ -40,6 +40,8 @@ def main():
                         help="size of the FFT window")
     parser.add_argument('-n', '--basename', default=BASENAME,
                         help="save nets etc using this basename")
+    parser.add_argument('-r', '--random-alignment', action='store_true',
+                        help="slightly randomise alignment of fft windows")
 
     args = parser.parse_args()
     if args.learn_rate:
@@ -100,6 +102,8 @@ def main():
     c.no_save_net = args.no_save_net
     c.quiet = not args.verbose
     c.timings = full_timings
+
+    c.classifier.set_property('random-alignment', args.random_alignment)
 
     if args.bottom_layer:
         c.classifier.set_property('bottom-layer', args.bottom_layer)
