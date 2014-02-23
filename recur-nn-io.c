@@ -16,8 +16,11 @@ rnn_save_net(RecurNN *net, const char *filename, int backup){
   if (net == NULL || filename == NULL)
     goto early_error;
   fd = mkostemp(tmpfn, O_RDWR | O_CREAT);
-  if (fd == -1)
+  if (fd == -1){
+    DEBUG("cannot open temporary file for writing");
+    perror();
     goto early_error;
+  }
   ret = cdb_make_start(&cdbm, fd);
   if (ret)
     goto error;
@@ -145,6 +148,10 @@ rnn_load_net(const char *filename){
   RecurExtraLayer *bottom_layer = &tmpbl;
 
   fd = open(filename, O_RDONLY);
+  if (fd == -1){
+    DEBUG("can't open '%s' (%s)", filename, strerror(errno));
+    goto open_error;
+  }
 
   int version = 0;
   if (cdb_seek(fd, FORMAT_VERSION, strlen(FORMAT_VERSION), &vlen) >= 0){
@@ -322,7 +329,8 @@ rnn_load_net(const char *filename){
  error:
   rnn_delete_net(net);
  pre_alloc_error:
-  DEBUG("loading net failed!");
   close(fd);
+ open_error:
+  DEBUG("loading net failed!");
   return NULL;
 }
