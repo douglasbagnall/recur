@@ -147,7 +147,7 @@ init_channel(ClassifyChannel *c, RecurNN *net,
   c->pcm_now = zalloc_aligned_or_die(window_size * sizeof(float));
   c->features = zalloc_aligned_or_die(n_inputs * sizeof(float));
   c->group_target = zalloc_aligned_or_die(n_groups * 2 * sizeof(int));
-  c->group_winner = c->group_target + n_groups * sizeof(int);
+  c->group_winner = c->group_target + n_groups;
   c->mfcc_image = NULL;
 
   if (PGM_DUMP_FEATURES && id == 0){
