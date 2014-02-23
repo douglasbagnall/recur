@@ -566,9 +566,6 @@ load_or_create_net(GstClassify *self){
       rnn_multi_pgm_dump(net, "how ihw iha biw bid");
     }
   }
-  else {
-    rnn_set_log_file(net, NULL, 0);
-  }
   if (net->bottom_layer){
     self->error_image = temporal_ppm_alloc(net->bottom_layer->o_size, 300, "bottom_error",
         0, PGM_DUMP_COLOUR, &net->bottom_layer->o_error);
