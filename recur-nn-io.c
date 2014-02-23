@@ -17,8 +17,7 @@ rnn_save_net(RecurNN *net, const char *filename, int backup){
     goto early_error;
   fd = mkostemp(tmpfn, O_RDWR | O_CREAT);
   if (fd == -1){
-    DEBUG("cannot open temporary file for writing");
-    perror();
+    perror("can't open temporary file for writing");
     goto early_error;
   }
   ret = cdb_make_start(&cdbm, fd);
