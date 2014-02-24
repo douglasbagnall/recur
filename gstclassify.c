@@ -507,7 +507,7 @@ static int parse_classes_string(GstClassify *self, const char *orig)
   for (i = 0; i < n_groups; i++){
     ClassifyClassGroup *group = &self->class_groups[i];
     group->classes = s;
-    group->n_classes = 0;
+    group->n_classes = 1;
     group->offset = offset;
     for (; *s; s++){
       group->n_classes++;
