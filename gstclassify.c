@@ -661,7 +661,10 @@ gst_classify_setup(GstAudioFilter *base, const GstAudioInfo *info){
     self->read_offset = offset * self->n_channels;
     if (offset < 0){
       self->read_offset += self->queue_size;
-      memset(self->audio_queue + self->read_offset, 0, offset * sizeof(s16));
+      STDERR_DEBUG("random offset is %d, read_offset %d queue_size %d", offset,
+          self->read_offset, self->queue_size);
+      memset(self->audio_queue + self->read_offset, 0,
+          (self->queue_size - self->read_offset) * sizeof(s16));
     }
 
     STDERR_DEBUG("random offset is %d (%d * %d)",
