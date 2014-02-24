@@ -1334,7 +1334,7 @@ prepare_next_chunk(GstClassify *self){
         memory is allocated but not initialised. So we copy the samples in
         from the beginning.*/
       memcpy(self->audio_queue + self->queue_size, self->audio_queue,
-          self->read_offset);
+          self->read_offset * sizeof(s16));
     }
   }
 
