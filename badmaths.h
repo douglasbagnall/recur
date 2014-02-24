@@ -107,21 +107,28 @@ softmax_best_guess(float *restrict error, const float *restrict src, int len)
 {
   softmax(error, src, len);
   /*softmax error is 0-1. all values should be 0, EXCEPT the hot one, which
-   should be 1. Error encodes the desired change, i.e., a negative number in
-   most cases, and 1 - softmax for the hot.
+   should be 1. The passed in error array is overwritten with negated softmax
+   values. Training error encodes the desired change, i.e., a negative number
+   in most cases, and 1 - softmax for the correct answer, so in training
+   situations you want to add one straight afterwards:
+
+    int target = whatever();
+    int winner = softmax_best_guess(error, answer, len);
+    error[target] += 1.0f;
 
    Sum of softmax is always one, so error sum is always twice target error.
   */
-  int best_i = -1;
-  float best_e = -1;
-  for (int i = 0; i < len; i++){
-    if (error[i] > best_e){
-      best_e = error[i];
+  int best_i = 0;
+  float best_e = error[0];
+  error[0] = -best_e;
+  for (int i = 1; i < len; i++){
+    float e = error[i];
+    if (e > best_e){
+      best_e = e;
       best_i = i;
     }
-    error[i] = -error[i];
+    error[i] = -e;
   }
-  //DEBUG("best guess %d next %d", best_i, next);
   return best_i;
 }
 
