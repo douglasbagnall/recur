@@ -8,7 +8,7 @@ import argparse
 from classify import gst_init
 from classify_kiwi import MFCCS, WINDOW_SIZE, BASENAME
 from classify import COLOURS, targeted_wav_finder
-from classify import Trainer, lr_steps, categorised_files, load_binary_timings
+from classify import Trainer, lr_steps, load_timings
 
 NET_LOG_FILE = "kiwi.log"
 
@@ -67,23 +67,11 @@ def main():
         dropout = 0
 
 
-
-
-    all_classes = args.classes.split('|')
-    timings = {}
-    for fn in args.timings:
-        timings.update(load_binary_timings(fn, all_classes))
-    #timings = coalesce_timings(timings)
-
-    timed_files = []
-    for d in args.audio_directory:
-        timed_files.extend(targeted_wav_finder(d, timings))
-
     random.seed(1)
-    random.shuffle(timed_files)
 
-    #print timings
-    full_timings = {ffn: timings[fn] for fn, ffn in timed_files}
+    all_classes, timed_files, full_timings = load_timings(args.classes,
+                                                          args.timings,
+                                                          args.audio_directory)
 
     n_channels = args.channels
     validate_streams = [[ffn for fn, ffn in timed_files[:n_channels]]]

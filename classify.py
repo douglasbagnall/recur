@@ -630,3 +630,23 @@ def targeted_wav_finder(d, files):
         ffn = os.path.join(d, fn)
         if os.path.exists(ffn):
             yield (fn, ffn)
+
+
+
+def load_timings(class_string, timing_files, audio_directories):
+    all_classes = class_string.split('|')
+    timings = {}
+    for fn in timing_files:
+        timings.update(load_binary_timings(fn, all_classes))
+    #timings = coalesce_timings(timings)
+
+    timed_files = []
+    for d in audio_directories:
+        timed_files.extend(targeted_wav_finder(d, timings))
+
+    random.shuffle(timed_files)
+
+    #print timings
+    full_timings = {ffn: timings[fn] for fn, ffn in timed_files}
+
+    return all_classes, timed_files, full_timings
