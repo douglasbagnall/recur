@@ -32,6 +32,7 @@ enum
   PROP_HIDDEN_SIZE,
   PROP_MIN_FREQUENCY,
   PROP_MAX_FREQUENCY,
+  PROP_KNEE_FREQUENCY,
   PROP_MOMENTUM,
   PROP_MOMENTUM_STYLE,
   PROP_MOMENTUM_SOFT_START,
@@ -69,6 +70,7 @@ enum
 #define DEFAULT_PROP_MOMENTUM_SOFT_START 0.0f
 #define DEFAULT_PROP_MOMENTUM_STYLE 1
 #define DEFAULT_MIN_FREQUENCY 100
+#define DEFAULT_KNEE_FREQUENCY 700
 #define DEFAULT_MAX_FREQUENCY (CLASSIFY_RATE * 0.499)
 #define MINIMUM_AUDIO_FREQUENCY 0
 #define MAXIMUM_AUDIO_FREQUENCY (CLASSIFY_RATE * 0.5)
@@ -332,14 +334,21 @@ gst_classify_class_init (GstClassifyClass * klass)
           "Lowest audio frequency to analyse",
           MINIMUM_AUDIO_FREQUENCY, MAXIMUM_AUDIO_FREQUENCY,
           DEFAULT_MIN_FREQUENCY,
-          G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+          G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
+
+  g_object_class_install_property (gobject_class, PROP_MIN_FREQUENCY,
+      g_param_spec_float("knee-frequency", "knee-frequency",
+          "controls the focus of pitch",
+          MINIMUM_AUDIO_FREQUENCY, MAXIMUM_AUDIO_FREQUENCY,
+          DEFAULT_KNEE_FREQUENCY,
+          G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class, PROP_MAX_FREQUENCY,
       g_param_spec_float("max-frequency", "max-frequency",
           "Highest audio frequency to analyse",
           MINIMUM_AUDIO_FREQUENCY, MAXIMUM_AUDIO_FREQUENCY,
           DEFAULT_MAX_FREQUENCY,
-          G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+          G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class, PROP_LEARN_RATE,
       g_param_spec_float("learn-rate", "learn-rate",
@@ -611,12 +620,14 @@ gst_classify_setup(GstAudioFilter *base, const GstAudioInfo *info){
     float min_freq = get_gvalue_float(PENDING_PROP(self, PROP_MIN_FREQUENCY),
       DEFAULT_MIN_FREQUENCY);
     float max_freq = get_gvalue_float(PENDING_PROP(self, PROP_MAX_FREQUENCY),
-      DEFAULT_MIN_FREQUENCY);
+      DEFAULT_MAX_FREQUENCY);
+    float knee_freq = get_gvalue_float(PENDING_PROP(self, PROP_KNEE_FREQUENCY),
+      DEFAULT_KNEE_FREQUENCY);
 
     self->mfcc_factory = recur_audio_binner_new(self->window_size,
         RECUR_WINDOW_HANN,
         CLASSIFY_N_FFT_BINS,
-        min_freq, max_freq,
+        min_freq, max_freq, knee_freq,
         CLASSIFY_RATE,
         1.0f / 32768,
         CLASSIFY_VALUE_SIZE

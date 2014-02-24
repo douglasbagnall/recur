@@ -2,9 +2,6 @@
 #include "pgm_dump.h"
 #include "badmaths.h"
 
-#define HZ_TO_MEL(x) (1127.0f * logf(1.0f + (x) / 700.0f))
-#define MEL_TO_HZ(x) (700.0f * (expf((x) / 1127.0f) - 1.0f))
-
 #define POWER(x) (x.r * x.r + x.i * x.i)
 
 static float *
@@ -97,12 +94,18 @@ recur_extract_mfccs(RecurAudioBinner *ab, float *data){
 
 RecurAudioBinSlope * __attribute__((malloc))
 recur_bin_slopes_new(const int n_bins, const int fft_len,
-                     const float fmin, const float fmax,
+                     const float fmin, const float fmax, const float fknee,
                      const float audio_rate){
   const int n_slopes = n_bins + 1;
   RecurAudioBinSlope * slopes = malloc_aligned_or_die(n_slopes *
                                                       sizeof(RecurAudioBinSlope));
   int i;
+
+  /*usual scale is 1127 */
+#define MEL_SCALE 1127.0f
+#define HZ_TO_MEL(x) (MEL_SCALE * logf(1.0f + (x) / fknee))
+#define MEL_TO_HZ(x) (fknee * (expf((x) / MEL_SCALE) - 1.0f))
+
   float mmin = HZ_TO_MEL(fmin);
   float mmax = HZ_TO_MEL(fmax);
   float step = (mmax - mmin) / n_slopes;
@@ -126,6 +129,10 @@ recur_bin_slopes_new(const int n_bins, const int fft_len,
     }
     s->log_scale = logf(1.0f + right - left);
   }
+
+#undef HZ_TO_MEL
+#undef MEL_TO_HZ
+
   return slopes;
 }
 
@@ -252,6 +259,7 @@ recur_audio_binner_new(int window_size, int window_type,
     int n_bins,
     float min_freq,
     float max_freq,
+    float knee_freq,
     float audio_rate,
     float scale,
     int value_size /*1 for real, 2 for complex*/
@@ -273,6 +281,7 @@ recur_audio_binner_new(int window_size, int window_type,
       window_size / value_size,
       min_freq,
       max_freq,
+      knee_freq,
       audio_rate
   );
   mfcc_slopes_dump(ab);
