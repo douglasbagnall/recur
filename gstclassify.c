@@ -341,7 +341,7 @@ gst_classify_class_init (GstClassifyClass * klass)
           DEFAULT_MIN_FREQUENCY,
           G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
-  g_object_class_install_property (gobject_class, PROP_MIN_FREQUENCY,
+  g_object_class_install_property (gobject_class, PROP_KNEE_FREQUENCY,
       g_param_spec_float("knee-frequency", "knee-frequency",
           "controls the focus of pitch",
           MINIMUM_AUDIO_FREQUENCY, MAXIMUM_AUDIO_FREQUENCY,
@@ -1072,6 +1072,7 @@ gst_classify_set_property (GObject * object, guint prop_id, const GValue * value
       be changed afterwards go here.
     */
     case PROP_MIN_FREQUENCY:
+    case PROP_KNEE_FREQUENCY:
     case PROP_MAX_FREQUENCY:
     case PROP_CLASSES:
     case PROP_BOTTOM_LAYER:
