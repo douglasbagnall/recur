@@ -614,7 +614,7 @@ load_or_create_net(GstClassify *self){
     }
 
     if (diagonal_proportion){
-      rnn_emphasise_diagonal(net, 0.5, diagonal_proportion);
+      rnn_emphasise_diagonal(net, 0.4, diagonal_proportion);
     }
 
     net->bptt->ho_scale = top_learn_rate_scale;
