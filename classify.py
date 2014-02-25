@@ -361,6 +361,13 @@ class Trainer(BaseClassifier):
                     self.timestamp - starttime))
             self.classifier.set_property('learn_rate', r)
 
+
+        self.probability_sums = []
+        self.probability_counts = []
+        for j, group in enumerate(self.classes):
+            self.probability_sums.append({x:[0.0, 0.0] for x in group})
+            self.probability_counts.append({x:[0.0, 0.0] for x in group})
+
         self.next_set(self.trainers)
 
 
@@ -381,11 +388,14 @@ class Trainer(BaseClassifier):
             print target_string
 
 
-
     def evaluate_test(self):
-        print self.test_scores, self.classes, self.test_runs
+        #print self.test_scores, self.classes, self.test_runs
         colours = [COLOURS[x] for x in 'PPrRYYGGgCC']
-        for classes, score, runs in zip(self.classes, self.test_scores, self.test_runs):
+        for classes, score, runs, probs, pcounts in zip(self.classes,
+                                                        self.test_scores,
+                                                        self.test_runs,
+                                                        self.probability_sums,
+                                                        self.probability_counts):
             #classes is a string
             #score and runs are dicts indexed by chars in classes
             output = []
@@ -394,7 +404,7 @@ class Trainer(BaseClassifier):
             good_enough = 10 // len(classes)
 
             for c in classes:
-                print c, score, runs
+                #print c, score, runs
                 s = score[c]
                 r = runs[c]
                 if r:
@@ -410,10 +420,18 @@ class Trainer(BaseClassifier):
 
             rightness /= len(classes)
             winners /= float(len(classes))
-            output += (" %s%.2f%s %.2f%s" %
-                       (colours[int(rightness * 9.99)], rightness,
-                        colours[int(winners * 9.99)], winners,
-                        COLOURS['Z']))
+            output.append(" %s%.2f%s %.2f%s" %
+                          (colours[int(rightness * 9.99)], rightness,
+                           colours[int(winners * 9.99)], winners,
+                           COLOURS['Z']))
+
+            output.append(" probabilities (right/wrong)")
+            for x in classes:
+                wrong, right = probs[x]
+                wrong_c, right_c = pcounts[x]
+                output.append(" %s %.3f/%.3f " % (x, right / right_c,
+                                                  wrong / wrong_c))
+
             print ''.join(output)
             if winners > 0.9:
                 self.save_named_net(tag='goodness-%d-%d' %
@@ -464,9 +482,16 @@ class Trainer(BaseClassifier):
                 for j, group in enumerate(self.classes):
                     target = v('channel %d, group %d target' % (i, j))
                     correct = v('channel %d, group %d correct' % (i, j))
-                    #print group, target, correct
+                    #print group, target, correct, target in group
                     self.test_scores[j][target] += correct
                     self.test_runs[j][target] += 1
+                    for x in group:
+                        p = v('channel %d, group %d %s' % (i, j, x))
+                        #print x, target, p
+                        self.probability_sums[j][x][x == target] += p
+                        self.probability_counts[j][x][x == target] += 1.0
+
+
 
 def lr_steps(*args):
     args = list(args)
