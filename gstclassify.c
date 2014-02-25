@@ -49,6 +49,7 @@ enum
   PROP_WEIGHT_SPARSITY,
   PROP_WEIGHT_FAN_IN_SUM,
   PROP_WEIGHT_FAN_IN_KURTOSIS,
+  PROP_WEIGHT_DIAGONAL,
   PROP_LAWN_MOWER,
   PROP_RNG_SEED,
   PROP_BOTTOM_LAYER,
@@ -103,6 +104,10 @@ enum
 #define WEIGHT_SPARSITY_MAX 10
 #define DEFAULT_PROP_WEIGHT_FAN_IN_SUM 0
 #define DEFAULT_PROP_WEIGHT_FAN_IN_KURTOSIS 0.3
+#define DEFAULT_PROP_WEIGHT_DIAGONAL 0
+#define PROP_WEIGHT_DIAGONAL_MIN 0
+#define PROP_WEIGHT_DIAGONAL_MAX 1.0f
+
 #define PROP_WEIGHT_FAN_IN_SUM_MAX 99.0
 #define PROP_WEIGHT_FAN_IN_SUM_MIN 0.0
 #define PROP_WEIGHT_FAN_IN_KURTOSIS_MAX 1.5
@@ -394,6 +399,14 @@ gst_classify_class_init (GstClassifyClass * klass)
           DEFAULT_PROP_WEIGHT_FAN_IN_KURTOSIS,
           G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
+  g_object_class_install_property (gobject_class, PROP_WEIGHT_DIAGONAL,
+      g_param_spec_float("weight-diagonal", "weight-diagonal",
+          "add to this proportion of hidden to hidden self-weights",
+          PROP_WEIGHT_DIAGONAL_MIN,
+          PROP_WEIGHT_DIAGONAL_MAX,
+          DEFAULT_PROP_WEIGHT_DIAGONAL,
+          G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
+
   g_object_class_install_property (gobject_class, PROP_MOMENTUM_SOFT_START,
       g_param_spec_float("momentum-soft-start", "momentum-soft-start",
           "Ease into momentum over many generations",
@@ -580,6 +593,9 @@ load_or_create_net(GstClassify *self){
     float fan_in_kurtosis = GET_FLOAT(PROP_WEIGHT_FAN_IN_KURTOSIS,
         DEFAULT_PROP_WEIGHT_FAN_IN_KURTOSIS);
 
+    float diagonal_proportion = GET_FLOAT(PROP_WEIGHT_DIAGONAL,
+        DEFAULT_PROP_WEIGHT_DIAGONAL);
+
     u64 rng_seed = get_gvalue_u64(PENDING_PROP(self, PROP_RNG_SEED), DEFAULT_RNG_SEED);
     GST_DEBUG("rng seed %lu", rng_seed);
 
@@ -596,6 +612,11 @@ load_or_create_net(GstClassify *self){
       rnn_randomise_weights(net, RNN_INITIAL_WEIGHT_VARIANCE_FACTOR / net->h_size,
           weight_sparsity, 0.5);
     }
+
+    if (diagonal_proportion){
+      rnn_emphasise_diagonal(net, 0.5, diagonal_proportion);
+    }
+
     net->bptt->ho_scale = top_learn_rate_scale;
     if (net->bottom_layer){
       net->bottom_layer->learn_rate_scale = bottom_learn_rate_scale;
@@ -1060,6 +1081,7 @@ gst_classify_set_property (GObject * object, guint prop_id, const GValue * value
     case PROP_WEIGHT_SPARSITY:
     case PROP_WEIGHT_FAN_IN_SUM:
     case PROP_WEIGHT_FAN_IN_KURTOSIS:
+    case PROP_WEIGHT_DIAGONAL:
     case PROP_RNG_SEED:
       if (self->net == NULL){
         set_gvalue(PENDING_PROP(self, prop_id), value);

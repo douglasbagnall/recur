@@ -454,6 +454,16 @@ void rnn_perforate_weights(RecurNN *net, float p){
   dropout_array(net->ho_weights, net->ho_size, p, &net->rng);
 }
 
+void rnn_emphasise_diagonal(RecurNN *net, float magnitude, float proportion){
+  int i;
+  int n = MIN(net->hidden_size * proportion + net->bias, net->hidden_size);
+
+  for (i = net->bias; i < n; i++){
+    int offset = i * (net->h_size + 1);
+    net->ih_weights[offset] += rand_double(&net->rng) * 2 * magnitude - magnitude;
+  }
+}
+
 
 void
 rnn_scale_initial_weights(RecurNN *net, float factor){
