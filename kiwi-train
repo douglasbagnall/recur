@@ -48,11 +48,11 @@ def main():
         lr = lr_steps(args.learn_rate)
     else:
         lr = lr_steps(
-            #1e-4, 200,
-            1e-5, 20,
-            3e-6, 20,
-            1e-6, 40,
-            3e-7, 64,
+            3e-5, 20,
+            1e-5, 80,
+            3e-6, 100,
+            1e-6, 200,
+            3e-7, 400,
             1e-7, 2000,
             3e-8)
     if 0:
@@ -102,9 +102,11 @@ def main():
                         ('momentum', 0.95),
                         ('momentum-style', 1),
                         ('weight-fan-in-sum', 3),
-                        ('weight-fan-in-kurtosis', 0.1),
-                        ('min-frequency', 400),
+                        ('weight-fan-in-kurtosis', 0.15),
+                        ('min-frequency', 300),
+                        ('knee-frequency', 1100),
                         ('max-frequency', 3800),
+                        ('weight-diagonal', 0.5),
                         #('error-weight', '3:2'),
                     ))
 
