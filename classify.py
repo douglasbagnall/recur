@@ -124,12 +124,21 @@ class Classifier(BaseClassifier):
     data = []
     quiet = False
 
-    def classify(self, data):
+    def classify(self, data,
+                 ground_truth_file=None,
+                 classification_file=None, show_roc=False):
+        if ground_truth_file:
+            self.ground_truth_file = open(ground_truth_file, 'w')
+            self.ground_truth_index = (0, self.classes[0][-1])
+        if classification_file:
+            self.classification_file = open(classification_file, 'w')
+            self.classification_index = (0, self.classes[0][-1])
+
+        self.show_roc = show_roc
         self.all_results = []
         self.class_results = self.get_results_counter()
         self.data = list(reversed(data))
         self.classifier.set_property('training', False)
-        self.probabilities = self.get_results_counter(0)
         self.load_next_file()
         self.mainloop.run()
         return self.all_results
@@ -145,6 +154,9 @@ class Classifier(BaseClassifier):
         self.classifier.set_property('target', targets)
         self.file_results = [[] for x in self.classes]
         self.file_class_results = self.get_results_counter()
+        self.probabilities = self.get_results_counter(0)
+        self.ground_truth = self.get_results_counter(0)
+
         self.pipeline.set_state(Gst.State.PLAYING)
 
 
@@ -163,6 +175,9 @@ class Classifier(BaseClassifier):
             target = v(key + 'target')
             for k in group:
                 probs[k].append(v(key + k))
+                if self.ground_truth_file:
+                    self.ground_truth[i][k].append(k == target)
+
             group[target][correct] += 1
             f_group[target][correct] += 1
             self.file_results[i].append((target, correct))
@@ -279,10 +294,26 @@ class Classifier(BaseClassifier):
 
     def on_eos(self, bus, msg):
         #self.report()
+        fn = os.path.basename(self.current_file)
+        if self.ground_truth_file:
+            i, k = self.ground_truth_index
+            a = [fn] + ['%d' % x for x in self.ground_truth[i][k]]
+            print >>self.ground_truth_file, ','.join(a)
+            print "ground truth len %s" % len(self.ground_truth[i][k])
+
+        if self.classification_file:
+            i, k = self.ground_truth_index
+            a = [fn] + ['%.5g' % x for x in self.probabilities[i][k]]
+            print >>self.classification_file, ','.join(a)
+            print "classification len %s" % len(self.probabilities[i][k])
+
+
         if not self.data:
-            self.show_roc_curve()
+            if self.show_roc:
+                self.show_roc_curve()
             self.stop()
         else:
+
             self.load_next_file()
 
 

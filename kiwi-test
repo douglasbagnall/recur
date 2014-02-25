@@ -36,6 +36,12 @@ def main():
                         help="number of hidden neurons")
     parser.add_argument('-B', '--bottom-layer', type=int,
                         help="number of bottom layer output nodes")
+    parser.add_argument('--ground-truth-file',
+                        help="write ground truth to this file (CSV)")
+    parser.add_argument('--classification-file',
+                        help="write classifications to this file")
+    parser.add_argument('--roc', action='store_true',
+                        help="show ROC curves")
 
     args = parser.parse_args()
 
@@ -48,13 +54,14 @@ def main():
     c = Classifier(mfccs=MFCCS,
                    hsize=args.hidden_size,
                    channels=1,
-                   classes=args.classes,
+                   classes=all_classes,
                    window_size=WINDOW_SIZE,
                    basename=BASENAME)
     c.quiet = not args.verbose
     if args.bottom_layer:
         c.classifier.set_property('bottom-layer', args.bottom_layer)
 
-    c.classify(test_files)
+    c.classify(test_files, ground_truth_file=args.ground_truth_file,
+               classification_file=args.classification_file, show_roc=args.roc)
 
 main()
