@@ -622,10 +622,10 @@ load_or_create_net(GstClassify *self){
       net->bottom_layer->learn_rate_scale = bottom_learn_rate_scale;
     }
     if (PERIODIC_PGM_DUMP){
-      rnn_multi_pgm_dump(net, "how ihw iha biw bid");
+      rnn_multi_pgm_dump(net, "how ihw biw");
     }
   }
-  if (net->bottom_layer){
+  if (net->bottom_layer && 0){
     self->error_image = temporal_ppm_alloc(net->bottom_layer->o_size, 300, "bottom_error",
         0, PGM_DUMP_COLOUR, &net->bottom_layer->o_error);
   }
@@ -1413,7 +1413,7 @@ maybe_learn(GstClassify *self){
 
     /*XXX periodic_pgm_dump and image string should be gst properties */
     if (PERIODIC_PGM_DUMP && net->generation % PERIODIC_PGM_DUMP == 0){
-      rnn_multi_pgm_dump(net, "how ihw iha biw bid");
+      rnn_multi_pgm_dump(net, "how ihw biw");
     }
     float momentum = rnn_calculate_momentum_soft_start(net->generation,
         net->bptt->momentum, self->momentum_soft_start);
