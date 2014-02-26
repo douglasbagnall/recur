@@ -589,18 +589,21 @@ class GTKClassifier(BaseClassifier):
         p.seek_simple(Gst.Format.TIME, 0, then)
 
 
-def load_binary_timings(fn, all_classes, default_state=0):
+def load_binary_timings(fn, all_classes, default_state=0, classes=None):
     #all_classes is a sequence of class groups. Each group of
     #all_classes is a string of characters. By default the first one
     #is used, but if a line like 'group: Xxy' comes along, the the
     #group represented by Xxy is used.
 
-    #start with classes[1], first time switches to classes[0],
+    #start with classes[0], first time switches to classes[1],
     #alternating thereafter
     f = open(fn)
     timings = {}
     group = 0
-    classes = all_classes[0]
+    if classes == None:
+        classes = all_classes[0]
+
+    print "loading %s with classes %s" % (fn, classes)
     target_string = 'c%%dt%s:%s'
     group_string = '%s' + '=' * (len(all_classes) - 1)
     def add_event(state, t):
@@ -644,10 +647,16 @@ def targeted_wav_finder(d, files):
 
 
 def load_timings(class_string, timing_files, audio_directories):
-    all_classes = class_string.split('|')
+    all_classes = class_string.split(',')
     timings = {}
     for fn in timing_files:
-        timings.update(load_binary_timings(fn, all_classes))
+        classes = None
+        if ',' in fn:
+            fn, classes = fn.rsplit(',', 1)
+            if classes not in all_classes:
+                classes = None
+        timings.update(load_binary_timings(fn, all_classes, classes=classes))
+
     #timings = coalesce_timings(timings)
 
     timed_files = []
