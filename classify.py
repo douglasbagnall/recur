@@ -460,8 +460,9 @@ class Trainer(BaseClassifier):
             for x in classes:
                 wrong, right = probs[x]
                 wrong_c, right_c = pcounts[x]
-                output.append(" %s %.3f/%.3f " % (x, right / right_c,
-                                                  wrong / wrong_c))
+                right_p = right / right_c if right_c else float('nan')
+                wrong_p = wrong / wrong_c if wrong_c else float('nan')
+                output.append(" %s %.3f/%.3f " % (x, right_p, wrong_p))
 
             print ''.join(output)
             if winners > 0.9:
