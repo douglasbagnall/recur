@@ -571,8 +571,12 @@ class GTKClassifier(BaseClassifier):
             #target = v('channel 0 target')
             #print correct, winner, target, winner == target
             #print s.to_string()
-            scores = tuple(-v('channel 0, output %d' % (j))
-                           for j in range(len(self.classes)))
+            scores = []
+            for j, group in enumerate(self.classes):
+                for x in group:
+                    scores.extend(-v('channel 0, group %d %s' % (j, x))
+                                  for j in range(len(self.classes)))
+
             self.widget.notify_results((winner, scores))
 
     def on_eos(self, bus, msg):
