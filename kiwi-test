@@ -20,14 +20,12 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('-v', '--verbose', action='store_true',
                         help='lots of rubbish output')
-    parser.add_argument('-x', '--no-roc', action='store_true',
-                        help='no ROC curves')
     parser.add_argument('-t', '--timings', action='append',
                         help='read timings from here')
     parser.add_argument('-d', '--audio-directory', action='append',
                         help='find audio in this directory')
     parser.add_argument('-c', '--classes', default='tf',
-                        help="classes (letter per class, groups separated by '|')")
+                        help="classes (letter per class, groups separated by ',')")
     parser.add_argument('-C', '--first-n', type=int, default=12,
                         help="classify this many files")
     parser.add_argument('-i', '--iterations', type=int, default=10000,
