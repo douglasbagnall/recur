@@ -101,7 +101,7 @@ recur_bin_slopes_new(const int n_bins, const int fft_len,
                                                       sizeof(RecurAudioBinSlope));
   int i;
 
-  /*usual scale is 1127 */
+  /*usual scale is 1127, but it really doesn't matter */
 #define MEL_SCALE 1127.0f
 #define HZ_TO_MEL(x) (MEL_SCALE * logf(1.0f + (x) / fknee))
 #define MEL_TO_HZ(x) (fknee * (expf((x) / MEL_SCALE) - 1.0f))
