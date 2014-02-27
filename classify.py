@@ -123,7 +123,8 @@ class BaseClassifier(object):
 class Classifier(BaseClassifier):
     data = []
     quiet = False
-
+    ground_truth_file = None
+    classification_file = None
     def classify(self, data,
                  ground_truth_file=None,
                  classification_file=None, show_roc=False):
