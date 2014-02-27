@@ -150,7 +150,6 @@ class Classifier(BaseClassifier):
         targets = ' '.join(x[3] % 0 for x in timings)
         #print fn, targets
         self.current_file = fn
-        self.classifier.set_property("forget", 0)
         self.filesrcs[0].set_property('location', fn)
         self.classifier.set_property('target', targets)
         self.file_results = [[] for x in self.classes]
@@ -553,7 +552,6 @@ class GTKClassifier(BaseClassifier):
     def load_next_file(self):
         self.pipeline.set_state(Gst.State.READY)
         fn = self.pending_files.pop()
-        self.classifier.set_property("forget", True)
         self.filesrcs[0].set_property('location', fn)
         print fn
         self.pipeline.set_state(Gst.State.PLAYING)
