@@ -26,7 +26,7 @@ def main():
                         help='find audio in this directory')
     parser.add_argument('-c', '--classes', default='tf',
                         help="classes (letter per class, groups separated by ',')")
-    parser.add_argument('-C', '--first-n', type=int, default=12,
+    parser.add_argument('-C', '--first-n', type=int, default=0,
                         help="classify this many files")
     parser.add_argument('-i', '--iterations', type=int, default=10000,
                         help="how many file cycles to run for")
@@ -47,7 +47,9 @@ def main():
                                                           args.timings,
                                                           args.audio_directory)
 
-    test_files = [(ffn, full_timings[ffn]) for fn, ffn in timed_files[:args.first_n]]
+    if args.first_n:
+        timed_files = timed_files[:args.first_n]
+    test_files = [(ffn, full_timings[ffn]) for fn, ffn in timed_files]
 
     c = Classifier(mfccs=MFCCS,
                    hsize=args.hidden_size,

@@ -300,13 +300,11 @@ class Classifier(BaseClassifier):
             i, k = self.ground_truth_index
             a = [fn] + ['%d' % x for x in self.ground_truth[i][k]]
             print >>self.ground_truth_file, ','.join(a)
-            print "ground truth len %s" % len(self.ground_truth[i][k])
 
         if self.classification_file:
             i, k = self.ground_truth_index
             a = [fn] + ['%.5g' % x for x in self.probabilities[i][k]]
             print >>self.classification_file, ','.join(a)
-            print "classification len %s" % len(self.probabilities[i][k])
 
 
         if not self.data:
@@ -314,7 +312,6 @@ class Classifier(BaseClassifier):
                 self.show_roc_curve()
             self.stop()
         else:
-
             self.load_next_file()
 
 
