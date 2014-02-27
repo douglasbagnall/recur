@@ -40,6 +40,8 @@ def main():
                         help="write classifications to this file")
     parser.add_argument('--roc', action='store_true',
                         help="show ROC curves")
+    parser.add_argument('-n', '--basename', default=BASENAME,
+                        help="save nets etc using this basename")
 
     args = parser.parse_args()
 
@@ -56,7 +58,7 @@ def main():
                    channels=1,
                    classes=all_classes,
                    window_size=WINDOW_SIZE,
-                   basename=BASENAME)
+                   basename=args.basename)
     c.quiet = not args.verbose
     if args.bottom_layer:
         c.classifier.set_property('bottom-layer', args.bottom_layer)
