@@ -6,6 +6,8 @@
 
 const char *FORMAT_VERSION = "save_format_version";
 
+const uint MAX_METADATA_SIZE = 100 * 1000 * 1000;
+
 int
 rnn_save_net(RecurNN *net, const char *filename, int backup){
   MAYBE_DEBUG("saving net at generation %d", net->generation);
@@ -77,7 +79,10 @@ rnn_save_net(RecurNN *net, const char *filename, int backup){
   SAVE_ARRAY(net, output_layer, net->o_size);
   SAVE_ARRAY(net, ih_weights, net->ih_size);
   SAVE_ARRAY(net, ho_weights, net->ho_size);
-
+  if (net->metadata){
+    size_t slen = strlen(net->metadata) + 1;
+    SAVE_ARRAY(net, metadata, slen);
+  }
   if ((net->flags & RNN_NET_FLAG_OWN_BPTT) && net->bptt){
     RecurNNBPTT *bptt = net->bptt;
     SAVE_SCALAR(bptt, depth);
@@ -302,12 +307,30 @@ rnn_load_net(const char *filename){
     cdb_bread(fd, obj->attr, size);                                     \
   } while (0)
 
+#define READ_FREE_SIZE_ARRAY(obj, attr, max_size) do {                  \
+    char *key = QUOTE(obj) "." QUOTE(attr);                             \
+    ret = cdb_seek(fd, key, strlen(key), &vlen);                        \
+    if (ret < 1){ DEBUG("error %d loading '%s'", ret, key);             \
+      goto error;}                                                      \
+    if (vlen > max_size) {                                              \
+      DEBUG("size of '%s'(%u) exceeds maximum %u",                      \
+          key, vlen, max_size);                                         \
+      goto error;                                                       \
+    }                                                                   \
+    obj->attr = malloc_aligned_or_die(vlen + sizeof(obj->attr[0]));     \
+    cdb_bread(fd, obj->attr, vlen);                                     \
+    obj->attr[vlen] = 0; /*for strings, restoring terminating \0 */     \
+  } while (0)
+
+
   READ_ARRAY(net, input_layer, net->i_size * sizeof(float));
   READ_ARRAY(net, hidden_layer, net->h_size * sizeof(float));
   READ_ARRAY(net, output_layer, net->o_size * sizeof(float));
   READ_ARRAY(net, ih_weights, net->ih_size * sizeof(float));
   READ_ARRAY(net, ho_weights, net->ho_size * sizeof(float));
-
+  if (net->metadata){
+    READ_FREE_SIZE_ARRAY(net, metadata, MAX_METADATA_SIZE);
+  }
   if(bptt){
     READ_ARRAY(bptt, i_error, net->i_size * sizeof(float));
     READ_ARRAY(bptt, h_error, net->h_size * sizeof(float));
@@ -322,6 +345,7 @@ rnn_load_net(const char *filename){
     /*not restoring full state (momentums etc) */
   }
 #undef READ_ARRAY
+#undef READ_FREE_SIZE_ARRAY
   close(fd);
   DEBUG("successfully loaded net '%s'", filename);
   return net;

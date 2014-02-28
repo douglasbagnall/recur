@@ -139,6 +139,7 @@ struct _RecurNN {
   RecurNNBPTT *bptt; /*training struct*/
   RecurExtraLayer *bottom_layer;
   u32 generation;
+  char *metadata;
 };
 
 struct _RecurNNBPTT {
