@@ -297,6 +297,7 @@ gst_parrot_setup(GstAudioFilter *base, const GstAudioInfo *info){
         PARROT_N_FFT_BINS,
         PARROT_MFCC_MIN_FREQ,
         PARROT_MFCC_MAX_FREQ,
+        PARROT_MFCC_KNEE_FREQ,
         PARROT_RATE,
         1.0f,
         PARROT_VALUE_SIZE
