@@ -552,20 +552,21 @@ construct_metadata(GstClassify *self){
   char *metadata = malloc_aligned_or_die(alloc_bytes);
   char *s = metadata;
   char *e = metadata + alloc_bytes;
-  s += add_metadata_item_string(s, e - s, "classes",
-      PENDING_PROP(self, PROP_CLASSES), DEFAULT_PROP_CLASSES);
-  s += add_metadata_item_float(s, e - s, "min-frequency",
-      PENDING_PROP(self, PROP_MIN_FREQUENCY), DEFAULT_MIN_FREQUENCY);
-  s += add_metadata_item_float(s, e - s, "max-frequency",
-      PENDING_PROP(self, PROP_MAX_FREQUENCY), DEFAULT_MAX_FREQUENCY);
-  s += add_metadata_item_float(s, e - s, "knee-frequency",
-      PENDING_PROP(self, PROP_KNEE_FREQUENCY), DEFAULT_KNEE_FREQUENCY);
-  s += add_metadata_item_int(s, e - s, "mfccs",
-      PENDING_PROP(self, PROP_MFCCS), DEFAULT_PROP_MFCCS);
-  s += add_metadata_item_int(s, e - s, "window-size",
-      PENDING_PROP(self, PROP_WINDOW_SIZE), DEFAULT_WINDOW_SIZE);
-  s += add_metadata_item_string(s, e - s, "basename",
-      PENDING_PROP(self, PROP_BASENAME), DEFAULT_BASENAME);
+  s += METADATA_ADD_PP_STRING(self, s, e - s, "classes",
+      PROP_CLASSES, DEFAULT_PROP_CLASSES);
+  s += METADATA_ADD_PP_FLOAT(self, s, e - s, "min-frequency",
+      PROP_MIN_FREQUENCY, DEFAULT_MIN_FREQUENCY);
+  s += METADATA_ADD_PP_FLOAT(self, s, e - s, "max-frequency",
+      PROP_MAX_FREQUENCY, DEFAULT_MAX_FREQUENCY);
+  s += METADATA_ADD_PP_FLOAT(self, s, e - s, "knee-frequency",
+      PROP_KNEE_FREQUENCY, DEFAULT_KNEE_FREQUENCY);
+  s += METADATA_ADD_DIRECT_INT(s, e - s, "mfccs",
+      self->mfccs);
+  s += METADATA_ADD_DIRECT_INT(s, e - s, "window-size",
+      self->window_size);
+  s += METADATA_ADD_DIRECT_STRING(s, e - s, "basename",
+      self->basename);
+
   metadata = realloc(metadata, e - s + 2);
   STDERR_DEBUG("%s", metadata);
   return metadata;
@@ -574,15 +575,11 @@ construct_metadata(GstClassify *self){
 static RecurNN *
 load_or_create_net(GstClassify *self){
   char *metadata = construct_metadata(self);
-
-#define GET_FLOAT(id, _default) get_gvalue_float(PENDING_PROP(self, id), _default)
-#define GET_INT(id, _default) get_gvalue_int(PENDING_PROP(self, id), _default)
-
-  int hidden_size = GET_INT(PROP_HIDDEN_SIZE, DEFAULT_HIDDEN_SIZE);
-  int bottom_layer_size = GET_INT(PROP_BOTTOM_LAYER, 0);
+  int hidden_size = PP_GET_INT(self, PROP_HIDDEN_SIZE, DEFAULT_HIDDEN_SIZE);
+  int bottom_layer_size = PP_GET_INT(self, PROP_BOTTOM_LAYER, 0);
 
   int top_layer_size = parse_classes_string(self,
-      get_gvalue_string(PENDING_PROP(self, PROP_CLASSES)));
+      get_gvalue_string(PENDING_PROP(self, PROP_CLASSES), DEFAULT_PROP_CLASSES));
 
   if (self->net_filename == NULL){
     reset_net_filename(self, hidden_size, bottom_layer_size, top_layer_size, metadata);
@@ -598,7 +595,7 @@ load_or_create_net(GstClassify *self){
       rnn_delete_net(net);
       net = NULL;
     }
-    if (strcmp(net->metadata, metadata)){
+    if (! net->metadata || strcmp(net->metadata, metadata)){
       GST_WARNING("The loaded net metadata doesn't match");
       GST_WARNING("calculated metadata:\n%s\n", metadata);
       GST_WARNING("loaded metadata:\n%s\n", net->metadata);
@@ -618,31 +615,28 @@ load_or_create_net(GstClassify *self){
       flags &= ~RNN_COND_USE_LAWN_MOWER;
     }
 
-    int weight_sparsity = GET_INT(PROP_WEIGHT_SPARSITY, DEFAULT_PROP_WEIGHT_SPARSITY);
-    int bptt_depth = GET_INT(PROP_BPTT_DEPTH, DEFAULT_PROP_BPTT_DEPTH);
+    int weight_sparsity = PP_GET_INT(self, PROP_WEIGHT_SPARSITY, DEFAULT_PROP_WEIGHT_SPARSITY);
+    int bptt_depth = PP_GET_INT(self, PROP_BPTT_DEPTH, DEFAULT_PROP_BPTT_DEPTH);
 
-    float momentum = GET_FLOAT(PROP_MOMENTUM, DEFAULT_PROP_MOMENTUM);
-    float learn_rate = GET_FLOAT(PROP_LEARN_RATE, DEFAULT_LEARN_RATE);
+    float momentum = PP_GET_FLOAT(self, PROP_MOMENTUM, DEFAULT_PROP_MOMENTUM);
+    float learn_rate = PP_GET_FLOAT(self, PROP_LEARN_RATE, DEFAULT_LEARN_RATE);
 
-    float bottom_learn_rate_scale = GET_FLOAT(PROP_BOTTOM_LEARN_RATE_SCALE,
+    float bottom_learn_rate_scale = PP_GET_FLOAT(self, PROP_BOTTOM_LEARN_RATE_SCALE,
         DEFAULT_BOTTOM_LEARN_RATE_SCALE);
-    float top_learn_rate_scale = GET_FLOAT(PROP_TOP_LEARN_RATE_SCALE,
+    float top_learn_rate_scale = PP_GET_FLOAT(self, PROP_TOP_LEARN_RATE_SCALE,
         DEFAULT_TOP_LEARN_RATE_SCALE);
 
-    float fan_in_sum = GET_FLOAT(PROP_WEIGHT_FAN_IN_SUM,
+    float fan_in_sum = PP_GET_FLOAT(self, PROP_WEIGHT_FAN_IN_SUM,
         DEFAULT_PROP_WEIGHT_FAN_IN_SUM);
 
-    float fan_in_kurtosis = GET_FLOAT(PROP_WEIGHT_FAN_IN_KURTOSIS,
+    float fan_in_kurtosis = PP_GET_FLOAT(self, PROP_WEIGHT_FAN_IN_KURTOSIS,
         DEFAULT_PROP_WEIGHT_FAN_IN_KURTOSIS);
 
-    float diagonal_proportion = GET_FLOAT(PROP_WEIGHT_DIAGONAL,
+    float diagonal_proportion = PP_GET_FLOAT(self, PROP_WEIGHT_DIAGONAL,
         DEFAULT_PROP_WEIGHT_DIAGONAL);
 
     u64 rng_seed = get_gvalue_u64(PENDING_PROP(self, PROP_RNG_SEED), DEFAULT_RNG_SEED);
     GST_DEBUG("rng seed %lu", rng_seed);
-
-#undef GET_FLOAT
-#undef GET_INT
 
     net = rnn_new_with_bottom_layer(n_features, bottom_layer_size, hidden_size,
         top_layer_size, flags, rng_seed,
@@ -977,7 +971,7 @@ maybe_parse_error_weight_string(GstClassify *self){
 
 static void
 maybe_start_logging(GstClassify *self){
-  const char *s = get_gvalue_string(PENDING_PROP(self, PROP_LOG_FILE));
+  const char *s = get_gvalue_string(PENDING_PROP(self, PROP_LOG_FILE), NULL);
   GST_DEBUG("pending log '%s'; subnets is %p", s, self->subnets);
   if (s && self->subnets){
     if (s[0] == 0){

@@ -3,6 +3,9 @@
 #include <string.h>
 
 #define PENDING_PROP(self, prop) (&(self)->pending_properties[prop])
+#define PP_GET_FLOAT(self, id, def) get_gvalue_float(PENDING_PROP(self, id), def)
+#define PP_GET_INT(self, id, def) get_gvalue_int(PENDING_PROP(self, id), def)
+#define PP_GET_STRING(self, id, def) get_gvalue_string(PENDING_PROP(self, id), def)
 
 static inline void
 set_gvalue(GValue *dest, const GValue *src)
@@ -17,9 +20,9 @@ set_gvalue(GValue *dest, const GValue *src)
 }
 
 static inline const char *
-get_gvalue_string(GValue *v){
+get_gvalue_string(GValue *v, const char *_default){
   if (! G_VALUE_HOLDS_STRING(v)){
-    return NULL;
+    return _default;
   }
   return g_value_get_string(v);
 }
@@ -66,49 +69,14 @@ steal_gvalue_string(GValue *v){
   return s;
 }
 
-static inline int
-add_metadata_item(char *metadata, size_t len, const char *name, const GValue *v){
-  char *vs = gst_value_serialize(v);
-  int consumed = snprintf(metadata, len, "%s: %s\n", name, vs);
-  g_free(vs);
-  return consumed; /*NOT counting the final zero*/
-}
+#define METADATA_ADD_DIRECT_STRING(metadata, len, name, value) \
+  snprintf(metadata, len, "%s: %s\n", name, value)
+#define METADATA_ADD_DIRECT_INT(metadata, len, name, value) \
+  snprintf(metadata, len, "%s: %d\n", name, value)
 
-static inline int
-add_metadata_item_float(char *metadata, size_t len, const char *name,
-    GValue *v, float _default){
-  if (! G_VALUE_HOLDS_FLOAT(v)){
-    g_value_init(v, G_TYPE_FLOAT);
-    g_value_set_float(v, _default);
-  }
-  char *vs = gst_value_serialize(v);
-  int consumed = snprintf(metadata, len, "%s: %s\n", name, vs);
-  g_free(vs);
-  return consumed; /*NOT counting the final zero*/
-}
-
-static inline int
-add_metadata_item_int(char *metadata, size_t len, const char *name,
-    GValue *v, int _default){
-  if (! G_VALUE_HOLDS_INT(v)){
-    g_value_init(v, G_TYPE_INT);
-    g_value_set_int(v, _default);
-  }
-  char *vs = gst_value_serialize(v);
-  int consumed = snprintf(metadata, len, "%s: %s\n", name, vs);
-  g_free(vs);
-  return consumed; /*NOT counting the final zero*/
-}
-
-static inline int
-add_metadata_item_string(char *metadata, size_t len, const char *name,
-    GValue *v, const char *_default){
-  if (! G_VALUE_HOLDS_STRING(v)){
-    g_value_init(v, G_TYPE_STRING);
-    g_value_set_string(v, _default);
-  }
-  char *vs = gst_value_serialize(v);
-  int consumed = snprintf(metadata, len, "%s: %s\n", name, vs);
-  g_free(vs);
-  return consumed; /*NOT counting the final zero*/
-}
+#define METADATA_ADD_PP_STRING(self, metadata, len, name, prop_id, _default) \
+  snprintf(metadata, len, "%s: %s\n", name, PP_GET_STRING(self, prop_id, _default))
+#define METADATA_ADD_PP_INT(self, metadata, len, name, prop_id, _default)   \
+  snprintf(metadata, len, "%s: %d\n", name, PP_GET_INT(self, prop_id, _default))
+#define METADATA_ADD_PP_FLOAT(self, metadata, len, name, prop_id, _default) \
+  snprintf(metadata, len, "%s: %f\n", name, PP_GET_FLOAT(self, prop_id, _default))
