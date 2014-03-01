@@ -479,10 +479,8 @@ gst_classify_init (GstClassify * self)
   self->class_events = NULL;
   self->class_events_index = 0;
   self->n_class_events = 0;
-  self->window_size = DEFAULT_WINDOW_SIZE;
   self->momentum_soft_start = DEFAULT_PROP_MOMENTUM_SOFT_START;
   self->dropout = DEFAULT_PROP_DROPOUT;
-  self->basename = strdup(DEFAULT_BASENAME);
   self->error_weight = NULL;
   GST_INFO("gst classify init\n");
 }
@@ -560,12 +558,12 @@ construct_metadata(GstClassify *self){
       PROP_MAX_FREQUENCY, DEFAULT_MAX_FREQUENCY);
   s += METADATA_ADD_PP_FLOAT(self, s, e - s, "knee-frequency",
       PROP_KNEE_FREQUENCY, DEFAULT_KNEE_FREQUENCY);
-  s += METADATA_ADD_DIRECT_INT(s, e - s, "mfccs",
-      self->mfccs);
-  s += METADATA_ADD_DIRECT_INT(s, e - s, "window-size",
-      self->window_size);
-  s += METADATA_ADD_DIRECT_STRING(s, e - s, "basename",
-      self->basename);
+  s += METADATA_ADD_PP_INT(self, s, e - s, "mfccs",
+      PROP_MFCCS, DEFAULT_PROP_MFCCS);
+  s += METADATA_ADD_PP_INT(self, s, e - s, "window-size",
+      PROP_WINDOW_SIZE, DEFAULT_WINDOW_SIZE);
+  s += METADATA_ADD_PP_STRING(self, s, e - s, "basename",
+      PROP_BASENAME, DEFAULT_BASENAME);
 
   metadata = realloc(metadata, e - s + 2);
   STDERR_DEBUG("%s", metadata);
@@ -673,13 +671,14 @@ static gboolean
 gst_classify_setup(GstAudioFilter *base, const GstAudioInfo *info){
   GST_INFO("gst_classify_setup\n");
   GstClassify *self = GST_CLASSIFY(base);
+  self->window_size = PP_GET_INT(self, PROP_WINDOW_SIZE, DEFAULT_WINDOW_SIZE);
+  self->mfccs = PP_GET_INT(self, PROP_MFCCS, DEFAULT_PROP_MFCCS);
+  self->basename = PP_GET_STRING(self, PROP_BASENAME, DEFAULT_BASENAME);
+
   if (self->mfcc_factory == NULL){
-    float min_freq = get_gvalue_float(PENDING_PROP(self, PROP_MIN_FREQUENCY),
-      DEFAULT_MIN_FREQUENCY);
-    float max_freq = get_gvalue_float(PENDING_PROP(self, PROP_MAX_FREQUENCY),
-      DEFAULT_MAX_FREQUENCY);
-    float knee_freq = get_gvalue_float(PENDING_PROP(self, PROP_KNEE_FREQUENCY),
-      DEFAULT_KNEE_FREQUENCY);
+    float min_freq = PP_GET_FLOAT(self, PROP_MIN_FREQUENCY, DEFAULT_MIN_FREQUENCY);
+    float max_freq = PP_GET_FLOAT(self, PROP_MAX_FREQUENCY, DEFAULT_MAX_FREQUENCY);
+    float knee_freq = PP_GET_FLOAT(self, PROP_KNEE_FREQUENCY, DEFAULT_KNEE_FREQUENCY);
 
     self->mfcc_factory = recur_audio_binner_new(self->window_size,
         RECUR_WINDOW_HANN,
@@ -1043,11 +1042,6 @@ gst_classify_set_property (GObject * object, guint prop_id, const GValue * value
       }
       break;
 
-    case PROP_BASENAME:
-      free(self->basename);
-      self->basename = g_value_dup_string(value);
-      break;
-
     case PROP_SAVE_NET:
       strvalue = g_value_get_string(value);
       if (self->net){
@@ -1095,6 +1089,8 @@ gst_classify_set_property (GObject * object, guint prop_id, const GValue * value
       self->momentum_style = g_value_get_int(value);
       break;
 
+      /*These ones affect the net directly if the net exists. Otherwise they
+        need to be stored as pending properties.*/
     case PROP_TOP_LEARN_RATE_SCALE:
     case PROP_BOTTOM_LEARN_RATE_SCALE:
     case PROP_LEARN_RATE:
@@ -1104,6 +1100,7 @@ gst_classify_set_property (GObject * object, guint prop_id, const GValue * value
     /*properties that only need to be stored until net creation, and can't
       be changed afterwards go here.
     */
+    case PROP_BASENAME:
     case PROP_MIN_FREQUENCY:
     case PROP_KNEE_FREQUENCY:
     case PROP_MAX_FREQUENCY:
@@ -1117,6 +1114,9 @@ gst_classify_set_property (GObject * object, guint prop_id, const GValue * value
     case PROP_WEIGHT_FAN_IN_KURTOSIS:
     case PROP_WEIGHT_DIAGONAL:
     case PROP_RNG_SEED:
+    case PROP_WINDOW_SIZE:
+    case PROP_MFCCS:
+
       if (self->net == NULL){
         set_gvalue(PENDING_PROP(self, prop_id), value);
       }
@@ -1124,29 +1124,6 @@ gst_classify_set_property (GObject * object, guint prop_id, const GValue * value
         GST_WARNING("it is TOO LATE to set %s.", pspec->name);
       }
       break;
-
-      /*these next ones have no effect if set late (after net creation)
-       */
-
-#define SET_INT_IF_NOT_TOO_LATE(attr, name) do {                        \
-        if (self->net == NULL){                                         \
-          self->attr = g_value_get_int(value);                          \
-        }                                                               \
-        else {                                                          \
-          GST_WARNING("it is TOO LATE to set " name                     \
-              " (is %d, requested %d)", self->attr,                     \
-              g_value_get_int(value));                                  \
-        }} while (0)
-
-    case PROP_WINDOW_SIZE:
-      SET_INT_IF_NOT_TOO_LATE(window_size, "audio window size");
-      break;
-
-    case PROP_MFCCS:
-      SET_INT_IF_NOT_TOO_LATE(mfccs, "number of MFCCs");
-      break;
-
-#undef SET_INT_IF_NOT_TOO_LATE
 
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);

@@ -283,7 +283,7 @@ rnn_load_net(const char *filename){
     }
   }
 
-  if (net->bottom_layer && 0){
+  if (net->bottom_layer && 0){//XXX
     CHECK_SCALAR(net->bottom_layer, tmpbl, input_size);
     CHECK_SCALAR(net->bottom_layer, tmpbl, output_size);
     CHECK_SCALAR(net->bottom_layer, tmpbl, i_size);
