@@ -69,11 +69,6 @@ steal_gvalue_string(GValue *v){
   return s;
 }
 
-#define METADATA_ADD_DIRECT_STRING(metadata, len, name, value) \
-  snprintf(metadata, len, "%s: %s\n", name, value)
-#define METADATA_ADD_DIRECT_INT(metadata, len, name, value) \
-  snprintf(metadata, len, "%s: %d\n", name, value)
-
 #define METADATA_ADD_PP_STRING(self, metadata, len, name, prop_id, _default) \
   snprintf(metadata, len, "%s: %s\n", name, PP_GET_STRING(self, prop_id, _default))
 #define METADATA_ADD_PP_INT(self, metadata, len, name, prop_id, _default)   \
