@@ -490,17 +490,22 @@ gst_classify_init (GstClassify * self)
 
 static void
 reset_net_filename(GstClassify *self, int hidden_size, int bottom_layer,
-    int top_layer_size){
+    int top_layer_size, char *metadata){
   char s[200];
+  uint sig = 0;
+  uint len = strlen(metadata);
+  for (uint i = 0; i < len; i++){
+    sig ^= ROTATE(sig - metadata[i], 13) + metadata[i];
+  }
   int n_features = self->mfccs ? self->mfccs : CLASSIFY_N_FFT_BINS;
   if (bottom_layer > 0){
-    snprintf(s, sizeof(s), "%s-i%d-b%d-h%d-o%d-b%d-%dHz-w%d.net",
-        self->basename, n_features, bottom_layer, hidden_size, top_layer_size,
+    snprintf(s, sizeof(s), "%s-%0x-i%d-b%d-h%d-o%d-b%d-%dHz-w%d.net",
+        self->basename, sig, n_features, bottom_layer, hidden_size, top_layer_size,
         CLASSIFY_BIAS, CLASSIFY_RATE, self->window_size);
   }
   else {
-    snprintf(s, sizeof(s), "%s-i%d-h%d-o%d-b%d-%dHz-w%d.net",
-        self->basename, n_features, hidden_size, top_layer_size,
+    snprintf(s, sizeof(s), "%s-%0x-i%d-h%d-o%d-b%d-%dHz-w%d.net",
+        self->basename, sig, n_features, hidden_size, top_layer_size,
         CLASSIFY_BIAS, CLASSIFY_RATE, self->window_size);
   }
   if (self->net_filename){
@@ -541,25 +546,65 @@ static int parse_classes_string(GstClassify *self, const char *orig)
   return offset;
 }
 
+static char*
+construct_metadata(GstClassify *self){
+  int alloc_bytes = 100000;
+  char *metadata = malloc_aligned_or_die(alloc_bytes);
+  char *s = metadata;
+  char *e = metadata + alloc_bytes;
+  s += add_metadata_item_string(s, e - s, "classes",
+      PENDING_PROP(self, PROP_CLASSES), DEFAULT_PROP_CLASSES);
+  s += add_metadata_item_float(s, e - s, "min-frequency",
+      PENDING_PROP(self, PROP_MIN_FREQUENCY), DEFAULT_MIN_FREQUENCY);
+  s += add_metadata_item_float(s, e - s, "max-frequency",
+      PENDING_PROP(self, PROP_MAX_FREQUENCY), DEFAULT_MAX_FREQUENCY);
+  s += add_metadata_item_float(s, e - s, "knee-frequency",
+      PENDING_PROP(self, PROP_KNEE_FREQUENCY), DEFAULT_KNEE_FREQUENCY);
+  s += add_metadata_item_int(s, e - s, "mfccs",
+      PENDING_PROP(self, PROP_MFCCS), DEFAULT_PROP_MFCCS);
+  s += add_metadata_item_int(s, e - s, "window-size",
+      PENDING_PROP(self, PROP_WINDOW_SIZE), DEFAULT_WINDOW_SIZE);
+  s += add_metadata_item_string(s, e - s, "basename",
+      PENDING_PROP(self, PROP_BASENAME), DEFAULT_BASENAME);
+  metadata = realloc(metadata, e - s + 2);
+  STDERR_DEBUG("%s", metadata);
+  return metadata;
+}
 
 static RecurNN *
 load_or_create_net(GstClassify *self){
-  int hidden_size = get_gvalue_int(PENDING_PROP(self, PROP_HIDDEN_SIZE),
-      DEFAULT_HIDDEN_SIZE);
-  int bottom_layer_size = get_gvalue_int(PENDING_PROP(self, PROP_BOTTOM_LAYER), 0);
+  char *metadata = construct_metadata(self);
+
+#define GET_FLOAT(id, _default) get_gvalue_float(PENDING_PROP(self, id), _default)
+#define GET_INT(id, _default) get_gvalue_int(PENDING_PROP(self, id), _default)
+
+  int hidden_size = GET_INT(PROP_HIDDEN_SIZE, DEFAULT_HIDDEN_SIZE);
+  int bottom_layer_size = GET_INT(PROP_BOTTOM_LAYER, 0);
 
   int top_layer_size = parse_classes_string(self,
       get_gvalue_string(PENDING_PROP(self, PROP_CLASSES)));
 
   if (self->net_filename == NULL){
-    reset_net_filename(self, hidden_size, bottom_layer_size, top_layer_size);
+    reset_net_filename(self, hidden_size, bottom_layer_size, top_layer_size, metadata);
   }
   RecurNN *net = TRY_RELOAD ? rnn_load_net(self->net_filename) : NULL;
   if (net){
-    if (net->output_size != top_layer_size){
+    if (net->output_size != top_layer_size ||
+        net->hidden_size != hidden_size ||
+        (net->bottom_layer && ! bottom_layer_size)
+    ){
+      /*XXX there could be more checks! */
       GST_WARNING("loaded net doesn't seem to match!");
       rnn_delete_net(net);
       net = NULL;
+    }
+    if (strcmp(net->metadata, metadata)){
+      GST_WARNING("The loaded net metadata doesn't match");
+      GST_WARNING("calculated metadata:\n%s\n", metadata);
+      GST_WARNING("loaded metadata:\n%s\n", net->metadata);
+      rnn_delete_net(net);
+      net = NULL;
+      /**stop on error */
     }
   }
   if (net == NULL){
@@ -572,9 +617,6 @@ load_or_create_net(GstClassify *self){
     else {
       flags &= ~RNN_COND_USE_LAWN_MOWER;
     }
-
-#define GET_FLOAT(id, _default) get_gvalue_float(PENDING_PROP(self, id), _default)
-#define GET_INT(id, _default) get_gvalue_int(PENDING_PROP(self, id), _default)
 
     int weight_sparsity = GET_INT(PROP_WEIGHT_SPARSITY, DEFAULT_PROP_WEIGHT_SPARSITY);
     int bptt_depth = GET_INT(PROP_BPTT_DEPTH, DEFAULT_PROP_BPTT_DEPTH);

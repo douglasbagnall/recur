@@ -65,3 +65,50 @@ steal_gvalue_string(GValue *v){
   g_value_unset(v);
   return s;
 }
+
+static inline int
+add_metadata_item(char *metadata, size_t len, const char *name, const GValue *v){
+  char *vs = gst_value_serialize(v);
+  int consumed = snprintf(metadata, len, "%s: %s\n", name, vs);
+  g_free(vs);
+  return consumed; /*NOT counting the final zero*/
+}
+
+static inline int
+add_metadata_item_float(char *metadata, size_t len, const char *name,
+    GValue *v, float _default){
+  if (! G_VALUE_HOLDS_FLOAT(v)){
+    g_value_init(v, G_TYPE_FLOAT);
+    g_value_set_float(v, _default);
+  }
+  char *vs = gst_value_serialize(v);
+  int consumed = snprintf(metadata, len, "%s: %s\n", name, vs);
+  g_free(vs);
+  return consumed; /*NOT counting the final zero*/
+}
+
+static inline int
+add_metadata_item_int(char *metadata, size_t len, const char *name,
+    GValue *v, int _default){
+  if (! G_VALUE_HOLDS_INT(v)){
+    g_value_init(v, G_TYPE_INT);
+    g_value_set_int(v, _default);
+  }
+  char *vs = gst_value_serialize(v);
+  int consumed = snprintf(metadata, len, "%s: %s\n", name, vs);
+  g_free(vs);
+  return consumed; /*NOT counting the final zero*/
+}
+
+static inline int
+add_metadata_item_string(char *metadata, size_t len, const char *name,
+    GValue *v, const char *_default){
+  if (! G_VALUE_HOLDS_STRING(v)){
+    g_value_init(v, G_TYPE_STRING);
+    g_value_set_string(v, _default);
+  }
+  char *vs = gst_value_serialize(v);
+  int consumed = snprintf(metadata, len, "%s: %s\n", name, vs);
+  g_free(vs);
+  return consumed; /*NOT counting the final zero*/
+}
