@@ -54,6 +54,7 @@ enum
   PROP_RNG_SEED,
   PROP_BOTTOM_LAYER,
   PROP_RANDOM_ALIGNMENT,
+  PROP_NET_FILENAME,
 
   PROP_LAST
 };
@@ -255,6 +256,12 @@ gst_classify_class_init (GstClassifyClass * klass)
       g_param_spec_string("target", "target",
           "Target outputs for all channels (dot separated)",
           DEFAULT_PROP_TARGET,
+          G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
+
+  g_object_class_install_property (gobject_class, PROP_NET_FILENAME,
+      g_param_spec_string("net-filename", "net-filename",
+          "Load net from here (and save here)",
+          NULL,
           G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class, PROP_PGM_DUMP,
@@ -487,7 +494,7 @@ gst_classify_init (GstClassify * self)
 
 
 static void
-reset_net_filename(GstClassify *self, int hidden_size, int bottom_layer,
+set_net_filename(GstClassify *self, int hidden_size, int bottom_layer,
     int top_layer_size, char *metadata){
   char s[200];
   uint sig = 0;
@@ -505,9 +512,6 @@ reset_net_filename(GstClassify *self, int hidden_size, int bottom_layer,
     snprintf(s, sizeof(s), "%s-%0x-i%d-h%d-o%d-b%d-%dHz-w%d.net",
         self->basename, sig, n_features, hidden_size, top_layer_size,
         CLASSIFY_BIAS, CLASSIFY_RATE, self->window_size);
-  }
-  if (self->net_filename){
-    free(self->net_filename);
   }
   self->net_filename = strdup(s);
 }
@@ -597,6 +601,103 @@ load_metadata(const char *metadata, struct ClassifyMetadata *m){
   }
   return 1;
 }
+
+static void
+setup_audio(GstClassify *self, int window_size, int mfccs, float min_freq,
+    float max_freq, float knee_freq){
+  self->mfcc_factory = recur_audio_binner_new(window_size,
+      RECUR_WINDOW_HANN,
+      CLASSIFY_N_FFT_BINS,
+      min_freq, max_freq, knee_freq,
+      CLASSIFY_RATE,
+      1.0f / 32768,
+      CLASSIFY_VALUE_SIZE);
+
+  self->window_size = window_size;
+  self->mfccs = mfccs;
+}
+
+static RecurNN *
+load_specified_net(GstClassify *self, const char *filename){
+  struct ClassifyMetadata m;
+  RecurNN *net = rnn_load_net(filename);
+  load_metadata(net->metadata, &m);
+  if (self->mfcc_factory != NULL ||
+      self->net != NULL){
+    GST_ERROR("There is already a net (%p) and/or audiobinner (%p). This won't work",
+        self->net, self->mfcc_factory);
+    abort();
+  }
+  self->net_filename = filename;
+  setup_audio(self, m.window_size, m.mfccs, m.min_freq,
+      m.max_freq, m.knee_freq);
+
+  return net;
+}
+
+static RecurNN *
+create_net(GstClassify *self, int bottom_layer_size,
+    int hidden_size, int top_layer_size){
+  if (self->mfcc_factory == NULL){
+    GST_ERROR("We seem to be creating a net before the audio stuff has been set up. "
+        "It won't work.");
+    abort();
+  }
+  RecurNN *net;
+  int n_features = self->mfccs ? self->mfccs : CLASSIFY_N_FFT_BINS;
+  u32 flags = CLASSIFY_RNN_FLAGS;
+  int weight_sparsity = PP_GET_INT(self, PROP_WEIGHT_SPARSITY,
+      DEFAULT_PROP_WEIGHT_SPARSITY);
+  int bptt_depth = PP_GET_INT(self, PROP_BPTT_DEPTH, DEFAULT_PROP_BPTT_DEPTH);
+  float momentum = PP_GET_FLOAT(self, PROP_MOMENTUM, DEFAULT_PROP_MOMENTUM);
+  float learn_rate = PP_GET_FLOAT(self, PROP_LEARN_RATE, DEFAULT_LEARN_RATE);
+  float bottom_learn_rate_scale = PP_GET_FLOAT(self, PROP_BOTTOM_LEARN_RATE_SCALE,
+      DEFAULT_BOTTOM_LEARN_RATE_SCALE);
+  float top_learn_rate_scale = PP_GET_FLOAT(self, PROP_TOP_LEARN_RATE_SCALE,
+      DEFAULT_TOP_LEARN_RATE_SCALE);
+  float fan_in_sum = PP_GET_FLOAT(self, PROP_WEIGHT_FAN_IN_SUM,
+      DEFAULT_PROP_WEIGHT_FAN_IN_SUM);
+  float fan_in_kurtosis = PP_GET_FLOAT(self, PROP_WEIGHT_FAN_IN_KURTOSIS,
+      DEFAULT_PROP_WEIGHT_FAN_IN_KURTOSIS);
+  float diagonal_proportion = PP_GET_FLOAT(self, PROP_WEIGHT_DIAGONAL,
+      DEFAULT_PROP_WEIGHT_DIAGONAL);
+  u64 rng_seed = get_gvalue_u64(PENDING_PROP(self, PROP_RNG_SEED), DEFAULT_RNG_SEED);
+  GST_DEBUG("rng seed %lu", rng_seed);
+
+  int lawnmower = PP_GET_BOOLEAN(self, PROP_LAWN_MOWER, DEFAULT_PROP_LAWN_MOWER);
+  if (lawnmower){
+    flags |= RNN_COND_USE_LAWN_MOWER;
+  }
+  else {
+    flags &= ~RNN_COND_USE_LAWN_MOWER;
+  }
+
+  net = rnn_new_with_bottom_layer(n_features, bottom_layer_size, hidden_size,
+      top_layer_size, flags, rng_seed,
+      NULL, bptt_depth, learn_rate, momentum, 0);
+  if (fan_in_sum){
+    rnn_randomise_weights_fan_in(net, fan_in_sum, fan_in_kurtosis, 0.1f, 0);
+  }
+  else {
+    rnn_randomise_weights(net, RNN_INITIAL_WEIGHT_VARIANCE_FACTOR / net->h_size,
+        weight_sparsity, 0.5);
+  }
+
+  if (diagonal_proportion){
+    rnn_emphasise_diagonal(net, 0.4, diagonal_proportion);
+  }
+
+  net->bptt->ho_scale = top_learn_rate_scale;
+  if (net->bottom_layer){
+    net->bottom_layer->learn_rate_scale = bottom_learn_rate_scale;
+  }
+  if (PERIODIC_PGM_DUMP){
+    rnn_multi_pgm_dump(net, "how ihw biw");
+  }
+  return net;
+}
+
+
 static RecurNN *
 load_or_create_net(GstClassify *self){
   char *metadata = construct_metadata(self);
@@ -607,7 +708,7 @@ load_or_create_net(GstClassify *self){
       get_gvalue_string(PENDING_PROP(self, PROP_CLASSES), DEFAULT_PROP_CLASSES));
 
   if (self->net_filename == NULL){
-    reset_net_filename(self, hidden_size, bottom_layer_size, top_layer_size, metadata);
+    set_net_filename(self, hidden_size, bottom_layer_size, top_layer_size, metadata);
   }
   RecurNN *net = TRY_RELOAD ? rnn_load_net(self->net_filename) : NULL;
   if (net){
@@ -630,94 +731,55 @@ load_or_create_net(GstClassify *self){
     }
   }
   if (net == NULL){
-    int n_features = self->mfccs ? self->mfccs : CLASSIFY_N_FFT_BINS;
-    u32 flags = CLASSIFY_RNN_FLAGS;
-    if (get_gvalue_boolean(PENDING_PROP(self, PROP_LAWN_MOWER),
-            DEFAULT_PROP_LAWN_MOWER)){
-      flags |= RNN_COND_USE_LAWN_MOWER;
-    }
-    else {
-      flags &= ~RNN_COND_USE_LAWN_MOWER;
-    }
-
-    int weight_sparsity = PP_GET_INT(self, PROP_WEIGHT_SPARSITY, DEFAULT_PROP_WEIGHT_SPARSITY);
-    int bptt_depth = PP_GET_INT(self, PROP_BPTT_DEPTH, DEFAULT_PROP_BPTT_DEPTH);
-
-    float momentum = PP_GET_FLOAT(self, PROP_MOMENTUM, DEFAULT_PROP_MOMENTUM);
-    float learn_rate = PP_GET_FLOAT(self, PROP_LEARN_RATE, DEFAULT_LEARN_RATE);
-
-    float bottom_learn_rate_scale = PP_GET_FLOAT(self, PROP_BOTTOM_LEARN_RATE_SCALE,
-        DEFAULT_BOTTOM_LEARN_RATE_SCALE);
-    float top_learn_rate_scale = PP_GET_FLOAT(self, PROP_TOP_LEARN_RATE_SCALE,
-        DEFAULT_TOP_LEARN_RATE_SCALE);
-
-    float fan_in_sum = PP_GET_FLOAT(self, PROP_WEIGHT_FAN_IN_SUM,
-        DEFAULT_PROP_WEIGHT_FAN_IN_SUM);
-
-    float fan_in_kurtosis = PP_GET_FLOAT(self, PROP_WEIGHT_FAN_IN_KURTOSIS,
-        DEFAULT_PROP_WEIGHT_FAN_IN_KURTOSIS);
-
-    float diagonal_proportion = PP_GET_FLOAT(self, PROP_WEIGHT_DIAGONAL,
-        DEFAULT_PROP_WEIGHT_DIAGONAL);
-
-    u64 rng_seed = get_gvalue_u64(PENDING_PROP(self, PROP_RNG_SEED), DEFAULT_RNG_SEED);
-    GST_DEBUG("rng seed %lu", rng_seed);
-
-    net = rnn_new_with_bottom_layer(n_features, bottom_layer_size, hidden_size,
-        top_layer_size, flags, rng_seed,
-        NULL, bptt_depth, learn_rate, momentum, 0);
-    if (fan_in_sum){
-      rnn_randomise_weights_fan_in(net, fan_in_sum, fan_in_kurtosis, 0.1f, 0);
-    }
-    else {
-      rnn_randomise_weights(net, RNN_INITIAL_WEIGHT_VARIANCE_FACTOR / net->h_size,
-          weight_sparsity, 0.5);
-    }
-
-    if (diagonal_proportion){
-      rnn_emphasise_diagonal(net, 0.4, diagonal_proportion);
-    }
-
-    net->bptt->ho_scale = top_learn_rate_scale;
-    if (net->bottom_layer){
-      net->bottom_layer->learn_rate_scale = bottom_learn_rate_scale;
-    }
-    if (PERIODIC_PGM_DUMP){
-      rnn_multi_pgm_dump(net, "how ihw biw");
-    }
-  }
-  if (net->bottom_layer && 0){
-    self->error_image = temporal_ppm_alloc(net->bottom_layer->o_size, 300, "bottom_error",
-        0, PGM_DUMP_COLOUR, &net->bottom_layer->o_error);
+    net = create_net(self, bottom_layer_size, hidden_size, top_layer_size);
   }
   return net;
 }
 
+/*gst_classify_setup is called every time the pipeline starts up -- that is,
+  for every new set of input files. It is also the first hook after all the
+  initial properties have been dealt with. So it has two kinds of role: the
+  once-only setting up of net and audio feature extraction, and the repeated
+  adjustments and checks for each set of audio sources.
+ */
 
 static gboolean
 gst_classify_setup(GstAudioFilter *base, const GstAudioInfo *info){
   GST_INFO("gst_classify_setup\n");
   GstClassify *self = GST_CLASSIFY(base);
-  self->window_size = PP_GET_INT(self, PROP_WINDOW_SIZE, DEFAULT_WINDOW_SIZE);
-  self->mfccs = PP_GET_INT(self, PROP_MFCCS, DEFAULT_PROP_MFCCS);
-  self->basename = PP_GET_STRING(self, PROP_BASENAME, DEFAULT_BASENAME);
-
-  if (self->mfcc_factory == NULL){
-    float min_freq = PP_GET_FLOAT(self, PROP_MIN_FREQUENCY, DEFAULT_MIN_FREQUENCY);
-    float max_freq = PP_GET_FLOAT(self, PROP_MAX_FREQUENCY, DEFAULT_MAX_FREQUENCY);
-    float knee_freq = PP_GET_FLOAT(self, PROP_KNEE_FREQUENCY, DEFAULT_KNEE_FREQUENCY);
-
-    self->mfcc_factory = recur_audio_binner_new(self->window_size,
-        RECUR_WINDOW_HANN,
-        CLASSIFY_N_FFT_BINS,
-        min_freq, max_freq, knee_freq,
-        CLASSIFY_RATE,
-        1.0f / 32768,
-        CLASSIFY_VALUE_SIZE
-    );
-  }
   if (self->net == NULL){
-    self->net = load_or_create_net(self);
+    /*there are two paths to loading a net.
+
+      1. if the net is specifically named, metadata for audio processing is
+      loaded from it, and values specified via properties or defaults are
+      ignored (XXX for now; later an override switch).
+
+      2. if no net name is specified, the audio parameters are determined
+      first, and a network name is determined from them and layer parameters.
+
+     */
+    const char *filename = PP_GET_STRING(self, PROP_NET_FILENAME, NULL);
+    if (self->mfcc_factory != NULL){
+      GST_ERROR("mfcc_factory exists before net. This won't work.");
+      abort();
+    }
+    else if (filename){
+      load_specified_net(self, filename);
+    }
+    else {
+      self->basename = PP_GET_STRING(self, PROP_BASENAME, DEFAULT_BASENAME);
+      setup_audio(self, PP_GET_INT(self, PROP_WINDOW_SIZE, DEFAULT_WINDOW_SIZE),
+          PP_GET_INT(self, PROP_MFCCS, DEFAULT_PROP_MFCCS),
+          PP_GET_FLOAT(self, PROP_MIN_FREQUENCY, DEFAULT_MIN_FREQUENCY),
+          PP_GET_FLOAT(self, PROP_MAX_FREQUENCY, DEFAULT_MAX_FREQUENCY),
+          PP_GET_FLOAT(self, PROP_KNEE_FREQUENCY, DEFAULT_KNEE_FREQUENCY));
+      self->net = load_or_create_net(self);
+    }
+    RecurNN *net = self->net;
+    if (net->bottom_layer && 0){
+      self->error_image = temporal_ppm_alloc(net->bottom_layer->o_size, 300,
+          "bottom_error", 0, PGM_DUMP_COLOUR, &net->bottom_layer->o_error);
+    }
   }
 
   if (self->n_channels != info->channels){
@@ -1127,6 +1189,7 @@ gst_classify_set_property (GObject * object, guint prop_id, const GValue * value
     /*properties that only need to be stored until net creation, and can't
       be changed afterwards go here.
     */
+    case PROP_NET_FILENAME:
     case PROP_BASENAME:
     case PROP_MIN_FREQUENCY:
     case PROP_KNEE_FREQUENCY:
@@ -1254,7 +1317,7 @@ gst_classify_get_property (GObject * object, guint prop_id, GValue * value,
 
 /*XXX shared with parrot and possibly others */
 static inline void
-possibly_save_net(RecurNN *net, char *filename)
+possibly_save_net(RecurNN *net, const char *filename)
 {
   GST_LOG("possibly saving to %s", filename);
   if (PERIODIC_SAVE_NET && (net->generation & 511) == 0){

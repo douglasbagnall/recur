@@ -93,7 +93,7 @@ struct _GstClassify
   int read_offset;
   int write_offset;
   RecurAudioBinner *mfcc_factory;
-  char *net_filename;
+  const char *net_filename;
   const char *basename;
   int queue_size;
   int mfccs;

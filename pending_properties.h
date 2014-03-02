@@ -6,16 +6,16 @@
 #define PP_GET_FLOAT(self, id, def) get_gvalue_float(PENDING_PROP(self, id), def)
 #define PP_GET_INT(self, id, def) get_gvalue_int(PENDING_PROP(self, id), def)
 #define PP_GET_STRING(self, id, def) get_gvalue_string(PENDING_PROP(self, id), def)
+#define PP_GET_BOOLEAN(self, id, def) get_gvalue_boolean(PENDING_PROP(self, id), def)
+
+#define RESET_OR_INIT_GV(v, t) ((G_IS_VALUE(v)) ? g_value_reset(v) : \
+      g_value_init((v), (t)))
+
 
 static inline void
 set_gvalue(GValue *dest, const GValue *src)
 {
-  if (G_IS_VALUE(dest)){
-    g_value_reset(dest);
-  }
-  else {
-    g_value_init(dest, G_VALUE_TYPE(src));
-  }
+  RESET_OR_INIT_GV(dest, G_VALUE_TYPE(src));
   g_value_copy(src, dest);
 }
 
@@ -69,3 +69,10 @@ steal_gvalue_string(GValue *v){
   return s;
 }
 
+static inline void
+set_gvalue_float(GValue *v, const float f){
+  RESET_OR_INIT_GV(v, G_TYPE_FLOAT);
+  g_value_set_float(v, f);
+
+
+}
