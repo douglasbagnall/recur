@@ -524,7 +524,7 @@ static int parse_classes_string(GstClassify *self, const char *orig)
   int i;
   int n_groups = 1;
   for (s = str; *s; s++){
-    if (*s == '|'){
+    if (*s == '|' || *s == ','){
       *s = 0;
       n_groups++;
     }
