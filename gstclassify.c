@@ -1292,7 +1292,7 @@ gst_classify_get_property (GObject * object, guint prop_id, GValue * value,
 
   case PROP_TRAINING:
     g_value_set_boolean(value, self->training);
-
+    break;
   case PROP_MFCCS:
     g_value_set_int(value, self->mfccs);
     break;
