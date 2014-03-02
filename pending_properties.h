@@ -13,8 +13,9 @@
 
 
 static inline void
-set_gvalue(GValue *dest, const GValue *src)
+copy_gvalue(GValue *dest, const GValue *src)
 {
+  /*XXX does this reclaim a string value? who knows */
   RESET_OR_INIT_GV(dest, G_VALUE_TYPE(src));
   g_value_copy(src, dest);
 }

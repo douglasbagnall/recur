@@ -137,6 +137,8 @@ static GstFlowReturn gst_classify_transform_ip(GstBaseTransform *base, GstBuffer
 static gboolean gst_classify_setup(GstAudioFilter * filter, const GstAudioInfo * info);
 static void maybe_parse_target_string(GstClassify *self);
 static void maybe_start_logging(GstClassify *self);
+static void maybe_parse_error_weight_string(GstClassify *self);
+
 
 #define gst_classify_parent_class parent_class
 G_DEFINE_TYPE (GstClassify, gst_classify, GST_TYPE_AUDIO_FILTER)
@@ -806,6 +808,7 @@ gst_classify_setup(GstAudioFilter *base, const GstAudioInfo *info){
   }
   maybe_start_logging(self);
   maybe_parse_target_string(self);
+  maybe_parse_error_weight_string(self);
 
   GstStructure *s = gst_structure_new_empty("classify-setup");
   GstMessage *msg = gst_message_new_element(GST_OBJECT(self), s);
@@ -1025,7 +1028,7 @@ maybe_parse_error_weight_string(GstClassify *self){
   char *orig, *e, *s;
   int i;
   if (self->channels == NULL){
-    GST_DEBUG("not parsing target string because channels is NULL");
+    GST_DEBUG("not parsing error_weight string because channels is NULL");
     return;
   }
   e = orig = s = steal_gvalue_string(PENDING_PROP(self, PROP_ERROR_WEIGHT));
@@ -1097,7 +1100,7 @@ maybe_set_net_scalar(GstClassify *self, guint prop_id, const GValue *value)
     }
   }
   else {
-    set_gvalue(PENDING_PROP(self, prop_id), value);
+    copy_gvalue(PENDING_PROP(self, prop_id), value);
   }
 
 #undef SET_FLOAT
@@ -1113,16 +1116,6 @@ gst_classify_set_property (GObject * object, guint prop_id, const GValue * value
   if (value){
     const char *strvalue;
     switch (prop_id) {
-    case PROP_TARGET:
-      set_gvalue(PENDING_PROP(self, prop_id), value);
-      maybe_parse_target_string(self);
-      break;
-
-    case PROP_ERROR_WEIGHT:
-      set_gvalue(PENDING_PROP(self, prop_id), value);
-      maybe_parse_error_weight_string(self);
-      break;
-
     case PROP_PGM_DUMP:
       if (self->net){
         strvalue = g_value_get_string(value);
@@ -1140,12 +1133,6 @@ gst_classify_set_property (GObject * object, guint prop_id, const GValue * value
           rnn_save_net(self->net, self->net_filename, 1);
         }
       }
-      break;
-
-    case PROP_LOG_FILE:
-      /*defer setting the actual log file, in case the nets aren't ready yet*/
-      set_gvalue(PENDING_PROP(self, prop_id), value);
-      maybe_start_logging(self);
       break;
 
     case PROP_FORGET:
@@ -1185,8 +1172,8 @@ gst_classify_set_property (GObject * object, guint prop_id, const GValue * value
     case PROP_MOMENTUM:
       maybe_set_net_scalar(self, prop_id, value);
       break;
-    /*properties that only need to be stored until net creation, and can't
-      be changed afterwards go here.
+    /*These properties only need to be stored until net creation, and can't
+      be changed afterwards.
     */
     case PROP_NET_FILENAME:
     case PROP_BASENAME:
@@ -1206,11 +1193,20 @@ gst_classify_set_property (GObject * object, guint prop_id, const GValue * value
     case PROP_WINDOW_SIZE:
     case PROP_MFCCS:
       if (self->net == NULL){
-        set_gvalue(PENDING_PROP(self, prop_id), value);
+        copy_gvalue(PENDING_PROP(self, prop_id), value);
       }
       else {
         GST_WARNING("it is TOO LATE to set %s.", pspec->name);
       }
+      break;
+
+    /*these ones can be set any time but only have effect in
+      gst_classify_setup(). that is, after a net exists but possibly more than
+      once.*/
+    case PROP_LOG_FILE:
+    case PROP_TARGET:
+    case PROP_ERROR_WEIGHT:
+      copy_gvalue(PENDING_PROP(self, prop_id), value);
       break;
 
     default:
