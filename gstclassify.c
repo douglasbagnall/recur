@@ -1216,73 +1216,53 @@ gst_classify_set_property (GObject * object, guint prop_id, const GValue * value
   }
 }
 
-void
-maybe_get_net_scalar(GstClassify *self, guint prop_id, GValue *dest)
-{
-  RecurNN *net = self->net;
-  if (net){
-    switch (prop_id){
-    case PROP_LEARN_RATE:
-      g_value_set_float(dest, net->bptt->learn_rate);
-      break;
-    case PROP_BPTT_DEPTH:
-      g_value_set_int(dest, net->bptt->depth);
-      break;
-    case PROP_MOMENTUM:
-      g_value_set_float(dest, net->bptt->momentum);
-      break;
-    case PROP_HIDDEN_SIZE:
-      g_value_set_int(dest, net->hidden_size);
-      break;
-    case PROP_BOTTOM_LAYER:
-      {
-        int x = (net->bottom_layer) ? net->bottom_layer->output_size : 0;
-        g_value_set_int(dest, x);
-      }
-      break;
-    case PROP_TOP_LEARN_RATE_SCALE:
-      g_value_set_float(dest, net->bptt->ho_scale);
-      break;
-    case PROP_BOTTOM_LEARN_RATE_SCALE:
-      if (net->bottom_layer){
-        g_value_set_float(dest, net->bottom_layer->learn_rate_scale);
-      }
-      else {
-        g_value_set_float(dest, 0);/* there is no right answer */
-      }
-      break;
-    case PROP_LAWN_MOWER:
-      g_value_set_boolean(dest, !! (self->net->flags & RNN_COND_USE_LAWN_MOWER));
-      break;
-    }
-  }
-  else {
-    const GValue *src = PENDING_PROP(self, prop_id);
-    if (G_IS_VALUE(src)){
-      g_value_copy(src, dest);
-    }
-    else {
-      /*now what?*/
-    }
-  }
-}
 
 static void
 gst_classify_get_property (GObject * object, guint prop_id, GValue * value,
     GParamSpec * pspec)
 {
   GstClassify *self = GST_CLASSIFY (object);
+  RecurNN *net = self->net;
+
   switch (prop_id) {
+
+#define NET_OR_PP(attr, type, needs_bptt, needs_bottom_layer) do {      \
+    if (net && (!(needs_bptt) || net->bptt) &&                          \
+        (!(needs_bottom_layer) || net->bottom_layer)){                  \
+      g_value_set_ ## type(value, net->attr);                           \
+    } else {                                                            \
+      const GValue *pp = PENDING_PROP(self, prop_id);                   \
+      if (G_IS_VALUE(pp)){                                              \
+        g_value_copy(pp, value);                                        \
+      }                                                                 \
+    }} while(0)
+
   case PROP_LEARN_RATE:
+    NET_OR_PP(bptt->learn_rate, float, 1, 0);
+    break;
   case PROP_TOP_LEARN_RATE_SCALE:
+    NET_OR_PP(bptt->ho_scale, float, 1, 0);
+    break;
   case PROP_MOMENTUM:
+    NET_OR_PP(bptt->momentum, float, 1, 0);
+    break;
   case PROP_BOTTOM_LEARN_RATE_SCALE:
+    NET_OR_PP(bottom_layer->learn_rate_scale, float, 0, 1);
+    break;
   case PROP_BPTT_DEPTH:
+    NET_OR_PP(bptt->depth, int, 1, 0);
+    break;
   case PROP_HIDDEN_SIZE:
+    NET_OR_PP(hidden_size, int, 0, 0);
+    break;
   case PROP_BOTTOM_LAYER:
+    NET_OR_PP(bottom_layer->input_size, int, 0, 1);
+    break;
   case PROP_LAWN_MOWER:
-      maybe_get_net_scalar(self, prop_id, value);
-      break;
+    NET_OR_PP(flags & RNN_COND_USE_LAWN_MOWER, boolean, 0, 0);
+    break;
+
+#undef NET_OR_PP
 
   case PROP_TRAINING:
     g_value_set_boolean(value, self->training);
