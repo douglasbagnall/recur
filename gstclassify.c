@@ -703,7 +703,6 @@ load_or_create_net(GstClassify *self){
   char *metadata = construct_metadata(self);
   int hidden_size = PP_GET_INT(self, PROP_HIDDEN_SIZE, DEFAULT_HIDDEN_SIZE);
   int bottom_layer_size = PP_GET_INT(self, PROP_BOTTOM_LAYER, 0);
-
   int top_layer_size = parse_classes_string(self,
       get_gvalue_string(PENDING_PROP(self, PROP_CLASSES), DEFAULT_PROP_CLASSES));
 
@@ -727,7 +726,7 @@ load_or_create_net(GstClassify *self){
       GST_WARNING("loaded metadata:\n%s\n", net->metadata);
       rnn_delete_net(net);
       net = NULL;
-      /**stop on error */
+      /*stop ? */
     }
   }
   if (net == NULL){
@@ -811,7 +810,7 @@ gst_classify_setup(GstAudioFilter *base, const GstAudioInfo *info){
   GstStructure *s = gst_structure_new_empty("classify-setup");
   GstMessage *msg = gst_message_new_element(GST_OBJECT(self), s);
   gst_element_post_message(GST_ELEMENT(self), msg);
-  if (self->random_alignment){
+  if (self->random_alignment){/*and mode == training?*/
     self->write_offset = 0;
     int offset = rand_small_int(&self->net->rng, self->window_size) - self->window_size / 2;
     self->read_offset = offset * self->n_channels;
@@ -1206,7 +1205,6 @@ gst_classify_set_property (GObject * object, guint prop_id, const GValue * value
     case PROP_RNG_SEED:
     case PROP_WINDOW_SIZE:
     case PROP_MFCCS:
-
       if (self->net == NULL){
         set_gvalue(PENDING_PROP(self, prop_id), value);
       }

@@ -73,6 +73,4 @@ static inline void
 set_gvalue_float(GValue *v, const float f){
   RESET_OR_INIT_GV(v, G_TYPE_FLOAT);
   g_value_set_float(v, f);
-
-
 }
