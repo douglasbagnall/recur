@@ -33,7 +33,7 @@ def main():
     parser.add_argument('-N', '--no-save-net', action='store_true',
                         help="don't save the net, periodically or otherwise")
     parser.add_argument('-c', '--classes', default='tf',
-                        help="classes (letter per class, groups separated by '|')")
+                        help="classes (letter per class, groups separated by commas)")
     parser.add_argument('-C', '--channels', default=12, type=int,
                         help="how many channels to use")
     parser.add_argument('-w', '--window-size', default=WINDOW_SIZE, type=int,

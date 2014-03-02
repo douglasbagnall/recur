@@ -64,7 +64,7 @@ class BaseClassifier(object):
 
     def build_pipeline(self, mfccs, hsize, channels, sinkname='fakesink'):
         self.channels = channels
-        classes = '|'.join(self.classes)
+        classes = ','.join(self.classes)
         self.sink = self.make_add_link(sinkname, None)
         self.classifier = self.make_add_link('classify', self.sink)
         self.classifier.set_property('mfccs', mfccs)

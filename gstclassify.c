@@ -292,7 +292,7 @@ gst_classify_class_init (GstClassifyClass * klass)
 
   g_object_class_install_property (gobject_class, PROP_CLASSES,
       g_param_spec_string("classes", "classes",
-          "Identify classes (one letter per class, groups separated by '|')",
+          "Identify classes (one letter per class, groups separated by commas)",
           DEFAULT_PROP_CLASSES,
           G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
@@ -526,7 +526,7 @@ static int parse_classes_string(GstClassify *self, const char *orig)
   int i;
   int n_groups = 1;
   for (s = str; *s; s++){
-    if (*s == '|' || *s == ','){
+    if (*s == ','){
       *s = 0;
       n_groups++;
     }
