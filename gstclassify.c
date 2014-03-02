@@ -546,30 +546,57 @@ static int parse_classes_string(GstClassify *self, const char *orig)
 
 static char*
 construct_metadata(GstClassify *self){
-  int alloc_bytes = 100000;
-  char *metadata = malloc_aligned_or_die(alloc_bytes);
-  char *s = metadata;
-  char *e = metadata + alloc_bytes;
-  s += METADATA_ADD_PP_STRING(self, s, e - s, "classes",
-      PROP_CLASSES, DEFAULT_PROP_CLASSES);
-  s += METADATA_ADD_PP_FLOAT(self, s, e - s, "min-frequency",
-      PROP_MIN_FREQUENCY, DEFAULT_MIN_FREQUENCY);
-  s += METADATA_ADD_PP_FLOAT(self, s, e - s, "max-frequency",
-      PROP_MAX_FREQUENCY, DEFAULT_MAX_FREQUENCY);
-  s += METADATA_ADD_PP_FLOAT(self, s, e - s, "knee-frequency",
-      PROP_KNEE_FREQUENCY, DEFAULT_KNEE_FREQUENCY);
-  s += METADATA_ADD_PP_INT(self, s, e - s, "mfccs",
-      PROP_MFCCS, DEFAULT_PROP_MFCCS);
-  s += METADATA_ADD_PP_INT(self, s, e - s, "window-size",
-      PROP_WINDOW_SIZE, DEFAULT_WINDOW_SIZE);
-  s += METADATA_ADD_PP_STRING(self, s, e - s, "basename",
-      PROP_BASENAME, DEFAULT_BASENAME);
-
-  metadata = realloc(metadata, e - s + 2);
+  char *metadata;
+  int ret = asprintf(&metadata,
+      "classes %s\n"
+      "min-frequency %f\n"
+      "max-frequency %f\n"
+      "knee-frequency %f\n"
+      "mfccs %d\n"
+      "window-size %d\n"
+      "basename %s\n",
+      PP_GET_STRING(self, PROP_CLASSES, DEFAULT_PROP_CLASSES),
+      PP_GET_FLOAT(self, PROP_MIN_FREQUENCY, DEFAULT_MIN_FREQUENCY),
+      PP_GET_FLOAT(self, PROP_MAX_FREQUENCY, DEFAULT_MAX_FREQUENCY),
+      PP_GET_FLOAT(self, PROP_KNEE_FREQUENCY, DEFAULT_KNEE_FREQUENCY),
+      PP_GET_INT(self, PROP_MFCCS, DEFAULT_PROP_MFCCS),
+      PP_GET_INT(self, PROP_WINDOW_SIZE, DEFAULT_WINDOW_SIZE),
+      PP_GET_STRING(self, PROP_BASENAME, DEFAULT_BASENAME));
   STDERR_DEBUG("%s", metadata);
+  if (ret == -1){
+    STDERR_DEBUG("can't alloc memory for metadata. or something.");
+    abort();
+  }
   return metadata;
 }
 
+struct ClassifyMetadata {
+  char *classes;
+  float min_freq, max_freq, knee_freq;
+  int mfccs;
+  int window_size;
+  char *basename;
+};
+
+static int
+load_metadata(const char *metadata, struct ClassifyMetadata *m){
+  const char *template = (
+      "classes %ms "
+      "min-frequency %f "
+      "max-frequency %f "
+      "knee-frequency %f "
+      "mfccs %ms "
+      "window-size %d "
+      "basename %ms");
+  int n = sscanf(metadata, template, &m->classes,
+      &m->min_freq, &m->max_freq, &m->knee_freq,
+      &m->mfccs, &m->window_size, &m->basename);
+  if (n != 7){
+    GST_WARNING("Found only %d/%d metadata items", n, 7);
+    return 0;
+  }
+  return 1;
+}
 static RecurNN *
 load_or_create_net(GstClassify *self){
   char *metadata = construct_metadata(self);
