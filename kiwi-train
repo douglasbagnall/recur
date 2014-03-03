@@ -78,7 +78,7 @@ def main():
     c.no_save_net = args.no_save_net
     c.quiet = not args.verbose
 
-    c.classifier.set_property('random-alignment', args.random_alignment)
+    c.setp('random-alignment', args.random_alignment)
 
     if args.net_filename:
         c.setup_from_file(args.net_filename)
@@ -90,7 +90,7 @@ def main():
                 basename=args.basename)
 
     if args.bottom_layer:
-        c.classifier.set_property('bottom-layer', args.bottom_layer)
+        c.setp('bottom-layer', args.bottom_layer)
 
 
     timed_files, full_timings = load_timings(c.classes,

@@ -79,22 +79,25 @@ class BaseClassifier(object):
             mainloop = GObject.MainLoop()
         self.mainloop = mainloop
         self.build_pipeline(channels, sinkname, samplerate)
+        self.setp = self.classifier.set_property
+        self.getp = self.classifier.get_property
 
     def setup_from_file(self, filename):
-        self.classifier.set_property('net-filename', filename)
-        self.classes = self.classifier.get_property('classes').split(',')
+        self.setp('net-filename', filename)
+        self.classes = self.getp('classes').split(',')
 
     def setup(self, mfccs, hsize, class_string, basename='classify', window_size=None):
         #put classes through a round trip, just to be sure it works
-        self.classifier.set_property('classes', class_string)
-        self.classes = self.classifier.get_property('classes').split(',')
+        self.setp('classes', class_string)
+        self.classes = self.setp('classes').split(',')
         if window_size is not None:
-            self.classifier.set_property('window-size', window_size)
+            self.setp('window-size', window_size)
         if mfccs is not None:
-            self.classifier.set_property('mfccs', mfccs)
+            self.setp('mfccs', mfccs)
         if hsize is not None:
-            self.classifier.set_property('hidden-size', hsize)
-        self.classifier.set_property('basename', basename)
+            self.setp('hidden-size', hsize)
+        self.setp('basename', basename)
+
 
     def on_eos(self, bus, msg):
         print('on_eos()')
@@ -139,7 +142,7 @@ class Classifier(BaseClassifier):
         self.all_results = []
         self.class_results = self.get_results_counter()
         self.data = list(reversed(data))
-        self.classifier.set_property('training', False)
+        self.setp('training', False)
         self.load_next_file()
         self.mainloop.run()
         return self.all_results
@@ -151,7 +154,7 @@ class Classifier(BaseClassifier):
         #print fn, targets
         self.current_file = fn
         self.filesrcs[0].set_property('location', fn)
-        self.classifier.set_property('target', targets)
+        self.setp('target', targets)
         self.file_results = [[] for x in self.classes]
         self.file_class_results = self.get_results_counter()
         self.probabilities = self.get_results_counter(0)
@@ -354,9 +357,9 @@ class Trainer(BaseClassifier):
         testers = eternal_alternator(testers)
         self.testset = [testers.next() for i in range(self.channels)]
         self.test_scores = None
-        self.classifier.set_property('log-file', log_file)
+        self.setp('log-file', log_file)
         for k, v in properties:
-            self.classifier.set_property(k, v)
+            self.setp(k, v)
         self.timestamp = time.time()
         self.next_training_set()
         self.pipeline.set_state(Gst.State.PLAYING)
@@ -368,17 +371,17 @@ class Trainer(BaseClassifier):
                             for y in self.classes]
         self.test_runs = [{x: 0 for x in y}
                           for y in self.classes]
-        self.classifier.set_property('dropout', 0)
-        self.classifier.set_property('forget', 0)
-        self.classifier.set_property('training', False)
+        self.setp('dropout', 0)
+        self.setp('forget', 0)
+        self.setp('training', False)
         self.next_set(iter(self.testset))
         self.test_n = 0
         self.timestamp = time.time()
 
     def next_training_set(self):
         dropout = self.dropout.next()
-        self.classifier.set_property('dropout', dropout)
-        self.classifier.set_property('training', True)
+        self.setp('dropout', dropout)
+        self.setp('training', True)
         starttime = self.timestamp
         self.timestamp = time.time()
 
@@ -387,7 +390,7 @@ class Trainer(BaseClassifier):
             print ("%s/%s learn_rate %.4g dropout %.2g elapsed %.2f" %
                    (self.counter, self.iterations, r, dropout,
                     self.timestamp - starttime))
-            self.classifier.set_property('learn_rate', r)
+            self.setp('learn_rate', r)
 
 
         self.probability_sums = []
@@ -411,7 +414,7 @@ class Trainer(BaseClassifier):
                 print fn, timings
 
         target_string = ' '.join(targets)
-        self.classifier.set_property('target', target_string)
+        self.setp('target', target_string)
         if not self.quiet:
             print target_string
 
@@ -477,7 +480,7 @@ class Trainer(BaseClassifier):
 
     def save_net(self, name=''):
         if not self.no_save_net:
-            self.classifier.set_property('save-net', name)
+            self.setp('save-net', name)
 
 
     def on_eos(self, bus, msg):
@@ -506,7 +509,7 @@ class Trainer(BaseClassifier):
         s = msg.get_structure()
         #print s.to_string()
         name = s.get_name()
-        if name == 'classify' and not self.classifier.get_property('training'):
+        if name == 'classify' and not self.getp('training'):
             self.test_n += self.channels
             v = s.get_value
             for i in range(self.channels):
