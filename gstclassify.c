@@ -1149,20 +1149,19 @@ gst_classify_set_property (GObject * object, guint prop_id, const GValue * value
   GstClassify *self = GST_CLASSIFY (object);
   GST_DEBUG("gst_classify_set_property with prop_id %d\n", prop_id);
   if (value){
-    const char *strvalue;
     switch (prop_id) {
     case PROP_PGM_DUMP:
       if (self->net){
-        strvalue = g_value_get_string(value);
-        rnn_multi_pgm_dump(self->net, strvalue);
+        const char *s = g_value_get_string(value);
+        rnn_multi_pgm_dump(self->net, s);
       }
       break;
 
     case PROP_SAVE_NET:
-      strvalue = g_value_get_string(value);
       if (self->net){
-        if (strvalue && strvalue[0] != 0){
-          rnn_save_net(self->net, strvalue, 1);
+        const char *s = g_value_get_string(value);
+        if (s && s[0] != 0){
+          rnn_save_net(self->net, s, 1);
         }
         else {
           rnn_save_net(self->net, self->net_filename, 1);
