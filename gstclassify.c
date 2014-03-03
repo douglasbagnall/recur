@@ -605,7 +605,7 @@ load_metadata(const char *metadata, struct ClassifyMetadata *m){
       "min-frequency %f "
       "max-frequency %f "
       "knee-frequency %f "
-      "mfccs %ms "
+      "mfccs %d "
       "window-size %d "
       "basename %ms");
   int n = sscanf(metadata, template, &m->classes,
