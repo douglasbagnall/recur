@@ -659,8 +659,8 @@ load_specified_net(GstClassify *self, const char *filename){
         self->net, self->mfcc_factory);
     abort();
   }
-  self->net_filename = filename;
-  self->basename = m.basename;
+  self->net_filename = strdup(filename);
+  self->basename = strdup(m.basename);
   setup_audio(self, m.window_size, m.mfccs, m.min_freq,
       m.max_freq, m.knee_freq);
   self->net = net;
@@ -803,7 +803,7 @@ gst_classify_setup(GstAudioFilter *base, const GstAudioInfo *info){
       GST_ERROR("mfcc_factory exists before net. This won't work.");
       abort();
     }
-    self->basename = PP_GET_STRING(self, PROP_BASENAME, DEFAULT_BASENAME);
+    self->basename = strdup(PP_GET_STRING(self, PROP_BASENAME, DEFAULT_BASENAME));
     setup_audio(self, PP_GET_INT(self, PROP_WINDOW_SIZE, DEFAULT_WINDOW_SIZE),
         PP_GET_INT(self, PROP_MFCCS, DEFAULT_PROP_MFCCS),
         PP_GET_FLOAT(self, PROP_MIN_FREQUENCY, DEFAULT_MIN_FREQUENCY),
