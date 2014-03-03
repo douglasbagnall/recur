@@ -294,7 +294,7 @@ gst_classify_class_init (GstClassifyClass * klass)
       g_param_spec_string("classes", "classes",
           "Identify classes (one letter per class, groups separated by commas)",
           DEFAULT_PROP_CLASSES,
-          G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
+          G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class, PROP_BPTT_DEPTH,
       g_param_spec_int("bptt-depth", "bptt-depth",
@@ -532,25 +532,18 @@ count_class_groups(const char *s){
 static int parse_classes_string(GstClassify *self, const char *orig)
 {
   char *str = strdup(orig);
-  char *s;
+  char *s = str;
   int i;
-  int n_groups = 1;
-  for (s = str; *s; s++){
-    if (*s == ','){
-      *s = 0;
-      n_groups++;
-    }
-  }
+  int n_groups = count_class_groups(str);
   self->class_groups = realloc_or_die(self->class_groups,
       (n_groups + 2) * sizeof(ClassifyClassGroup));
-  s = str;
   int offset = 0;
   for (i = 0; i < n_groups; i++){
     ClassifyClassGroup *group = &self->class_groups[i];
     group->classes = s;
     group->n_classes = 1;
     group->offset = offset;
-    for (; *s; s++){
+    for (; *s && *s != ','; s++){
       group->n_classes++;
       offset++;
     }
@@ -1301,6 +1294,17 @@ gst_classify_get_property (GObject * object, guint prop_id, GValue * value,
     break;
 
 #undef NET_OR_PP
+
+  case PROP_CLASSES:
+    /*The first class group happens to be the beginning of the class
+      string. This will break if that ever changes. */
+    if (net){
+      g_value_set_string(value, self->class_groups[0].classes);
+    }
+    else{
+      g_value_copy(PENDING_PROP(self, prop_id), value);
+    }
+    break;
 
   case PROP_TRAINING:
     g_value_set_boolean(value, self->training);
