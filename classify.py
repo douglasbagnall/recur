@@ -82,9 +82,10 @@ class BaseClassifier(object):
 
     def setup_from_file(self, filename):
         self.classifier.set_property('net-filename', filename)
+        self.classes = self.classifier.get_property('classes').split(',')
 
-    def setup(self, mfccs, hsize, classes, basename='classify', window_size=None):
-        self.classes = classes #tuple of strings
+    def setup(self, mfccs, hsize, class_string, basename='classify', window_size=None):
+        self.classes = class_string.split(',')
         if window_size is not None:
             self.classifier.set_property('window-size', window_size)
         if mfccs is not None:
