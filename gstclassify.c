@@ -519,6 +519,16 @@ set_net_filename(GstClassify *self, int hidden_size, int bottom_layer,
 }
 
 
+
+static inline int
+count_class_groups(const char *s){
+  int n_groups = 1;
+  for (; *s; s++){
+    n_groups += (*s == ',');
+  }
+  return n_groups;
+}
+
 static int parse_classes_string(GstClassify *self, const char *orig)
 {
   char *str = strdup(orig);
@@ -586,6 +596,10 @@ struct ClassifyMetadata {
 
 static int
 load_metadata(const char *metadata, struct ClassifyMetadata *m){
+  if (! metadata){
+    GST_WARNING("There is no metadata!");
+    return -1;
+  }
   const char *template = (
       "classes %ms "
       "min-frequency %f "
@@ -598,10 +612,10 @@ load_metadata(const char *metadata, struct ClassifyMetadata *m){
       &m->min_freq, &m->max_freq, &m->knee_freq,
       &m->mfccs, &m->window_size, &m->basename);
   if (n != 7){
-    GST_WARNING("Found only %d/%d metadata items", n, 7);
-    return 0;
+    STDERR_DEBUG("Found only %d/%d metadata items", n, 7);
+    return -1;
   }
-  return 1;
+  return 0;
 }
 
 static void
@@ -621,25 +635,39 @@ setup_audio(GstClassify *self, int window_size, int mfccs, float min_freq,
 
 static RecurNN *
 load_specified_net(GstClassify *self, const char *filename){
-  struct ClassifyMetadata m;
+  struct ClassifyMetadata m = {0};
   RecurNN *net = rnn_load_net(filename);
-  load_metadata(net->metadata, &m);
+  if (net == NULL){
+    STDERR_DEBUG("Could not load %s", filename);
+    abort();
+  }
+  if (load_metadata(net->metadata, &m)){
+    STDERR_DEBUG("The metadata (%s) is bad", net->metadata);
+    abort();
+  }
+  int n_outputs = parse_classes_string(self, m.classes);
+  if (n_outputs != net->output_size){
+    STDERR_DEBUG("Class string suggests %d outputs, net has %d",
+        n_outputs, net->output_size);
+    abort();
+  }
   if (self->mfcc_factory != NULL ||
       self->net != NULL){
-    GST_ERROR("There is already a net (%p) and/or audiobinner (%p). This won't work",
+    STDERR_DEBUG("There is already a net (%p) and/or audiobinner (%p). This won't work",
         self->net, self->mfcc_factory);
     abort();
   }
   self->net_filename = filename;
+  self->basename = m.basename;
   setup_audio(self, m.window_size, m.mfccs, m.min_freq,
       m.max_freq, m.knee_freq);
-
+  self->net = net;
   return net;
 }
 
 static RecurNN *
 create_net(GstClassify *self, int bottom_layer_size,
-    int hidden_size, int top_layer_size){
+    int hidden_size, int top_layer_size, char *metadata){
   if (self->mfcc_factory == NULL){
     GST_ERROR("We seem to be creating a net before the audio stuff has been set up. "
         "It won't work.");
@@ -696,6 +724,7 @@ create_net(GstClassify *self, int bottom_layer_size,
   if (PERIODIC_PGM_DUMP){
     rnn_multi_pgm_dump(net, "how ihw biw");
   }
+  net->metadata = metadata;
   return net;
 }
 
@@ -705,8 +734,8 @@ load_or_create_net(GstClassify *self){
   char *metadata = construct_metadata(self);
   int hidden_size = PP_GET_INT(self, PROP_HIDDEN_SIZE, DEFAULT_HIDDEN_SIZE);
   int bottom_layer_size = PP_GET_INT(self, PROP_BOTTOM_LAYER, 0);
-  int top_layer_size = parse_classes_string(self,
-      get_gvalue_string(PENDING_PROP(self, PROP_CLASSES), DEFAULT_PROP_CLASSES));
+  const char *class_string = PP_GET_STRING(self, PROP_CLASSES, DEFAULT_PROP_CLASSES);
+  int top_layer_size = count_class_groups(class_string);
 
   if (self->net_filename == NULL){
     set_net_filename(self, hidden_size, bottom_layer_size, top_layer_size, metadata);
@@ -732,7 +761,16 @@ load_or_create_net(GstClassify *self){
     }
   }
   if (net == NULL){
-    net = create_net(self, bottom_layer_size, hidden_size, top_layer_size);
+    net = create_net(self, bottom_layer_size, hidden_size, top_layer_size, metadata);
+  }
+  struct ClassifyMetadata m = {0};
+  load_metadata(net->metadata, &m);
+  int n_outputs = parse_classes_string(self, m.classes);
+  if (n_outputs != net->output_size ||
+      strcmp(class_string, m.classes)){
+    STDERR_DEBUG("Metadata class string %s suggests %d outputs, net has %s and %d",
+        m.classes, n_outputs, class_string, net->output_size);
+    abort();
   }
   return net;
 }

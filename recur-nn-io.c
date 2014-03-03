@@ -32,7 +32,8 @@ rnn_save_net(RecurNN *net, const char *filename, int backup){
   /* 3: saves BPTT min_error_factor       */
   /* 4: saves bottom layer if applicable, using more qualified keys
      ("net->X", "bptt->X", "bottom_layer->X") */
-  const int version = 4;
+  /* 5: includes metadata */
+  const int version = 5;
   cdb_make_add(&cdbm, FORMAT_VERSION, strlen(FORMAT_VERSION), &version, sizeof(version));
 
 #define SAVE_SCALAR(obj, attr) do {                                     \
@@ -82,6 +83,9 @@ rnn_save_net(RecurNN *net, const char *filename, int backup){
   if (net->metadata){
     size_t slen = strlen(net->metadata) + 1;
     SAVE_ARRAY(net, metadata, slen);
+  }
+  else {
+    DEBUG("not saving net metadata because it is %s", net->metadata);
   }
   if ((net->flags & RNN_NET_FLAG_OWN_BPTT) && net->bptt){
     RecurNNBPTT *bptt = net->bptt;
@@ -328,7 +332,7 @@ rnn_load_net(const char *filename){
   READ_ARRAY(net, output_layer, net->o_size * sizeof(float));
   READ_ARRAY(net, ih_weights, net->ih_size * sizeof(float));
   READ_ARRAY(net, ho_weights, net->ho_size * sizeof(float));
-  if (net->metadata){
+  if (version >= 5){
     READ_FREE_SIZE_ARRAY(net, metadata, MAX_METADATA_SIZE);
   }
   if(bptt){
