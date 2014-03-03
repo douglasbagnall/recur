@@ -842,7 +842,7 @@ gst_classify_setup(GstAudioFilter *base, const GstAudioInfo *info){
   GstStructure *s = gst_structure_new_empty("classify-setup");
   GstMessage *msg = gst_message_new_element(GST_OBJECT(self), s);
   gst_element_post_message(GST_ELEMENT(self), msg);
-  if (self->random_alignment){/*and mode == training?*/
+  if (self->random_alignment && self->training){
     self->write_offset = 0;
     int offset = rand_small_int(&self->net->rng, self->window_size) - self->window_size / 2;
     self->read_offset = offset * self->n_channels;
@@ -853,6 +853,10 @@ gst_classify_setup(GstAudioFilter *base, const GstAudioInfo *info){
     }
     GST_LOG("random offset is %d (%d * %d)",
         self->read_offset, offset, self->n_channels);
+  }
+  else {//XXX?
+    self->write_offset = 0;
+    self->read_offset = 0;
   }
   return TRUE;
 }
@@ -878,7 +882,7 @@ cmp_class_event(const void *a, const void *b){
   the two special characters. '=' means the group target is not being changed,
   while '-' means there is no target for that group.
 
-  For example, if the classes had been set to "Mm|Kk|Wx", this would be a
+  For example, if the classes had been set to "Mm,Kk,Wx", this would be a
   valid target string:
 
   "c0t2.3:mkW c0t4.1:m-x c11t123:=K= c1t0:Mkx"
