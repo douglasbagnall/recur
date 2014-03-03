@@ -582,8 +582,7 @@ construct_metadata(GstClassify *self){
       PP_GET_STRING(self, PROP_BASENAME, DEFAULT_BASENAME));
   STDERR_DEBUG("%s", metadata);
   if (ret == -1){
-    STDERR_DEBUG("can't alloc memory for metadata. or something.");
-    abort();
+    FATAL_ERROR("can't alloc memory for metadata. or something.");
   }
   return metadata;
 }
@@ -614,7 +613,7 @@ load_metadata(const char *metadata, struct ClassifyMetadata *m){
       &m->min_freq, &m->max_freq, &m->knee_freq,
       &m->mfccs, &m->window_size, &m->basename);
   if (n != 7){
-    STDERR_DEBUG("Found only %d/%d metadata items", n, 7);
+    GST_WARNING("Found only %d/%d metadata items", n, 7);
     return -1;
   }
   return 0;
@@ -632,6 +631,7 @@ setup_audio(GstClassify *self, int window_size, int mfccs, float min_freq,
       CLASSIFY_VALUE_SIZE);
 
   self->window_size = window_size;
+  GST_LOG("mfccs: %d", mfccs);
   self->mfccs = mfccs;
 }
 
@@ -640,24 +640,21 @@ load_specified_net(GstClassify *self, const char *filename){
   struct ClassifyMetadata m = {0};
   RecurNN *net = rnn_load_net(filename);
   if (net == NULL){
-    STDERR_DEBUG("Could not load %s", filename);
-    abort();
+    FATAL_ERROR("Could not load %s", filename);
   }
+  GST_DEBUG("loaded metadata: %s", net->metadata);
   if (load_metadata(net->metadata, &m)){
-    STDERR_DEBUG("The metadata (%s) is bad", net->metadata);
-    abort();
+    FATAL_ERROR("The metadata (%s) is bad", net->metadata);
   }
   int n_outputs = parse_classes_string(self, m.classes);
   if (n_outputs != net->output_size){
-    STDERR_DEBUG("Class string suggests %d outputs, net has %d",
-        n_outputs, net->output_size);
-    abort();
+    FATAL_ERROR("Class '%s' string suggests %d outputs, net has %d",
+        m.classes, n_outputs, net->output_size);
   }
   if (self->mfcc_factory != NULL ||
       self->net != NULL){
-    STDERR_DEBUG("There is already a net (%p) and/or audiobinner (%p). This won't work",
-        self->net, self->mfcc_factory);
-    abort();
+    FATAL_ERROR("There is already a net (%p) and/or audiobinner (%p). "
+        "This won't work", self->net, self->mfcc_factory);
   }
   self->net_filename = strdup(filename);
   self->basename = strdup(m.basename);
@@ -671,9 +668,8 @@ static RecurNN *
 create_net(GstClassify *self, int bottom_layer_size,
     int hidden_size, int top_layer_size, char *metadata){
   if (self->mfcc_factory == NULL){
-    GST_ERROR("We seem to be creating a net before the audio stuff has been set up. "
-        "It won't work.");
-    abort();
+    FATAL_ERROR("We seem to be creating a net before the audio stuff"
+        " has been set up. It won't work.");
   }
   RecurNN *net;
   int n_features = self->mfccs ? self->mfccs : CLASSIFY_N_FFT_BINS;
@@ -770,9 +766,8 @@ load_or_create_net(GstClassify *self){
   int n_outputs = parse_classes_string(self, m.classes);
   if (n_outputs != net->output_size ||
       strcmp(class_string, m.classes)){
-    STDERR_DEBUG("Metadata class string %s suggests %d outputs, net has %s and %d",
+    FATAL_ERROR("Metadata class string %s suggests %d outputs, net has %s and %d",
         m.classes, n_outputs, class_string, net->output_size);
-    abort();
   }
   return net;
 }
@@ -800,8 +795,7 @@ gst_classify_setup(GstAudioFilter *base, const GstAudioInfo *info){
       created from them and the net made.
     */
     if (self->mfcc_factory != NULL){
-      GST_ERROR("mfcc_factory exists before net. This won't work.");
-      abort();
+      FATAL_ERROR("mfcc_factory exists before net. This won't work.");
     }
     self->basename = strdup(PP_GET_STRING(self, PROP_BASENAME, DEFAULT_BASENAME));
     setup_audio(self, PP_GET_INT(self, PROP_WINDOW_SIZE, DEFAULT_WINDOW_SIZE),

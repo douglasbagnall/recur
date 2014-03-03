@@ -53,6 +53,11 @@
     while(0)
 #endif
 
+#define FATAL_ERROR(args...) do {               \
+    STDERR_DEBUG(args);                         \
+    exit(1);                                    \
+  }while(0)
+
 #define ROUND_UP_16(x)  (((x) + 15) & ~15UL)
 #define ROUND_UP_4(x)  (((x) + 3) & ~3UL)
 

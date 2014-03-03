@@ -26,6 +26,7 @@ rnn_save_net(RecurNN *net, const char *filename, int backup){
   if (ret)
     goto error;
 
+  MAYBE_DEBUG("tmpfn is '%s'; fd %d", tmpfn, fd);
   /* save a version number                */
   /* none (or 0,1): original version      */
   /* 2: saves ho_scale                    */
@@ -85,7 +86,7 @@ rnn_save_net(RecurNN *net, const char *filename, int backup){
     SAVE_ARRAY(net, metadata, slen);
   }
   else {
-    DEBUG("not saving net metadata because it is %s", net->metadata);
+    MAYBE_DEBUG("not saving empty net metadata");
   }
   if ((net->flags & RNN_NET_FLAG_OWN_BPTT) && net->bptt){
     RecurNNBPTT *bptt = net->bptt;
@@ -132,6 +133,7 @@ rnn_save_net(RecurNN *net, const char *filename, int backup){
     }
   }
   /*XXX should check the rename errors */
+  MAYBE_DEBUG("tmpfn is '%s'; filename is %s; fd %d", tmpfn, filename, fd);
   rename(tmpfn, filename);
   return 0;
  error:
