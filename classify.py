@@ -85,15 +85,15 @@ class BaseClassifier(object):
         self.classes = self.classifier.get_property('classes').split(',')
 
     def setup(self, mfccs, hsize, class_string, basename='classify', window_size=None):
-        self.classes = class_string.split(',')
+        #put classes through a round trip, just to be sure it works
+        self.classifier.set_property('classes', class_string)
+        self.classes = self.classifier.get_property('classes').split(',')
         if window_size is not None:
             self.classifier.set_property('window-size', window_size)
         if mfccs is not None:
             self.classifier.set_property('mfccs', mfccs)
         if hsize is not None:
             self.classifier.set_property('hidden-size', hsize)
-        if classes is not None:
-            self.classifier.set_property('classes', ','.join(classes))
         self.classifier.set_property('basename', basename)
 
     def on_eos(self, bus, msg):
@@ -392,7 +392,7 @@ class Trainer(BaseClassifier):
 
         self.probability_sums = []
         self.probability_counts = []
-        for j, group in enumerate(self.classes):
+        for group in self.classes:
             self.probability_sums.append({x:[0.0, 0.0] for x in group})
             self.probability_counts.append({x:[0.0, 0.0] for x in group})
 
@@ -455,6 +455,7 @@ class Trainer(BaseClassifier):
 
             output.append(" probabilities (right/wrong)")
             for x in classes:
+                #print x, probs, pcounts
                 wrong, right = probs[x]
                 wrong_c, right_c = pcounts[x]
                 right_p = right / right_c if right_c else float('nan')
@@ -647,8 +648,7 @@ def targeted_wav_finder(d, files):
 
 
 
-def load_timings(class_string, timing_files, audio_directories):
-    all_classes = class_string.split(',')
+def load_timings(all_classes, timing_files, audio_directories):
     timings = {}
     for fn in timing_files:
         classes = None
@@ -669,4 +669,4 @@ def load_timings(class_string, timing_files, audio_directories):
     #print timings
     full_timings = {ffn: timings[fn] for fn, ffn in timed_files}
 
-    return all_classes, timed_files, full_timings
+    return timed_files, full_timings

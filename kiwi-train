@@ -71,36 +71,39 @@ def main():
 
     random.seed(1)
 
-    all_classes, timed_files, full_timings = load_timings(args.classes,
-                                                          args.timings,
-                                                          args.audio_directory)
-
     n_channels = args.channels
-    validate_streams = [[ffn for fn, ffn in timed_files[:n_channels]]]
-    training_streams = [[ffn for fn, ffn in timed_files[n_channels:]]]
-
-    for x in training_streams:
-        random.shuffle(x)
 
     c = Trainer(channels=n_channels)
 
     c.no_save_net = args.no_save_net
     c.quiet = not args.verbose
-    c.timings = full_timings
 
     c.classifier.set_property('random-alignment', args.random_alignment)
 
     if args.net_filename:
         c.setup_from_file(args.net_filename)
     else:
-        c.setup(mfccs=MFCCS,
-                hsize=args.hidden_size,
-                classes=all_classes,
+        c.setup(MFCCS,
+                args.hidden_size,
+                args.classes,
                 window_size=args.window_size,
                 basename=args.basename)
 
     if args.bottom_layer:
         c.classifier.set_property('bottom-layer', args.bottom_layer)
+
+
+    timed_files, full_timings = load_timings(c.classes,
+                                             args.timings,
+                                             args.audio_directory)
+
+    validate_streams = [[ffn for fn, ffn in timed_files[:n_channels]]]
+    training_streams = [[ffn for fn, ffn in timed_files[n_channels:]]]
+
+    for x in training_streams:
+        random.shuffle(x)
+
+    c.timings = full_timings
 
     c.train(training_streams, validate_streams, iterations=args.iterations,
             learn_rate=lr, dropout=dropout, log_file=NET_LOG_FILE,
