@@ -102,8 +102,10 @@ def main():
 
     c.timings = full_timings
 
+    log_file_name = c.getp('basename') + '.log'
+
     c.train(training_streams, validate_streams, iterations=args.iterations,
-            learn_rate=lr, dropout=dropout, log_file=NET_LOG_FILE,
+            learn_rate=lr, dropout=dropout, log_file=log_file_name,
             properties=(('momentum-soft-start', 10000),
                         ('momentum', 0.95),
                         ('momentum-style', 1),

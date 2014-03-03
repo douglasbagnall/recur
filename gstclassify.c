@@ -288,7 +288,7 @@ gst_classify_class_init (GstClassifyClass * klass)
       g_param_spec_string("basename", "basename",
           "Base net file names on this root",
           DEFAULT_BASENAME,
-          G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
+          G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class, PROP_CLASSES,
       g_param_spec_string("classes", "classes",
@@ -1269,10 +1269,10 @@ gst_classify_get_property (GObject * object, guint prop_id, GValue * value,
 
   switch (prop_id) {
 
-#define NET_OR_PP(attr, type, needs_bptt, needs_bottom_layer) do {      \
+#define NET_OR_PP(var, type, needs_bptt, needs_bottom_layer) do {       \
     if (net && (!(needs_bptt) || net->bptt) &&                          \
         (!(needs_bottom_layer) || net->bottom_layer)){                  \
-      g_value_set_ ## type(value, net->attr);                           \
+      g_value_set_ ## type(value, var);                                 \
     } else {                                                            \
       const GValue *pp = PENDING_PROP(self, prop_id);                   \
       if (G_IS_VALUE(pp)){                                              \
@@ -1281,28 +1281,31 @@ gst_classify_get_property (GObject * object, guint prop_id, GValue * value,
     }} while(0)
 
   case PROP_LEARN_RATE:
-    NET_OR_PP(bptt->learn_rate, float, 1, 0);
+    NET_OR_PP(net->bptt->learn_rate, float, 1, 0);
     break;
   case PROP_TOP_LEARN_RATE_SCALE:
-    NET_OR_PP(bptt->ho_scale, float, 1, 0);
+    NET_OR_PP(net->bptt->ho_scale, float, 1, 0);
     break;
   case PROP_MOMENTUM:
-    NET_OR_PP(bptt->momentum, float, 1, 0);
+    NET_OR_PP(net->bptt->momentum, float, 1, 0);
     break;
   case PROP_BOTTOM_LEARN_RATE_SCALE:
-    NET_OR_PP(bottom_layer->learn_rate_scale, float, 0, 1);
+    NET_OR_PP(net->bottom_layer->learn_rate_scale, float, 0, 1);
     break;
   case PROP_BPTT_DEPTH:
-    NET_OR_PP(bptt->depth, int, 1, 0);
+    NET_OR_PP(net->bptt->depth, int, 1, 0);
     break;
   case PROP_HIDDEN_SIZE:
-    NET_OR_PP(hidden_size, int, 0, 0);
+    NET_OR_PP(net->hidden_size, int, 0, 0);
     break;
   case PROP_BOTTOM_LAYER:
-    NET_OR_PP(bottom_layer->input_size, int, 0, 1);
+    NET_OR_PP(net->bottom_layer->input_size, int, 0, 1);
     break;
   case PROP_LAWN_MOWER:
-    NET_OR_PP(flags & RNN_COND_USE_LAWN_MOWER, boolean, 0, 0);
+    NET_OR_PP(net->flags & RNN_COND_USE_LAWN_MOWER, boolean, 0, 0);
+    break;
+  case PROP_BASENAME:
+    NET_OR_PP(self->basename, string, 0, 0);
     break;
 
 #undef NET_OR_PP
