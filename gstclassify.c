@@ -791,31 +791,26 @@ gst_classify_setup(GstAudioFilter *base, const GstAudioInfo *info){
   if (self->net == NULL){
     /*there are two paths to loading a net.
 
-      1. if the net is specifically named, metadata for audio processing is
-      loaded from it, and values specified via properties or defaults are
-      ignored (XXX for now; later an override switch).
+      1. If the net has been specifically named in the 'net-filename'
+      property, it (and the audio feature extraction) will have been set up
+      already from the set_property hook.
 
-      2. if no net name is specified, the audio parameters are determined
-      first, and a network name is determined from them and layer parameters.
-
-     */
-    const char *filename = PP_GET_STRING(self, PROP_NET_FILENAME, NULL);
+      2. If no net name is specified, the net is created here. First the audio
+      parameters and layer sizes are determined, then a network name is
+      created from them and the net made.
+    */
     if (self->mfcc_factory != NULL){
       GST_ERROR("mfcc_factory exists before net. This won't work.");
       abort();
     }
-    else if (filename){
-      load_specified_net(self, filename);
-    }
-    else {
-      self->basename = PP_GET_STRING(self, PROP_BASENAME, DEFAULT_BASENAME);
-      setup_audio(self, PP_GET_INT(self, PROP_WINDOW_SIZE, DEFAULT_WINDOW_SIZE),
-          PP_GET_INT(self, PROP_MFCCS, DEFAULT_PROP_MFCCS),
-          PP_GET_FLOAT(self, PROP_MIN_FREQUENCY, DEFAULT_MIN_FREQUENCY),
-          PP_GET_FLOAT(self, PROP_MAX_FREQUENCY, DEFAULT_MAX_FREQUENCY),
-          PP_GET_FLOAT(self, PROP_KNEE_FREQUENCY, DEFAULT_KNEE_FREQUENCY));
-      self->net = load_or_create_net(self);
-    }
+    self->basename = PP_GET_STRING(self, PROP_BASENAME, DEFAULT_BASENAME);
+    setup_audio(self, PP_GET_INT(self, PROP_WINDOW_SIZE, DEFAULT_WINDOW_SIZE),
+        PP_GET_INT(self, PROP_MFCCS, DEFAULT_PROP_MFCCS),
+        PP_GET_FLOAT(self, PROP_MIN_FREQUENCY, DEFAULT_MIN_FREQUENCY),
+        PP_GET_FLOAT(self, PROP_MAX_FREQUENCY, DEFAULT_MAX_FREQUENCY),
+        PP_GET_FLOAT(self, PROP_KNEE_FREQUENCY, DEFAULT_KNEE_FREQUENCY));
+    self->net = load_or_create_net(self);
+
     RecurNN *net = self->net;
     if (net->bottom_layer && 0){
       self->error_image = temporal_ppm_alloc(net->bottom_layer->o_size, 300,
@@ -1204,6 +1199,19 @@ gst_classify_set_property (GObject * object, guint prop_id, const GValue * value
       self->momentum_style = g_value_get_int(value);
       break;
 
+      /*this causes the net to be loaded immediately, if possible, so that
+        various properties can be queried */
+    case PROP_NET_FILENAME:
+      if (self->net == NULL){
+        const char *s = g_value_get_string(value);
+        load_specified_net(self, s);
+        //XXX what to do on error
+      }
+      else {
+        GST_WARNING("it is TOO LATE to set %s.", pspec->name);
+      }
+      break;
+
       /*These ones affect the net directly if the net exists. Otherwise they
         need to be stored as pending properties.*/
     case PROP_TOP_LEARN_RATE_SCALE:
@@ -1215,7 +1223,6 @@ gst_classify_set_property (GObject * object, guint prop_id, const GValue * value
     /*These properties only need to be stored until net creation, and can't
       be changed afterwards.
     */
-    case PROP_NET_FILENAME:
     case PROP_BASENAME:
     case PROP_MIN_FREQUENCY:
     case PROP_KNEE_FREQUENCY:
@@ -1239,7 +1246,6 @@ gst_classify_set_property (GObject * object, guint prop_id, const GValue * value
         GST_WARNING("it is TOO LATE to set %s.", pspec->name);
       }
       break;
-
     /*these ones can be set any time but only have effect in
       gst_classify_setup(). that is, after a net exists but possibly more than
       once.*/
