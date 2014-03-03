@@ -529,6 +529,15 @@ count_class_groups(const char *s){
   return n_groups;
 }
 
+static inline int
+count_class_group_members(const char *s){
+  int n_groups = 0;
+  for (; *s; s++){
+    n_groups += (*s != ',');
+  }
+  return n_groups;
+}
+
 static int parse_classes_string(GstClassify *self, const char *orig)
 {
   char *str = strdup(orig);
@@ -728,7 +737,7 @@ load_or_create_net(GstClassify *self){
   int hidden_size = PP_GET_INT(self, PROP_HIDDEN_SIZE, DEFAULT_HIDDEN_SIZE);
   int bottom_layer_size = PP_GET_INT(self, PROP_BOTTOM_LAYER, 0);
   const char *class_string = PP_GET_STRING(self, PROP_CLASSES, DEFAULT_PROP_CLASSES);
-  int top_layer_size = count_class_groups(class_string);
+  int top_layer_size = count_class_group_members(class_string);
 
   if (self->net_filename == NULL){
     set_net_filename(self, hidden_size, bottom_layer_size, top_layer_size, metadata);
