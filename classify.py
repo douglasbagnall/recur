@@ -98,7 +98,6 @@ class BaseClassifier(object):
             self.setp('hidden-size', hsize)
         self.setp('basename', basename)
 
-
     def on_eos(self, bus, msg):
         print('on_eos()')
 
@@ -341,8 +340,8 @@ class Trainer(BaseClassifier):
     trainers = None
     lr_adjust = 1.0
     no_save_net = False
-    def train(self, trainers, testers, iterations=100, learn_rate=None, dropout=0.0,
-              log_file=DEFAULT_LOG_FILE, properties=()):
+    def train(self, trainers, testers, timings, iterations=100, learn_rate=None,
+              dropout=0.0, log_file='auto', properties=()):
         if isinstance(learn_rate, (int, float)):
             self.learn_rate = itertools.repeat(learn_rate)
         else:
@@ -353,10 +352,15 @@ class Trainer(BaseClassifier):
             self.dropout = dropout
         self.counter = 0
         self.iterations = iterations
+        self.timings = timings
         self.trainers = eternal_shuffler(trainers)
         testers = eternal_alternator(testers)
         self.testset = [testers.next() for i in range(self.channels)]
         self.test_scores = None
+        if log_file == 'auto':
+            log_file = self.getp('basename') + '.log'
+        elif not log_file:
+            log_file = ''
         self.setp('log-file', log_file)
         for k, v in properties:
             self.setp(k, v)
