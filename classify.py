@@ -89,7 +89,7 @@ class BaseClassifier(object):
     def setup(self, mfccs, hsize, class_string, basename='classify', window_size=None):
         #put classes through a round trip, just to be sure it works
         self.setp('classes', class_string)
-        self.classes = self.setp('classes').split(',')
+        self.classes = self.getp('classes').split(',')
         if window_size is not None:
             self.setp('window-size', window_size)
         if mfccs is not None:
