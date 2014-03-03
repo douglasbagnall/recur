@@ -20,6 +20,8 @@ def main():
                         help='lots of rubbish output')
     parser.add_argument('-t', '--timings', action='append',
                         help='read timings from here')
+    parser.add_argument('-f', '--net-filename',
+                        help='load RNN from here')
     parser.add_argument('-d', '--audio-directory', action='append',
                         help='find audio in this directory')
     parser.add_argument('-l', '--learn-rate', type=float,
@@ -80,18 +82,22 @@ def main():
     for x in training_streams:
         random.shuffle(x)
 
-    c = Trainer(mfccs=MFCCS,
-                hsize=args.hidden_size,
-                channels=n_channels,
-                classes=all_classes,
-                window_size=args.window_size,
-                basename=args.basename)
+    c = Trainer(channels=n_channels)
 
     c.no_save_net = args.no_save_net
     c.quiet = not args.verbose
     c.timings = full_timings
 
     c.classifier.set_property('random-alignment', args.random_alignment)
+
+    if args.net_filename:
+        c.setup_from_file(args.net_filename)
+    else:
+        c.setup(mfccs=MFCCS,
+                hsize=args.hidden_size,
+                classes=all_classes,
+                window_size=args.window_size,
+                basename=args.basename)
 
     if args.bottom_layer:
         c.classifier.set_property('bottom-layer', args.bottom_layer)

@@ -52,25 +52,10 @@ class BaseClassifier(object):
             x.link(link)
         return x
 
-    def set_channels(self, channels):
+    def build_pipeline(self, channels, sinkname, samplerate):
         self.channels = channels
-        caps =  Gst.caps_from_string("audio/x-raw, "
-                                     "layout=(string)interleaved, "
-                                     "channel-mask=(bitmask)0x0, "
-                                     "rate=8000, channels=%s"
-                                     % channels)
-        self.capsfilter.set_property("caps", caps)
-        self.summaries = [[]] * channels
-
-    def build_pipeline(self, mfccs, hsize, channels, sinkname='fakesink'):
-        self.channels = channels
-        classes = ','.join(self.classes)
         self.sink = self.make_add_link(sinkname, None)
         self.classifier = self.make_add_link('classify', self.sink)
-        self.classifier.set_property('mfccs', mfccs)
-        self.classifier.set_property('hidden-size', hsize)
-        self.classifier.set_property('classes', classes)
-
         self.capsfilter = self.make_add_link('capsfilter', self.classifier)
         self.interleave = self.make_add_link('interleave', self.capsfilter)
         self.filesrcs = []
@@ -81,18 +66,33 @@ class BaseClassifier(object):
             fs = self.make_add_link('filesrc', wp)
             self.filesrcs.append(fs)
 
-        self.set_channels(channels)
+        self.channels = channels
+        caps =  Gst.caps_from_string("audio/x-raw, "
+                                     "layout=(string)interleaved, "
+                                     "channel-mask=(bitmask)0x0, "
+                                     "rate=%d, channels=%d"
+                                     % (samplerate, channels))
+        self.capsfilter.set_property("caps", caps)
 
-    def __init__(self, mfccs, hsize, classes, channels=1, mainloop=None,
-                 sinkname='fakesink', basename='classify', window_size=None):
+    def __init__(self, channels=1, mainloop=None, sinkname='fakesink', samplerate=8000):
         if mainloop is None:
             mainloop = GObject.MainLoop()
         self.mainloop = mainloop
+        self.build_pipeline(channels, sinkname, samplerate)
+
+    def setup_from_file(self, filename):
+        self.classifier.set_property('net-filename', filename)
+
+    def setup(self, mfccs, hsize, classes, basename='classify', window_size=None):
         self.classes = classes #tuple of strings
-        self.build_pipeline(mfccs, hsize, channels, sinkname=sinkname)
         if window_size is not None:
             self.classifier.set_property('window-size', window_size)
-        self.basename = basename
+        if mfccs is not None:
+            self.classifier.set_property('mfccs', mfccs)
+        if hsize is not None:
+            self.classifier.set_property('hidden-size', hsize)
+        if classes is not None:
+            self.classifier.set_property('classes', ','.join(classes))
         self.classifier.set_property('basename', basename)
 
     def on_eos(self, bus, msg):
@@ -110,7 +110,6 @@ class BaseClassifier(object):
     def stop(self):
         self.pipeline.set_state(Gst.State.NULL)
         self.mainloop.quit()
-
 
     def get_results_counter(self, members=2):
         groups = []
@@ -468,8 +467,9 @@ class Trainer(BaseClassifier):
 
 
     def save_named_net(self, tag='', dir=SAVE_LOCATION):
+        basename = self.classifier.getproperty('basename')
         fn = ("%s/%s-%s-%s.net" %
-              (dir, self.basename, time.time(), tag))
+              (dir, basename, time.time(), tag))
         print "saving %s" % fn
         self.save_net(fn)
 
@@ -511,7 +511,7 @@ class Trainer(BaseClassifier):
                 for j, group in enumerate(self.classes):
                     target = v('channel %d, group %d target' % (i, j))
                     correct = v('channel %d, group %d correct' % (i, j))
-                    #print group, target, correct, target in group
+                    #print group, target, correct
                     self.test_scores[j][target] += correct
                     self.test_runs[j][target] += 1
                     for x in group:
