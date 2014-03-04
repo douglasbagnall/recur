@@ -6,11 +6,11 @@ import time
 import argparse
 
 from classify import gst_init, Gst
-from classify_kiwi import MFCCS, CLASSES, WINDOW_SIZE, BASENAME
+from classify_kiwi import MFCCS, WINDOW_SIZE, BASENAME
 
 from classify import targeted_wav_finder, load_timings
 from classify import categorised_files
-from classify import Classifier
+from classify import Classifier, add_common_args
 
 TEST_AUDIO_DIR = "/home/douglas/corpora/kiwi/test/"
 KIWI_TIMING_DATA = '/home/douglas/corpora/kiwi/times.txt'
@@ -18,30 +18,16 @@ KIWI_TIMING_DATA = '/home/douglas/corpora/kiwi/times.txt'
 def main():
     gst_init()
     parser = argparse.ArgumentParser()
-    parser.add_argument('-v', '--verbose', action='store_true',
-                        help='lots of rubbish output')
-    parser.add_argument('-t', '--timings', action='append',
-                        help='read timings from here')
-    parser.add_argument('-d', '--audio-directory', action='append',
-                        help='find audio in this directory')
-    parser.add_argument('-c', '--classes', default='tf',
-                        help="classes (letter per class, groups separated by ',')")
+    add_common_args(parser, WINDOW_SIZE=WINDOW_SIZE,
+                    BASENAME=BASENAME)
     parser.add_argument('-C', '--first-n', type=int, default=0,
                         help="classify this many files")
-    parser.add_argument('-i', '--iterations', type=int, default=10000,
-                        help="how many file cycles to run for")
-    parser.add_argument('-H', '--hidden-size', type=int,
-                        help="number of hidden neurons")
-    parser.add_argument('-B', '--bottom-layer', type=int,
-                        help="number of bottom layer output nodes")
     parser.add_argument('--ground-truth-file',
                         help="write ground truth to this file (CSV)")
     parser.add_argument('--classification-file',
                         help="write classifications to this file")
     parser.add_argument('--roc', action='store_true',
                         help="show ROC curves")
-    parser.add_argument('-n', '--basename', default=BASENAME,
-                        help="save nets etc using this basename")
 
     args = parser.parse_args()
 
