@@ -66,11 +66,8 @@ def main():
                 args.hidden_size,
                 args.classes,
                 window_size=args.window_size,
+                bottom_layer=args.bottom_layer,
                 basename=args.basename)
-
-    if args.bottom_layer:
-        c.setp('bottom-layer', args.bottom_layer)
-
 
     timed_files, full_timings = load_timings(c.classes,
                                              args.timings,

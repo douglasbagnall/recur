@@ -41,6 +41,7 @@ def main():
                 args.hidden_size,
                 args.classes,
                 window_size=args.window_size,
+                bottom_layer=args.bottom_layer,
                 basename=args.basename)
 
     timed_files, full_timings = load_timings(c.classes,
@@ -50,9 +51,6 @@ def main():
     if args.first_n:
         timed_files = timed_files[:args.first_n]
     test_files = [(ffn, full_timings[ffn]) for fn, ffn in timed_files]
-
-    if args.bottom_layer:
-        c.classifier.set_property('bottom-layer', args.bottom_layer)
 
     c.classify(test_files, ground_truth_file=args.ground_truth_file,
                classification_file=args.classification_file, show_roc=args.roc)

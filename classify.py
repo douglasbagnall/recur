@@ -86,7 +86,8 @@ class BaseClassifier(object):
         self.setp('net-filename', filename)
         self.classes = self.getp('classes').split(',')
 
-    def setup(self, mfccs, hsize, class_string, basename='classify', window_size=None):
+    def setup(self, mfccs, hsize, class_string, basename='classify',
+              bottom_layer=0, window_size=None):
         #put classes through a round trip, just to be sure it works
         self.setp('classes', class_string)
         self.classes = self.getp('classes').split(',')
@@ -96,6 +97,8 @@ class BaseClassifier(object):
             self.setp('mfccs', mfccs)
         if hsize is not None:
             self.setp('hidden-size', hsize)
+        if bottom_layer:
+            self.setp('bottom-layer', bottom_layer)
         self.setp('basename', basename)
 
     def on_eos(self, bus, msg):
