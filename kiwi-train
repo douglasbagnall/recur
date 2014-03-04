@@ -67,7 +67,10 @@ def main():
                 args.classes,
                 window_size=args.window_size,
                 bottom_layer=args.bottom_layer,
-                basename=args.basename)
+                basename=args.basename,
+                min_freq=300,
+                max_freq=3800,
+                knee_freq=1100)
 
     timed_files, full_timings = load_timings(c.classes,
                                              args.timings,
@@ -87,9 +90,6 @@ def main():
                         ('momentum-style', 1),
                         ('weight-fan-in-sum', 3),
                         ('weight-fan-in-kurtosis', 0.15),
-                        ('min-frequency', 300),
-                        ('knee-frequency', 1100),
-                        ('max-frequency', 3800),
                         ('weight-diagonal', 0.5),
                         #('error-weight', '3:2'),
                     ))

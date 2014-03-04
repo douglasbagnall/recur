@@ -87,7 +87,8 @@ class BaseClassifier(object):
         self.classes = self.getp('classes').split(',')
 
     def setup(self, mfccs, hsize, class_string, basename='classify',
-              bottom_layer=0, window_size=None):
+              bottom_layer=0, window_size=None, min_freq=None,
+              knee_freq=None, max_freq=None):
         #put classes through a round trip, just to be sure it works
         self.setp('classes', class_string)
         self.classes = self.getp('classes').split(',')
@@ -99,6 +100,12 @@ class BaseClassifier(object):
             self.setp('hidden-size', hsize)
         if bottom_layer:
             self.setp('bottom-layer', bottom_layer)
+        if min_freq is not None:
+            self.setp('min-frequency', min_freq)
+        if max_freq is not None:
+            self.setp('max-frequency', max_freq)
+        if knee_freq is not None:
+            self.setp('knee-frequency', knee_freq)
         self.setp('basename', basename)
 
     def on_eos(self, bus, msg):
