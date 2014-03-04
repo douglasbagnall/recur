@@ -7,6 +7,7 @@ import argparse
 
 from classify import gst_init, Gst
 from classify_kiwi import MFCCS, WINDOW_SIZE, BASENAME
+from classify_kiwi import MIN_FREQUENCY, MAX_FREQUENCY, KNEE_FREQUENCY
 
 from classify import targeted_wav_finder, load_timings
 from classify import categorised_files
@@ -43,9 +44,9 @@ def main():
                 window_size=args.window_size,
                 bottom_layer=args.bottom_layer,
                 basename=args.basename,
-                min_freq=300,
-                max_freq=3800,
-                knee_freq=1100)
+                min_freq=MIN_FREQUENCY,
+                max_freq=MAX_FREQUENCY,
+                knee_freq=KNEE_FREQUENCY)
 
     timed_files, full_timings = load_timings(c.classes,
                                              args.timings,
