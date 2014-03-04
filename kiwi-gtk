@@ -3,7 +3,7 @@ import os, sys
 import random
 from gtkdisplay import run
 from classify import GTKClassifier, gst_init, Gst
-from classify_kiwi import MFCCS, CLASSES, WINDOW_SIZE, BASENAME
+from classify_kiwi import MFCCS, WINDOW_SIZE, BASENAME
 import argparse
 
 def main():
