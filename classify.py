@@ -282,7 +282,9 @@ class Classifier(BaseClassifier):
 
         self.scores.extend(self.file_probabilities[i][k])
         self.score_targets.extend(self.file_ground_truth[i][k])
-        print len(self.scores), len(self.score_targets)
+        if 0:
+            show_roc_curve(self.file_probabilities[i][k],
+                           self.file_ground_truth[i][k])
 
         if not self.data:
             if self.show_roc:
@@ -735,8 +737,8 @@ def show_roc_curve(scores, truth):
 
     fp.reverse()
     tp.reverse()
-    print "best", bx, by
-    print "half", hx, hy
+    print "best %.3f true, %.3f false" % (by, bx)
+    print "half %.3f true, %.3f false" % (hy, hx)
     plt.plot(fp, tp)
     plt.annotate("0.5", (hx, hy), (0.4, 0.4),
                  arrowprops={'width':1, 'color': '#00cc00'})
