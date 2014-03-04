@@ -45,21 +45,26 @@ def main():
 
     args = parser.parse_args()
 
-    all_classes, timed_files, full_timings = load_timings(args.classes,
-                                                          args.timings,
-                                                          args.audio_directory)
+    c = Classifier(channels=1)
+    c.quiet = not args.verbose
+
+    if args.net_filename:
+        c.setup_from_file(args.net_filename)
+    else:
+        c.setup(MFCCS,
+                args.hidden_size,
+                args.classes,
+                window_size=args.window_size,
+                basename=args.basename)
+
+    timed_files, full_timings = load_timings(c.classes,
+                                             args.timings,
+                                             args.audio_directory)
 
     if args.first_n:
         timed_files = timed_files[:args.first_n]
     test_files = [(ffn, full_timings[ffn]) for fn, ffn in timed_files]
 
-    c = Classifier(mfccs=MFCCS,
-                   hsize=args.hidden_size,
-                   channels=1,
-                   classes=all_classes,
-                   window_size=WINDOW_SIZE,
-                   basename=args.basename)
-    c.quiet = not args.verbose
     if args.bottom_layer:
         c.classifier.set_property('bottom-layer', args.bottom_layer)
 
