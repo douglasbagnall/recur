@@ -453,7 +453,7 @@ gst_classify_class_init (GstClassifyClass * klass)
 
   g_object_class_install_property (gobject_class, PROP_ERROR_WEIGHT,
       g_param_spec_string("error-weight", "error-weight",
-          "Weight output errors (space or colon separated floats)",
+          "Weight output errors (space, comma, or colon separated floats)",
           DEFAULT_PROP_ERROR_WEIGHT,
           G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
@@ -1066,6 +1066,23 @@ maybe_parse_target_string(GstClassify *self){
 
 static void
 maybe_parse_error_weight_string(GstClassify *self){
+  /*the error weight string typically looks something like this "5:3:4", which
+    gives the first class 5/3 the weight of the second and 5/4 that of the
+    third, by multiplying each weight by the corresponding number. To maintain
+    the overall error scale, you would use "1.25:0.75:1" for the same weight
+    ratio.
+
+    The syntax is rather loose -- any non-numeric character will do as a
+    separator. This means, depending on locale, it happens to work if you have
+    multiple groups separated by commas (e.g. "1:1:3,2:1"). That will probably
+    fail in locales where the comma is the decimal point, and it is probably
+    wiser to continue with colons or something else (e.g "1:1:3 2:1"). At some
+    point the syntax might get stricter.
+
+    In the two class case, this may have little effect other than scaling the
+    overall error.
+  */
+
   char *orig, *e, *s;
   int i;
   if (self->channels == NULL){

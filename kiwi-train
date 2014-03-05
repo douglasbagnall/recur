@@ -25,6 +25,8 @@ def main():
                         help="how many channels to use")
     parser.add_argument('-r', '--random-alignment', action='store_true',
                         help="slightly randomise alignment of fft windows")
+    parser.add_argument('-E', '--error-weights',
+                        help="multiply output errors by these ratios")
 
     args = parser.parse_args()
     if args.learn_rate:
@@ -84,6 +86,9 @@ def main():
     for x in training_streams:
         random.shuffle(x)
 
+    if args.error_weights:
+        c.setp('error-weight', args.error_weights)
+
     c.train(training_streams, validate_streams, full_timings,
             iterations=args.iterations,
             learn_rate=lr, dropout=dropout,
@@ -93,7 +98,6 @@ def main():
                         ('weight-fan-in-sum', 3),
                         ('weight-fan-in-kurtosis', 0.15),
                         ('weight-diagonal', 0.5),
-                        #('error-weight', '3:2'),
                     ))
 
 main()
