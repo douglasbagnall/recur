@@ -827,6 +827,9 @@ gst_classify_setup(GstAudioFilter *base, const GstAudioInfo *info){
     int alloc_size = self->queue_size + info->channels * self->window_size / 2;
     self->audio_queue = malloc_aligned_or_die(alloc_size * sizeof(s16));
     if (self->channels){
+      for (int i = 0; i < self->n_channels; i++){
+        finalise_channel(&self->channels[i]);
+      }
       free(self->channels);
     }
     self->channels = malloc_aligned_or_die(self->n_channels * sizeof(ClassifyChannel));
