@@ -740,20 +740,27 @@ load_or_create_net(GstClassify *self){
   if (net){
     if (net->output_size != top_layer_size ||
         net->hidden_size != hidden_size ||
-        (net->bottom_layer && ! bottom_layer_size)
-    ){
-      /*XXX there could be more checks! */
-      GST_WARNING("loaded net doesn't seem to match!");
-      rnn_delete_net(net);
-      net = NULL;
-    }
-    if (! net->metadata || strcmp(net->metadata, metadata)){
-      GST_WARNING("The loaded net metadata doesn't match");
-      GST_WARNING("calculated metadata:\n%s\n", metadata);
-      GST_WARNING("loaded metadata:\n%s\n", net->metadata);
-      rnn_delete_net(net);
-      net = NULL;
-      /*stop ? */
+        (net->bottom_layer && ! bottom_layer_size) ||
+        (net->metadata && strcmp(net->metadata, metadata))){
+      FATAL_ERROR("I thought I could load the file '%s',\n"
+          "but it doesn't seem to match the layer sizes and metadata I want.\n"
+          "If you mean to continue with a freshly made net, please move\n"
+          "that file aside. If you are sure you mean to use that file,\n"
+          "specify it directly using the 'net-filename' property. If you\n"
+          "are trying to do domething like use the same net with different\n"
+          "audio metadata, then you are out of luck, for now at least. Sorry. Most\n"
+          "likely any problems are my fault. The compared layer sizes are:\n"
+          "output: expected %d,  loaded %d\n"
+          "hidden: expected %d,  loaded %d\n"
+          "bottom: expected %d,  loaded %d\n"
+          "and the metadata is:\n"
+          "expected:\n%s\n"
+          "loaded:\n%s\n",
+          self->net_filename,
+          top_layer_size, net->output_size,
+          hidden_size, net->hidden_size,
+          bottom_layer_size, net->bottom_layer ? net->bottom_layer->output_size : 0,
+          metadata, net->metadata);
     }
   }
   if (net == NULL){
