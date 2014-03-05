@@ -27,14 +27,16 @@ rnn_save_net(RecurNN *net, const char *filename, int backup){
     goto error;
 
   MAYBE_DEBUG("tmpfn is '%s'; fd %d", tmpfn, fd);
-  /* save a version number                */
-  /* none (or 0,1): original version      */
-  /* 2: saves ho_scale                    */
-  /* 3: saves BPTT min_error_factor       */
-  /* 4: saves bottom layer if applicable, using more qualified keys
-     ("net->X", "bptt->X", "bottom_layer->X") */
-  /* 5: includes metadata */
-  const int version = 5;
+  /* Save a version number.
+   * none (or 0,1): original version
+   * 2: saves ho_scale
+   * 3: saves BPTT min_error_factor
+   * 4: saves bottom layer if applicable
+   *    uses more qualified keys ("net.X", "bptt.X", vs "X")
+   * 5: includes metadata
+   * 6: doesn't save BPTT training arrays (e.g. momentum) or hidden state
+   */
+  const int version = 6;
   cdb_make_add(&cdbm, FORMAT_VERSION, strlen(FORMAT_VERSION), &version, sizeof(version));
 
 #define SAVE_SCALAR(obj, attr) do {                                     \
@@ -62,6 +64,9 @@ rnn_save_net(RecurNN *net, const char *filename, int backup){
         net->bptt (pointer)
         net->log (file handle)
         bptt->mem (pointer for deallocation)
+        bptt arrays (i_error, h_error, o_error, ih_momentum, ho_momentum,
+        history, ih_delta)
+        net activations (input_layer, hidden_layer, output_layer)
   */
   SAVE_SCALAR(net, i_size);
   SAVE_SCALAR(net, h_size);
@@ -76,9 +81,6 @@ rnn_save_net(RecurNN *net, const char *filename, int backup){
   SAVE_SCALAR(net, flags);
   SAVE_SCALAR(net, rng); /* a struct, should work? */
 
-  SAVE_ARRAY(net, input_layer, net->i_size);
-  SAVE_ARRAY(net, hidden_layer, net->h_size);
-  SAVE_ARRAY(net, output_layer, net->o_size);
   SAVE_ARRAY(net, ih_weights, net->ih_size);
   SAVE_ARRAY(net, ho_weights, net->ho_size);
   if (net->metadata){
@@ -97,13 +99,6 @@ rnn_save_net(RecurNN *net, const char *filename, int backup){
     SAVE_SCALAR(bptt, momentum);
     SAVE_SCALAR(bptt, momentum_weight);
     SAVE_SCALAR(bptt, min_error_factor);   /*version 3 and above*/
-    SAVE_ARRAY(bptt, i_error, net->i_size);
-    SAVE_ARRAY(bptt, h_error, net->h_size);
-    SAVE_ARRAY(bptt, o_error, net->o_size);
-    SAVE_ARRAY(bptt, ih_momentum, net->ih_size);
-    SAVE_ARRAY(bptt, ho_momentum, net->ho_size);
-    SAVE_ARRAY(bptt, history, net->bptt->depth * net->i_size);
-    SAVE_ARRAY(bptt, ih_delta, net->ih_size);
   }
   if (net->bottom_layer){
     /*version 4+ */
@@ -328,27 +323,14 @@ rnn_load_net(const char *filename){
     obj->attr[vlen] = 0; /*for strings, restoring terminating \0 */     \
   } while (0)
 
-
-  READ_ARRAY(net, input_layer, net->i_size * sizeof(float));
-  READ_ARRAY(net, hidden_layer, net->h_size * sizeof(float));
-  READ_ARRAY(net, output_layer, net->o_size * sizeof(float));
   READ_ARRAY(net, ih_weights, net->ih_size * sizeof(float));
   READ_ARRAY(net, ho_weights, net->ho_size * sizeof(float));
   if (version >= 5){
     READ_FREE_SIZE_ARRAY(net, metadata, MAX_METADATA_SIZE);
   }
-  if(bptt){
-    READ_ARRAY(bptt, i_error, net->i_size * sizeof(float));
-    READ_ARRAY(bptt, h_error, net->h_size * sizeof(float));
-    READ_ARRAY(bptt, o_error, net->o_size * sizeof(float));
-    READ_ARRAY(bptt, ih_momentum, net->ih_size * sizeof(float));
-    READ_ARRAY(bptt, ho_momentum, net->ho_size * sizeof(float));
-    READ_ARRAY(bptt, history, bptt->depth * net->i_size * sizeof(float));
-    READ_ARRAY(bptt, ih_delta, net->ih_size * sizeof(float));
-  }
   if (bottom_layer){
-    READ_ARRAY(bottom_layer, weights, bottom_layer->i_size * bottom_layer->o_size * sizeof(float));
-    /*not restoring full state (momentums etc) */
+    READ_ARRAY(bottom_layer, weights,
+        bottom_layer->i_size * bottom_layer->o_size * sizeof(float));
   }
 #undef READ_ARRAY
 #undef READ_FREE_SIZE_ARRAY
