@@ -555,6 +555,7 @@ static int parse_classes_string(GstClassify *self, const char *orig)
       group->n_classes++;
     }
     s++;
+    GST_LOG("group %d has %d classes", i, group->n_classes);
   }
   self->n_groups = n_groups;
   return s - str - 1;
@@ -710,7 +711,7 @@ create_net(GstClassify *self, int bottom_layer_size,
   }
 
   if (diagonal_proportion){
-    rnn_emphasise_diagonal(net, 0.4, diagonal_proportion);
+    rnn_emphasise_diagonal(net, 0.2, diagonal_proportion);
   }
 
   net->bptt->ho_scale = top_learn_rate_scale;

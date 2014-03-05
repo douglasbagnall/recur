@@ -97,7 +97,7 @@ def main():
                         ('momentum-style', 1),
                         ('weight-fan-in-sum', 3),
                         ('weight-fan-in-kurtosis', 0.15),
-                        ('weight-diagonal', 0.5),
+                        ('weight-diagonal', 0.33),
                     ))
 
 main()
