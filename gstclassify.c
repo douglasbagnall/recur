@@ -531,11 +531,11 @@ count_class_groups(const char *s){
 
 static inline int
 count_class_group_members(const char *s){
-  int n_groups = 0;
+  int n_classes = 0;
   for (; *s; s++){
-    n_groups += (*s != ',');
+    n_classes += (*s != ',');
   }
-  return n_groups;
+  return n_classes;
 }
 
 static int parse_classes_string(GstClassify *self, const char *orig)
@@ -546,20 +546,18 @@ static int parse_classes_string(GstClassify *self, const char *orig)
   int n_groups = count_class_groups(str);
   self->class_groups = realloc_or_die(self->class_groups,
       (n_groups + 2) * sizeof(ClassifyClassGroup));
-  int offset = 0;
   for (i = 0; i < n_groups; i++){
     ClassifyClassGroup *group = &self->class_groups[i];
     group->classes = s;
-    group->n_classes = 1;
-    group->offset = offset;
+    group->n_classes = 0;
+    group->offset = s - str;
     for (; *s && *s != ','; s++){
       group->n_classes++;
-      offset++;
     }
     s++;
   }
   self->n_groups = n_groups;
-  return offset;
+  return s - str - 1;
 }
 
 static char*
