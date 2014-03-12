@@ -1381,19 +1381,11 @@ gst_classify_get_property (GObject * object, guint prop_id, GValue * value,
   case PROP_BASENAME:
     NET_OR_PP(self->basename, string, 0, 0);
     break;
+  case PROP_CLASSES:
+    NET_OR_PP(self->class_groups[0].classes, string, 0, 0);
+    break;
 
 #undef NET_OR_PP
-
-  case PROP_CLASSES:
-    /*The first class group happens to be the beginning of the class
-      string. This will break if that ever changes. */
-    if (net){
-      g_value_set_string(value, self->class_groups[0].classes);
-    }
-    else{
-      g_value_copy(PENDING_PROP(self, prop_id), value);
-    }
-    break;
 
   case PROP_TRAINING:
     g_value_set_boolean(value, self->training);
