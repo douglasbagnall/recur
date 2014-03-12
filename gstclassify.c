@@ -56,6 +56,7 @@ enum
   PROP_RANDOM_ALIGNMENT,
   PROP_NET_FILENAME,
   PROP_DELTA_FEATURES,
+  PROP_FORCE_LOAD,
 
   PROP_LAST
 };
@@ -82,6 +83,7 @@ enum
 #define DEFAULT_PROP_CLASSES "tf"
 #define DEFAULT_PROP_BPTT_DEPTH 30
 #define DEFAULT_PROP_FORGET 0
+#define DEFAULT_PROP_FORCE_LOAD 0
 #define DEFAULT_PROP_BOTTOM_LAYER 0
 #define DEFAULT_PROP_WEIGHT_SPARSITY 1
 #define DEFAULT_PROP_RANDOM_ALIGNMENT 1
@@ -345,6 +347,12 @@ gst_classify_class_init (GstClassifyClass * klass)
       g_param_spec_boolean("forget", "forget",
           "Forget the current hidden layer (all channels)",
           DEFAULT_PROP_FORGET,
+          G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
+
+  g_object_class_install_property (gobject_class, PROP_FORCE_LOAD,
+      g_param_spec_boolean("force-load", "force-load",
+          "Force the net to load even if metadata doesn't match",
+          DEFAULT_PROP_FORCE_LOAD,
           G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class, PROP_RANDOM_ALIGNMENT,
@@ -668,13 +676,20 @@ setup_audio(GstClassify *self, int window_size, int mfccs, float min_freq,
 static RecurNN *
 load_specified_net(GstClassify *self, const char *filename){
   struct ClassifyMetadata m = {0};
+  int force_load = PP_GET_BOOLEAN(self, PROP_FORCE_LOAD, DEFAULT_PROP_FORCE_LOAD);
   RecurNN *net = rnn_load_net(filename);
   if (net == NULL){
     FATAL_ERROR("Could not load %s", filename);
   }
   GST_DEBUG("loaded metadata: %s", net->metadata);
   if (load_metadata(net->metadata, &m)){
-    FATAL_ERROR("The metadata (%s) is bad", net->metadata);
+    if (force_load){
+      STDERR_DEBUG("continuing despite metadata mismatch, because force-load is set\n"
+          "%s", net->metadata);
+    }
+    else {
+      FATAL_ERROR("The metadata (%s) is bad", net->metadata);
+    }
   }
   int n_outputs = parse_classes_string(self, m.classes);
   if (n_outputs != net->output_size){
@@ -764,7 +779,7 @@ load_or_create_net(GstClassify *self){
   int bottom_layer_size = PP_GET_INT(self, PROP_BOTTOM_LAYER, 0);
   const char *class_string = PP_GET_STRING(self, PROP_CLASSES, DEFAULT_PROP_CLASSES);
   int top_layer_size = count_class_group_members(class_string);
-
+  int force_load = PP_GET_BOOLEAN(self, PROP_FORCE_LOAD, DEFAULT_PROP_FORCE_LOAD);
   if (self->net_filename == NULL){
     set_net_filename(self, hidden_size, bottom_layer_size, top_layer_size, metadata);
   }
@@ -773,7 +788,7 @@ load_or_create_net(GstClassify *self){
     if (net->output_size != top_layer_size ||
         net->hidden_size != hidden_size ||
         (net->bottom_layer && ! bottom_layer_size) ||
-        (net->metadata && strcmp(net->metadata, metadata))){
+        (net->metadata && ! force_load && strcmp(net->metadata, metadata))){
       FATAL_ERROR("I thought I could load the file '%s',\n"
           "but it doesn't seem to match the layer sizes and metadata I want.\n"
           "If you mean to continue with a freshly made net, please move\n"
@@ -1277,6 +1292,7 @@ gst_classify_set_property (GObject * object, guint prop_id, const GValue * value
     /*These properties only need to be stored until net creation, and can't
       be changed afterwards.
     */
+    case PROP_FORCE_LOAD:
     case PROP_BASENAME:
     case PROP_MIN_FREQUENCY:
     case PROP_KNEE_FREQUENCY:
