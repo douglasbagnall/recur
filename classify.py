@@ -679,6 +679,8 @@ def add_common_args(parser, WINDOW_SIZE, BASENAME):
                         help="save nets etc using this basename")
     parser.add_argument('-F', '--force-load', action='store_true',
                         help="load the net even if metadata doesn't match")
+    parser.add_argument('--delta-features', type=int,
+                        help="use this many layers of derivitive features")
 
 
 def show_roc_curve(scores, truth):

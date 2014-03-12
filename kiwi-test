@@ -35,7 +35,7 @@ def main():
     c = Classifier(channels=1)
     c.quiet = not args.verbose
     c.setp('force-load', args.force_load)
-
+    c.setp('delta-features', args.delta_features)
     if args.net_filename:
         c.setup_from_file(args.net_filename)
     else:
