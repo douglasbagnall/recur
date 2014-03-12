@@ -171,10 +171,9 @@ init_channel(ClassifyChannel *c, RecurNN *net,
   c->pcm_next = zalloc_aligned_or_die(window_size * sizeof(float));
   c->pcm_now = zalloc_aligned_or_die(window_size * sizeof(float));
 
-  int feature_size = n_inputs * (1 + delta_depth);
-  c->features = zalloc_aligned_or_die(feature_size * sizeof(float));
+  c->features = zalloc_aligned_or_die(n_inputs * sizeof(float));
   if (delta_depth > 0){
-    c->prev_features = zalloc_aligned_or_die(feature_size * sizeof(float));
+    c->prev_features = zalloc_aligned_or_die(n_inputs * sizeof(float));
   }
   else {
     c->prev_features = NULL;
@@ -184,7 +183,7 @@ init_channel(ClassifyChannel *c, RecurNN *net,
   c->mfcc_image = NULL;
 
   if (PGM_DUMP_FEATURES && id == 0){
-    c->mfcc_image = temporal_ppm_alloc(feature_size, 300, "features", id,
+    c->mfcc_image = temporal_ppm_alloc(n_inputs, 300, "features", id,
         PGM_DUMP_COLOUR, &c->features);
   }
 }
