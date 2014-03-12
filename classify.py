@@ -677,8 +677,8 @@ def add_common_args(parser, WINDOW_SIZE, BASENAME):
                         help="size of the FFT window")
     parser.add_argument('-n', '--basename', default=BASENAME,
                         help="save nets etc using this basename")
-
-
+    parser.add_argument('-F', '--force-load', action='store_true',
+                        help="load the net even if metadata doesn't match")
 
 
 def show_roc_curve(scores, truth):

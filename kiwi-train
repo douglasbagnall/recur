@@ -60,7 +60,7 @@ def main():
 
     c.no_save_net = args.no_save_net
     c.quiet = not args.verbose
-
+    c.setp('force-load', args.force_load)
     c.setp('random-alignment', args.random_alignment)
 
     if args.net_filename:

@@ -34,6 +34,7 @@ def main():
 
     c = Classifier(channels=1)
     c.quiet = not args.verbose
+    c.setp('force-load', args.force_load)
 
     if args.net_filename:
         c.setup_from_file(args.net_filename)
