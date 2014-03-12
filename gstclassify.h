@@ -72,6 +72,7 @@ typedef struct _ClassifyChannel
 {
   RecurNN *net;
   float *features;
+  float *prev_features;
   float *pcm_now;
   float *pcm_next;
   int *group_target;
@@ -110,6 +111,7 @@ struct _GstClassify
   float *error_weight;
   GValue *pending_properties;
   TemporalPPM *error_image;
+  int delta_features;
 };
 
 

@@ -55,6 +55,7 @@ enum
   PROP_BOTTOM_LAYER,
   PROP_RANDOM_ALIGNMENT,
   PROP_NET_FILENAME,
+  PROP_DELTA_FEATURES,
 
   PROP_LAST
 };
@@ -68,6 +69,7 @@ enum
 #define DEFAULT_PROP_LAWN_MOWER 0
 #define DEFAULT_PROP_TRAINING 0
 #define DEFAULT_PROP_MFCCS 0
+#define DEFAULT_PROP_DELTA_FEATURES 0
 #define DEFAULT_PROP_MOMENTUM 0.95f
 #define DEFAULT_PROP_MOMENTUM_SOFT_START 0.0f
 #define DEFAULT_PROP_MOMENTUM_STYLE 1
@@ -121,6 +123,8 @@ enum
 
 #define DROPOUT_MIN 0.0
 #define DROPOUT_MAX 1.0
+#define PROP_DELTA_FEATURES_MIN 0
+#define PROP_DELTA_FEATURES_MAX 4
 #define MIN_PROP_MFCCS 0
 #define MAX_PROP_MFCCS (CLASSIFY_N_FFT_BINS - 1)
 #define MOMENTUM_SOFT_START_MAX 1e9
@@ -151,7 +155,7 @@ G_DEFINE_TYPE (GstClassify, gst_classify, GST_TYPE_AUDIO_FILTER)
 
 static inline void
 init_channel(ClassifyChannel *c, RecurNN *net,
-    int window_size, int id, int n_groups)
+    int window_size, int id, int n_groups, uint delta_depth)
 {
   c->net = net;
   int n_inputs;
@@ -164,13 +168,21 @@ init_channel(ClassifyChannel *c, RecurNN *net,
 
   c->pcm_next = zalloc_aligned_or_die(window_size * sizeof(float));
   c->pcm_now = zalloc_aligned_or_die(window_size * sizeof(float));
-  c->features = zalloc_aligned_or_die(n_inputs * sizeof(float));
+
+  int feature_size = n_inputs * (1 + delta_depth);
+  c->features = zalloc_aligned_or_die(feature_size * sizeof(float));
+  if (delta_depth > 0){
+    c->prev_features = zalloc_aligned_or_die(feature_size * sizeof(float));
+  }
+  else {
+    c->prev_features = NULL;
+  }
   c->group_target = zalloc_aligned_or_die(n_groups * 2 * sizeof(int));
   c->group_winner = c->group_target + n_groups;
   c->mfcc_image = NULL;
 
   if (PGM_DUMP_FEATURES && id == 0){
-    c->mfcc_image = temporal_ppm_alloc(n_inputs, 300, "features", id,
+    c->mfcc_image = temporal_ppm_alloc(feature_size, 300, "features", id,
         PGM_DUMP_COLOUR, &c->features);
   }
 }
@@ -180,7 +192,12 @@ finalise_channel(ClassifyChannel *c)
 {
   free(c->pcm_next);
   free(c->pcm_now);
-  free(c->features);
+  if (c->features){
+    free(c->features);
+  }
+  if (c->prev_features){
+    free(c->prev_features);
+  }
   if (c->mfcc_image){
     temporal_ppm_free(c->mfcc_image);
     c->mfcc_image = NULL;
@@ -309,6 +326,13 @@ gst_classify_class_init (GstClassifyClass * klass)
           MIN_PROP_MFCCS, MAX_PROP_MFCCS,
           DEFAULT_PROP_MFCCS,
           G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+
+  g_object_class_install_property (gobject_class, PROP_DELTA_FEATURES,
+      g_param_spec_int("delta-features", "delta-features",
+          "Include this many levels of derivative features",
+          PROP_DELTA_FEATURES_MIN, PROP_DELTA_FEATURES_MAX,
+          DEFAULT_PROP_DELTA_FEATURES,
+          G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class, PROP_WEIGHT_SPARSITY,
       g_param_spec_int("weight-sparsity", "weight-sparsity",
@@ -494,6 +518,8 @@ gst_classify_init (GstClassify * self)
   GST_INFO("gst classify init\n");
 }
 
+#define N_FEATURES(self) (((self)->mfccs ? (self)->mfccs : CLASSIFY_N_FFT_BINS) \
+      * (1 + (self)->delta_features))
 
 static void
 set_net_filename(GstClassify *self, int hidden_size, int bottom_layer,
@@ -504,7 +530,7 @@ set_net_filename(GstClassify *self, int hidden_size, int bottom_layer,
   for (uint i = 0; i < len; i++){
     sig ^= ROTATE(sig - metadata[i], 13) + metadata[i];
   }
-  int n_features = self->mfccs ? self->mfccs : CLASSIFY_N_FFT_BINS;
+  int n_features = N_FEATURES(self);
   if (bottom_layer > 0){
     snprintf(s, sizeof(s), "%s-%0x-i%d-b%d-h%d-o%d-b%d-%dHz-w%d.net",
         self->basename, sig, n_features, bottom_layer, hidden_size, top_layer_size,
@@ -571,14 +597,16 @@ construct_metadata(GstClassify *self){
       "knee-frequency %f\n"
       "mfccs %d\n"
       "window-size %d\n"
-      "basename %s\n",
+      "basename %s\n"
+      "delta-features %d\n",
       PP_GET_STRING(self, PROP_CLASSES, DEFAULT_PROP_CLASSES),
       PP_GET_FLOAT(self, PROP_MIN_FREQUENCY, DEFAULT_MIN_FREQUENCY),
       PP_GET_FLOAT(self, PROP_MAX_FREQUENCY, DEFAULT_MAX_FREQUENCY),
       PP_GET_FLOAT(self, PROP_KNEE_FREQUENCY, DEFAULT_KNEE_FREQUENCY),
       PP_GET_INT(self, PROP_MFCCS, DEFAULT_PROP_MFCCS),
       PP_GET_INT(self, PROP_WINDOW_SIZE, DEFAULT_WINDOW_SIZE),
-      PP_GET_STRING(self, PROP_BASENAME, DEFAULT_BASENAME));
+      PP_GET_STRING(self, PROP_BASENAME, DEFAULT_BASENAME),
+      PP_GET_INT(self, PROP_DELTA_FEATURES, DEFAULT_PROP_DELTA_FEATURES));
   STDERR_DEBUG("%s", metadata);
   if (ret == -1){
     FATAL_ERROR("can't alloc memory for metadata. or something.");
@@ -592,6 +620,7 @@ struct ClassifyMetadata {
   int mfccs;
   int window_size;
   char *basename;
+  int delta_features;
 };
 
 static int
@@ -607,12 +636,13 @@ load_metadata(const char *metadata, struct ClassifyMetadata *m){
       "knee-frequency %f "
       "mfccs %d "
       "window-size %d "
-      "basename %ms");
+      "basename %ms "
+      "delta-features %d");
   int n = sscanf(metadata, template, &m->classes,
       &m->min_freq, &m->max_freq, &m->knee_freq,
-      &m->mfccs, &m->window_size, &m->basename);
-  if (n != 7){
-    GST_WARNING("Found only %d/%d metadata items", n, 7);
+      &m->mfccs, &m->window_size, &m->basename, &m->delta_features);
+  if (n != 8){
+    GST_WARNING("Found only %d/%d metadata items", n, 8);
     return -1;
   }
   return 0;
@@ -620,7 +650,7 @@ load_metadata(const char *metadata, struct ClassifyMetadata *m){
 
 static void
 setup_audio(GstClassify *self, int window_size, int mfccs, float min_freq,
-    float max_freq, float knee_freq){
+    float max_freq, float knee_freq, int delta_features){
   self->mfcc_factory = recur_audio_binner_new(window_size,
       RECUR_WINDOW_HANN,
       CLASSIFY_N_FFT_BINS,
@@ -630,6 +660,7 @@ setup_audio(GstClassify *self, int window_size, int mfccs, float min_freq,
       CLASSIFY_VALUE_SIZE);
 
   self->window_size = window_size;
+  self->delta_features = delta_features;
   GST_LOG("mfccs: %d", mfccs);
   self->mfccs = mfccs;
 }
@@ -658,7 +689,7 @@ load_specified_net(GstClassify *self, const char *filename){
   self->net_filename = strdup(filename);
   self->basename = strdup(m.basename);
   setup_audio(self, m.window_size, m.mfccs, m.min_freq,
-      m.max_freq, m.knee_freq);
+      m.max_freq, m.knee_freq, m.delta_features);
   self->net = net;
   return net;
 }
@@ -671,7 +702,7 @@ create_net(GstClassify *self, int bottom_layer_size,
         " has been set up. It won't work.");
   }
   RecurNN *net;
-  int n_features = self->mfccs ? self->mfccs : CLASSIFY_N_FFT_BINS;
+  int n_features = N_FEATURES(self);
   u32 flags = CLASSIFY_RNN_FLAGS;
   int weight_sparsity = PP_GET_INT(self, PROP_WEIGHT_SPARSITY,
       DEFAULT_PROP_WEIGHT_SPARSITY);
@@ -808,7 +839,8 @@ gst_classify_setup(GstAudioFilter *base, const GstAudioInfo *info){
         PP_GET_INT(self, PROP_MFCCS, DEFAULT_PROP_MFCCS),
         PP_GET_FLOAT(self, PROP_MIN_FREQUENCY, DEFAULT_MIN_FREQUENCY),
         PP_GET_FLOAT(self, PROP_MAX_FREQUENCY, DEFAULT_MAX_FREQUENCY),
-        PP_GET_FLOAT(self, PROP_KNEE_FREQUENCY, DEFAULT_KNEE_FREQUENCY));
+        PP_GET_FLOAT(self, PROP_KNEE_FREQUENCY, DEFAULT_KNEE_FREQUENCY),
+        PP_GET_INT(self, PROP_DELTA_FEATURES, DEFAULT_PROP_DELTA_FEATURES));
     self->net = load_or_create_net(self);
 
     RecurNN *net = self->net;
@@ -838,10 +870,9 @@ gst_classify_setup(GstAudioFilter *base, const GstAudioInfo *info){
       free(self->subnets);
     }
     self->subnets = rnn_new_training_set(self->net, self->n_channels);
-    /*XXXXX init_channel allocates memory*/
     for (int i = 0; i < self->n_channels; i++){
       init_channel(&self->channels[i], self->subnets[i],
-          self->window_size, i, self->n_groups);
+          self->window_size, i, self->n_groups, self->delta_features);
     }
   }
   maybe_start_logging(self);
@@ -1261,6 +1292,7 @@ gst_classify_set_property (GObject * object, guint prop_id, const GValue * value
     case PROP_WEIGHT_DIAGONAL:
     case PROP_RNG_SEED:
     case PROP_WINDOW_SIZE:
+    case PROP_DELTA_FEATURES:
     case PROP_MFCCS:
       if (self->net == NULL){
         copy_gvalue(PENDING_PROP(self, prop_id), value);
@@ -1429,20 +1461,33 @@ send_message(GstClassify *self, float mean_err, GstClockTime pts)
 
 
 static inline void
-pcm_to_features(RecurAudioBinner *mf, float *features, float *pcm, int mfccs){
+pcm_to_features(RecurAudioBinner *mf, ClassifyChannel *c, int mfccs,
+    int delta_features){
+  float *pcm = c->pcm_now;
   float *answer;
-  int n_features;
+  int n_raw_features;
   if (mfccs){
     answer = recur_extract_mfccs(mf, pcm) + 1;
-    n_features = mfccs;
+    n_raw_features = mfccs;
   }
   else {
     answer = recur_extract_log_freq_bins(mf, pcm);
-    n_features = CLASSIFY_N_FFT_BINS;
+    n_raw_features = CLASSIFY_N_FFT_BINS;
   }
-  /*XXX could do at least one less copy */
-  for (int i = 0; i < n_features; i++){
-    features[i] = answer[i];
+  if (c->prev_features){
+    float *tmp = c->features;
+    c->features = c->prev_features;
+    c->prev_features = tmp;
+  }
+  for (int i = 0; i < n_raw_features; i++){
+    c->features[i] = answer[i];
+  }
+  if (c->prev_features){
+    for (int j = (delta_features + 1) * n_raw_features - 1;
+         j >= n_raw_features; j--){
+      int i = j - n_raw_features;
+      c->features[j] = c->features[i] - c->prev_features[i];
+    }
   }
 }
 
@@ -1461,7 +1506,7 @@ prepare_channel_features(GstClassify *self, s16 *buffer_i, int j){
     c->pcm_now[half_window + i] = buffer_i[k];
   }
   /*get the features -- after which pcm_now is finished with. */
-  pcm_to_features(self->mfcc_factory, c->features, c->pcm_now, self->mfccs);
+  pcm_to_features(self->mfcc_factory, c, self->mfccs, self->delta_features);
   if (c->mfcc_image){
     temporal_ppm_row_from_source(c->mfcc_image);
   }
