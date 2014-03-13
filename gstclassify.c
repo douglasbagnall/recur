@@ -33,6 +33,7 @@ enum
   PROP_MIN_FREQUENCY,
   PROP_MAX_FREQUENCY,
   PROP_KNEE_FREQUENCY,
+  PROP_FOCUS_FREQUENCY,
   PROP_MOMENTUM,
   PROP_MOMENTUM_STYLE,
   PROP_MOMENTUM_SOFT_START,
@@ -76,6 +77,7 @@ enum
 #define DEFAULT_PROP_MOMENTUM_STYLE 1
 #define DEFAULT_MIN_FREQUENCY 100
 #define DEFAULT_KNEE_FREQUENCY 700
+#define DEFAULT_FOCUS_FREQUENCY 0
 #define DEFAULT_MAX_FREQUENCY (CLASSIFY_RATE * 0.499)
 #define MINIMUM_AUDIO_FREQUENCY 0
 #define MAXIMUM_AUDIO_FREQUENCY (CLASSIFY_RATE * 0.5)
@@ -388,6 +390,13 @@ gst_classify_class_init (GstClassifyClass * klass)
           DEFAULT_KNEE_FREQUENCY,
           G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
+  g_object_class_install_property (gobject_class, PROP_FOCUS_FREQUENCY,
+      g_param_spec_float("focus-frequency", "focus-frequency",
+          "controls the focus of pitch",
+          MINIMUM_AUDIO_FREQUENCY, MAXIMUM_AUDIO_FREQUENCY,
+          DEFAULT_FOCUS_FREQUENCY,
+          G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
+
   g_object_class_install_property (gobject_class, PROP_MAX_FREQUENCY,
       g_param_spec_float("max-frequency", "max-frequency",
           "Highest audio frequency to analyse",
@@ -605,7 +614,9 @@ construct_metadata(GstClassify *self){
       "mfccs %d\n"
       "window-size %d\n"
       "basename %s\n"
-      "delta-features %d\n",
+      "delta-features %d\n"
+      "focus-frequency %f\n"
+      ,
       PP_GET_STRING(self, PROP_CLASSES, DEFAULT_PROP_CLASSES),
       PP_GET_FLOAT(self, PROP_MIN_FREQUENCY, DEFAULT_MIN_FREQUENCY),
       PP_GET_FLOAT(self, PROP_MAX_FREQUENCY, DEFAULT_MAX_FREQUENCY),
@@ -613,7 +624,9 @@ construct_metadata(GstClassify *self){
       PP_GET_INT(self, PROP_MFCCS, DEFAULT_PROP_MFCCS),
       PP_GET_INT(self, PROP_WINDOW_SIZE, DEFAULT_WINDOW_SIZE),
       PP_GET_STRING(self, PROP_BASENAME, DEFAULT_BASENAME),
-      PP_GET_INT(self, PROP_DELTA_FEATURES, DEFAULT_PROP_DELTA_FEATURES));
+      PP_GET_INT(self, PROP_DELTA_FEATURES, DEFAULT_PROP_DELTA_FEATURES),
+      PP_GET_FLOAT(self, PROP_FOCUS_FREQUENCY, DEFAULT_FOCUS_FREQUENCY)
+  );
   STDERR_DEBUG("%s", metadata);
   if (ret == -1){
     FATAL_ERROR("can't alloc memory for metadata. or something.");
@@ -623,11 +636,14 @@ construct_metadata(GstClassify *self){
 
 struct ClassifyMetadata {
   char *classes;
-  float min_freq, max_freq, knee_freq;
+  float min_freq;
+  float max_freq;
+  float knee_freq;
   int mfccs;
   int window_size;
   char *basename;
   int delta_features;
+  float focus_freq;
 };
 
 static int
@@ -636,6 +652,12 @@ load_metadata(const char *metadata, struct ClassifyMetadata *m){
     GST_WARNING("There is no metadata!");
     return -1;
   }
+  /*New metadata items always need to added at the bottom, even if it would
+    make more sense to have them elsewhere -- so that old nets can properly be
+    loaded.
+
+    XXX alternately, there might be something better than sscanf().
+   */
   const char *template = (
       "classes %ms "
       "min-frequency %f "
@@ -644,12 +666,15 @@ load_metadata(const char *metadata, struct ClassifyMetadata *m){
       "mfccs %d "
       "window-size %d "
       "basename %ms "
-      "delta-features %d");
+      "delta-features %d "
+      "focus-frequency %f"
+  );
   int n = sscanf(metadata, template, &m->classes,
       &m->min_freq, &m->max_freq, &m->knee_freq,
-      &m->mfccs, &m->window_size, &m->basename, &m->delta_features);
-  if (n != 8){
-    GST_WARNING("Found only %d/%d metadata items", n, 8);
+      &m->mfccs, &m->window_size, &m->basename, &m->delta_features,
+      &m->focus_freq);
+  if (n != 9){
+    GST_WARNING("Found only %d/%d metadata items", n, 9);
     return -1;
   }
   return 0;
@@ -657,11 +682,11 @@ load_metadata(const char *metadata, struct ClassifyMetadata *m){
 
 static void
 setup_audio(GstClassify *self, int window_size, int mfccs, float min_freq,
-    float max_freq, float knee_freq, int delta_features){
+    float max_freq, float knee_freq, float focus_freq, int delta_features){
   self->mfcc_factory = recur_audio_binner_new(window_size,
       RECUR_WINDOW_HANN,
       CLASSIFY_N_FFT_BINS,
-      min_freq, max_freq, knee_freq,
+      min_freq, max_freq, knee_freq, focus_freq,
       CLASSIFY_RATE,
       1.0f / 32768,
       CLASSIFY_VALUE_SIZE);
@@ -703,7 +728,7 @@ load_specified_net(GstClassify *self, const char *filename){
   self->net_filename = strdup(filename);
   self->basename = strdup(m.basename);
   setup_audio(self, m.window_size, m.mfccs, m.min_freq,
-      m.max_freq, m.knee_freq, m.delta_features);
+      m.max_freq, m.knee_freq, m.focus_freq, m.delta_features);
   self->net = net;
   return net;
 }
@@ -854,7 +879,9 @@ gst_classify_setup(GstAudioFilter *base, const GstAudioInfo *info){
         PP_GET_FLOAT(self, PROP_MIN_FREQUENCY, DEFAULT_MIN_FREQUENCY),
         PP_GET_FLOAT(self, PROP_MAX_FREQUENCY, DEFAULT_MAX_FREQUENCY),
         PP_GET_FLOAT(self, PROP_KNEE_FREQUENCY, DEFAULT_KNEE_FREQUENCY),
-        PP_GET_INT(self, PROP_DELTA_FEATURES, DEFAULT_PROP_DELTA_FEATURES));
+        PP_GET_FLOAT(self, PROP_FOCUS_FREQUENCY, DEFAULT_FOCUS_FREQUENCY),
+        PP_GET_INT(self, PROP_DELTA_FEATURES, DEFAULT_PROP_DELTA_FEATURES)
+    );
     self->net = load_or_create_net(self);
 
     RecurNN *net = self->net;
@@ -1295,6 +1322,7 @@ gst_classify_set_property (GObject * object, guint prop_id, const GValue * value
     case PROP_BASENAME:
     case PROP_MIN_FREQUENCY:
     case PROP_KNEE_FREQUENCY:
+    case PROP_FOCUS_FREQUENCY:
     case PROP_MAX_FREQUENCY:
     case PROP_CLASSES:
     case PROP_BOTTOM_LAYER:
