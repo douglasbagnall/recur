@@ -349,7 +349,6 @@ class Trainer(BaseClassifier):
         self.setp('log-file', log_file)
         for k, v in properties:
             self.setp(k, v)
-        self.timestamp = time.time()
         self.next_training_set()
         self.pipeline.set_state(Gst.State.PLAYING)
         self.mainloop.run()
@@ -387,10 +386,7 @@ class Trainer(BaseClassifier):
 
     def next_set(self, src):
         targets = []
-        starttime = self.timestamp
         self.timestamp = time.time()
-        print "elapsed %.1f" % (self.timestamp - starttime)
-
         for channel, fs in enumerate(self.filesrcs):
             fn = src.next()
             timings = self.timings.get(fn, [])
@@ -472,6 +468,7 @@ class Trainer(BaseClassifier):
 
     def on_eos(self, bus, msg):
         self.pipeline.set_state(Gst.State.READY)
+        print "elapsed %.1f" % (time.time() - self.timestamp)
         #print self.counter
         if self.test_scores:
             self.evaluate_test()
