@@ -188,6 +188,8 @@ class Classifier(BaseClassifier):
             key = 'channel 0, group %d ' % i
             correct = v(key + 'correct')
             target = v(key + 'target')
+            if target is None:
+                continue
             for k in group:
                 probs[k].append(v(key + k))
                 self.file_ground_truth[i][k].append(k == target)
@@ -500,6 +502,8 @@ class Trainer(BaseClassifier):
             for i in range(self.channels):
                 for j, group in enumerate(self.classes):
                     target = v('channel %d, group %d target' % (i, j))
+                    if target is None:
+                        continue
                     correct = v('channel %d, group %d correct' % (i, j))
                     #print group, target, correct
                     self.test_scores[j][target] += correct
