@@ -53,6 +53,7 @@
 #define DEFAULT_WEIGHT_SCALE_FACTOR 0
 #define DEFAULT_REPORT_INTERVAL 1024
 #define DEFAULT_CONFAB_ONLY 0
+#define DEFAULT_DIAGONAL_BOOST 0
 
 #define BELOW_QUIET_LEVEL(quiet) if (opt_quiet < quiet)
 
@@ -109,6 +110,7 @@ static int opt_momentum_style = DEFAULT_MOMENTUM_STYLE;
 static float opt_weight_scale_factor = DEFAULT_WEIGHT_SCALE_FACTOR;
 static uint opt_report_interval = DEFAULT_REPORT_INTERVAL;
 static uint opt_confab_only = DEFAULT_CONFAB_ONLY;
+static float opt_diagonal_boost = DEFAULT_DIAGONAL_BOOST;
 
 
 /* Following ccan/opt/helpers.c opt_set_longval, etc */
@@ -221,6 +223,8 @@ static struct opt_table options[] = {
       &opt_report_interval, "how often to validate and report"),
   OPT_WITH_ARG("--confab-only=<chars>", opt_set_uintval, opt_show_uintval,
       &opt_confab_only, "no training, only confabulate this many characters"),
+  OPT_WITH_ARG("--diagonal-boost=<float>", opt_set_floatval, opt_show_floatval,
+      &opt_diagonal_boost, "boost this portion of diagonal weights"),
 
 
   OPT_WITHOUT_ARG("-h|--help", opt_usage_and_exit,
@@ -715,6 +719,9 @@ load_or_create_net(void){
     else {
       rnn_randomise_weights_auto(net);
       //rnn_randomise_weights_fan_in(net, 2.0f, 0.3f, 0.1f, 1.0);
+    }
+    if (opt_diagonal_boost){
+      rnn_emphasise_diagonal(net, 0.5, opt_diagonal_boost);
     }
     net->bptt->momentum_weight = opt_momentum_weight;
     if (opt_weight_scale_factor > 0){
