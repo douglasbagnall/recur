@@ -25,7 +25,7 @@ COLOURS = {
     "W": "\033[01;37m",
 }
 
-TEST_INTERVAL = 2
+TEST_INTERVAL = 3
 
 SAVE_LOCATION = 'nets/autosave'
 
@@ -363,23 +363,17 @@ class Trainer(BaseClassifier):
         self.setp('training', False)
         self.next_set(iter(self.testset))
         self.test_n = 0
-        self.timestamp = time.time()
 
     def next_training_set(self):
         dropout = self.dropout.next()
         self.setp('dropout', dropout)
         self.setp('training', True)
-        starttime = self.timestamp
-        self.timestamp = time.time()
 
         if self.learn_rate is not None:
             r = self.learn_rate.next() * self.lr_adjust
-            print ("%s/%s learn_rate %.4g dropout %.2g elapsed %.2f" %
-                   (self.counter, self.iterations, r, dropout,
-                    self.timestamp - starttime))
+            print ("%s/%s learn_rate %.4g dropout %.2g" %
+                   (self.counter, self.iterations, r, dropout)),
             self.setp('learn_rate', r)
-
-
         self.probability_sums = []
         self.probability_counts = []
         for group in self.classes:
@@ -391,6 +385,10 @@ class Trainer(BaseClassifier):
 
     def next_set(self, src):
         targets = []
+        starttime = self.timestamp
+        self.timestamp = time.time()
+        print "elapsed %.1f" % (self.timestamp - starttime)
+
         for channel, fs in enumerate(self.filesrcs):
             fn = src.next()
             timings = self.timings.get(fn, [])
