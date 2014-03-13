@@ -58,6 +58,7 @@ enum
   PROP_NET_FILENAME,
   PROP_DELTA_FEATURES,
   PROP_FORCE_LOAD,
+  PROP_LAG,
 
   PROP_LAST
 };
@@ -114,6 +115,9 @@ enum
 #define DEFAULT_PROP_WEIGHT_DIAGONAL 0
 #define PROP_WEIGHT_DIAGONAL_MIN 0
 #define PROP_WEIGHT_DIAGONAL_MAX 1.0f
+#define DEFAULT_PROP_LAG 0
+#define PROP_LAG_MIN -1
+#define PROP_LAG_MAX 1000
 
 #define PROP_WEIGHT_FAN_IN_SUM_MAX 99.0
 #define PROP_WEIGHT_FAN_IN_SUM_MIN 0.0
@@ -376,6 +380,13 @@ gst_classify_class_init (GstClassifyClass * klass)
           DEFAULT_PROP_TRAINING,
           G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
+  g_object_class_install_property (gobject_class, PROP_LAG,
+      g_param_spec_float("lag", "lag",
+          "Add this many seconds onto all timings",
+          PROP_LAG_MIN, PROP_LAG_MAX,
+          DEFAULT_PROP_LAG,
+          G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
+
   g_object_class_install_property (gobject_class, PROP_MIN_FREQUENCY,
       g_param_spec_float("min-frequency", "min-frequency",
           "Lowest audio frequency to analyse",
@@ -616,6 +627,7 @@ construct_metadata(GstClassify *self){
       "basename %s\n"
       "delta-features %d\n"
       "focus-frequency %f\n"
+      "lag %f\n"
       ,
       PP_GET_STRING(self, PROP_CLASSES, DEFAULT_PROP_CLASSES),
       PP_GET_FLOAT(self, PROP_MIN_FREQUENCY, DEFAULT_MIN_FREQUENCY),
@@ -625,7 +637,8 @@ construct_metadata(GstClassify *self){
       PP_GET_INT(self, PROP_WINDOW_SIZE, DEFAULT_WINDOW_SIZE),
       PP_GET_STRING(self, PROP_BASENAME, DEFAULT_BASENAME),
       PP_GET_INT(self, PROP_DELTA_FEATURES, DEFAULT_PROP_DELTA_FEATURES),
-      PP_GET_FLOAT(self, PROP_FOCUS_FREQUENCY, DEFAULT_FOCUS_FREQUENCY)
+      PP_GET_FLOAT(self, PROP_FOCUS_FREQUENCY, DEFAULT_FOCUS_FREQUENCY),
+      PP_GET_FLOAT(self, PROP_LAG, DEFAULT_PROP_LAG)
   );
   STDERR_DEBUG("%s", metadata);
   if (ret == -1){
@@ -644,6 +657,7 @@ struct ClassifyMetadata {
   char *basename;
   int delta_features;
   float focus_freq;
+  float lag;
 };
 
 static int
@@ -667,14 +681,15 @@ load_metadata(const char *metadata, struct ClassifyMetadata *m){
       "window-size %d "
       "basename %ms "
       "delta-features %d "
-      "focus-frequency %f"
+      "focus-frequency %f "
+      "lag %f"
   );
   int n = sscanf(metadata, template, &m->classes,
       &m->min_freq, &m->max_freq, &m->knee_freq,
       &m->mfccs, &m->window_size, &m->basename, &m->delta_features,
-      &m->focus_freq);
-  if (n != 9){
-    GST_WARNING("Found only %d/%d metadata items", n, 9);
+      &m->focus_freq, &m->lag);
+  if (n != 10){
+    GST_WARNING("Found only %d/%d metadata items", n, 10);
     return -1;
   }
   return 0;
@@ -682,7 +697,8 @@ load_metadata(const char *metadata, struct ClassifyMetadata *m){
 
 static void
 setup_audio(GstClassify *self, int window_size, int mfccs, float min_freq,
-    float max_freq, float knee_freq, float focus_freq, int delta_features){
+    float max_freq, float knee_freq, float focus_freq, int delta_features,
+    float lag){
   self->mfcc_factory = recur_audio_binner_new(window_size,
       RECUR_WINDOW_HANN,
       CLASSIFY_N_FFT_BINS,
@@ -693,6 +709,7 @@ setup_audio(GstClassify *self, int window_size, int mfccs, float min_freq,
 
   self->window_size = window_size;
   self->delta_features = delta_features;
+  self->lag = lag;
   GST_LOG("mfccs: %d", mfccs);
   self->mfccs = mfccs;
 }
@@ -728,7 +745,8 @@ load_specified_net(GstClassify *self, const char *filename){
   self->net_filename = strdup(filename);
   self->basename = strdup(m.basename);
   setup_audio(self, m.window_size, m.mfccs, m.min_freq,
-      m.max_freq, m.knee_freq, m.focus_freq, m.delta_features);
+      m.max_freq, m.knee_freq, m.focus_freq, m.delta_features,
+      m.lag);
   self->net = net;
   return net;
 }
@@ -848,6 +866,19 @@ load_or_create_net(GstClassify *self){
   return net;
 }
 
+
+static inline void
+reset_channel_targets(GstClassify *self){
+  int i, j;
+  /*out of bounds [0, n_channels - 1) signals no target */
+  for (i = 0; i < self->n_channels; i++){
+    for (j = 0; j < self->n_groups; j++){
+      self->channels[i].group_target[j] = -1;
+    }
+  }
+}
+
+
 /*gst_classify_setup is called every time the pipeline starts up -- that is,
   for every new set of input files. It is also the first hook after all the
   initial properties have been dealt with. So it has two kinds of role: the
@@ -880,7 +911,8 @@ gst_classify_setup(GstAudioFilter *base, const GstAudioInfo *info){
         PP_GET_FLOAT(self, PROP_MAX_FREQUENCY, DEFAULT_MAX_FREQUENCY),
         PP_GET_FLOAT(self, PROP_KNEE_FREQUENCY, DEFAULT_KNEE_FREQUENCY),
         PP_GET_FLOAT(self, PROP_FOCUS_FREQUENCY, DEFAULT_FOCUS_FREQUENCY),
-        PP_GET_INT(self, PROP_DELTA_FEATURES, DEFAULT_PROP_DELTA_FEATURES)
+        PP_GET_INT(self, PROP_DELTA_FEATURES, DEFAULT_PROP_DELTA_FEATURES),
+        PP_GET_FLOAT(self, PROP_LAG, DEFAULT_PROP_LAG)
     );
     self->net = load_or_create_net(self);
 
@@ -916,6 +948,7 @@ gst_classify_setup(GstAudioFilter *base, const GstAudioInfo *info){
           self->window_size, i, self->n_groups, self->delta_features);
     }
   }
+  reset_channel_targets(self);
   maybe_start_logging(self);
   maybe_parse_target_string(self);
   maybe_parse_error_weight_string(self);
@@ -923,6 +956,7 @@ gst_classify_setup(GstAudioFilter *base, const GstAudioInfo *info){
   GstStructure *s = gst_structure_new_empty("classify-setup");
   GstMessage *msg = gst_message_new_element(GST_OBJECT(self), s);
   gst_element_post_message(GST_ELEMENT(self), msg);
+
   if (self->random_alignment && self->training){
     self->write_offset = 0;
     int offset = rand_small_int(&self->net->rng, self->window_size) - self->window_size / 2;
@@ -977,7 +1011,11 @@ parse_complex_target_string(GstClassify *self, const char *str){
   char *e;
   const char *s;
   int i;
-  float time_to_window_no = CLASSIFY_RATE * 2.0f / self->window_size;
+  const float time_to_window_no = CLASSIFY_RATE * 2.0f / self->window_size;
+
+#define TIME_TO_WINDOW_NO(x) (((x) + self->lag) * time_to_window_no + 0.5)
+#define WINDOW_NO_TO_TIME(x) ((x) / time_to_window_no - self->lag)
+
   ClassifyClassEvent *ev;
   /* the number of characters in the string between a colon and a space,
      excluding equals signs, is the number of events.*/
@@ -1026,7 +1064,7 @@ parse_complex_target_string(GstClassify *self, const char *str){
     s = e + 1;
     float time = strtod(s, &e);
 
-    window_no = time * time_to_window_no + 0.5;
+    window_no = TIME_TO_WINDOW_NO(time);
     GST_DEBUG("time %f window_no %d", time, window_no);
 
     ERROR_IF(s == e || window_no < 0);
@@ -1076,7 +1114,7 @@ parse_complex_target_string(GstClassify *self, const char *str){
     s++;
     GST_LOG("event: channel %d target %d window %d starting %.2f (request %.2f)",
         ev->channel, ev->target, ev->window_no,
-        (double)ev->window_no * self->window_size / (2.0f * CLASSIFY_RATE), time);
+        (double)WINDOW_NO_TO_TIME(ev->window_no), time);
 #undef ERROR_IF
   }
   qsort(self->class_events, n_events, sizeof(ClassifyClassEvent), cmp_class_event);
@@ -1086,7 +1124,7 @@ parse_complex_target_string(GstClassify *self, const char *str){
   for (i = 0; i < n_events; i++){
     ev = &self->class_events[i];
     fprintf(stderr, "c%dt%.2f:%c ",
-        ev->channel, ev->window_no / time_to_window_no,
+        ev->channel, WINDOW_NO_TO_TIME(ev->window_no),
         self->class_groups[0].classes[ev->target]);
   }
   fprintf(stderr, "\n");
@@ -1098,17 +1136,9 @@ parse_complex_target_string(GstClassify *self, const char *str){
       str, n_events, self->n_channels, i, s - str);
   self->n_class_events = 0;
   return -1;
-}
 
-static inline void
-reset_channel_targets(GstClassify *self){
-  int i, j;
-  /*out of bounds [0, n_channels - 1) signals no target */
-  for (i = 0; i < self->n_channels; i++){
-    for (j = 0; j < self->n_groups; j++){
-      self->channels[i].group_target[j] = -1;
-    }
-  }
+#undef TIME_TO_WINDOW_NO
+#undef WINDOW_NO_TO_TIME
 }
 
 static void
@@ -1320,6 +1350,7 @@ gst_classify_set_property (GObject * object, guint prop_id, const GValue * value
     */
     case PROP_FORCE_LOAD:
     case PROP_BASENAME:
+    case PROP_LAG:
     case PROP_MIN_FREQUENCY:
     case PROP_KNEE_FREQUENCY:
     case PROP_FOCUS_FREQUENCY:

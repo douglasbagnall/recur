@@ -63,6 +63,7 @@ def main():
     c.setp('force-load', args.force_load)
     c.setp('random-alignment', args.random_alignment)
     c.setp('delta-features', args.delta_features)
+    c.setp('lag', args.lag)
 
     if args.net_filename:
         c.setup_from_file(args.net_filename)
@@ -79,8 +80,7 @@ def main():
 
     timed_files, full_timings = load_timings(c.classes,
                                              args.timings,
-                                             args.audio_directory,
-                                             lag = args.lag)
+                                             args.audio_directory)
 
     validate_streams = [[ffn for fn, ffn in timed_files[:n_channels]]]
     training_streams = [[ffn for fn, ffn in timed_files[n_channels:]]]
