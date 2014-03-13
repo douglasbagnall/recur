@@ -45,8 +45,8 @@ recur_extract_mfccs(RecurAudioBinner *ab, float *data);
 
 RecurAudioBinSlope *
 recur_bin_slopes_new(const int n_bins, const int fft_len,
-                     const float fmin, const float fmax, const float fknee,
-                     const float audio_rate) __attribute__ ((malloc));
+    const float fmin, const float fmax, const float fknee,
+    const float ffocus, const float audio_rate) __attribute__ ((malloc));
 
 
 RecurAudioBinner *
@@ -55,6 +55,7 @@ recur_audio_binner_new(int window_size, int window_type,
     float min_freq,
     float max_freq,
     float knee_freq,
+    float focus_freq,
     float audio_rate,
     float scale,
     int value_size

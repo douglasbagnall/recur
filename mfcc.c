@@ -92,33 +92,70 @@ recur_extract_mfccs(RecurAudioBinner *ab, float *data){
 }
 
 
+
+/*usual scale is 1127, but it really doesn't matter */
+#define MEL_SCALE 1127.0f
+
+static inline float
+hz_to_mel(float hz, float knee, float focus){
+  float mel = MEL_SCALE * logf(1.0f + hz / knee);
+  if (focus){
+    mel /= 1.0f + expf(3.0f * (1.0f - hz / focus));
+  }
+  return mel;
+}
+
+/*Calculating the inverse of the hz_to_mel function is not simple when focus
+  is non-zero. Since it is only needed at set-up time, we just make iterative
+  approximations.
+ */
+
+static inline float
+mel_to_hz(float mel, float knee, float focus){
+  float hz = (mel / 34) * (mel / 34);
+  float approx = hz_to_mel(hz + 1, knee, focus);
+  float prev;
+  float mul = 2.0f;
+  do {
+    prev = approx;
+    approx = hz_to_mel(hz, knee, focus);
+    MAYBE_DEBUG("mel %f approx %f prev %f diff %g mul %f hz %f",
+        mel, approx, prev, approx - mel, mul, hz);
+    hz = MAX(hz + mul * (mel - approx), 0);
+    if ((prev > mel) != (approx > mel)){
+      mul *= 0.75;
+    }
+  } while (fabs(mel - approx) > 0.0001 && prev != approx);
+  return hz;
+}
+
 RecurAudioBinSlope * __attribute__((malloc))
 recur_bin_slopes_new(const int n_bins, const int fft_len,
-                     const float fmin, const float fmax, const float fknee,
-                     const float audio_rate){
+    const float fmin, const float fmax,
+    const float fknee, const float ffocus,
+    const float audio_rate){
   const int n_slopes = n_bins + 1;
   RecurAudioBinSlope * slopes = malloc_aligned_or_die(n_slopes *
                                                       sizeof(RecurAudioBinSlope));
   int i;
-
-  /*usual scale is 1127, but it really doesn't matter */
-#define MEL_SCALE 1127.0f
-#define HZ_TO_MEL(x) (MEL_SCALE * logf(1.0f + (x) / fknee))
-#define MEL_TO_HZ(x) (fknee * (expf((x) / MEL_SCALE) - 1.0f))
-
-  float mmin = HZ_TO_MEL(fmin);
-  float mmax = HZ_TO_MEL(fmax);
-  float step = (mmax - mmin) / n_slopes;
-  float mel = mmin;
+  const float mmin = hz_to_mel(fmin, fknee, ffocus);
+  const float mmax = hz_to_mel(fmax, fknee, ffocus);
+  const float step = (mmax - mmin) / n_slopes;
   float hz_to_samples = fft_len * 2 / audio_rate;
-  float right = MEL_TO_HZ(mel) * hz_to_samples;
+  float hz = fmin;
+  float mel = mmin;
+  float right = hz * hz_to_samples;
+  MAYBE_DEBUG("mmin %f mmax %f, fmin %f, fmax %f fknee %f ffocus %f",
+      mmin, mmax,  fmin, fmax, fknee, ffocus);
+
   for (i = 0; i < n_slopes; i++){
     RecurAudioBinSlope *s = &slopes[i];
     float left = right;
     s->left = (int)left;
     s->left_fraction = 1.0 - (left - s->left);
     mel += step;
-    right = MEL_TO_HZ(mel) * hz_to_samples;
+    hz = mel_to_hz(mel, fknee, ffocus);
+    right = hz * hz_to_samples;
     s->right = (int)right;
     s->right_fraction = right - s->right;
     s->slope = 1.0 / (right - left);
@@ -128,11 +165,11 @@ recur_bin_slopes_new(const int n_bins, const int fft_len,
       s->right_fraction = 0;
     }
     s->log_scale = logf(1.0f + right - left);
+    MAYBE_DEBUG("slope %d: left %d+%.2f  right %d+%.2f log_scale %f hz %f"
+        " mel %f mmin %f mmax %f",
+        i, s->left, s->left_fraction, s->right, s->right_fraction, s->log_scale,
+        hz, mel, mmin, mmax);
   }
-
-#undef HZ_TO_MEL
-#undef MEL_TO_HZ
-
   return slopes;
 }
 
@@ -260,6 +297,7 @@ recur_audio_binner_new(int window_size, int window_type,
     float min_freq,
     float max_freq,
     float knee_freq,
+    float focus_freq,
     float audio_rate,
     float scale,
     int value_size /*1 for real, 2 for complex*/
@@ -282,6 +320,7 @@ recur_audio_binner_new(int window_size, int window_type,
       min_freq,
       max_freq,
       knee_freq,
+      focus_freq,
       audio_rate
   );
   mfcc_slopes_dump(ab);

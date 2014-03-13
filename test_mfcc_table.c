@@ -1,8 +1,15 @@
-#include "recur-context.h"
+#include "recur-common.h"
 #include "mfcc.h"
 #include "pgm_dump.h"
 #include <gst/fft/gstfftf32.h>
 #include "path.h"
+
+#define RECUR_N_FFT_BINS 40
+#define RECUR_MFCC_MIN_FREQ 20
+#define RECUR_MFCC_MAX_FREQ (RECUR_AUDIO_RATE * 0.499)
+#define RECUR_MFCC_KNEE_FREQ 700
+#define RECUR_AUDIO_RATE 16000
+
 
 int
 main(void){
@@ -16,6 +23,7 @@ main(void){
       window_size / 2,
       RECUR_MFCC_MIN_FREQ,
       RECUR_MFCC_MAX_FREQ,
+      700, 0,
       RECUR_AUDIO_RATE
   );
 

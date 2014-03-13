@@ -118,7 +118,10 @@ libgstclassify.so: $(RNN_OBJECTS) gstclassify.o mfcc.o
 	$(CC) -shared -Wl,-O1 $+ $(INCLUDES) $(DEFINES) $(LINKS) -Wl,-soname -Wl,$@ \
 	  -o $@
 
-test_mfcc_table: %: recur-context.o $(RNN_OBJECTS) rescale.o %.o
+test_mfcc_table: %: mfcc.o rescale.o %.o
+	$(CC) -Wl,-O1 $^ $(INCLUDES) $(DEFINES) $(LINKS)  -o $@
+
+test_mfcc_bins: %: mfcc.o %.o
 	$(CC) -Wl,-O1 $^ $(INCLUDES) $(DEFINES) $(LINKS)  -o $@
 
 test_backprop.o: config.h
