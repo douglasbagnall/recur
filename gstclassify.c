@@ -1596,11 +1596,13 @@ train_channel(GstClassify *self, ClassifyChannel *c, int *win_count){
     float *group_error = error + o;
     float *group_answer = answer + o;
     int target = c->group_target[i];
-    int winner = softmax_best_guess(group_error, group_answer, g->n_classes);
-    c->group_winner[i] = winner;
-    *win_count += winner == target;
-    group_error[target] += 1.0f;
-    wrongness += group_error[target];
+    if (target >= 0 && target < g->n_classes){
+      int winner = softmax_best_guess(group_error, group_answer, g->n_classes);
+      c->group_winner[i] = winner;
+      *win_count += winner == target;
+      group_error[target] += 1.0f;
+      wrongness += group_error[target];
+    }
   }
   if (self->error_weight){
     for (int i = 0; i < net->output_size; i++){
