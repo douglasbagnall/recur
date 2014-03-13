@@ -576,7 +576,7 @@ class GTKClassifier(BaseClassifier):
         p.seek_simple(Gst.Format.TIME, 0, then)
 
 
-def load_binary_timings(fn, all_classes, default_state=0, classes=None):
+def load_binary_timings(fn, all_classes, default_state=0, classes=None, lag=0):
     #all_classes is a sequence of class groups. Each group of
     #all_classes is a string of characters. By default the first one
     #is used, but if a line like 'group: Xxy' comes along, the the
@@ -591,11 +591,14 @@ def load_binary_timings(fn, all_classes, default_state=0, classes=None):
         classes = all_classes[0]
 
     print "loading %s with classes %s" % (fn, classes)
-    target_string = 'c%%dt%s:%s'
+    target_string = 'c%%dt%.2f:%s'
     group_string = '%s' + '=' * (len(all_classes) - 1)
-    def add_event(state, t):
+    def add_event(state, t, lag=0):
         c = classes[state]
-        events.append((group, classes[state], float(t),
+        t = float(t)
+        if t > 0:
+            t += lag
+        events.append((group, classes[state], t,
                        target_string % (t, group_string % c)))
 
     for line in f:
@@ -613,12 +616,12 @@ def load_binary_timings(fn, all_classes, default_state=0, classes=None):
             if d:
                 state = default_state
                 if float(d[0]) > 0:
-                    add_event(state, 0)
+                    add_event(state, 0, lag)
                 for t in d:
                     state = 1 - state
-                    add_event(state, t)
+                    add_event(state, t, lag)
             else:
-                add_event(default_state, 0)
+                add_event(default_state, 0, lag)
 
     f.close()
     #XXX sort timings?
@@ -633,7 +636,7 @@ def targeted_wav_finder(d, files):
 
 
 
-def load_timings(all_classes, timing_files, audio_directories):
+def load_timings(all_classes, timing_files, audio_directories, lag=0):
     timings = {}
     for fn in timing_files:
         classes = None
@@ -641,7 +644,7 @@ def load_timings(all_classes, timing_files, audio_directories):
             fn, classes = fn.rsplit(',', 1)
             if classes not in all_classes:
                 classes = None
-        timings.update(load_binary_timings(fn, all_classes, classes=classes))
+        timings.update(load_binary_timings(fn, all_classes, classes=classes, lag=lag))
 
     #timings = coalesce_timings(timings)
 
@@ -681,6 +684,8 @@ def add_common_args(parser, WINDOW_SIZE, BASENAME):
                         help="load the net even if metadata doesn't match")
     parser.add_argument('--delta-features', type=int,
                         help="use this many layers of derivitive features")
+    parser.add_argument('--lag', type=float, default=0.0,
+                        help="add this much lag to loaded times")
 
 
 def show_roc_curve(scores, truth):

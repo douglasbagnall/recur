@@ -79,7 +79,8 @@ def main():
 
     timed_files, full_timings = load_timings(c.classes,
                                              args.timings,
-                                             args.audio_directory)
+                                             args.audio_directory,
+                                             lag = args.lag)
 
     validate_streams = [[ffn for fn, ffn in timed_files[:n_channels]]]
     training_streams = [[ffn for fn, ffn in timed_files[n_channels:]]]

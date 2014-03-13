@@ -51,7 +51,8 @@ def main():
 
     timed_files, full_timings = load_timings(c.classes,
                                              args.timings,
-                                             args.audio_directory)
+                                             args.audio_directory,
+                                             lag=args.lag)
 
     if args.first_n:
         timed_files = timed_files[:args.first_n]
