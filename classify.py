@@ -88,7 +88,8 @@ class BaseClassifier(object):
 
     def setup(self, mfccs, hsize, class_string, basename='classify',
               bottom_layer=0, window_size=None, min_freq=None,
-              knee_freq=None, max_freq=None):
+              knee_freq=None, max_freq=None, lag=0, delta_features=0,
+              focus_freq=0):
         #put classes through a round trip, just to be sure it works
         self.setp('classes', class_string)
         self.classes = self.getp('classes').split(',')
@@ -106,6 +107,10 @@ class BaseClassifier(object):
             self.setp('max-frequency', max_freq)
         if knee_freq is not None:
             self.setp('knee-frequency', knee_freq)
+
+        self.setp('focus-frequency', focus_freq)
+        self.setp('delta-features', delta_features)
+        self.setp('lag', lag)
         self.setp('basename', basename)
 
     def on_eos(self, bus, msg):
@@ -684,6 +689,8 @@ def add_common_args(parser, WINDOW_SIZE, BASENAME):
                         help="use this many layers of derivitive features")
     parser.add_argument('--lag', type=float, default=0.0,
                         help="add this much lag to loaded times")
+    parser.add_argument('--focus-frequency', type=float, default=0.0,
+                        help="focus on frequencies around this")
 
 
 def show_roc_curve(scores, truth):

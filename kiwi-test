@@ -35,8 +35,6 @@ def main():
     c = Classifier(channels=1)
     c.quiet = not args.verbose
     c.setp('force-load', args.force_load)
-    c.setp('delta-features', args.delta_features)
-    c.setp('lag', args.lag)
 
     if args.net_filename:
         c.setup_from_file(args.net_filename)
@@ -49,7 +47,10 @@ def main():
                 basename=args.basename,
                 min_freq=MIN_FREQUENCY,
                 max_freq=MAX_FREQUENCY,
-                knee_freq=KNEE_FREQUENCY)
+                knee_freq=KNEE_FREQUENCY,
+                focus_freq=args.focus_frequency,
+                lag=args.lag,
+                delta_features=args.delta_features)
 
     timed_files, full_timings = load_timings(c.classes,
                                              args.timings,
