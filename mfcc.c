@@ -113,20 +113,22 @@ hz_to_mel(float hz, float knee, float focus){
 static inline float
 mel_to_hz(float mel, float knee, float focus){
   float hz = (mel / 34) * (mel / 34);
-  float approx = hz_to_mel(hz + 1, knee, focus);
-  float prev;
+  float approx;
+  float prev = hz_to_mel(hz, knee, focus) - 1;
   float mul = 2.0f;
-  do {
-    prev = approx;
+  for (;;){
     approx = hz_to_mel(hz, knee, focus);
     MAYBE_DEBUG("mel %f approx %f prev %f diff %g mul %f hz %f",
         mel, approx, prev, approx - mel, mul, hz);
+    if (fabs(mel - approx) < 0.0001 || prev == approx){
+      return hz;
+    }
     hz = MAX(hz + mul * (mel - approx), 0);
     if ((prev > mel) != (approx > mel)){
-      mul *= 0.75;
+      mul *= 0.5;
     }
-  } while (fabs(mel - approx) > 0.0001 && prev != approx);
-  return hz;
+    prev = approx;
+  }
 }
 
 RecurAudioBinSlope * __attribute__((malloc))
