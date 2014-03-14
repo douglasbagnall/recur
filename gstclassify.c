@@ -1603,6 +1603,11 @@ train_channel(GstClassify *self, ClassifyChannel *c, int *win_count){
       group_error[target] += 1.0f;
       wrongness += group_error[target];
     }
+    else {
+      for (int j = 0; j < g->n_classes; j++){
+        group_error[j] = 0;
+      }
+    }
   }
   if (self->error_weight){
     for (int i = 0; i < net->output_size; i++){
