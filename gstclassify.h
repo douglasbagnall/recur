@@ -112,6 +112,7 @@ struct _GstClassify
   GValue *pending_properties;
   TemporalPPM *error_image;
   int delta_features;
+  int intensity_feature;
   float lag;
 };
 

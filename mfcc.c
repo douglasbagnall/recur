@@ -326,7 +326,7 @@ recur_audio_binner_new(int window_size, int window_type,
       audio_rate
   );
   mfcc_slopes_dump(ab);
-  ab->fft_bins = malloc_aligned_or_die((n_bins + 2) * sizeof(float));
+  ab->fft_bins = malloc_aligned_or_die((n_bins + 3) * sizeof(float));
   ab->dct_bins = malloc_aligned_or_die((n_bins + 2) * sizeof(float));
   mfcc_slopes_dump2(ab);
   return ab;

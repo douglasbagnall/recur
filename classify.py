@@ -89,7 +89,7 @@ class BaseClassifier(object):
     def setup(self, mfccs, hsize, class_string, basename='classify',
               bottom_layer=0, window_size=None, min_freq=None,
               knee_freq=None, max_freq=None, lag=0, delta_features=0,
-              focus_freq=0):
+              focus_freq=0, intensity_feature=0):
         #put classes through a round trip, just to be sure it works
         self.setp('classes', class_string)
         self.classes = self.getp('classes').split(',')
@@ -110,6 +110,7 @@ class BaseClassifier(object):
 
         self.setp('focus-frequency', focus_freq)
         self.setp('delta-features', delta_features)
+        self.setp('intensity-feature', intensity_feature)
         self.setp('lag', lag)
         self.setp('basename', basename)
 
@@ -686,6 +687,8 @@ def add_common_args(parser, WINDOW_SIZE, BASENAME):
                         help="load the net even if metadata doesn't match")
     parser.add_argument('--delta-features', type=int,
                         help="use this many layers of derivitive features")
+    parser.add_argument('--intensity-feature', action='store_true',
+                        help="use the overall intensity as a feature")
     parser.add_argument('--lag', type=float, default=0.0,
                         help="add this much lag to loaded times")
     parser.add_argument('--focus-frequency', type=float, default=0.0,

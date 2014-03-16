@@ -77,14 +77,18 @@ def main():
                 knee_freq=KNEE_FREQUENCY,
                 focus_freq=args.focus_frequency,
                 lag=args.lag,
-                delta_features=args.delta_features)
+                delta_features=args.delta_features,
+                intensity_feature=args.intensity_feature)
 
     timed_files, full_timings = load_timings(c.classes,
                                              args.timings,
                                              args.audio_directory)
 
     validate_streams = [[ffn for fn, ffn in timed_files[:n_channels]]]
-    training_streams = [[ffn for fn, ffn in timed_files[n_channels:]]]
+    training_streams = [[ffn for fn, ffn in timed_files[n_channels:]],
+                        [ffn for fn, ffn in timed_files[n_channels:]
+                         if len(full_timings[ffn]) > 1]
+                    ]
 
     for x in training_streams:
         random.shuffle(x)

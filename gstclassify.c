@@ -57,6 +57,7 @@ enum
   PROP_RANDOM_ALIGNMENT,
   PROP_NET_FILENAME,
   PROP_DELTA_FEATURES,
+  PROP_INTENSITY_FEATURE,
   PROP_FORCE_LOAD,
   PROP_LAG,
 
@@ -73,6 +74,7 @@ enum
 #define DEFAULT_PROP_TRAINING 0
 #define DEFAULT_PROP_MFCCS 0
 #define DEFAULT_PROP_DELTA_FEATURES 0
+#define DEFAULT_PROP_INTENSITY_FEATURE 0
 #define DEFAULT_PROP_MOMENTUM 0.95f
 #define DEFAULT_PROP_MOMENTUM_SOFT_START 0.0f
 #define DEFAULT_PROP_MOMENTUM_STYLE 1
@@ -341,6 +343,12 @@ gst_classify_class_init (GstClassifyClass * klass)
           DEFAULT_PROP_DELTA_FEATURES,
           G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
+  g_object_class_install_property (gobject_class, PROP_INTENSITY_FEATURE,
+      g_param_spec_boolean("intensity-feature", "intensity-feature",
+          "Use the total signal intensity as one input",
+          DEFAULT_PROP_INTENSITY_FEATURE,
+          G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
+
   g_object_class_install_property (gobject_class, PROP_WEIGHT_SPARSITY,
       g_param_spec_int("weight-sparsity", "weight-sparsity",
           "higher numbers for more initial weights near zero",
@@ -545,8 +553,8 @@ gst_classify_init (GstClassify * self)
   GST_INFO("gst classify init\n");
 }
 
-#define N_FEATURES(self) (((self)->mfccs ? (self)->mfccs : CLASSIFY_N_FFT_BINS) \
-      * (1 + (self)->delta_features))
+#define N_FEATURES(self) ((((self)->mfccs ? (self)->mfccs : CLASSIFY_N_FFT_BINS) \
+      + self->intensity_feature) * (1 + (self)->delta_features))
 
 static void
 set_net_filename(GstClassify *self, int hidden_size, int bottom_layer,
@@ -628,6 +636,7 @@ construct_metadata(GstClassify *self){
       "delta-features %d\n"
       "focus-frequency %f\n"
       "lag %f\n"
+      "intensity-feature %d\n"
       ,
       PP_GET_STRING(self, PROP_CLASSES, DEFAULT_PROP_CLASSES),
       PP_GET_FLOAT(self, PROP_MIN_FREQUENCY, DEFAULT_MIN_FREQUENCY),
@@ -638,7 +647,9 @@ construct_metadata(GstClassify *self){
       PP_GET_STRING(self, PROP_BASENAME, DEFAULT_BASENAME),
       PP_GET_INT(self, PROP_DELTA_FEATURES, DEFAULT_PROP_DELTA_FEATURES),
       PP_GET_FLOAT(self, PROP_FOCUS_FREQUENCY, DEFAULT_FOCUS_FREQUENCY),
-      PP_GET_FLOAT(self, PROP_LAG, DEFAULT_PROP_LAG)
+      PP_GET_FLOAT(self, PROP_LAG, DEFAULT_PROP_LAG),
+      PP_GET_INT(self, PROP_INTENSITY_FEATURE, DEFAULT_PROP_INTENSITY_FEATURE)
+
   );
   STDERR_DEBUG("%s", metadata);
   if (ret == -1){
@@ -656,6 +667,7 @@ struct ClassifyMetadata {
   int window_size;
   char *basename;
   int delta_features;
+  int intensity_feature;
   float focus_freq;
   float lag;
 };
@@ -682,12 +694,13 @@ load_metadata(const char *metadata, struct ClassifyMetadata *m){
       "basename %ms "
       "delta-features %d "
       "focus-frequency %f "
-      "lag %f"
+      "lag %f "
+      "intensity-feature %d"
   );
   int n = sscanf(metadata, template, &m->classes,
       &m->min_freq, &m->max_freq, &m->knee_freq,
       &m->mfccs, &m->window_size, &m->basename, &m->delta_features,
-      &m->focus_freq, &m->lag);
+      &m->focus_freq, &m->lag, &m->intensity_feature);
   if (n != 10){
     GST_WARNING("Found only %d/%d metadata items", n, 10);
     return -1;
@@ -698,7 +711,7 @@ load_metadata(const char *metadata, struct ClassifyMetadata *m){
 static void
 setup_audio(GstClassify *self, int window_size, int mfccs, float min_freq,
     float max_freq, float knee_freq, float focus_freq, int delta_features,
-    float lag){
+    int intensity_feature, float lag){
   self->mfcc_factory = recur_audio_binner_new(window_size,
       RECUR_WINDOW_HANN,
       CLASSIFY_N_FFT_BINS,
@@ -709,6 +722,7 @@ setup_audio(GstClassify *self, int window_size, int mfccs, float min_freq,
 
   self->window_size = window_size;
   self->delta_features = delta_features;
+  self->intensity_feature = intensity_feature;
   self->lag = lag;
   GST_LOG("mfccs: %d", mfccs);
   self->mfccs = mfccs;
@@ -746,7 +760,7 @@ load_specified_net(GstClassify *self, const char *filename){
   self->basename = strdup(m.basename);
   setup_audio(self, m.window_size, m.mfccs, m.min_freq,
       m.max_freq, m.knee_freq, m.focus_freq, m.delta_features,
-      m.lag);
+      m.intensity_feature, m.lag);
   self->net = net;
   return net;
 }
@@ -912,7 +926,8 @@ gst_classify_setup(GstAudioFilter *base, const GstAudioInfo *info){
         PP_GET_FLOAT(self, PROP_KNEE_FREQUENCY, DEFAULT_KNEE_FREQUENCY),
         PP_GET_FLOAT(self, PROP_FOCUS_FREQUENCY, DEFAULT_FOCUS_FREQUENCY),
         PP_GET_INT(self, PROP_DELTA_FEATURES, DEFAULT_PROP_DELTA_FEATURES),
-        PP_GET_FLOAT(self, PROP_LAG, DEFAULT_PROP_LAG)
+        PP_GET_FLOAT(self, PROP_LAG, DEFAULT_PROP_LAG),
+        PP_GET_INT(self, PROP_INTENSITY_FEATURE, DEFAULT_PROP_INTENSITY_FEATURE)
     );
     self->net = load_or_create_net(self);
 
@@ -1367,6 +1382,7 @@ gst_classify_set_property (GObject * object, guint prop_id, const GValue * value
     case PROP_RNG_SEED:
     case PROP_WINDOW_SIZE:
     case PROP_DELTA_FEATURES:
+    case PROP_INTENSITY_FEATURE:
     case PROP_MFCCS:
       if (self->net == NULL){
         copy_gvalue(PENDING_PROP(self, prop_id), value);
@@ -1528,17 +1544,27 @@ send_message(GstClassify *self, float mean_err, GstClockTime pts)
 
 static inline void
 pcm_to_features(RecurAudioBinner *mf, ClassifyChannel *c, int mfccs,
-    int delta_features){
+    int delta_features, int intensity_feature){
   float *pcm = c->pcm_now;
   float *answer;
   int n_raw_features;
   if (mfccs){
-    answer = recur_extract_mfccs(mf, pcm) + 1;
+    answer = recur_extract_mfccs(mf, pcm) + (intensity_feature ? 0 : 1);
     n_raw_features = mfccs;
   }
   else {
     answer = recur_extract_log_freq_bins(mf, pcm);
-    n_raw_features = CLASSIFY_N_FFT_BINS;
+    if (intensity_feature){
+      float sum = 0;
+      for (int i = 0; i < CLASSIFY_N_FFT_BINS; i++){
+        sum += answer[i];
+      }
+      answer[CLASSIFY_N_FFT_BINS] = sum / CLASSIFY_N_FFT_BINS;
+      n_raw_features = CLASSIFY_N_FFT_BINS + 1;
+    }
+    else {
+      n_raw_features = CLASSIFY_N_FFT_BINS;
+    }
   }
   if (c->prev_features){
     float *tmp = c->features;
@@ -1572,7 +1598,8 @@ prepare_channel_features(GstClassify *self, s16 *buffer_i, int j){
     c->pcm_now[half_window + i] = buffer_i[k];
   }
   /*get the features -- after which pcm_now is finished with. */
-  pcm_to_features(self->mfcc_factory, c, self->mfccs, self->delta_features);
+  pcm_to_features(self->mfcc_factory, c, self->mfccs, self->delta_features,
+      self->intensity_feature);
   if (c->mfcc_image){
     temporal_ppm_row_from_source(c->mfcc_image);
   }
