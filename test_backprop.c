@@ -54,6 +54,10 @@
 #define DEFAULT_REPORT_INTERVAL 1024
 #define DEFAULT_CONFAB_ONLY 0
 #define DEFAULT_DIAGONAL_BOOST 0
+#define DEFAULT_BOTTOM_LAYER 0
+#define DEFAULT_TOP_LEARN_RATE_SCALE 1.0f
+#define DEFAULT_BOTTOM_LEARN_RATE_SCALE 1.0f
+
 
 #define BELOW_QUIET_LEVEL(quiet) if (opt_quiet < quiet)
 
@@ -111,6 +115,9 @@ static float opt_weight_scale_factor = DEFAULT_WEIGHT_SCALE_FACTOR;
 static uint opt_report_interval = DEFAULT_REPORT_INTERVAL;
 static uint opt_confab_only = DEFAULT_CONFAB_ONLY;
 static float opt_diagonal_boost = DEFAULT_DIAGONAL_BOOST;
+static uint opt_bottom_layer = DEFAULT_BOTTOM_LAYER;
+static float opt_top_learn_rate_scale = DEFAULT_TOP_LEARN_RATE_SCALE;
+static float opt_bottom_learn_rate_scale = DEFAULT_BOTTOM_LEARN_RATE_SCALE;
 
 
 /* Following ccan/opt/helpers.c opt_set_longval, etc */
@@ -225,7 +232,12 @@ static struct opt_table options[] = {
       &opt_confab_only, "no training, only confabulate this many characters"),
   OPT_WITH_ARG("--diagonal-boost=<float>", opt_set_floatval, opt_show_floatval,
       &opt_diagonal_boost, "boost this portion of diagonal weights"),
-
+  OPT_WITH_ARG("--bottom-layer=<nodes>", opt_set_uintval, opt_show_uintval,
+      &opt_bottom_layer, "use a bottom layer with this many output nodes"),
+  OPT_WITH_ARG("--top-learn-rate-scale=<float>", opt_set_floatval, opt_show_floatval,
+      &opt_top_learn_rate_scale, "top layer learn rate (relative)"),
+  OPT_WITH_ARG("--bottom-learn-rate-scale=<float>", opt_set_floatval, opt_show_floatval,
+      &opt_bottom_learn_rate_scale, "bottom layer learn rate (relative)"),
 
   OPT_WITHOUT_ARG("-h|--help", opt_usage_and_exit,
       ": Rnn modelling of text at the character level",
@@ -341,12 +353,23 @@ search_for_max(float *answer, int len){
 
 static inline float*
 one_hot_opinion(RecurNN *net, const int hot){
-  //XXX could just set the previous one to zero (i.e. remember it)
-  memset(net->real_inputs, 0, net->input_size * sizeof(float));
-  if (opt_learn_capitals && (hot & 0x80)){
-    net->real_inputs[net->input_size - 1] = 1.0f;
+  float *inputs;
+  int len;
+  if (net->bottom_layer){
+    inputs = net->bottom_layer->inputs;
+    len = net->bottom_layer->input_size;
   }
-  net->real_inputs[hot & 0x7f] = 1.0f;
+  else{
+    inputs = net->real_inputs;
+    len = net->input_size;
+  }
+
+  //XXX could just set the previous one to zero (i.e. remember it)
+  memset(inputs, 0, len * sizeof(float));
+  if (opt_learn_capitals && (hot & 0x80)){
+    inputs[len - 1] = 1.0f;
+  }
+  inputs[hot & 0x7f] = 1.0f;
   return rnn_opinion(net, NULL, opt_dropout);
 }
 
@@ -678,9 +701,16 @@ construct_net_filename(void){
   for (uint i = 0; i < len; i++){
     sig ^= ROTATE(sig - s[i], 13) + s[i];
   }
-  snprintf(s, sizeof(s), "text-s%0x-i%d-h%d-o%d-b%d-c%d.net",
-      sig, input_size, opt_hidden_size, output_size,
-      opt_bias, opt_learn_capitals);
+  if (opt_bottom_layer){
+    snprintf(s, sizeof(s), "text-s%0x-i%d-b%d-h%d-o%d-b%d-c%d.net",
+        sig, input_size, opt_bottom_layer, opt_hidden_size, output_size,
+        opt_bias, opt_learn_capitals);
+  }
+  else{
+    snprintf(s, sizeof(s), "text-s%0x-i%d-h%d-o%d-b%d-c%d.net",
+        sig, input_size, opt_hidden_size, output_size,
+        opt_bias, opt_learn_capitals);
+  }
   DEBUG("filename: %s", s);
   return strdup(s);
 }
@@ -708,10 +738,18 @@ load_or_create_net(void){
     if (opt_bptt_adaptive_min){/*on by default*/
       flags |= RNN_NET_FLAG_BPTT_ADAPTIVE_MIN_ERROR;
     }
-    net = rnn_new(input_size, opt_hidden_size,
-        output_size, flags, opt_rng_seed,
-        opt_logfile, opt_bptt_depth, opt_learn_rate,
-        opt_momentum);
+    if(opt_bottom_layer){
+      net = rnn_new_with_bottom_layer(input_size, opt_bottom_layer,
+          opt_hidden_size, output_size, flags, opt_rng_seed,
+          opt_logfile, opt_bptt_depth, opt_learn_rate,
+          opt_momentum, 0);
+    }
+    else{
+      net = rnn_new(input_size, opt_hidden_size,
+          output_size, flags, opt_rng_seed,
+          opt_logfile, opt_bptt_depth, opt_learn_rate,
+          opt_momentum);
+    }
     if (opt_dense_weights){
       rnn_randomise_weights(net, RNN_INITIAL_WEIGHT_VARIANCE_FACTOR / net->h_size,
           opt_dense_weights, opt_perforate_weights);
@@ -721,7 +759,7 @@ load_or_create_net(void){
       //rnn_randomise_weights_fan_in(net, 2.0f, 0.3f, 0.1f, 1.0);
     }
     if (opt_diagonal_boost){
-      rnn_emphasise_diagonal(net, 0.5, opt_diagonal_boost);
+      rnn_emphasise_diagonal(net, 0.25, opt_diagonal_boost);
     }
     net->bptt->momentum_weight = opt_momentum_weight;
     if (opt_weight_scale_factor > 0){
@@ -736,6 +774,10 @@ load_or_create_net(void){
     bptt->learn_rate = opt_learn_rate;
     bptt->momentum = opt_momentum;
     bptt->momentum_weight = opt_momentum_weight;
+  }
+  net->bptt->ho_scale = opt_top_learn_rate_scale;
+  if (net->bottom_layer){
+    net->bottom_layer->learn_rate_scale = opt_bottom_learn_rate_scale;
   }
 
   return net;
