@@ -27,6 +27,8 @@ def main():
                         help="slightly randomise alignment of fft windows")
     parser.add_argument('-E', '--error-weights',
                         help="multiply output errors by these ratios")
+    parser.add_argument('--bptt-depth', type=int,
+                        help="Depth of BPTT training")
 
     args = parser.parse_args()
     if args.learn_rate:
@@ -62,6 +64,7 @@ def main():
     c.quiet = not args.verbose
     c.setp('force-load', args.force_load)
     c.setp('random-alignment', args.random_alignment)
+    c.setp('bptt-depth', args.bptt_depth)
 
     if args.net_filename:
         c.setup_from_file(args.net_filename)
@@ -100,7 +103,7 @@ def main():
             iterations=args.iterations,
             learn_rate=lr, dropout=dropout,
             properties=(('momentum-soft-start', 10000),
-                        ('momentum', 0.95),
+                        ('momentum', 0.93),
                         ('momentum-style', 1),
                         ('weight-fan-in-sum', 3),
                         ('weight-fan-in-kurtosis', 0.15),
