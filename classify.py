@@ -713,6 +713,7 @@ def show_roc_curve(scores, truth):
     bx, by, bd, bp = 0, 0, 99, 0
     cx, cy, cd, cp = 0, 0, 0, 0
     dx, dy, dd, dp = 0, 0, 0, 0
+    ex, ey, ed, ep = 0, 0, 0, 0
 
     #print results
 
@@ -746,6 +747,12 @@ def show_roc_curve(scores, truth):
             dx = x
             dy = y
             dp = score
+        d = y ** 2 - x ** 2
+        if d > ed:
+            ed = d
+            ex = x
+            ey = y
+            ep = score
         fp.append(x)
         tp.append(y)
 
@@ -761,6 +768,9 @@ def show_roc_curve(scores, truth):
     print "~best %0.3f  %.3f true, %.3f false" % (cp, cy, cx)
     print "halfway 0.5  %.3f true, %.3f false" % (hy, hx)
     plt.plot(fp, tp)
+    plt.annotate("max sq diff %.2g" % ep, (ex, ey), (0.7, 0.7),
+                 arrowprops={'width':1, 'color': '#0088aa'},
+                 )
     plt.annotate("max sqrt diff %.2g" % dp, (dx, dy), (0.2, 0.2),
                  arrowprops={'width':1, 'color': '#8800aa'},
                  )
