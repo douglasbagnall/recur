@@ -701,8 +701,8 @@ load_metadata(const char *metadata, struct ClassifyMetadata *m){
       &m->min_freq, &m->max_freq, &m->knee_freq,
       &m->mfccs, &m->window_size, &m->basename, &m->delta_features,
       &m->focus_freq, &m->lag, &m->intensity_feature);
-  if (n != 10){
-    GST_WARNING("Found only %d/%d metadata items", n, 10);
+  if (n != 11){
+    GST_WARNING("Found only %d/%d metadata items", n, 11);
     return -1;
   }
   return 0;
