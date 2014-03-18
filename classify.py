@@ -10,7 +10,9 @@ import gi
 gi.require_version('Gst', '1.0')
 from gi.repository import Gst, GObject
 
-DEFAULT_LOG_FILE = "classify.log"
+MIN_FREQUENCY = 40
+MAX_FREQUENCY = 3900
+KNEE_FREQUENCY = 700
 
 COLOURS = {
     "Z": "\033[00m",
@@ -93,26 +95,21 @@ class BaseClassifier(object):
         #put classes through a round trip, just to be sure it works
         self.setp('classes', class_string)
         self.classes = self.getp('classes').split(',')
-        if window_size is not None:
-            self.setp('window-size', window_size)
-        if mfccs is not None:
-            self.setp('mfccs', mfccs)
-        if hsize is not None:
-            self.setp('hidden-size', hsize)
-        if bottom_layer:
-            self.setp('bottom-layer', bottom_layer)
-        if min_freq is not None:
-            self.setp('min-frequency', min_freq)
-        if max_freq is not None:
-            self.setp('max-frequency', max_freq)
-        if knee_freq is not None:
-            self.setp('knee-frequency', knee_freq)
+        for gstarg, pyarg in (('window-size', window_size),
+                              ('mfccs', mfccs),
+                              ('hidden-size', hsize),
+                              ('bottom-layer', bottom_layer),
+                              ('min-frequency', min_freq),
+                              ('max-frequency', max_freq),
+                              ('knee-frequency', knee_freq),
+                              ('focus-frequency', focus_freq),
+                              ('delta-features', delta_features),
+                              ('intensity-feature', intensity_feature),
+                              ('lag', lag),
+                              ('basename', basename)):
+            if pyarg is not None:
+                self.setp(gstarg, pyarg)
 
-        self.setp('focus-frequency', focus_freq)
-        self.setp('delta-features', delta_features)
-        self.setp('intensity-feature', intensity_feature)
-        self.setp('lag', lag)
-        self.setp('basename', basename)
 
     def on_eos(self, bus, msg):
         print('on_eos()')
@@ -145,8 +142,12 @@ class Classifier(BaseClassifier):
     classification_file = None
     def classify(self, data,
                  ground_truth_file=None,
-                 classification_file=None, show_roc=False):
-        self.target_index = (0, self.classes[0][-1])
+                 classification_file=None, show_roc=False,
+                 target_index=None):
+        if target_index is None:
+            self.target_index = (0, self.classes[0][-1])
+        else:
+            self.target_index = target_index
         if ground_truth_file:
             self.ground_truth_file = open(ground_truth_file, 'w')
         if classification_file:
@@ -450,13 +451,13 @@ class Trainer(BaseClassifier):
                 output.append(" %s %.3f/%.3f " % (x, right_p, wrong_p))
 
             print ''.join(output)
-            if winners > 0.9:
+            if rightness > 0.8:
                 self.save_named_net(tag='goodness-%d-%d' %
                                     (int(rightness * 100), int(winners * 100)))
 
 
     def save_named_net(self, tag='', dir=SAVE_LOCATION):
-        basename = self.classifier.getproperty('basename')
+        basename = self.getp('basename')
         fn = ("%s/%s-%s-%s.net" %
               (dir, basename, time.time(), tag))
         print "saving %s" % fn
@@ -637,8 +638,6 @@ def targeted_wav_finder(d, files):
         if os.path.exists(ffn):
             yield (fn, ffn)
 
-
-
 def load_timings(all_classes, timing_files, audio_directories):
     timings = {}
     for fn in timing_files:
@@ -662,11 +661,41 @@ def load_timings(all_classes, timing_files, audio_directories):
 
     return timed_files, full_timings
 
+def load_timings_from_file_names(classes, audio_directories):
+    group_map = {}
+    for i, group in enumerate(classes):
+        for x in group:
+            group_map[x] = i
+    timed_files = []
+    for root in audio_directories:
+        for d, subdirs, files in os.walk(root):
+            wavs = [x for x in files if x.endswith('.wav') and x[0] in group_map]
+            timed_files.extend((x, os.path.join(d, x)) for x in wavs)
+
+    full_timings = {}
+    for fn, ffn in timed_files:
+        c = fn[0]
+        group = group_map[c]
+        target = 'c%dt0:' + '=' * group + c + '=' * (len(classes) - group - 1)
+        full_timings[ffn] = [(group, c, 0, target)]
+
+    return timed_files, full_timings
+
+
+def targeted_wav_finder(d, files):
+    for fn in files:
+        ffn = os.path.join(d, fn)
+        if os.path.exists(ffn):
+            yield (fn, ffn)
+
+
 def add_common_args(parser, WINDOW_SIZE, BASENAME):
     parser.add_argument('-v', '--verbose', action='store_true',
                         help='lots of rubbish output')
     parser.add_argument('-t', '--timings', action='append',
                         help='read timings from here')
+    parser.add_argument('--classes-from-file-names', action='store_true',
+                        help='the first letter of each file indicates its class')
     parser.add_argument('-f', '--net-filename',
                         help='load RNN from here')
     parser.add_argument('-d', '--audio-directory', action='append',
@@ -693,11 +722,48 @@ def add_common_args(parser, WINDOW_SIZE, BASENAME):
                         help="add this much lag to loaded times")
     parser.add_argument('--focus-frequency', type=float, default=0.0,
                         help="focus on frequencies around this")
+    parser.add_argument('--min-frequency', type=float, default=MIN_FREQUENCY,
+                        help="lowest audio frequency to consider")
+    parser.add_argument('--max-frequency', type=float, default=MAX_FREQUENCY,
+                        help="highest audio frequency to consider")
+    parser.add_argument('--knee-frequency', type=float, default=KNEE_FREQUENCY,
+                        help="higher for more top-end response")
+    parser.add_argument('--mfccs', type=int, default=0,
+                        help="How many MFCCs to use (0 for raw fft bins)")
 
+def process_common_args(c, args):
+    c.quiet = not args.verbose
+    c.setp('force-load', args.force_load)
+    if args.net_filename:
+        c.setup_from_file(args.net_filename)
+    else:
+        c.setup(args.mfccs,
+                args.hidden_size,
+                args.classes,
+                window_size=args.window_size,
+                bottom_layer=args.bottom_layer,
+                basename=args.basename,
+                min_freq=args.min_frequency,
+                max_freq=args.max_frequency,
+                knee_freq=args.knee_frequency,
+                focus_freq=args.focus_frequency,
+                lag=args.lag,
+                delta_features=args.delta_features,
+                intensity_feature=args.intensity_feature)
+
+    if args.classes_from_file_names:
+        timed_files, full_timings = load_timings_from_file_names(c.classes,
+                                                                 args.audio_directory)
+    else:
+        timed_files, full_timings = load_timings(c.classes,
+                                                 args.timings,
+                                                 args.audio_directory)
+    return timed_files, full_timings
 
 def show_roc_curve(scores, truth):
     import matplotlib.pyplot as plt
     results = zip(scores, truth)
+    #print results
     results.sort()
     sum_true = sum(1 for x in truth if x)
     sum_false = len(truth) - sum_true

@@ -5,12 +5,10 @@ import itertools
 import time
 import argparse
 
-from classify_kiwi import MFCCS, WINDOW_SIZE, BASENAME
-from classify_kiwi import MIN_FREQUENCY, MAX_FREQUENCY, KNEE_FREQUENCY
+from classify_kiwi import WINDOW_SIZE, BASENAME
 
-from classify import targeted_wav_finder, gst_init
-from classify import Trainer, lr_steps, load_timings
-from classify import add_common_args
+from classify import Trainer, lr_steps, gst_init
+from classify import add_common_args, process_common_args
 
 def main():
     gst_init()
@@ -29,6 +27,8 @@ def main():
                         help="multiply output errors by these ratios")
     parser.add_argument('--bptt-depth', type=int,
                         help="Depth of BPTT training")
+    parser.add_argument('--activity-bias', type=int, default=1,
+                        help="Train more on examples with changing classes")
 
     args = parser.parse_args()
     if args.learn_rate:
@@ -53,45 +53,26 @@ def main():
     else:
         dropout = 0
 
-
     random.seed(1)
 
     n_channels = args.channels
 
     c = Trainer(channels=n_channels)
-
     c.no_save_net = args.no_save_net
-    c.quiet = not args.verbose
-    c.setp('force-load', args.force_load)
     c.setp('random-alignment', args.random_alignment)
-    c.setp('bptt-depth', args.bptt_depth)
-
-    if args.net_filename:
-        c.setup_from_file(args.net_filename)
-    else:
-        c.setup(MFCCS,
-                args.hidden_size,
-                args.classes,
-                window_size=args.window_size,
-                bottom_layer=args.bottom_layer,
-                basename=args.basename,
-                min_freq=MIN_FREQUENCY,
-                max_freq=MAX_FREQUENCY,
-                knee_freq=KNEE_FREQUENCY,
-                focus_freq=args.focus_frequency,
-                lag=args.lag,
-                delta_features=args.delta_features,
-                intensity_feature=args.intensity_feature)
-
-    timed_files, full_timings = load_timings(c.classes,
-                                             args.timings,
-                                             args.audio_directory)
+    if args.bptt_depth:
+        c.setp('bptt-depth', args.bptt_depth)
+    timed_files, full_timings = process_common_args(c, args)
 
     validate_streams = [[ffn for fn, ffn in timed_files[:n_channels]]]
-    training_streams = [[ffn for fn, ffn in timed_files[n_channels:]],
-                        [ffn for fn, ffn in timed_files[n_channels:]
-                         if len(full_timings[ffn]) > 1]
-                    ]
+    training_streams = [[ffn for fn, ffn in timed_files[n_channels:]]]
+    for i in range(args.activity_bias):
+        stream = [ffn for fn, ffn in timed_files[n_channels:]
+                  if len(full_timings[ffn]) > i + 1]
+        if len(stream) > min(n_channels * 10, len(timed_files) / 4):
+            training_streams.append(stream)
+        else:
+            training_streams.append(training_streams[-1][:])
 
     for x in training_streams:
         random.shuffle(x)

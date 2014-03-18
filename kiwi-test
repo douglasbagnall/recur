@@ -6,12 +6,8 @@ import time
 import argparse
 
 from classify import gst_init, Gst
-from classify_kiwi import MFCCS, WINDOW_SIZE, BASENAME
-from classify_kiwi import MIN_FREQUENCY, MAX_FREQUENCY, KNEE_FREQUENCY
-
-from classify import targeted_wav_finder, load_timings
-from classify import categorised_files
-from classify import Classifier, add_common_args
+from classify_kiwi import WINDOW_SIZE, BASENAME
+from classify import Classifier, add_common_args, process_common_args
 
 TEST_AUDIO_DIR = "/home/douglas/corpora/kiwi/test/"
 KIWI_TIMING_DATA = '/home/douglas/corpora/kiwi/times.txt'
@@ -29,39 +25,26 @@ def main():
                         help="write classifications to this file")
     parser.add_argument('--roc', action='store_true',
                         help="show ROC curves")
+    parser.add_argument('--target-class',
+                        help="use this class in reports and ROC")
+    parser.add_argument('--target-group', type=int, default=0,
+                        help="use this class group in reports and ROC")
 
     args = parser.parse_args()
 
     c = Classifier(channels=1)
-    c.quiet = not args.verbose
-    c.setp('force-load', args.force_load)
-
-    if args.net_filename:
-        c.setup_from_file(args.net_filename)
-    else:
-        c.setup(MFCCS,
-                args.hidden_size,
-                args.classes,
-                window_size=args.window_size,
-                bottom_layer=args.bottom_layer,
-                basename=args.basename,
-                min_freq=MIN_FREQUENCY,
-                max_freq=MAX_FREQUENCY,
-                knee_freq=KNEE_FREQUENCY,
-                focus_freq=args.focus_frequency,
-                lag=args.lag,
-                delta_features=args.delta_features,
-                intensity_feature=args.intensity_feature)
-
-    timed_files, full_timings = load_timings(c.classes,
-                                             args.timings,
-                                             args.audio_directory)
+    timed_files, full_timings = process_common_args(c, args)
 
     if args.first_n:
         timed_files = timed_files[:args.first_n]
     test_files = [(ffn, full_timings[ffn]) for fn, ffn in timed_files]
 
+    target = None
+    if args.target_class:
+        target=(args.target_group, args.target_class)
+
     c.classify(test_files, ground_truth_file=args.ground_truth_file,
-               classification_file=args.classification_file, show_roc=args.roc)
+               classification_file=args.classification_file, show_roc=args.roc,
+               target_index=target)
 
 main()
