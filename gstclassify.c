@@ -639,9 +639,9 @@ static int parse_classes_string(GstClassify *self, const char *orig)
 static char*
 construct_metadata(GstClassify *self, struct ClassifyMetadata *m){
   char *metadata;
+  struct ClassifyMetadata m_defaults = CLASSIFY_METADATA_DEFAULTS(self);
   if (m == NULL){
-    struct ClassifyMetadata m_new = CLASSIFY_METADATA_DEFAULTS(self);
-    m = &m_new;
+    m = &m_defaults;
   }
   int ret = asprintf(&metadata,
       "classes %s\n"
