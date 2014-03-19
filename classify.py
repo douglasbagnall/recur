@@ -158,8 +158,8 @@ class Classifier(BaseClassifier):
         self.class_results = self.get_results_counter()
         self.data = list(reversed(data))
         self.setp('training', False)
-        self.scores = []
-        self.score_targets = []
+        self.scores = self.get_results_counter(0)
+        self.score_targets = self.get_results_counter(0)
         self.load_next_file()
         self.mainloop.run()
 
@@ -281,7 +281,6 @@ class Classifier(BaseClassifier):
     def on_eos(self, bus, msg):
         self.report()
         fn = os.path.basename(self.current_file)
-        i, k = self.target_index
         if self.ground_truth_file:
             a = [fn] + ['%d' % x for x in self.file_ground_truth[i][k]]
             print >>self.ground_truth_file, ','.join(a)
@@ -290,8 +289,12 @@ class Classifier(BaseClassifier):
             a = [fn] + ['%.5g' % x for x in self.file_probabilities[i][k]]
             print >>self.classification_file, ','.join(a)
 
-        self.scores.extend(self.file_probabilities[i][k])
-        self.score_targets.extend(self.file_ground_truth[i][k])
+        for scores, fscores in zip(self.scores, self.file_probabilities):
+            for k in scores:
+                scores[k].extend(fscores[k])
+        for targets, ftargets in zip(self.score_targets, self.file_ground_truth):
+            for k in targets:
+                targets[k].extend(ftargets[k])
         if 0:
             show_roc_curve(self.file_probabilities[i][k],
                            self.file_ground_truth[i][k],
@@ -299,7 +302,18 @@ class Classifier(BaseClassifier):
 
         if not self.data:
             if self.show_roc:
-                show_roc_curve(self.scores, self.score_targets, k)
+                if 0:
+                    i, k = self.target_index
+                    show_roc_curve(self.scores[i][k], self.score_targets[i][k], k)
+                else:
+                    for i, group in enumerate(self.classes):
+                        for k in group[len(group) == 2:]:
+                            show_roc_curve(self.scores[i][k],
+                                           self.score_targets[i][k], k, show=False)
+                    import matplotlib.pyplot as plt
+                    plt.show()
+
+
             self.stop()
         else:
             self.load_next_file()
@@ -765,7 +779,7 @@ def process_common_args(c, args):
                                                  args.audio_directory)
     return timed_files, full_timings
 
-def show_roc_curve(scores, truth, title='ROC'):
+def show_roc_curve(scores, truth, title='ROC', show=True):
     import matplotlib.pyplot as plt
     results = zip(scores, truth)
     #print results
@@ -855,4 +869,5 @@ def show_roc_curve(scores, truth, title='ROC'):
 
     plt.axes().set_aspect('equal')
     plt.title(title)
-    plt.show()
+    if show:
+        plt.show()
