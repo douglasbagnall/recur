@@ -709,46 +709,47 @@ def targeted_wav_finder(d, files):
 
 
 def add_common_args(parser, WINDOW_SIZE, BASENAME):
-    parser.add_argument('-v', '--verbose', action='store_true',
-                        help='lots of rubbish output')
-    parser.add_argument('-t', '--timings', action='append',
-                        help='read timings from here')
-    parser.add_argument('--classes-from-file-names', action='store_true',
-                        help='the first letter of each file indicates its class')
-    parser.add_argument('-f', '--net-filename',
-                        help='load RNN from here')
-    parser.add_argument('-d', '--audio-directory', action='append',
-                        help='find audio in this directory')
-    parser.add_argument('-i', '--iterations', type=int, default=10000,
-                        help="how many file cycles to run for")
-    parser.add_argument('-H', '--hidden-size', type=int,
-                        help="number of hidden neurons")
-    parser.add_argument('-B', '--bottom-layer', type=int,
-                        help="number of bottom layer output nodes")
-    parser.add_argument('-c', '--classes', default='tf',
-                        help="classes (letter per class, groups separated by commas)")
-    parser.add_argument('-w', '--window-size', default=WINDOW_SIZE, type=int,
-                        help="size of the FFT window")
-    parser.add_argument('-n', '--basename', default=BASENAME,
-                        help="save nets etc using this basename")
-    parser.add_argument('-F', '--force-load', action='store_true',
-                        help="load the net even if metadata doesn't match")
-    parser.add_argument('--delta-features', type=int,
-                        help="use this many layers of derivitive features")
-    parser.add_argument('--intensity-feature', action='store_true',
-                        help="use the overall intensity as a feature")
-    parser.add_argument('--lag', type=float, default=0.0,
-                        help="add this much lag to loaded times")
-    parser.add_argument('--focus-frequency', type=float, default=0.0,
-                        help="focus on frequencies around this")
-    parser.add_argument('--min-frequency', type=float, default=MIN_FREQUENCY,
-                        help="lowest audio frequency to consider")
-    parser.add_argument('--max-frequency', type=float, default=MAX_FREQUENCY,
-                        help="highest audio frequency to consider")
-    parser.add_argument('--knee-frequency', type=float, default=KNEE_FREQUENCY,
-                        help="higher for more top-end response")
-    parser.add_argument('--mfccs', type=int, default=0,
-                        help="How many MFCCs to use (0 for raw fft bins)")
+    group = parser.add_argument_group('Common arguments')
+    group.add_argument('-v', '--verbose', action='store_true',
+                       help='lots of rubbish output')
+    group.add_argument('-t', '--timings', action='append',
+                       help='read timings from here')
+    group.add_argument('--classes-from-file-names', action='store_true',
+                       help='the first letter of each file indicates its class')
+    group.add_argument('-f', '--net-filename',
+                       help='load RNN from here')
+    group.add_argument('-d', '--audio-directory', action='append',
+                       help='find audio in this directory')
+    group.add_argument('-i', '--iterations', type=int, default=10000,
+                       help="how many file cycles to run for")
+    group.add_argument('-H', '--hidden-size', type=int,
+                       help="number of hidden neurons")
+    group.add_argument('-B', '--bottom-layer', type=int,
+                       help="number of bottom layer output nodes")
+    group.add_argument('-c', '--classes', default='tf',
+                       help="classes (letter per class, groups separated by commas)")
+    group.add_argument('-w', '--window-size', default=WINDOW_SIZE, type=int,
+                       help="size of the FFT window")
+    group.add_argument('-n', '--basename', default=BASENAME,
+                       help="save nets etc using this basename")
+    group.add_argument('-F', '--force-load', action='store_true',
+                       help="load the net even if metadata doesn't match")
+    group.add_argument('--delta-features', type=int,
+                       help="use this many layers of derivitive features")
+    group.add_argument('--intensity-feature', action='store_true',
+                       help="use the overall intensity as a feature")
+    group.add_argument('--lag', type=float, default=0.0,
+                       help="add this much lag to loaded times")
+    group.add_argument('--focus-frequency', type=float, default=0.0,
+                       help="focus on frequencies around this")
+    group.add_argument('--min-frequency', type=float, default=MIN_FREQUENCY,
+                       help="lowest audio frequency to consider")
+    group.add_argument('--max-frequency', type=float, default=MAX_FREQUENCY,
+                       help="highest audio frequency to consider")
+    group.add_argument('--knee-frequency', type=float, default=KNEE_FREQUENCY,
+                       help="higher for more top-end response")
+    group.add_argument('--mfccs', type=int, default=0,
+                       help="How many MFCCs to use (0 for raw fft bins)")
 
 def process_common_args(c, args):
     c.quiet = not args.verbose

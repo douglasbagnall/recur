@@ -17,18 +17,19 @@ def main():
     parser = argparse.ArgumentParser()
     add_common_args(parser, WINDOW_SIZE=WINDOW_SIZE,
                     BASENAME=BASENAME)
-    parser.add_argument('-C', '--first-n', type=int, default=0,
-                        help="classify this many files")
-    parser.add_argument('--ground-truth-file',
-                        help="write ground truth to this file (CSV)")
-    parser.add_argument('--classification-file',
-                        help="write classifications to this file")
-    parser.add_argument('--roc', action='store_true',
-                        help="show ROC curves")
-    parser.add_argument('--target-class',
-                        help="use this class in reports and ROC")
-    parser.add_argument('--target-group', type=int, default=0,
-                        help="use this class group in reports and ROC")
+    group = parser.add_argument_group('kiwi-test specific arguments')
+    group.add_argument('-C', '--first-n', type=int, default=0,
+                       help="classify this many files")
+    group.add_argument('--ground-truth-file',
+                       help="write ground truth to this file (CSV)")
+    group.add_argument('--classification-file',
+                       help="write classifications to this file")
+    group.add_argument('--roc', action='store_true',
+                       help="show ROC curves")
+    group.add_argument('--target-class',
+                       help="use this class in reports and ROC")
+    group.add_argument('--target-group', type=int, default=0,
+                       help="use this class group in reports and ROC")
 
     args = parser.parse_args()
 
