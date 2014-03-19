@@ -145,10 +145,7 @@ class Classifier(BaseClassifier):
                  ground_truth_file=None,
                  classification_file=None, show_roc=False,
                  target_index=None):
-        if target_index is None:
-            self.target_index = (0, self.classes[0][-1])
-        else:
-            self.target_index = target_index
+        self.target_index = target_index
         if ground_truth_file:
             self.ground_truth_file = open(ground_truth_file, 'w')
         if classification_file:
@@ -233,7 +230,11 @@ class Classifier(BaseClassifier):
 
             out.extend((COLOURS['Z'],'\n'))
 
-        i, k = self.target_index
+        if self.target_index:
+            i, k = self.target_index
+        else:
+            i, k = 0, self.classes[0][-1]
+
         truth = self.file_ground_truth[i][k]
         scores = self.file_probabilities[i][k]
         r_sum = 0
@@ -302,7 +303,7 @@ class Classifier(BaseClassifier):
 
         if not self.data:
             if self.show_roc:
-                if 0:
+                if self.target_index:
                     i, k = self.target_index
                     show_roc_curve(self.scores[i][k], self.score_targets[i][k], k)
                 else:
