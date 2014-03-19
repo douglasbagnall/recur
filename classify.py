@@ -311,8 +311,7 @@ class Classifier(BaseClassifier):
                         for k in group[len(group) == 2:]:
                             show_roc_curve(self.scores[i][k],
                                            self.score_targets[i][k], k, show=False)
-                    import matplotlib.pyplot as plt
-                    plt.show()
+                    actually_show_roc()
 
 
             self.stop()
@@ -850,7 +849,7 @@ def show_roc_curve(scores, truth, title='ROC', show=True):
     tp.reverse()
     print "~best %0.3f  %.3f true, %.3f false" % (cp, cy, cx)
     print "halfway 0.5  %.3f true, %.3f false" % (hy, hx)
-    plt.plot(fp, tp)
+    plt.plot(fp, tp, label=title)
     plt.annotate("95%% negative %.2g" % ep, (ex, ey), (0.7, 0.7),
                  arrowprops={'width':1, 'color': '#0088aa'},
                  )
@@ -869,7 +868,11 @@ def show_roc_curve(scores, truth, title='ROC', show=True):
                  arrowprops={'width':1, 'color': '#aa6600'},
                  )
 
-    plt.axes().set_aspect('equal')
-    plt.title(title)
     if show:
-        plt.show()
+        actually_show_roc()
+
+def actually_show_roc():
+    import matplotlib.pyplot as plt
+    plt.axes().set_aspect('equal')
+    plt.legend(loc='lower right')
+    plt.show()
