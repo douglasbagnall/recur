@@ -417,11 +417,20 @@ class Trainer(BaseClassifier):
             #score and runs are dicts indexed by chars in classes
             output = []
             rightness = 0
-            winners = 0
-            good_enough = 10 // len(classes)
-
+            p_strings = [" probabilities (right/wrong)"]
+            gap_p = 0
+            ratio_p = 0
+            count_p = 0
             for c in classes:
-                #print c, score, runs
+                wrong, right = probs[c]
+                wrong_c, right_c = pcounts[c]
+                right_p = right / right_c if right_c else 0.0
+                wrong_p = wrong / wrong_c if wrong_c else 0.0
+                p_strings.append(" %s %.2f/%.2f " % (c, right_p, wrong_p))
+                if right_c and wrong_c:
+                    gap_p += right_p - wrong_p
+                    ratio_p += right_p / wrong_p
+                    count_p += 1
                 s = score[c]
                 r = runs[c]
                 if r:
@@ -431,25 +440,19 @@ class Trainer(BaseClassifier):
                     output.append(c)
                     output.append(' %.2f%s %d/%d ' % (x, COLOURS['Z'], s, r))
                     rightness += x
-                    winners += i > good_enough
                 else:
                     output.append('%s --- %d/0 ' % (c, s,))
-
+            if count_p:
+                gap_p /= count_p
+                ratio_p /= count_p
             rightness /= len(classes)
-            winners /= float(len(classes))
-            output.append(" %s%.2f%s %.2f%s" %
+            output.append(" %s%.2f %s%.2f %s%.2f%s" %
                           (colours[int(rightness * 9.99)], rightness,
-                           colours[int(winners * 9.99)], winners,
+                           colours[min(int(gap_p * 15), 9)], gap_p,
+                           colours[min(int(ratio_p * 2), 9)], ratio_p,
                            COLOURS['Z']))
 
-            output.append(" probabilities (right/wrong)")
-            for x in classes:
-                #print x, probs, pcounts
-                wrong, right = probs[x]
-                wrong_c, right_c = pcounts[x]
-                right_p = right / right_c if right_c else float('nan')
-                wrong_p = wrong / wrong_c if wrong_c else float('nan')
-                output.append(" %s %.3f/%.3f " % (x, right_p, wrong_p))
+            output.extend(p_strings)
 
             print ''.join(output)
             if rightness > 0.8:
