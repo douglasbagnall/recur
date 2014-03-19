@@ -54,6 +54,20 @@ typedef s16 audio_sample;
 typedef struct _GstClassify GstClassify;
 typedef struct _GstClassifyClass GstClassifyClass;
 
+struct ClassifyMetadata {
+  const char *classes;
+  float min_freq;
+  float max_freq;
+  float knee_freq;
+  int mfccs;
+  int window_size;
+  const char *basename;
+  int delta_features;
+  float focus_freq;
+  float lag;
+  int intensity_feature;
+};
+
 typedef struct _ClassifyClassEvent {
   int channel;
   int class_group;
@@ -115,7 +129,6 @@ struct _GstClassify
   int intensity_feature;
   float lag;
 };
-
 
 struct _GstClassifyClass
 {

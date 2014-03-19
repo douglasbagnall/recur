@@ -622,9 +622,27 @@ static int parse_classes_string(GstClassify *self, const char *orig)
   return s - str - 1;
 }
 
+#define CLASSIFY_METADATA_DEFAULTS(self) {                              \
+    PP_GET_STRING(self, PROP_CLASSES, DEFAULT_PROP_CLASSES),            \
+    PP_GET_FLOAT(self, PROP_MIN_FREQUENCY, DEFAULT_MIN_FREQUENCY),    \
+    PP_GET_FLOAT(self, PROP_MAX_FREQUENCY, DEFAULT_MAX_FREQUENCY),    \
+    PP_GET_FLOAT(self, PROP_KNEE_FREQUENCY, DEFAULT_KNEE_FREQUENCY),  \
+    PP_GET_INT(self, PROP_MFCCS, DEFAULT_PROP_MFCCS),                   \
+    PP_GET_INT(self, PROP_WINDOW_SIZE, DEFAULT_WINDOW_SIZE),            \
+    PP_GET_STRING(self, PROP_BASENAME, DEFAULT_BASENAME),               \
+    PP_GET_INT(self, PROP_DELTA_FEATURES, DEFAULT_PROP_DELTA_FEATURES), \
+    PP_GET_FLOAT(self, PROP_FOCUS_FREQUENCY, DEFAULT_FOCUS_FREQUENCY),  \
+    PP_GET_FLOAT(self, PROP_LAG, DEFAULT_PROP_LAG),                     \
+    PP_GET_INT(self, PROP_INTENSITY_FEATURE, DEFAULT_PROP_INTENSITY_FEATURE) \
+    }
+
 static char*
-construct_metadata(GstClassify *self){
+construct_metadata(GstClassify *self, struct ClassifyMetadata *m){
   char *metadata;
+  if (m == NULL){
+    struct ClassifyMetadata m_new = CLASSIFY_METADATA_DEFAULTS(self);
+    m = &m_new;
+  }
   int ret = asprintf(&metadata,
       "classes %s\n"
       "min-frequency %f\n"
@@ -638,18 +656,17 @@ construct_metadata(GstClassify *self){
       "lag %f\n"
       "intensity-feature %d\n"
       ,
-      PP_GET_STRING(self, PROP_CLASSES, DEFAULT_PROP_CLASSES),
-      PP_GET_FLOAT(self, PROP_MIN_FREQUENCY, DEFAULT_MIN_FREQUENCY),
-      PP_GET_FLOAT(self, PROP_MAX_FREQUENCY, DEFAULT_MAX_FREQUENCY),
-      PP_GET_FLOAT(self, PROP_KNEE_FREQUENCY, DEFAULT_KNEE_FREQUENCY),
-      PP_GET_INT(self, PROP_MFCCS, DEFAULT_PROP_MFCCS),
-      PP_GET_INT(self, PROP_WINDOW_SIZE, DEFAULT_WINDOW_SIZE),
-      PP_GET_STRING(self, PROP_BASENAME, DEFAULT_BASENAME),
-      PP_GET_INT(self, PROP_DELTA_FEATURES, DEFAULT_PROP_DELTA_FEATURES),
-      PP_GET_FLOAT(self, PROP_FOCUS_FREQUENCY, DEFAULT_FOCUS_FREQUENCY),
-      PP_GET_FLOAT(self, PROP_LAG, DEFAULT_PROP_LAG),
-      PP_GET_INT(self, PROP_INTENSITY_FEATURE, DEFAULT_PROP_INTENSITY_FEATURE)
-
+      m->classes,
+      m->min_freq,
+      m->max_freq,
+      m->knee_freq,
+      m->mfccs,
+      m->window_size,
+      m->basename,
+      m->delta_features,
+      m->focus_freq,
+      m->lag,
+      m->intensity_feature
   );
   STDERR_DEBUG("%s", metadata);
   if (ret == -1){
@@ -657,20 +674,6 @@ construct_metadata(GstClassify *self){
   }
   return metadata;
 }
-
-struct ClassifyMetadata {
-  char *classes;
-  float min_freq;
-  float max_freq;
-  float knee_freq;
-  int mfccs;
-  int window_size;
-  char *basename;
-  int delta_features;
-  int intensity_feature;
-  float focus_freq;
-  float lag;
-};
 
 static int
 load_metadata(const char *metadata, struct ClassifyMetadata *m){
@@ -703,7 +706,7 @@ load_metadata(const char *metadata, struct ClassifyMetadata *m){
       &m->focus_freq, &m->lag, &m->intensity_feature);
   if (n != 11){
     GST_WARNING("Found only %d/%d metadata items", n, 11);
-    return -1;
+    return 11 - n;
   }
   return 0;
 }
@@ -730,16 +733,22 @@ setup_audio(GstClassify *self, int window_size, int mfccs, float min_freq,
 
 static RecurNN *
 load_specified_net(GstClassify *self, const char *filename){
-  struct ClassifyMetadata m = {0};
+  struct ClassifyMetadata m = CLASSIFY_METADATA_DEFAULTS(self);
   int force_load = PP_GET_BOOLEAN(self, PROP_FORCE_LOAD, DEFAULT_PROP_FORCE_LOAD);
   RecurNN *net = rnn_load_net(filename);
   if (net == NULL){
     FATAL_ERROR("Could not load %s", filename);
   }
   GST_DEBUG("loaded metadata: %s", net->metadata);
-  if (load_metadata(net->metadata, &m)){
+
+  int unloaded_items = load_metadata(net->metadata, &m);
+  if (unloaded_items){
     if (force_load){
-      STDERR_DEBUG("continuing despite metadata mismatch, because force-load is set\n"
+      STDERR_DEBUG("continuing despite metadata mismatch (%d not loaded), "
+          "because force-load is set\n%s", unloaded_items, net->metadata);
+      free(net->metadata);
+      net->metadata = construct_metadata(self, &m);
+      STDERR_DEBUG("New metadata:\n"
           "%s", net->metadata);
     }
     else {
@@ -823,14 +832,14 @@ create_net(GstClassify *self, int bottom_layer_size,
   if (PERIODIC_PGM_DUMP){
     rnn_multi_pgm_dump(net, "how ihw biw");
   }
-  net->metadata = metadata;
+  net->metadata = strdup(metadata);
   return net;
 }
 
 
 static RecurNN *
 load_or_create_net(GstClassify *self){
-  char *metadata = construct_metadata(self);
+  char *metadata = construct_metadata(self, NULL);
   int hidden_size = PP_GET_INT(self, PROP_HIDDEN_SIZE, DEFAULT_HIDDEN_SIZE);
   int bottom_layer_size = PP_GET_INT(self, PROP_BOTTOM_LAYER, 0);
   const char *class_string = PP_GET_STRING(self, PROP_CLASSES, DEFAULT_PROP_CLASSES);
@@ -866,7 +875,7 @@ load_or_create_net(GstClassify *self){
           metadata, net->metadata);
     }
   }
-  if (net == NULL){
+  else {
     net = create_net(self, bottom_layer_size, hidden_size, top_layer_size, metadata);
   }
   struct ClassifyMetadata m = {0};
@@ -877,6 +886,7 @@ load_or_create_net(GstClassify *self){
     FATAL_ERROR("Metadata class string %s suggests %d outputs, net has %s and %d",
         m.classes, n_outputs, class_string, net->output_size);
   }
+  free(metadata);
   return net;
 }
 

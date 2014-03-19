@@ -85,6 +85,7 @@ class BaseClassifier(object):
         self.getp = self.classifier.get_property
 
     def setup_from_file(self, filename):
+        #XXX many arguments are quietly ignored.
         self.setp('net-filename', filename)
         self.classes = self.getp('classes').split(',')
 
