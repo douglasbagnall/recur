@@ -294,11 +294,12 @@ class Classifier(BaseClassifier):
         self.score_targets.extend(self.file_ground_truth[i][k])
         if 0:
             show_roc_curve(self.file_probabilities[i][k],
-                           self.file_ground_truth[i][k])
+                           self.file_ground_truth[i][k],
+                           k)
 
         if not self.data:
             if self.show_roc:
-                show_roc_curve(self.scores, self.score_targets)
+                show_roc_curve(self.scores, self.score_targets, k)
             self.stop()
         else:
             self.load_next_file()
@@ -764,7 +765,7 @@ def process_common_args(c, args):
                                                  args.audio_directory)
     return timed_files, full_timings
 
-def show_roc_curve(scores, truth):
+def show_roc_curve(scores, truth, title='ROC'):
     import matplotlib.pyplot as plt
     results = zip(scores, truth)
     #print results
@@ -782,9 +783,8 @@ def show_roc_curve(scores, truth):
     ax, ay, ad, ap = 0, 0, 0, 0
     bx, by, bd, bp = 0, 0, 99, 0
     cx, cy, cd, cp = 0, 0, 0, 0
-    dx, dy, dd, dp = 0, 0, 0, 0
-    ex, ey, ed, ep = 0, 0, None, 0
-
+    dx, dy, dp = 0, 0, 0
+    ex, ey, ep = 1.0, 1.0, 0.0
 
     for score, target in results:
         false_positives -= not target
@@ -810,13 +810,13 @@ def show_roc_curve(scores, truth):
             cx = x
             cy = y
             cp = score
-        if y < 20.0 * x:
+        if dx == 0 and y > 20.0 * x:
+            #print x, y
             dx = x
             dy = y
             dp = score
-        if ed is None and 1.0 - x < 20.0 * (1.0 - y):
-            print x, y, (1.0 - y) / (1.0 - x)
-            ed = 1
+        if 1.0 - x > 20.0 * (1.0 - y):
+            #print x, y, (1.0 - y) / (1.0 - x)
             ex = x
             ey = y
             ep = score
@@ -854,4 +854,5 @@ def show_roc_curve(scores, truth):
                  )
 
     plt.axes().set_aspect('equal')
+    plt.title(title)
     plt.show()
