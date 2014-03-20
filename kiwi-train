@@ -30,6 +30,8 @@ def main():
                        help="Depth of BPTT training")
     group.add_argument('--activity-bias', type=int, default=1,
                        help="Train more on examples with changing classes")
+    group.add_argument('-P', '--prioritise', type=int, default=False,
+                       help="Do not renice downwards")
 
     args = parser.parse_args()
     if args.learn_rate:
@@ -53,6 +55,9 @@ def main():
                        )
     else:
         dropout = 0
+
+    if not args.prioritise and hasattr(os, 'nice'):
+        os.nice(10)
 
     random.seed(1)
 
