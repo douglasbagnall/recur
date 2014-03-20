@@ -753,7 +753,7 @@ def add_common_args(parser, WINDOW_SIZE, BASENAME):
     group.add_argument('--mfccs', type=int, default=0,
                        help="How many MFCCs to use (0 for raw fft bins)")
 
-def process_common_args(c, args):
+def process_common_args(c, args, random_seed=1):
     c.quiet = not args.verbose
     c.setp('force-load', args.force_load)
     if args.net_filename:
@@ -772,7 +772,8 @@ def process_common_args(c, args):
                 lag=args.lag,
                 delta_features=args.delta_features,
                 intensity_feature=args.intensity_feature)
-
+    if random_seed is not None:
+        random.seed(random_seed)
     if args.classes_from_file_names:
         timed_files, full_timings = load_timings_from_file_names(c.classes,
                                                                  args.audio_directory)

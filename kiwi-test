@@ -1,8 +1,5 @@
 #!/usr/bin/python
 import os, sys
-import random
-import itertools
-import time
 import argparse
 
 from classify import gst_init, Gst
