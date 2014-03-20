@@ -89,10 +89,10 @@ def main():
             learn_rate=lr, dropout=dropout,
             properties=(('momentum-soft-start', 10000),
                         ('momentum', 0.93),
-                        ('momentum-style', 1),
-                        ('weight-fan-in-sum', 3),
+                        #('momentum-style', 1),
+                        ('weight-fan-in-sum', 4),
                         ('weight-fan-in-kurtosis', 0.15),
-                        ('weight-diagonal', 0.33),
+                        #('weight-diagonal', 0.33),
                     ))
 
 main()
