@@ -479,6 +479,8 @@ class Trainer(BaseClassifier):
         basename = self.getp('basename')
         fn = ("%s/%s-%s-%s.net" %
               (dir, basename, time.time(), tag))
+        if not os.path.exists(dir):
+            os.makedirs(dir)
         print "saving %s" % fn
         self.save_net(fn)
 
