@@ -27,11 +27,16 @@ def main():
                        help="use this class in reports and ROC")
     group.add_argument('--target-group', type=int, default=0,
                        help="use this class group in reports and ROC")
+    group.add_argument('--min-changes', type=int, default=0,
+                       help="only test files with at least this many class switches")
 
     args = parser.parse_args()
 
     c = Classifier(channels=1)
     timed_files, full_timings = process_common_args(c, args)
+    if args.min_changes:
+        timed_files = [(fn, ffn) for fn, ffn in timed_files
+                       if len(full_timings[ffn]) >= args.min_changes]
 
     if args.first_n:
         timed_files = timed_files[:args.first_n]
