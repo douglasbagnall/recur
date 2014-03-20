@@ -282,7 +282,7 @@ gst_classify_class_init (GstClassifyClass * klass)
 
   g_object_class_install_property (gobject_class, PROP_TARGET,
       g_param_spec_string("target", "target",
-          "Target outputs for all channels (dot separated)",
+          "target values for each channel (complex syntax)",
           DEFAULT_PROP_TARGET,
           G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
@@ -294,13 +294,13 @@ gst_classify_class_init (GstClassifyClass * klass)
 
   g_object_class_install_property (gobject_class, PROP_PGM_DUMP,
       g_param_spec_string("pgm-dump", "pgm-dump",
-          "Dump weight images (space separated \"ih* hh* ho* bi*\", *one of \"wdma\")",
+          "Dump weight images (space separated \"ih* hh* ho* bi*\", *one of \"wdmt\")",
           DEFAULT_PROP_PGM_DUMP,
           G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class, PROP_SAVE_NET,
       g_param_spec_string("save-net", "save-net",
-          "Save the net here, now.",
+          "Save the net here, now. (empty/null for auto-naming)",
           DEFAULT_PROP_SAVE_NET,
           G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
@@ -404,14 +404,14 @@ gst_classify_class_init (GstClassifyClass * klass)
 
   g_object_class_install_property (gobject_class, PROP_KNEE_FREQUENCY,
       g_param_spec_float("knee-frequency", "knee-frequency",
-          "controls the focus of pitch",
+          "lower for more pronounced knee (~ less high end)",
           MINIMUM_AUDIO_FREQUENCY, MAXIMUM_AUDIO_FREQUENCY,
           DEFAULT_KNEE_FREQUENCY,
           G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class, PROP_FOCUS_FREQUENCY,
       g_param_spec_float("focus-frequency", "focus-frequency",
-          "controls the focus of pitch",
+          "concentrate on frequencies around here",
           MINIMUM_AUDIO_FREQUENCY, MAXIMUM_AUDIO_FREQUENCY,
           DEFAULT_FOCUS_FREQUENCY,
           G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
