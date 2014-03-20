@@ -471,8 +471,8 @@ class Trainer(BaseClassifier):
 
             print ''.join(output)
             if rightness > 0.8:
-                self.save_named_net(tag='goodness-%d-%d' %
-                                    (int(rightness * 100), int(winners * 100)))
+                self.save_named_net(tag='goodness-%d-%d-%d' %
+                                    (int(rightness * 100), int(gap_p * 15), int(ratio_p * 2)))
 
 
     def save_named_net(self, tag='', dir=SAVE_LOCATION):
