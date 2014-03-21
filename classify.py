@@ -430,9 +430,9 @@ class Trainer(BaseClassifier):
                                                         self.probability_counts):
             #classes is a string
             #score and runs are dicts indexed by chars in classes
-            output = []
+            output = [self.getp('basename'), ': ']
             rightness = 0
-            p_strings = [" probabilities (right/wrong)"]
+            p_strings = [" scores (right/wrong)"]
             gap_p = 0
             ratio_p = 0
             count_p = 0
