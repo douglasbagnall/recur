@@ -282,13 +282,15 @@ class Classifier(BaseClassifier):
     def on_eos(self, bus, msg):
         self.report()
         fn = os.path.basename(self.current_file)
-        if self.ground_truth_file:
-            a = [fn] + ['%d' % x for x in self.file_ground_truth[i][k]]
-            print >>self.ground_truth_file, ','.join(a)
+        if self.target_index:
+            i, k = self.target_index
+            if self.ground_truth_file:
+                a = [fn] + ['%d' % x for x in self.file_ground_truth[i][k]]
+                print >>self.ground_truth_file, ','.join(a)
 
-        if self.classification_file:
-            a = [fn] + ['%.5g' % x for x in self.file_probabilities[i][k]]
-            print >>self.classification_file, ','.join(a)
+            if self.classification_file:
+                a = [fn] + ['%.5g' % x for x in self.file_probabilities[i][k]]
+                print >>self.classification_file, ','.join(a)
 
         for scores, fscores in zip(self.scores, self.file_probabilities):
             for k in scores:
@@ -297,6 +299,7 @@ class Classifier(BaseClassifier):
             for k in targets:
                 targets[k].extend(ftargets[k])
         if 0:
+            i, k = self.target_index
             show_roc_curve(self.file_probabilities[i][k],
                            self.file_ground_truth[i][k],
                            k)
