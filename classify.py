@@ -470,7 +470,7 @@ class Trainer(BaseClassifier):
             output.extend(p_strings)
 
             print ''.join(output)
-            if rightness > 0.8:
+            if rightness > 0.8 or ratio_p > 5:
                 self.save_named_net(tag='goodness-%d-%d-%d' %
                                     (int(rightness * 100), int(gap_p * 15), int(ratio_p * 2)))
 
