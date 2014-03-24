@@ -66,25 +66,25 @@ def main():
     c.setp('random-alignment', args.random_alignment)
     if args.bptt_depth:
         c.setp('bptt-depth', args.bptt_depth)
-    timed_files, full_timings = process_common_args(c, args)
 
-    validate_streams = [[ffn for fn, ffn in timed_files[:n_channels]]]
-    training_streams = [[ffn for fn, ffn in timed_files[n_channels:]]]
+    timed_files = process_common_args(c, args)
+
+    validate_streams = [timed_files[:n_channels]]
+    training_streams = [timed_files[n_channels:]]
+    random.shuffle(training_streams[0])
+    #--activity_bias=n: add n streams of tracks that actually have class changes,
+    # but drop one file on each round to ensure they cycle out of sync
     for i in range(args.activity_bias):
-        stream = [ffn for fn, ffn in timed_files[n_channels:]
-                  if len(full_timings[ffn]) > i + 1]
-        if len(stream) > min(n_channels * 10, len(timed_files) / 4):
-            training_streams.append(stream)
-        else:
-            training_streams.append(training_streams[-1][:])
-
-    for x in training_streams:
-        random.shuffle(x)
+        s  = [x for x in training_streams[0] if len(x.timings) > 1]
+        if len(s) == 0: # < n_channels?
+            break
+        random.shuffle(s)
+        training_streams.append(s[i:])
 
     if args.error_weights:
         c.setp('error-weight', args.error_weights)
 
-    c.train(training_streams, validate_streams, full_timings,
+    c.train(training_streams, validate_streams,
             iterations=args.iterations,
             learn_rate=lr, dropout=dropout,
             properties=(('momentum-soft-start', 10000),

@@ -1,48 +1,28 @@
 #!/usr/bin/python
 import os, sys
 import random
-from gtkdisplay import run
-from classify import GTKClassifier, gst_init, Gst
-from classify_kiwi import MFCCS, WINDOW_SIZE, BASENAME
 import argparse
+from gtkdisplay import run
+
+from classify import GTKClassifier, gst_init, Gst
+from classify_kiwi import WINDOW_SIZE, BASENAME
+from classify import Classifier, add_common_args, process_common_args
 
 def main():
     gst_init()
     parser = argparse.ArgumentParser()
-    parser.add_argument('-v', '--verbose', action='store_true',
-                        help='lots of rubbish output')
-    parser.add_argument('-d', '--audio-directory', action='append',
-                        help='find audio in this directory')
-    parser.add_argument('-c', '--classes', default='tf',
-                        help="classes (letter per class, groups separated by ',')")
-    parser.add_argument('-C', '--first-n', type=int, default=12,
+    add_common_args(parser, WINDOW_SIZE=WINDOW_SIZE,
+                    BASENAME=BASENAME)
+    parser.add_argument('-C', '--first-n', type=int, default=0,
                         help="classify this many files")
-    parser.add_argument('-H', '--hidden-size', type=int,
-                        help="number of hidden neurons")
-    parser.add_argument('-B', '--bottom-layer', type=int,
-                        help="number of bottom layer output nodes")
-
     parser.add_argument('files', metavar='FILE', nargs='*',
                         help='files to process before --audio-directory')
 
     args = parser.parse_args()
+    c = GTKClassifier(sinkname='autoaudiosink')
+    untimed_files = process_common_args(c, args, timed=False)
 
-    c = GTKClassifier(mfccs=MFCCS,
-                      basename=BASENAME,
-                      classes=args.classes.split(','),
-                      hsize=args.hidden_size,
-                      window_size=WINDOW_SIZE,
-                      sinkname='autoaudiosink')
-    if args.bottom_layer:
-        c.classifier.set_property('bottom-layer', args.bottom_layer)
-
-    files = args.files[:]
-    for d in args.audio_directory:
-        dfiles = [os.path.join(d, x) for x in os.listdir(d) if x.endswith('.wav')]
-        random.shuffle(dfiles)
-        files.extend(dfiles)
-
+    files = args.files[:] + [x.fullname for x in untimed_files]
     run(c, files)
-
 
 main()

@@ -6,9 +6,6 @@ from classify import gst_init, Gst
 from classify_kiwi import WINDOW_SIZE, BASENAME
 from classify import Classifier, add_common_args, process_common_args
 
-TEST_AUDIO_DIR = "/home/douglas/corpora/kiwi/test/"
-KIWI_TIMING_DATA = '/home/douglas/corpora/kiwi/times.txt'
-
 def main():
     gst_init()
     parser = argparse.ArgumentParser()
@@ -33,20 +30,19 @@ def main():
     args = parser.parse_args()
 
     c = Classifier(channels=1)
-    timed_files, full_timings = process_common_args(c, args)
+    timed_files = process_common_args(c, args)
     if args.min_changes:
-        timed_files = [(fn, ffn) for fn, ffn in timed_files
-                       if len(full_timings[ffn]) >= args.min_changes]
+        timed_files = [x for x in timed_files
+                       if len(x.timings) >= args.min_changes]
 
     if args.first_n:
         timed_files = timed_files[:args.first_n]
-    test_files = [(ffn, full_timings[ffn]) for fn, ffn in timed_files]
 
     target = None
     if args.target_class:
         target=(args.target_group, args.target_class)
 
-    c.classify(test_files, ground_truth_file=args.ground_truth_file,
+    c.classify(timed_files, ground_truth_file=args.ground_truth_file,
                classification_file=args.classification_file, show_roc=args.roc,
                target_index=target)
 

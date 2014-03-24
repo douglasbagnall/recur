@@ -162,11 +162,10 @@ class Classifier(BaseClassifier):
 
     def load_next_file(self):
         self.pipeline.set_state(Gst.State.READY)
-        fn, timings = self.data.pop()
-        targets = ' '.join(x[3] % 0 for x in timings)
-        #print fn, targets
-        self.current_file = fn
-        self.filesrcs[0].set_property('location', fn)
+        f = self.data.pop()
+        targets = ' '.join(x % 0 for x in f.targets)
+        self.current_file = f
+        self.filesrcs[0].set_property('location', f.fullname)
         self.setp('target', targets)
         self.file_results = [[] for x in self.classes]
         self.file_class_results = self.get_results_counter()
@@ -281,7 +280,7 @@ class Classifier(BaseClassifier):
 
     def on_eos(self, bus, msg):
         self.report()
-        fn = os.path.basename(self.current_file)
+        fn = self.current_file.basename
         if self.target_index:
             i, k = self.target_index
             if self.ground_truth_file:
@@ -346,7 +345,7 @@ class Trainer(BaseClassifier):
     trainers = None
     lr_adjust = 1.0
     no_save_net = False
-    def train(self, trainers, testers, timings, iterations=100, learn_rate=None,
+    def train(self, trainers, testers, iterations=100, learn_rate=None,
               dropout=0.0, log_file='auto', properties=()):
         if isinstance(learn_rate, (int, float)):
             self.learn_rate = itertools.repeat(learn_rate)
@@ -358,7 +357,6 @@ class Trainer(BaseClassifier):
             self.dropout = dropout
         self.counter = 0
         self.iterations = iterations
-        self.timings = timings
         self.trainers = eternal_shuffler(trainers)
         testers = eternal_alternator(testers)
         self.testset = [testers.next() for i in range(self.channels)]
@@ -409,13 +407,11 @@ class Trainer(BaseClassifier):
         targets = []
         self.timestamp = time.time()
         for channel, fs in enumerate(self.filesrcs):
-            fn = src.next()
-            timings = self.timings.get(fn, [])
-            for group, c, t, ts in timings:
-                targets.append(ts % channel)
-            fs.set_property('location', fn)
+            f = src.next()
+            targets.extend(x % channel for x in f.targets)
+            fs.set_property('location', f.fullname)
             if not self.quiet:
-                print fn, timings
+                print f.basename, targets
 
         target_string = ' '.join(targets)
         self.setp('target', target_string)
@@ -587,7 +583,7 @@ class GTKClassifier(BaseClassifier):
             scores = []
             for j, group in enumerate(self.classes):
                 for x in group:
-                    scores.extend(-v('channel 0, group %d %s' % (j, x))
+                    scores.extend(v('channel 0, group %d %s' % (j, x))
                                   for j in range(len(self.classes)))
 
             self.widget.notify_results((winner, scores))
@@ -662,6 +658,15 @@ def targeted_wav_finder(d, files):
         if os.path.exists(ffn):
             yield (fn, ffn)
 
+class TimedFile(object):
+    def __init__(self, fn, ffn, timings=None):
+        self.basename = fn
+        self.fullname = ffn
+        if timings is None:
+            timings = []
+        self.timings = timings
+        self.targets = [x[3] for x in timings]
+
 def load_timings(all_classes, timing_files, audio_directories):
     timings = {}
     for fn in timing_files:
@@ -672,18 +677,13 @@ def load_timings(all_classes, timing_files, audio_directories):
                 classes = None
         timings.update(load_binary_timings(fn, all_classes, classes=classes))
 
-    #timings = coalesce_timings(timings)
-
     timed_files = []
     for d in audio_directories:
-        timed_files.extend(targeted_wav_finder(d, timings))
+        for fn, ffn in targeted_wav_finder(d, timings):
+            t = TimedFile(fn, ffn, timings[fn])
+            timed_files.append(t)
 
-    random.shuffle(timed_files)
-
-    #print timings
-    full_timings = {ffn: timings[fn] for fn, ffn in timed_files}
-
-    return timed_files, full_timings
+    return timed_files
 
 def load_timings_from_file_names(classes, audio_directories):
     group_map = {}
@@ -693,24 +693,29 @@ def load_timings_from_file_names(classes, audio_directories):
     timed_files = []
     for root in audio_directories:
         for d, subdirs, files in os.walk(root):
-            wavs = [x for x in files if x.endswith('.wav') and x[0] in group_map]
-            timed_files.extend((x, os.path.join(d, x)) for x in wavs)
+            for fn in files:
+                c = fn[0]
+                if fn.endswith('.wav') and c in group_map:
+                    ffn = os.path.join(d, fn)
+                    group = group_map[c]
+                    target = 'c%dt0:' + '=' * group + c + '=' * (len(classes) - group - 1)
+                    timings = [(group, c, 0, target)]
+                    t = TimedFile(fn, ffn, timings)
+                    timed_files.append(t)
 
-    full_timings = {}
-    for fn, ffn in timed_files:
-        c = fn[0]
-        group = group_map[c]
-        target = 'c%dt0:' + '=' * group + c + '=' * (len(classes) - group - 1)
-        full_timings[ffn] = [(group, c, 0, target)]
+    return timed_files
 
-    return timed_files, full_timings
+def load_untimed_files(audio_directories):
+    untimed_files = []
+    for root in audio_directories:
+        for d, subdirs, files in os.walk(root):
+            for fn in files:
+                if fn.endswith('.wav'):
+                    ffn = os.path.join(d, fn)
+                    t = TimedFile(fn, ffn, None)
+                    untimed_files.append(t)
 
-
-def targeted_wav_finder(d, files):
-    for fn in files:
-        ffn = os.path.join(d, fn)
-        if os.path.exists(ffn):
-            yield (fn, ffn)
+    return untimed_files
 
 
 def add_common_args(parser, WINDOW_SIZE, BASENAME):
@@ -756,7 +761,7 @@ def add_common_args(parser, WINDOW_SIZE, BASENAME):
     group.add_argument('--mfccs', type=int, default=0,
                        help="How many MFCCs to use (0 for raw fft bins)")
 
-def process_common_args(c, args, random_seed=1):
+def process_common_args(c, args, random_seed=1, timed=True):
     c.quiet = not args.verbose
     c.setp('force-load', args.force_load)
     if args.net_filename:
@@ -777,14 +782,21 @@ def process_common_args(c, args, random_seed=1):
                 intensity_feature=args.intensity_feature)
     if random_seed is not None:
         random.seed(random_seed)
-    if args.classes_from_file_names:
-        timed_files, full_timings = load_timings_from_file_names(c.classes,
-                                                                 args.audio_directory)
+
+    if not timed:
+        if args.audio_directory:
+            files = load_untimed_files(args.audio_directory)
+        else:
+            files = []
+    elif args.classes_from_file_names:
+        files = load_timings_from_file_names(c.classes,
+                                             args.audio_directory)
     else:
-        timed_files, full_timings = load_timings(c.classes,
-                                                 args.timings,
-                                                 args.audio_directory)
-    return timed_files, full_timings
+        files = load_timings(c.classes,
+                             args.timings,
+                             args.audio_directory)
+    random.shuffle(files)
+    return files
 
 def show_roc_curve(scores, truth, title='ROC', show=True):
     import matplotlib.pyplot as plt
