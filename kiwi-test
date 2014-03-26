@@ -26,11 +26,14 @@ def main():
                        help="use this class group in reports and ROC")
     group.add_argument('--min-changes', type=int, default=0,
                        help="only test files with at least this many class switches")
+    group.add_argument('--no-timings', action='store_true',
+                       help="Don't compare with canonical timings")
 
     args = parser.parse_args()
+    timed = not args.no_timings
 
     c = Classifier(channels=1)
-    timed_files = process_common_args(c, args)
+    timed_files = process_common_args(c, args, timed=timed)
     if args.min_changes:
         timed_files = [x for x in timed_files
                        if len(x.timings) >= args.min_changes]

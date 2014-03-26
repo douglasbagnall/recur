@@ -188,14 +188,15 @@ class Classifier(BaseClassifier):
             correct = v(key + 'correct')
             target = v(key + 'target')
             if target is None:
-                continue
-            for k in group:
-                probs[k].append(v(key + k))
-                self.file_ground_truth[i][k].append(k == target)
-
-            group[target][correct] += 1
-            f_group[target][correct] += 1
-            self.file_results[i].append((target, correct))
+                for k in group:
+                    probs[k].append(v(key + k))
+            else:
+                for k in group:
+                    probs[k].append(v(key + k))
+                    self.file_ground_truth[i][k].append(k == target)
+                group[target][correct] += 1
+                f_group[target][correct] += 1
+                self.file_results[i].append((target, correct))
 
 
     def report(self):
