@@ -138,7 +138,7 @@ class BaseClassifier(object):
 
 class Classifier(BaseClassifier):
     data = []
-    quiet = False
+    verbosity = 1
     ground_truth_file = None
     classification_file = None
     def classify(self, data,
@@ -279,7 +279,8 @@ class Classifier(BaseClassifier):
         print ''.join(out)
 
     def on_eos(self, bus, msg):
-        self.report()
+        if self.verbosity > 0:
+            self.report()
         fn = self.current_file.basename
         if self.target_index:
             i, k = self.target_index
@@ -410,12 +411,12 @@ class Trainer(BaseClassifier):
             f = src.next()
             targets.extend(x % channel for x in f.targets)
             fs.set_property('location', f.fullname)
-            if not self.quiet:
+            if self.verbosity > 1:
                 print f.basename, targets
 
         target_string = ' '.join(targets)
         self.setp('target', target_string)
-        if not self.quiet:
+        if self.verbosity > 1:
             print target_string
 
 
@@ -720,8 +721,8 @@ def load_untimed_files(audio_directories):
 
 def add_common_args(parser, WINDOW_SIZE, BASENAME):
     group = parser.add_argument_group('Common arguments')
-    group.add_argument('-v', '--verbose', action='store_true',
-                       help='lots of rubbish output')
+    group.add_argument('-v', '--verbosity', type=int, default=1,
+                       help='0 for near silence, 2 for lots of rubbish output')
     group.add_argument('-t', '--timings', action='append',
                        help='read timings from here')
     group.add_argument('--classes-from-file-names', action='store_true',
@@ -762,7 +763,7 @@ def add_common_args(parser, WINDOW_SIZE, BASENAME):
                        help="How many MFCCs to use (0 for raw fft bins)")
 
 def process_common_args(c, args, random_seed=1, timed=True):
-    c.quiet = not args.verbose
+    c.verbosity = args.verbosity
     c.setp('force-load', args.force_load)
     if args.net_filename:
         c.setup_from_file(args.net_filename)
