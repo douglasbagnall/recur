@@ -274,12 +274,10 @@ class Classifier(BaseClassifier):
                         (diff > 0.1) + (diff > 0.5)]
         else:
             c = COLOURS['Z']
-        out.append(self.current_file.basename)
-        out.append('  ')
         sigma = unichr(0x03c3).encode('utf-8')
-        out.append("%s scores. %s%s %.2f (%s %.2f)   not-%s %.2f (%s %.2f)%s\n" %
+        out.append("%s scores. %s%s %.2f (%s %.2f)   not-%s %.2f (%s %.2f)%s %s\n" %
                    (k, c, k, r_mean, sigma, r_stddev, k, w_mean, sigma,
-                    w_stddev, COLOURS['Z']))
+                    w_stddev, COLOURS['Z'], self.current_file.basename))
 
         print ''.join(out)
 
