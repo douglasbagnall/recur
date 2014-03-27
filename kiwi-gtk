@@ -14,15 +14,17 @@ def main():
     add_common_args(parser, WINDOW_SIZE=WINDOW_SIZE,
                     BASENAME=BASENAME)
     parser.add_argument('-C', '--first-n', type=int, default=0,
-                        help="classify this many files")
+                        help="look at this many files from the audio directory")
+    parser.add_argument('-k', '--keys',
+                        help="keys to use (2-3 chars, left, right [, bottom])")
     parser.add_argument('files', metavar='FILE', nargs='*',
                         help='files to process before --audio-directory')
 
     args = parser.parse_args()
     c = GTKClassifier(sinkname='autoaudiosink')
     untimed_files = process_common_args(c, args, timed=False)
-
+    keys = args.keys
     files = args.files[:] + [x.fullname for x in untimed_files]
-    run(c, files)
+    run(c, files, keys)
 
 main()

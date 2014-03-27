@@ -560,8 +560,9 @@ def categorised_files(_dir, classes):
 
 class GTKClassifier(BaseClassifier):
     widget = None
-
-    def run(self, *files):
+    keys = None
+    def run(self, files, keys=None):
+        self.keys = keys
         self.pending_files = list(reversed(files))
         self.load_next_file()
         self.pipeline.set_state(Gst.State.PLAYING)
@@ -581,15 +582,16 @@ class GTKClassifier(BaseClassifier):
                 return
             v = s.get_value
             winner = v('channel 0 winner')
-            #correct = v('channel 0 correct')
-            #target = v('channel 0 target')
-            #print correct, winner, target, winner == target
-            #print s.to_string()
             scores = []
-            for j, group in enumerate(self.classes):
-                for x in group:
-                    scores.extend(v('channel 0, group %d %s' % (j, x))
-                                  for j in range(len(self.classes)))
+            if not self.keys:
+                for j, group in enumerate(self.classes):
+                    for x in group:
+                        scores.extend(v('channel 0, group %d %s' % (j, x))
+                                      for j in range(len(self.classes)))
+            else:
+                j = 0
+                for x in self.keys:
+                    scores.append(v('channel 0, group 0 %s' % x))
 
             self.widget.notify_results((winner, scores))
 

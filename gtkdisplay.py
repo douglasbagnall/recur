@@ -80,7 +80,7 @@ def on_key_press_event(widget, event):
     #print "Key %s (%d) was pressed" % (keyname, event.keyval)
 
 
-def run(classifier, files):
+def run(classifier, files, keys):
     window = Gtk.Window()
     window.set_title ("RNN Classifier")
     app = ClassifierDisplay(classifier, 300)
@@ -93,5 +93,5 @@ def run(classifier, files):
     window.connect('key_press_event', on_key_press_event)
     window.show_all()
 
-    classifier.run(*files)
+    classifier.run(files, keys)
     Gtk.main()
