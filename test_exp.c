@@ -54,6 +54,41 @@
  */
 
 
+/*untried newcomers */
+/*https://www.allegro.cc/forums/thread/183952/183964 #1*/
+static float fast_logf_allegro(float x)
+{
+  float y = (x - 1.0f) / (x + 1.0f);
+  float y_squared = y * y;
+  return (y * 2.0f * (15.0f - y_squared * 4.0f) / (15.0f - y_squared * 9.0f));
+}
+
+/****https://www.allegro.cc/forums/thread/183952/183964 #2 ****/
+static inline float fast_logf_small(float x)
+{
+  float y = (x-1) / (x+1);
+  float y_cubed = y * y * y;
+  return 2.0f * (y + 0.33333333f * y_cubed + 0.2f * y_cubed * y * y);
+}
+
+#define MANTISSA(x)((x) & 0x7FFFFF) * 1.1920928955e-7 + 1.0
+#define EXPONENT(x) ((((x) >> 23) & 255) - 127)
+
+static float
+fast_logf_43(float y)
+{
+  union REAL {
+    u32 i;
+    float fp;
+  } x;
+  x.fp = y;
+  float m = MANTISSA(x.i);
+  int exp = EXPONENT(x.i);
+  return (fast_logf_small(m) + (float)exp) * LG2f;
+}
+
+/******************/
+
 static float
 fast_logf(float x){
   float c = 0, a;
@@ -516,6 +551,8 @@ main(void){
   TIME_LOGF(fast_logf_b_pade, fast_logf_b_pade);
   TIME_LOGF(fast_logf_mineiro2, fast_logf_mineiro2);
   TIME_LOGF(fast_logf_mineiro, fast_logf_mineiro);
+  TIME_LOGF(fast_logf_allegro, fast_logf_allegro);
+  TIME_LOGF(fast_logf_43, fast_logf_43);
   TIME_LOGF(logf, libm_logf);
   TIME_LOG(fast_log, fast_log);
   TIME_LOG(fast_log_b, fast_log_b);

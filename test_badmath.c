@@ -2,8 +2,6 @@
 #include "pgm_dump.h"
 #include "badmaths.h"
 #include <math.h>
-
-
 /*suboptimal tanh's */
 
 static inline float
