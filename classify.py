@@ -181,15 +181,18 @@ class Classifier(BaseClassifier):
             return
         #print s.to_string()
         v = s.get_value
+        no_targets = not self.current_file.targets
         for i, group in enumerate(self.class_results):
             f_group = self.file_class_results[i]
             probs = self.file_probabilities[i]
             key = 'channel 0, group %d ' % i
             correct = v(key + 'correct')
             target = v(key + 'target')
-            if target is None:
+            if no_targets:
                 for k in group:
                     probs[k].append(v(key + k))
+            elif target is None:
+                continue
             else:
                 for k in group:
                     probs[k].append(v(key + k))
