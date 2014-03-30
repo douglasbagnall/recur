@@ -2,6 +2,7 @@ import os
 import random
 import itertools
 import time
+import json
 
 _dirname = os.path.dirname(os.path.abspath(__file__))
 os.environ['GST_PLUGIN_PATH'] = _dirname
@@ -608,7 +609,7 @@ class GTKClassifier(BaseClassifier):
         p.seek_simple(Gst.Format.TIME, 0, then)
 
 
-def load_binary_timings(fn, all_classes, default_state=0, classes=None):
+def load_binary_timings(fn, all_classes, default_state=0, classes=None, threshold=0):
     #all_classes is a sequence of class groups. Each group of
     #all_classes is a string of characters. By default the first one
     #is used, but if a line like 'group: Xxy' comes along, the the
@@ -626,32 +627,51 @@ def load_binary_timings(fn, all_classes, default_state=0, classes=None):
     target_string = 'c%%dt%f:%s'
     group_string = '%s' + '=' * (len(all_classes) - 1)
     def add_event(state, t):
-        c = classes[state]
+        if state is None:
+            c = '-'
+        else:
+            c = classes[state]
         t = float(t)
-        events.append((group, classes[state], t,
+        events.append((group, c, t,
                        target_string % (t, group_string % c)))
 
     for line in f:
-        d = line.split()
-        name = d.pop(0)
-        if name == 'group:':
-            classes = d[0]
-            if classes not in all_classes:
-                raise ValueError("%s refers to unknown class group '%s'", fn, classes)
-            group = all_classes.index(classes)
-            group_string = '=' * group + '%s' + '=' * (len(all_classes) - group - 1)
-        else:
+        if line[0] == '[':
+            calls = json.loads(line)
+            name = calls.pop(0)
             events = timings.setdefault(name, [])
+            state = default_state
+            add_event(state, 0)
+            for s, e, intensity in calls:
+                if s == 0:
+                    events.pop()
+                if intensity > threshold:
+                    add_event(1 - default_state, s)
+                    add_event(default_state, e)
+                else:
+                    add_event(None, s)
+                    add_event(default_state, e)
 
-            if d:
-                state = default_state
-                if float(d[0]) > 0:
-                    add_event(state, 0)
-                for t in d:
-                    state = 1 - state
-                    add_event(state, t)
+        else:
+            d = line.split()
+            name = d.pop(0)
+            if name == 'group:':
+                classes = d[0]
+                if classes not in all_classes:
+                    raise ValueError("%s refers to unknown class group '%s'", fn, classes)
+                group = all_classes.index(classes)
+                group_string = '=' * group + '%s' + '=' * (len(all_classes) - group - 1)
             else:
-                add_event(default_state, 0)
+                events = timings.setdefault(name, [])
+                if d:
+                    state = default_state
+                    if float(d[0]) > 0:
+                        add_event(state, 0)
+                    for t in d:
+                        state = 1 - state
+                        add_event(state, t)
+                else:
+                    add_event(default_state, 0)
 
     f.close()
     #XXX sort timings?
@@ -673,7 +693,7 @@ class TimedFile(object):
         self.timings = timings
         self.targets = [x[3] for x in timings]
 
-def load_timings(all_classes, timing_files, audio_directories):
+def load_timings(all_classes, timing_files, audio_directories, min_call_intensity=0):
     timings = {}
     for fn in timing_files:
         classes = None
@@ -681,7 +701,8 @@ def load_timings(all_classes, timing_files, audio_directories):
             fn, classes = fn.rsplit(',', 1)
             if classes not in all_classes:
                 classes = None
-        timings.update(load_binary_timings(fn, all_classes, classes=classes))
+        timings.update(load_binary_timings(fn, all_classes, classes=classes,
+                                           threshold=min_call_intensity))
 
     timed_files = []
     for d in audio_directories:
@@ -766,6 +787,8 @@ def add_common_args(parser, WINDOW_SIZE, BASENAME):
                        help="higher for more top-end response")
     group.add_argument('--mfccs', type=int, default=0,
                        help="How many MFCCs to use (0 for raw fft bins)")
+    group.add_argument('--min-call-intensity', type=float, default=0,
+                       help="threshold for call intensity (if calls have intensity)")
 
 def process_common_args(c, args, random_seed=1, timed=True):
     c.verbosity = args.verbosity
@@ -800,7 +823,8 @@ def process_common_args(c, args, random_seed=1, timed=True):
     else:
         files = load_timings(c.classes,
                              args.timings,
-                             args.audio_directory)
+                             args.audio_directory,
+                             args.min_call_intensity)
     random.shuffle(files)
     return files
 
