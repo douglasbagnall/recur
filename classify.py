@@ -681,8 +681,8 @@ def targeted_wav_finder(d, files):
 
 class TimedFile(object):
     def __init__(self, fn, ffn, timings=None):
-        self.basename = fn
-        self.fullname = ffn
+        self.basename = fn.encode('utf-8')
+        self.fullname = ffn.encode('utf-8')
         if timings is None:
             timings = []
         self.timings = timings
