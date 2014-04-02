@@ -449,7 +449,7 @@ class Trainer(BaseClassifier):
                 right_p = right / right_c if right_c else 0.0
                 wrong_p = wrong / wrong_c if wrong_c else 0.0
                 p_strings.append(" %s %.2f/%.2f " % (c, right_p, wrong_p))
-                if right_c and wrong_c:
+                if right_c and wrong_c and wrong_p:
                     gap_p += right_p - wrong_p
                     ratio_p += right_p / wrong_p
                     count_p += 1
