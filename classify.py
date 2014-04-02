@@ -158,6 +158,7 @@ class Classifier(BaseClassifier):
         self.setp('training', False)
         self.scores = self.get_results_counter(0)
         self.score_targets = self.get_results_counter(0)
+        self.minute_results = {x:[] for x in self.classes[0]}
         self.load_next_file()
         self.mainloop.run()
 
@@ -286,40 +287,54 @@ class Classifier(BaseClassifier):
         if self.verbosity > 0:
             self.report()
         fn = self.current_file.basename
+        probs = self.file_probabilities
+        gt = self.file_ground_truth
+
         if self.target_index:
             i, k = self.target_index
             if self.ground_truth_file:
-                a = [fn] + ['%d' % x for x in self.file_ground_truth[i][k]]
+                a = [fn] + ['%d' % x for x in gt[i][k]]
                 print >>self.ground_truth_file, ','.join(a)
 
             if self.classification_file:
-                a = [fn] + ['%.5g' % x for x in self.file_probabilities[i][k]]
+                a = [fn] + ['%.5g' % x for x in probs[i][k]]
                 print >>self.classification_file, ','.join(a)
 
-        for scores, fscores in zip(self.scores, self.file_probabilities):
+
+        r = {}
+        for k, v in probs[0].items():
+            r[k] = (sorted(v[10:])[-20:][::-1], sum(gt[0][k]))
+            #print r[k]
+        for k in r:
+            self.minute_results[k].append(r[k])
+        for scores, fscores in zip(self.scores, probs):
             for k in scores:
                 scores[k].extend(fscores[k])
-        for targets, ftargets in zip(self.score_targets, self.file_ground_truth):
+        for targets, ftargets in zip(self.score_targets, gt):
             for k in targets:
                 targets[k].extend(ftargets[k])
         if 0:
             i, k = self.target_index
-            show_roc_curve(self.file_probabilities[i][k],
-                           self.file_ground_truth[i][k],
+            draw_roc_curve(probs[i][k],
+                           gt[i][k],
                            k)
+            actually_show_roc()
 
         if not self.data:
             if self.show_roc:
                 if self.target_index:
                     i, k = self.target_index
-                    show_roc_curve(self.scores[i][k], self.score_targets[i][k], k)
+                    draw_roc_curve(self.scores[i][k], self.score_targets[i][k], k)
                 else:
                     for i, group in enumerate(self.classes):
                         for k in group[len(group) == 2:]:
-                            show_roc_curve(self.scores[i][k],
-                                           self.score_targets[i][k], k, show=False)
-                    actually_show_roc()
+                            draw_roc_curve(self.scores[i][k],
+                                           self.score_targets[i][k], k)
+                            for n in (0, 4, 9, 15, 19):
+                                draw_presence_roc(self.minute_results[k], n,
+                                                  '%s-nth %s' %(k, n))
 
+                actually_show_roc()
 
             self.stop()
         else:
@@ -845,7 +860,7 @@ def process_common_args(c, args, random_seed=1, timed=True):
     random.shuffle(files)
     return files
 
-def show_roc_curve(scores, truth, title='ROC', show=True):
+def draw_roc_curve(scores, truth, title='ROC'):
     import matplotlib.pyplot as plt
     results = zip(scores, truth)
     #print results
@@ -933,11 +948,98 @@ def show_roc_curve(scores, truth, title='ROC', show=True):
                  arrowprops={'width':1, 'color': '#aa6600'},
                  )
 
-    if show:
-        actually_show_roc()
-
 def actually_show_roc():
     import matplotlib.pyplot as plt
     plt.axes().set_aspect('equal')
     plt.legend(loc='lower right')
     plt.show()
+
+def draw_presence_roc(data, index=0, title='ROC'):
+    import matplotlib.pyplot as plt
+    scores = [(x[0][index], bool(x[1])) for x in data]
+    scores.sort()
+
+    sum_true = sum(x[1] for x in scores)
+    sum_false = len(scores) - sum_true
+
+    tp_scale = 1.0 / (sum_true or 1)
+    fp_scale = 1.0 / (sum_false or 1)
+    tp = []
+    fp = []
+    false_positives = sum_false
+    true_positives = sum_true
+    half = 0
+    ax, ay, ad, ap = 0, 0, 0, 0
+    bx, by, bd, bp = 0, 0, 99, 0
+    cx, cy, cd, cp = 0, 0, 0, 0
+    dx, dy, dp = 0, 0, 0
+    ex, ey, ep = 1.0, 1.0, 0.0
+    #print scores
+
+    for score, target in scores:
+        false_positives -= not target
+        true_positives -= target
+        x = false_positives * fp_scale
+        y = true_positives * tp_scale
+        half += score < 0.5
+        d = (1 - x) * (1 - x) + y * y
+        if d > ad:
+            ad = d
+            ax = x
+            ay = y
+            ap = score
+        d = x * x + (1 - y) * (1 - y)
+        if d < bd:
+            bd = d
+            bx = x
+            by = y
+            bp = score
+        d = y - x
+        if d > cd:
+            cd = d
+            cx = x
+            cy = y
+            cp = score
+        if dx == 0 and y > 20.0 * x:
+            #print x, y
+            dx = x
+            dy = y
+            dp = score
+        if 1.0 - x > 20.0 * (1.0 - y):
+            #print x, y, (1.0 - y) / (1.0 - x)
+            ex = x
+            ey = y
+            ep = score
+        fp.append(x)
+        tp.append(y)
+
+    if half < len(fp):
+        hx = (fp[half - 1] + fp[half]) * 0.5
+        hy = (tp[half - 1] + tp[half]) * 0.5
+    else:
+        hx = fp[half - 1]
+        hy = tp[half - 1]
+
+    fp.reverse()
+    tp.reverse()
+    print "~best %0.3f  %.3f true, %.3f false" % (cp, cy, cx)
+    print "halfway 0.5  %.3f true, %.3f false" % (hy, hx)
+    plt.plot(fp, tp, label=title)
+    if 0:
+        plt.annotate("95%% negative %.2g" % ep, (ex, ey), (0.7, 0.7),
+                     arrowprops={'width':1, 'color': '#0088aa'},
+                     )
+        plt.annotate("95%% positive %.2g" % dp, (dx, dy), (0.2, 0.2),
+                     arrowprops={'width':1, 'color': '#8800aa'},
+                     )
+        plt.annotate("0.5", (hx, hy), (0.4, 0.4),
+                     arrowprops={'width':1, 'color': '#00cc00'})
+        plt.annotate("furthest from all bad %.2g" % ap, (ax, ay), (0.3, 0.3),
+                     arrowprops={'width':1, 'color': '#00cccc'},
+                     )
+        plt.annotate("closest to all good %.2g" % bp, (bx, by), (0.6, 0.6),
+                     arrowprops={'width':1, 'color': '#cc0000'},
+                     )
+        plt.annotate("furthest from diagonal %.2g" % cp, (cx, cy), (0.5, 0.5),
+                     arrowprops={'width':1, 'color': '#aa6600'},
+                     )
