@@ -60,6 +60,7 @@ enum
   PROP_INTENSITY_FEATURE,
   PROP_FORCE_LOAD,
   PROP_LAG,
+  PROP_GENERATION,
 
   PROP_LAST
 };
@@ -84,6 +85,7 @@ enum
 #define DEFAULT_MAX_FREQUENCY (CLASSIFY_RATE * 0.499)
 #define MINIMUM_AUDIO_FREQUENCY 0
 #define MAXIMUM_AUDIO_FREQUENCY (CLASSIFY_RATE * 0.5)
+#define DEFAULT_PROP_GENERATION 0
 
 #define DEFAULT_PROP_CLASSES "01"
 #define DEFAULT_PROP_BPTT_DEPTH 30
@@ -528,6 +530,13 @@ gst_classify_class_init (GstClassifyClass * klass)
           0, G_MAXUINT64,
           DEFAULT_RNG_SEED,
           G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
+
+  g_object_class_install_property (gobject_class, PROP_GENERATION,
+      g_param_spec_uint("generation", "generation",
+          "Read the net's training generation",
+          0, G_MAXUINT,
+          DEFAULT_PROP_GENERATION,
+          G_PARAM_READABLE | G_PARAM_STATIC_STRINGS));
 
   trans_class->transform_ip = GST_DEBUG_FUNCPTR (gst_classify_transform_ip);
   af_class->setup = GST_DEBUG_FUNCPTR (gst_classify_setup);
@@ -1471,6 +1480,14 @@ gst_classify_get_property (GObject * object, guint prop_id, GValue * value,
 
 #undef NET_OR_PP
 
+  case PROP_GENERATION:
+    if (net){
+      g_value_set_uint(value, net->generation);
+    }
+    else {
+      g_value_set_uint(value, 0);
+    }
+    break;
   case PROP_TRAINING:
     g_value_set_boolean(value, self->training);
     break;

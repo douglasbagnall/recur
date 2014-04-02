@@ -1,4 +1,4 @@
-import os
+import os, sys
 import random
 import itertools
 import time
@@ -348,18 +348,11 @@ def eternal_shuffler(iters, max_iterations=-1):
 
 class Trainer(BaseClassifier):
     trainers = None
-    lr_adjust = 1.0
     no_save_net = False
-    def train(self, trainers, testers, iterations=100, learn_rate=None,
-              dropout=0.0, log_file='auto', properties=()):
-        if isinstance(learn_rate, (int, float)):
-            self.learn_rate = itertools.repeat(learn_rate)
-        else:
-            self.learn_rate = learn_rate
-        if isinstance(dropout, (int, float)):
-            self.dropout = itertools.repeat(dropout)
-        else:
-            self.dropout = dropout
+    def train(self, trainers, testers, learn_rate_fn, dropout_fn=None,
+              iterations=100, log_file='auto', properties=()):
+        self.learn_rate_fn = learn_rate_fn
+        self.dropout_fn = dropout_fn
         self.counter = 0
         self.iterations = iterations
         self.trainers = eternal_shuffler(trainers)
@@ -390,15 +383,19 @@ class Trainer(BaseClassifier):
         self.test_n = 0
 
     def next_training_set(self):
-        dropout = self.dropout.next()
-        self.setp('dropout', dropout)
         self.setp('training', True)
+        generation = self.getp('generation')
 
-        if self.learn_rate is not None:
-            r = self.learn_rate.next() * self.lr_adjust
-            print ("%s/%s learn_rate %.4g dropout %.2g" %
-                   (self.counter, self.iterations, r, dropout)),
+        if self.dropout_fn is not None:
+            dropout = self.dropout_fn(generation)
+            self.setp('dropout', dropout)
+
+        if self.learn_rate_fn is not None:
+            r = self.learn_rate_fn(generation)
+            print ("%s/%s gen %d; learn_rate %.4g dropout %.2g;" %
+                   (self.counter, generation, self.iterations, r, dropout)),
             self.setp('learn_rate', r)
+
         self.probability_sums = []
         self.probability_counts = []
         for group in self.classes:
@@ -539,17 +536,36 @@ class Trainer(BaseClassifier):
                         self.probability_counts[j][x][x == target] += 1.0
 
 
+def negate_exponent(x):
+    m, e = ("%.9e" % x).split('e')
+    s = e[0]
+    e = e[1:]
+    if s == '-':
+        return float(m + 'e+' + e)
+    elif s == '+':
+        return float(m + 'e-' + e)
 
-def lr_steps(*args):
-    args = list(args)
-    while len(args) > 2:
-        rate = float(args.pop(0))
-        n = int(args.pop(0))
-        for i in xrange(n):
-            yield rate
-    #odd number of args --> repeat forever
-    while args:
-        yield args[0]
+def lr_sqrt_exp(start, scale, min_value, post_min_value=None):
+    if start > 1:
+        tmp = negate_exponent(start)
+        print >> sys.stderr, "assuming learn-rate %e means %e" % (start, tmp)
+        start = tmp
+    if scale > 1:
+        scale = negate_exponent(scale)
+    if post_min_value is None:
+        post_min_value = min_value
+    if scale == 0:
+        def fn(generation):
+            return start
+    else:
+        def fn(generation):
+            x = (generation * scale + 1) ** 0.5
+            v = start ** x
+            #print >> sys.stderr, "start %f, x %f, v %f" % (start, x, v)
+            if v < min_value:
+                return post_min_value
+            return v
+    return fn
 
 def categorised_files(_dir, classes):
     files = [x for x in os.listdir(_dir) if x.endswith('.wav')]
