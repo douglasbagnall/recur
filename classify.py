@@ -366,7 +366,11 @@ class Trainer(BaseClassifier):
         self.setp('log-file', log_file)
         for k, v in properties:
             self.setp(k, v)
+        #print >> sys.stderr, "in train()"
+
+        self.setp('load-net-now', 1)
         self.next_training_set()
+        #print >> sys.stderr, "setting PLAYING()"
         self.pipeline.set_state(Gst.State.PLAYING)
         self.mainloop.run()
 
@@ -383,8 +387,10 @@ class Trainer(BaseClassifier):
         self.test_n = 0
 
     def next_training_set(self):
+        #print >> sys.stderr, "in next_training_set()"
         self.setp('training', True)
         generation = self.getp('generation')
+        #print >> sys.stderr, "generation is %d" % generation
 
         if self.dropout_fn is not None:
             dropout = self.dropout_fn(generation)
@@ -393,7 +399,7 @@ class Trainer(BaseClassifier):
         if self.learn_rate_fn is not None:
             r = self.learn_rate_fn(generation)
             print ("%s/%s gen %d; learn_rate %.4g dropout %.2g;" %
-                   (self.counter, generation, self.iterations, r, dropout)),
+                   (self.counter, self.iterations, generation, r, dropout)),
             self.setp('learn_rate', r)
 
         self.probability_sums = []

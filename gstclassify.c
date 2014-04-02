@@ -61,6 +61,7 @@ enum
   PROP_FORCE_LOAD,
   PROP_LAG,
   PROP_GENERATION,
+  PROP_LOAD_NET_NOW,
 
   PROP_LAST
 };
@@ -151,6 +152,7 @@ static void gst_classify_set_property(GObject *object, guint prop_id, const GVal
 static void gst_classify_get_property(GObject *object, guint prop_id, GValue *value, GParamSpec *pspec);
 static GstFlowReturn gst_classify_transform_ip(GstBaseTransform *base, GstBuffer *buf);
 static gboolean gst_classify_setup(GstAudioFilter * filter, const GstAudioInfo * info);
+static gboolean start(GstBaseTransform *trans);
 static void maybe_parse_target_string(GstClassify *self);
 static void maybe_start_logging(GstClassify *self);
 static void maybe_parse_error_weight_string(GstClassify *self);
@@ -259,6 +261,12 @@ gst_classify_finalize (GObject * obj){
   free(self->pending_properties);
 }
 
+static gboolean
+stop(GstBaseTransform *trans){
+  //STDERR_DEBUG("in stop()");
+  return 1;
+}
+
 static void
 gst_classify_class_init (GstClassifyClass * klass)
 {
@@ -271,6 +279,9 @@ gst_classify_class_init (GstClassifyClass * klass)
   gobject_class->set_property = gst_classify_set_property;
   gobject_class->get_property = gst_classify_get_property;
   gobject_class->finalize = GST_DEBUG_FUNCPTR (gst_classify_finalize);
+  trans_class->start = GST_DEBUG_FUNCPTR (start);
+  trans_class->stop = GST_DEBUG_FUNCPTR (stop);
+
   /*8kHz interleaved 16 bit signed little endian PCM*/
   GstCaps *caps = gst_caps_from_string (CLASSIFY_CAPS_STRING);
   GST_DEBUG (CLASSIFY_CAPS_STRING);
@@ -522,6 +533,12 @@ gst_classify_class_init (GstClassifyClass * klass)
       g_param_spec_boolean("lawn-mower", "lawn-mower",
           "Don't let any weight grow bigger than " QUOTE(RNN_LAWN_MOWER_THRESHOLD),
           DEFAULT_PROP_LAWN_MOWER,
+          G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
+
+  g_object_class_install_property (gobject_class, PROP_LOAD_NET_NOW,
+      g_param_spec_boolean("load-net-now", "load-net-now",
+          "Load or create the net based on properites so far",
+          0,
           G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class, PROP_RNG_SEED,
@@ -911,6 +928,50 @@ reset_channel_targets(GstClassify *self){
   }
 }
 
+static void
+load_or_create_net_and_audio(GstClassify *self)
+{
+  /*there are two paths to loading a net.
+
+      1. If the net has been specifically named in the 'net-filename'
+      property, it (and the audio feature extraction) will have been set up
+      already from the set_property hook.
+
+      2. If no net name is specified, the net is created here. First the audio
+      parameters and layer sizes are determined, then a network name is
+      created from them and the net made.
+  */
+  if (self->mfcc_factory != NULL){
+    FATAL_ERROR("mfcc_factory exists before net. This won't work.");
+  }
+  self->basename = strdup(PP_GET_STRING(self, PROP_BASENAME, DEFAULT_BASENAME));
+  setup_audio(self, PP_GET_INT(self, PROP_WINDOW_SIZE, DEFAULT_WINDOW_SIZE),
+      PP_GET_INT(self, PROP_MFCCS, DEFAULT_PROP_MFCCS),
+      PP_GET_FLOAT(self, PROP_MIN_FREQUENCY, DEFAULT_MIN_FREQUENCY),
+      PP_GET_FLOAT(self, PROP_MAX_FREQUENCY, DEFAULT_MAX_FREQUENCY),
+      PP_GET_FLOAT(self, PROP_KNEE_FREQUENCY, DEFAULT_KNEE_FREQUENCY),
+      PP_GET_FLOAT(self, PROP_FOCUS_FREQUENCY, DEFAULT_FOCUS_FREQUENCY),
+      PP_GET_INT(self, PROP_DELTA_FEATURES, DEFAULT_PROP_DELTA_FEATURES),
+      PP_GET_FLOAT(self, PROP_LAG, DEFAULT_PROP_LAG),
+      PP_GET_INT(self, PROP_INTENSITY_FEATURE, DEFAULT_PROP_INTENSITY_FEATURE)
+  );
+  self->net = load_or_create_net(self);
+
+  RecurNN *net = self->net;
+  if (net->bottom_layer && 0){
+    self->error_image = temporal_ppm_alloc(net->bottom_layer->o_size, 300,
+        "bottom_error", 0, PGM_DUMP_COLOUR, &net->bottom_layer->o_error);
+  }
+}
+
+static gboolean
+start(GstBaseTransform *trans){
+  GstClassify *self = GST_CLASSIFY(trans);
+  if (self->net == NULL){
+    load_or_create_net_and_audio(self);
+  }
+  return TRUE;
+}
 
 /*gst_classify_setup is called every time the pipeline starts up -- that is,
   for every new set of input files. It is also the first hook after all the
@@ -923,39 +984,6 @@ static gboolean
 gst_classify_setup(GstAudioFilter *base, const GstAudioInfo *info){
   GST_INFO("gst_classify_setup\n");
   GstClassify *self = GST_CLASSIFY(base);
-  if (self->net == NULL){
-    /*there are two paths to loading a net.
-
-      1. If the net has been specifically named in the 'net-filename'
-      property, it (and the audio feature extraction) will have been set up
-      already from the set_property hook.
-
-      2. If no net name is specified, the net is created here. First the audio
-      parameters and layer sizes are determined, then a network name is
-      created from them and the net made.
-    */
-    if (self->mfcc_factory != NULL){
-      FATAL_ERROR("mfcc_factory exists before net. This won't work.");
-    }
-    self->basename = strdup(PP_GET_STRING(self, PROP_BASENAME, DEFAULT_BASENAME));
-    setup_audio(self, PP_GET_INT(self, PROP_WINDOW_SIZE, DEFAULT_WINDOW_SIZE),
-        PP_GET_INT(self, PROP_MFCCS, DEFAULT_PROP_MFCCS),
-        PP_GET_FLOAT(self, PROP_MIN_FREQUENCY, DEFAULT_MIN_FREQUENCY),
-        PP_GET_FLOAT(self, PROP_MAX_FREQUENCY, DEFAULT_MAX_FREQUENCY),
-        PP_GET_FLOAT(self, PROP_KNEE_FREQUENCY, DEFAULT_KNEE_FREQUENCY),
-        PP_GET_FLOAT(self, PROP_FOCUS_FREQUENCY, DEFAULT_FOCUS_FREQUENCY),
-        PP_GET_INT(self, PROP_DELTA_FEATURES, DEFAULT_PROP_DELTA_FEATURES),
-        PP_GET_FLOAT(self, PROP_LAG, DEFAULT_PROP_LAG),
-        PP_GET_INT(self, PROP_INTENSITY_FEATURE, DEFAULT_PROP_INTENSITY_FEATURE)
-    );
-    self->net = load_or_create_net(self);
-
-    RecurNN *net = self->net;
-    if (net->bottom_layer && 0){
-      self->error_image = temporal_ppm_alloc(net->bottom_layer->o_size, 300,
-          "bottom_error", 0, PGM_DUMP_COLOUR, &net->bottom_layer->o_error);
-    }
-  }
 
   if (self->n_channels != info->channels){
     DEBUG("given %d channels, previous %d", info->channels, self->n_channels);
@@ -1358,6 +1386,15 @@ gst_classify_set_property (GObject * object, guint prop_id, const GValue * value
       self->momentum_style = g_value_get_int(value);
       break;
 
+      /*this causes the net to be loaded or created based on the properties so
+        far.*/
+    case PROP_LOAD_NET_NOW:
+      if (self->net == NULL){
+        load_or_create_net_and_audio(self);
+      }
+      else {
+        GST_WARNING("There is a net already. Let's not make a new one");
+      }
       /*this causes the net to be loaded immediately, if possible, so that
         various properties can be queried */
     case PROP_NET_FILENAME:
