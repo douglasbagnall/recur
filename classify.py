@@ -641,7 +641,8 @@ class GTKClassifier(BaseClassifier):
         p.seek_simple(Gst.Format.TIME, 0, then)
 
 
-def load_binary_timings(fn, all_classes, default_state=0, classes=None, threshold=0):
+def load_binary_timings(fn, all_classes, default_state=0, classes=None,
+                        threshold=0, max_duration=0):
     #all_classes is a sequence of class groups. Each group of
     #all_classes is a string of characters. By default the first one
     #is used, but if a line like 'group: Xxy' comes along, the the
@@ -677,7 +678,8 @@ def load_binary_timings(fn, all_classes, default_state=0, classes=None, threshol
             for s, e, intensity in calls:
                 if s == 0:
                     events.pop()
-                if intensity > threshold:
+                if (intensity > threshold and
+                    (max_duration == 0 or s - e > max_duration)):
                     add_event(1 - default_state, s)
                     add_event(default_state, e)
                 else:
@@ -725,7 +727,8 @@ class TimedFile(object):
         self.timings = timings
         self.targets = [x[3] for x in timings]
 
-def load_timings(all_classes, timing_files, audio_directories, min_call_intensity=0):
+def load_timings(all_classes, timing_files, audio_directories, min_call_intensity=0,
+                 max_call_duration=0):
     timings = {}
     for fn in timing_files:
         classes = None
@@ -734,7 +737,8 @@ def load_timings(all_classes, timing_files, audio_directories, min_call_intensit
             if classes not in all_classes:
                 classes = None
         timings.update(load_binary_timings(fn, all_classes, classes=classes,
-                                           threshold=min_call_intensity))
+                                           threshold=min_call_intensity,
+                                           max_duration=max_call_duration))
 
     timed_files = []
     for d in audio_directories:
@@ -821,6 +825,8 @@ def add_common_args(parser, WINDOW_SIZE, BASENAME):
                        help="How many MFCCs to use (0 for raw fft bins)")
     group.add_argument('--min-call-intensity', type=float, default=0,
                        help="threshold for call intensity (if calls have intensity)")
+    group.add_argument('--max-call-duration', type=float, default=0,
+                       help="ignore calls longer than this")
 
 def process_common_args(c, args, random_seed=1, timed=True):
     c.verbosity = args.verbosity
@@ -856,7 +862,8 @@ def process_common_args(c, args, random_seed=1, timed=True):
         files = load_timings(c.classes,
                              args.timings,
                              args.audio_directory,
-                             args.min_call_intensity)
+                             args.min_call_intensity,
+                             args.max_call_duration)
     random.shuffle(files)
     return files
 
