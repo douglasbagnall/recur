@@ -3,6 +3,7 @@ import random
 import itertools
 import time
 import json
+import numpy as np
 
 _dirname = os.path.dirname(os.path.abspath(__file__))
 os.environ['GST_PLUGIN_PATH'] = _dirname
@@ -145,6 +146,7 @@ class Classifier(BaseClassifier):
     def classify(self, data,
                  ground_truth_file=None,
                  classification_file=None, show_roc=False,
+                 show_presence_roc=False,
                  target_index=None):
         self.target_index = target_index
         if ground_truth_file:
@@ -153,6 +155,7 @@ class Classifier(BaseClassifier):
             self.classification_file = open(classification_file, 'w')
 
         self.show_roc = show_roc
+        self.show_presence_roc = show_presence_roc
         self.class_results = self.get_results_counter()
         self.data = list(reversed(data))
         self.setp('training', False)
@@ -300,13 +303,18 @@ class Classifier(BaseClassifier):
                 a = [fn] + ['%.5g' % x for x in probs[i][k]]
                 print >>self.classification_file, ','.join(a)
 
+        if self.show_presence_roc:
+            r = {}
+            window = np.kaiser(15, 6)
+            for k, v in probs[0].items():
+                #v = np.array(v)
+                v = np.convolve(v, window)
+                vs = np.sort(v[10:])
+                r[k] = (vs[-70:][::-1], any(gt[0][k][10:]))
+                #print r[k]
+            for k in r:
+                self.minute_results[k].append(r[k])
 
-        r = {}
-        for k, v in probs[0].items():
-            r[k] = (sorted(v[10:])[-20:][::-1], sum(gt[0][k]))
-            #print r[k]
-        for k in r:
-            self.minute_results[k].append(r[k])
         for scores, fscores in zip(self.scores, probs):
             for k in scores:
                 scores[k].extend(fscores[k])
@@ -330,9 +338,10 @@ class Classifier(BaseClassifier):
                         for k in group[len(group) == 2:]:
                             draw_roc_curve(self.scores[i][k],
                                            self.score_targets[i][k], k)
-                            for n in (0, 4, 9, 15, 19):
-                                draw_presence_roc(self.minute_results[k], n,
-                                                  '%s-nth %s' %(k, n))
+                            if self.show_presence_roc:
+                                for n in (0, 4, 9, 16, 25, 36, 49, 64):
+                                    draw_presence_roc(self.minute_results[k], n,
+                                                      '%s-nth %s' % (k, n))
 
                 actually_show_roc()
 

@@ -28,6 +28,8 @@ def main():
                        help="only test files with at least this many class switches")
     group.add_argument('--no-timings', action='store_true',
                        help="Don't compare with canonical timings")
+    group.add_argument('--presence-roc', action='store_true',
+                       help="plot a ROC curve of presence (implies --roc)")
 
     args = parser.parse_args()
     timed = not args.no_timings
@@ -45,8 +47,10 @@ def main():
     if args.target_class:
         target=(args.target_group, args.target_class)
 
+    show_roc = args.roc or args.show_presence_roc
+
     c.classify(timed_files, ground_truth_file=args.ground_truth_file,
-               classification_file=args.classification_file, show_roc=args.roc,
-               target_index=target)
+               classification_file=args.classification_file, show_roc=show_roc,
+               show_presence_roc=args.presence_roc, target_index=target)
 
 main()
