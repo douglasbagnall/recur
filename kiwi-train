@@ -12,16 +12,13 @@ DEFAULT_DROPOUT = 0
 DEFAULT_DROPOUT_DECAY = 0
 DEFAULT_DROPOUT_MIN = 0.1
 
-from classify_kiwi import WINDOW_SIZE, BASENAME
-
 from classify import Trainer, lr_sqrt_exp, gst_init
 from classify import add_common_args, process_common_args
 
 def main():
     gst_init()
     parser = argparse.ArgumentParser()
-    add_common_args(parser, WINDOW_SIZE=WINDOW_SIZE,
-                    BASENAME=BASENAME)
+    add_common_args(parser)
     group = parser.add_argument_group('kiwi-train specific arguments')
     group.add_argument('-l', '--learn-rate', type=float, default=DEFAULT_LEARN_RATE,
                        help="learning rate")

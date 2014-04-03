@@ -15,7 +15,8 @@ from gi.repository import Gst, GObject
 MIN_FREQUENCY = 40
 MAX_FREQUENCY = 3900
 KNEE_FREQUENCY = 700
-
+WINDOW_SIZE = 1024
+BASENAME = 'classify'
 COLOURS = {
     "Z": "\033[00m",
     "g": '\033[00;32m',
@@ -791,7 +792,7 @@ def load_untimed_files(audio_directories):
     return untimed_files
 
 
-def add_common_args(parser, WINDOW_SIZE, BASENAME):
+def add_common_args(parser):
     group = parser.add_argument_group('Common arguments')
     group.add_argument('-v', '--verbosity', type=int, default=1,
                        help='0 for near silence, 2 for lots of rubbish output')

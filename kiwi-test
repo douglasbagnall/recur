@@ -3,14 +3,12 @@ import os, sys
 import argparse
 
 from classify import gst_init, Gst
-from classify_kiwi import WINDOW_SIZE, BASENAME
 from classify import Classifier, add_common_args, process_common_args
 
 def main():
     gst_init()
     parser = argparse.ArgumentParser()
-    add_common_args(parser, WINDOW_SIZE=WINDOW_SIZE,
-                    BASENAME=BASENAME)
+    add_common_args(parser)
     group = parser.add_argument_group('kiwi-test specific arguments')
     group.add_argument('-C', '--first-n', type=int, default=0,
                        help="classify this many files")

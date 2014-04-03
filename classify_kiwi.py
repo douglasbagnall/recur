@@ -1,2 +1,0 @@
-WINDOW_SIZE = 1024
-BASENAME = 'kiwi'

@@ -5,14 +5,12 @@ import argparse
 from gtkdisplay import run
 
 from classify import GTKClassifier, gst_init, Gst
-from classify_kiwi import WINDOW_SIZE, BASENAME
 from classify import Classifier, add_common_args, process_common_args
 
 def main():
     gst_init()
     parser = argparse.ArgumentParser()
-    add_common_args(parser, WINDOW_SIZE=WINDOW_SIZE,
-                    BASENAME=BASENAME)
+    add_common_args(parser)
     parser.add_argument('-C', '--first-n', type=int, default=0,
                         help="look at this many files from the audio directory")
     parser.add_argument('-R', '--reverse', action='store_true',
