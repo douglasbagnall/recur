@@ -218,8 +218,6 @@ class Classifier(BaseClassifier):
             next_stop = 0
             #print file_results
             for i, result in enumerate(file_results):
-                target, correct = result
-                t_index = classes.index(target)
                 if i >= next_stop:
                     if i:
                         s = sum(current_targets)
@@ -233,10 +231,13 @@ class Classifier(BaseClassifier):
                     next_stop += step
                     current_correct = 0
                     current_targets = [0] * len(classes)
+
+                target, correct = result
+                t_index = classes.index(target)
                 current_correct += correct
                 current_targets[t_index] += 1
 
-            out.extend((COLOURS['Z'],'\n'))
+            out.extend((COLOURS['Z'], str(len(file_results)), '\n'))
 
         if self.target_index:
             i, k = self.target_index
