@@ -118,8 +118,8 @@ libgstclassify.so: $(RNN_OBJECTS) gstclassify.o mfcc.o
 	$(CC) -shared -Wl,-O1 $+ $(INCLUDES) $(DEFINES) $(LINKS) -Wl,-soname -Wl,$@ \
 	  -o $@
 
-test_mfcc_table: %: mfcc.o rescale.o %.o
-	$(CC) -Wl,-O1 $^ $(INCLUDES) $(DEFINES) $(LINKS)  -o $@
+test_mfcc_table: %:  mfcc.o rescale.o %.o
+	$(CC) -Wl,-O1 $^ $(INCLUDES) $(DEFINES) $(LINKS)   -o $@
 
 test_mfcc_bins: %: mfcc.o %.o
 	$(CC) -Wl,-O1 $^ $(INCLUDES) $(DEFINES) $(LINKS)  -o $@
@@ -144,11 +144,11 @@ test_backprop test_fb_backprop: %: $(RNN_OBJECTS) %.o $(OPT_OBJECTS)
 convert-saved-net: %: $(RNN_OBJECTS) %.o
 	$(CC) -Iccan/opt/ -Wl,-O1 $(filter %.o,$^)   -I. $(DEFINES)  $(COMMON_LINKS)  -o $@
 
-test_mdct: %: recur-nn.o mdct.o window.o %.o
-	$(CC) -Wl,-O1 $^   -I. $(DEFINES)  $(COMMON_LINKS)  -o $@
+test_mdct: %: recur-nn.o mdct.o  %.o
+	$(CC) -Wl,-O1 $^   -I. $(DEFINES)  $(LINKS)  -o $@
 
-test_window: %: mfcc.o mdct.o window.o %.o
-	$(CC) -Wl,-O1 $^   -I. $(DEFINES)  $(COMMON_LINKS)  -o $@
+test_window: %: mfcc.o mdct.o %.o
+	$(CC) -Wl,-O1 $^   -I. $(DEFINES)  $(LINKS)  -o $@
 
 path.h:
 	@echo generating path.h
