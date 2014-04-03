@@ -1,6 +1,7 @@
 #include "mfcc.h"
 #include "pgm_dump.h"
 #include "badmaths.h"
+#include <gst/fft/gstfftf32.h>
 
 #define POWER(x) (x.r * x.r + x.i * x.i)
 
