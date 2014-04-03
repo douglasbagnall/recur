@@ -972,7 +972,14 @@ def actually_show_roc():
 
 def draw_presence_roc(data, index=0, title='ROC'):
     import matplotlib.pyplot as plt
-    scores = [(x[0][index], bool(x[1])) for x in data]
+    scores = []
+    for x in data:
+        s = x[0]
+        b = bool(x[1])
+        if len(s) > index:
+            scores.append((s[index], b))
+        elif len(s):
+            scores.append((s[-1], b))
     scores.sort()
 
     sum_true = sum(x[1] for x in scores)
