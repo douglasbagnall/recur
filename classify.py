@@ -839,25 +839,27 @@ def add_common_args(parser):
     group.add_argument('--max-call-duration', type=float, default=0,
                        help="ignore calls longer than this")
 
-def process_common_args(c, args, random_seed=1, timed=True):
+def process_common_args(c, args, random_seed=1, timed=True, load=True):
     c.verbosity = args.verbosity
-    c.setp('force-load', args.force_load)
-    if args.net_filename:
-        c.setup_from_file(args.net_filename)
-    else:
-        c.setup(args.mfccs,
-                args.hidden_size,
-                args.classes,
-                window_size=args.window_size,
-                bottom_layer=args.bottom_layer,
-                basename=args.basename,
-                min_freq=args.min_frequency,
-                max_freq=args.max_frequency,
-                knee_freq=args.knee_frequency,
-                focus_freq=args.focus_frequency,
-                lag=args.lag,
-                delta_features=args.delta_features,
-                intensity_feature=args.intensity_feature)
+    if load:
+        c.setp('force-load', args.force_load)
+        if args.net_filename:
+            c.setup_from_file(args.net_filename)
+        else:
+            c.setup(args.mfccs,
+                    args.hidden_size,
+                    args.classes,
+                    window_size=args.window_size,
+                    bottom_layer=args.bottom_layer,
+                    basename=args.basename,
+                    min_freq=args.min_frequency,
+                    max_freq=args.max_frequency,
+                    knee_freq=args.knee_frequency,
+                    focus_freq=args.focus_frequency,
+                    lag=args.lag,
+                    delta_features=args.delta_features,
+                    intensity_feature=args.intensity_feature)
+
     if random_seed is not None:
         random.seed(random_seed)
 
