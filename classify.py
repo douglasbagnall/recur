@@ -688,7 +688,7 @@ def load_binary_timings(fn, all_classes, default_state=0, classes=None,
                 if s == 0:
                     events.pop()
                 if (intensity > threshold and
-                    (max_duration == 0 or s - e > max_duration)):
+                    (max_duration == 0 or e - s < max_duration)):
                     add_event(1 - default_state, s)
                     add_event(default_state, e)
                 else:
