@@ -1,0 +1,340 @@
+#!/usr/bin/python
+import os, sys
+import argparse
+import numpy as np
+
+from classify import gst_init, Gst, GObject, COLOURS
+from classify import draw_roc_curve, draw_presence_roc, actually_show_roc
+from classify import BaseClassifier, add_common_args, process_common_args
+WINDOW_SIZE = 1024
+BASENAME = 'kiwi'
+
+class MultiClassifier(BaseClassifier):
+    data = []
+    verbosity = 1
+    ground_truth_file = None
+    classification_file = None
+
+    def build_pipeline(self, channels, sinkname, samplerate, n_classifiers):
+        self.channels = channels
+        self.sink = self.make_add_link(sinkname, None)
+        print "making %d classifiers" % n_classifiers
+        c = self.make_add_link('classify', self.sink)
+        self.classifiers = [c]
+        for x in range(n_classifiers - 1):
+            c = self.make_add_link('classify', c)
+            self.classifiers.append(c)
+        self.capsfilter = self.make_add_link('capsfilter', c)
+        self.interleave = self.make_add_link('interleave', self.capsfilter)
+        self.filesrcs = []
+        for i in range(channels):
+            ac = self.make_add_link('audioconvert', self.interleave)
+            ar = self.make_add_link('audioresample', ac)
+            wp = self.make_add_link('wavparse', ar)
+            fs = self.make_add_link('filesrc', wp)
+            self.filesrcs.append(fs)
+
+        self.channels = channels
+        caps =  Gst.caps_from_string("audio/x-raw, "
+                                     "layout=(string)interleaved, "
+                                     "channel-mask=(bitmask)0x0, "
+                                     "rate=%d, channels=%d"
+                                     % (samplerate, channels))
+        self.capsfilter.set_property("caps", caps)
+
+    def __init__(self, channels=1, mainloop=None, sinkname='fakesink',
+                 samplerate=8000, n_classifiers=1):
+        if mainloop is None:
+            mainloop = GObject.MainLoop()
+        self.mainloop = mainloop
+        self.build_pipeline(channels, sinkname, samplerate, n_classifiers)
+
+    def setp_all(self, prop, value):
+        for c in self.classifiers:
+            c.set_property(prop, value)
+
+    def set_filenames(self, *filenames):
+        print self.classifiers
+        for c, fn in zip(self.classifiers, filenames):
+            c.set_property('net-filename', fn)
+        classes = c.get_property('classes')
+        for c in self.classifiers[:-1]:
+            classes2 = c.get_property('classes')
+            if classes2 != classes:
+                raise RuntimeError("classes mismatch %r != %r" % (classes2, classes))
+        self.classes = classes.split(',')
+
+    def classify(self, data,
+                 ground_truth_file=None,
+                 classification_file=None, show_roc=False,
+                 show_presence_roc=False,
+                 target_index=None):
+        self.target_index = target_index
+        if ground_truth_file:
+            self.ground_truth_file = open(ground_truth_file, 'w')
+        if classification_file:
+            self.classification_file = open(classification_file, 'w')
+
+        self.show_roc = show_roc
+        self.show_presence_roc = show_presence_roc
+        self.data = list(reversed(data))
+        self.setp_all('training', False)
+        self.scores = self.get_results_counter(0)
+        self.minute_results = {x:[] for x in self.classes[0]}
+        self.load_next_file()
+        self.mainloop.run()
+
+
+    def load_next_file(self):
+        self.pipeline.set_state(Gst.State.READY)
+        f = self.data.pop()
+        targets = ' '.join(x % 0 for x in f.targets)
+        self.current_file = f
+        self.filesrcs[0].set_property('location', f.fullname)
+        self.setp_all('target', targets)
+        self.file_results = [[] for x in self.classes]
+        self.file_scores = self.get_results_counter(0)
+        keys = ''.join(self.classes)
+        self.timed_scores = {x: {} for x in keys}
+        self.pipeline.set_state(Gst.State.PLAYING)
+
+    def on_element(self, bus, msg):
+        s = msg.get_structure()
+        if s.get_name() != "classify":
+            return
+        #print s.to_string()
+        v = s.get_value
+        no_targets = not self.current_file.targets
+        timestamp = msg.timestamp
+        for i, group in enumerate(self.classes):
+            scores = self.file_scores[i]
+            key = 'channel 0, group %d ' % i
+            correct = v(key + 'correct')
+            target = v(key + 'target')
+            if no_targets:
+                for k in group:
+                    results = self.timed_scores[k].setdefault(timestamp, [])
+                    res = (v(key + k), None)
+                    results.append(res)
+                    scores[k].append(res)
+            elif target is None:
+                continue
+            else:
+                for k in group:
+                    results = self.timed_scores[k].setdefault(timestamp, [])
+                    res = (v(key + k), k == target)
+                    results.append(res)
+                    scores[k].append(res)
+                self.file_results[i].append((target, correct))
+
+
+    def report(self):
+        self.pipeline.set_state(Gst.State.READY)
+        out = []
+        colours = [COLOURS[x] for x in 'PPrrRRYYGgCC']
+
+        for groupno, file_results in enumerate(self.file_results):
+            classes = self.classes[groupno]
+            step = len(file_results) / 100.0
+            next_stop = 0
+            #print file_results
+            for i, result in enumerate(file_results):
+                if i >= next_stop:
+                    if i:
+                        s = sum(current_targets)
+                        m = max(current_targets)
+                        if m > s * 0.9:
+                            c = classes[current_targets.index(m)]
+                        else:
+                            c = '~'
+                        colour = colours[int(current_correct * 10.01 / s)]
+                        out.append('%s%s' % (colour, c))
+                    next_stop += step
+                    current_correct = 0
+                    current_targets = [0] * len(classes)
+
+                target, correct = result
+                t_index = classes.index(target)
+                current_correct += correct
+                current_targets[t_index] += 1
+
+            out.extend((COLOURS['Z'], str(len(file_results)), '\n'))
+
+        if self.target_index:
+            i, k = self.target_index
+        else:
+            i, k = 0, self.classes[0][-1]
+
+        scores = self.file_scores[i][k]
+        r_sum = 0
+        w_sum = 0
+        r_sum2, w_sum2 = 0, 0
+        r_count = 0
+        w_count = 0
+        for s, t in scores:
+            if t:
+                r_sum += s
+                r_sum2 += s * s
+                r_count += 1
+            else:
+                w_sum += s
+                w_sum2 += s * s
+                w_count += 1
+        if r_count:
+            r_mean = r_sum / r_count
+            r_stddev = (r_sum2 / r_count - r_mean * r_mean) ** 0.5
+        else:
+            r_mean = r_stddev = float('nan')
+        if w_count:
+            w_mean = w_sum / w_count
+            w_stddev = (w_sum2 / w_count  - w_mean * w_mean) ** 0.5
+        else:
+            w_mean = w_stddev = float('nan')
+
+        if r_count:
+            diff = r_mean - w_mean
+            sd = r_stddev + w_stddev
+            c = colours[(diff > 0) + (diff > r_stddev) + (diff > w_stddev) +
+                        (diff > sd) + (diff > sd * 2) + (diff > sd * 3) +
+                        (diff > w_mean) + (diff > w_mean * 2) +
+                        (diff > 0.1) + (diff > 0.5)]
+        else:
+            c = COLOURS['Z']
+        sigma = unichr(0x03c3).encode('utf-8')
+        out.append("%s scores. %s%s %.2f (%s %.2f)   not-%s %.2f (%s %.2f)%s %s\n" %
+                   (k, c, k, r_mean, sigma, r_stddev, k, w_mean, sigma,
+                    w_stddev, COLOURS['Z'], self.current_file.basename))
+
+        print ''.join(out)
+
+    def on_eos(self, bus, msg):
+        if self.verbosity > 0:
+            self.report()
+        fn = self.current_file.basename
+        #scores = self.file_scores
+        #print  self.timed_scores
+        scores = self.get_results_counter(0)
+        for k, v in self.timed_scores.items():
+            sk = scores[0][k]
+            for ts, vals in v.iteritems():
+                #print ts, len(vals)
+                #s = sum(x[0] * x[0] for x in vals)
+                s = sorted(x[0] for x in vals)[-1]
+                #for x in vals:
+                #    s *= x[0]
+                sk.append((s, any(x[1] for x in vals)))
+
+        if self.target_index and (self.classification_file
+                                  or self.ground_truth_file):
+            i, k = self.target_index
+            ground_truth = [fn]
+            classifications = [fn]
+            for s, t in scores[i][k]:
+                ground_truth.append('%d' % t)
+                classifications.append('%.5g' % s)
+
+            if self.ground_truth_file:
+                print >>self.ground_truth_file, ','.join(ground_truth)
+
+            if self.classification_file:
+                print >>self.classification_file, ','.join(classifications)
+
+        if self.show_presence_roc:
+            r = {}
+            window = np.kaiser(15, 6)
+            for k, v in scores[0].items():
+                gt = any([x[1] for x in v[10:]])
+                s = np.array([x[0] for x in v])
+                s = np.convolve(s, window)
+                ss = np.sort(s[10:])
+                r[k] = (ss[-70:][::-1], gt)
+                #print r[k]
+            for k in r:
+                self.minute_results[k].append(r[k])
+
+        for scores, fscores in zip(self.scores, scores):
+            for k in scores:
+                scores[k].extend(fscores[k])
+
+        if 0:
+            i, k = self.target_index
+            draw_roc_curve(scores[i][k], k)
+            actually_show_roc()
+
+        if not self.data:
+            if self.show_roc:
+                if self.target_index:
+                    i, k = self.target_index
+                    draw_roc_curve(self.scores[i][k], k)
+                else:
+                    for i, group in enumerate(self.classes):
+                        for k in group[len(group) == 2:]:
+                            draw_roc_curve(self.scores[i][k], k)
+                            if self.show_presence_roc:
+                                for n in (0, 4, 9, 16, 25, 36, 49, 64):
+                                    draw_presence_roc(self.minute_results[k], n,
+                                                      '%s-nth %s' % (k, n))
+
+                actually_show_roc()
+
+            self.stop()
+        else:
+            self.load_next_file()
+
+
+    def on_error(self, bus, msg):
+        pass
+
+
+
+def main():
+    gst_init()
+    parser = argparse.ArgumentParser()
+    add_common_args(parser)
+    group = parser.add_argument_group('kiwi-test specific arguments')
+    group.add_argument('-C', '--first-n', type=int, default=0,
+                       help="classify this many files")
+    group.add_argument('--ground-truth-file',
+                       help="write ground truth to this file (CSV)")
+    group.add_argument('--classification-file',
+                       help="write classifications to this file")
+    group.add_argument('--roc', action='store_true',
+                       help="show ROC curves")
+    group.add_argument('--target-class',
+                       help="use this class in reports and ROC")
+    group.add_argument('--target-group', type=int, default=0,
+                       help="use this class group in reports and ROC")
+    group.add_argument('--min-changes', type=int, default=0,
+                       help="only test files with at least this many class switches")
+    group.add_argument('--no-timings', action='store_true',
+                       help="Don't compare with canonical timings")
+    group.add_argument('--presence-roc', action='store_true',
+                       help="plot a ROC curve of presence (implies --roc)")
+    group.add_argument('nets', nargs='+',
+                       help="use these nets")
+
+    args = parser.parse_args()
+    timed = not args.no_timings
+
+    c = MultiClassifier(n_classifiers=len(args.nets))
+    #c.verbosity = 2
+    c.set_filenames(*args.nets)
+    timed_files = process_common_args(c, args, timed=timed, load=False)
+    if args.min_changes:
+        timed_files = [x for x in timed_files
+                       if len(x.timings) >= args.min_changes]
+
+    if args.first_n:
+        timed_files = timed_files[:args.first_n]
+
+    target = None
+    if args.target_class:
+        target=(args.target_group, args.target_class)
+
+    show_roc = args.roc or args.show_presence_roc
+
+    c.classify(timed_files, ground_truth_file=args.ground_truth_file,
+               classification_file=args.classification_file, show_roc=show_roc,
+               show_presence_roc=args.presence_roc, target_index=target)
+
+main()
