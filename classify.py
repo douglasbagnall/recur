@@ -157,11 +157,9 @@ class Classifier(BaseClassifier):
 
         self.show_roc = show_roc
         self.show_presence_roc = show_presence_roc
-        self.class_results = self.get_results_counter()
         self.data = list(reversed(data))
         self.setp('training', False)
         self.scores = self.get_results_counter(0)
-        self.score_targets = self.get_results_counter(0)
         self.minute_results = {x:[] for x in self.classes[0]}
         self.load_next_file()
         self.mainloop.run()
@@ -174,7 +172,6 @@ class Classifier(BaseClassifier):
         self.filesrcs[0].set_property('location', f.fullname)
         self.setp('target', targets)
         self.file_results = [[] for x in self.classes]
-        self.file_class_results = self.get_results_counter()
         self.file_scores = self.get_results_counter(0)
 
         self.pipeline.set_state(Gst.State.PLAYING)
@@ -187,8 +184,7 @@ class Classifier(BaseClassifier):
         #print s.to_string()
         v = s.get_value
         no_targets = not self.current_file.targets
-        for i, group in enumerate(self.class_results):
-            f_group = self.file_class_results[i]
+        for i, group in enumerate(self.classes):
             scores = self.file_scores[i]
             key = 'channel 0, group %d ' % i
             correct = v(key + 'correct')
@@ -201,8 +197,6 @@ class Classifier(BaseClassifier):
             else:
                 for k in group:
                     scores[k].append((v(key + k), k == target))
-                group[target][correct] += 1
-                f_group[target][correct] += 1
                 self.file_results[i].append((target, correct))
 
 
