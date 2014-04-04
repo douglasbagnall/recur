@@ -36,6 +36,7 @@ typedef s16 audio_sample;
 #define TRY_RELOAD 1
 
 #define PERIODIC_PGM_DUMP 2047
+#define PERIODIC_PGM_DUMPEES "how ihw biw"
 #define PGM_DUMP_FEATURES 0
 
 #define CLASSIFY_QUEUE_FACTOR 30

@@ -856,7 +856,7 @@ create_net(GstClassify *self, int bottom_layer_size,
     net->bottom_layer->learn_rate_scale = bottom_learn_rate_scale;
   }
   if (PERIODIC_PGM_DUMP){
-    rnn_multi_pgm_dump(net, "how ihw biw");
+    rnn_multi_pgm_dump(net, PERIODIC_PGM_DUMPEES);
   }
   net->metadata = strdup(metadata);
   return net;
@@ -1779,7 +1779,7 @@ maybe_learn(GstClassify *self){
 
     /*XXX periodic_pgm_dump and image string should be gst properties */
     if (PERIODIC_PGM_DUMP && net->generation % PERIODIC_PGM_DUMP == 0){
-      rnn_multi_pgm_dump(net, "how ihw biw");
+      rnn_multi_pgm_dump(net, PERIODIC_PGM_DUMPEES);
     }
     float momentum = rnn_calculate_momentum_soft_start(net->generation,
         net->bptt->momentum, self->momentum_soft_start);
