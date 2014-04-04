@@ -175,8 +175,7 @@ class Classifier(BaseClassifier):
         self.setp('target', targets)
         self.file_results = [[] for x in self.classes]
         self.file_class_results = self.get_results_counter()
-        self.file_probabilities = self.get_results_counter(0)
-        self.file_ground_truth = self.get_results_counter(0)
+        self.file_scores = self.get_results_counter(0)
 
         self.pipeline.set_state(Gst.State.PLAYING)
 
@@ -190,19 +189,18 @@ class Classifier(BaseClassifier):
         no_targets = not self.current_file.targets
         for i, group in enumerate(self.class_results):
             f_group = self.file_class_results[i]
-            probs = self.file_probabilities[i]
+            scores = self.file_scores[i]
             key = 'channel 0, group %d ' % i
             correct = v(key + 'correct')
             target = v(key + 'target')
             if no_targets:
                 for k in group:
-                    probs[k].append(v(key + k))
+                    scores[k].append((v(key + k), None))
             elif target is None:
                 continue
             else:
                 for k in group:
-                    probs[k].append(v(key + k))
-                    self.file_ground_truth[i][k].append(k == target)
+                    scores[k].append((v(key + k), k == target))
                 group[target][correct] += 1
                 f_group[target][correct] += 1
                 self.file_results[i].append((target, correct))
@@ -245,14 +243,13 @@ class Classifier(BaseClassifier):
         else:
             i, k = 0, self.classes[0][-1]
 
-        truth = self.file_ground_truth[i][k]
-        scores = self.file_probabilities[i][k]
+        scores = self.file_scores[i][k]
         r_sum = 0
         w_sum = 0
         r_sum2, w_sum2 = 0, 0
         r_count = 0
         w_count = 0
-        for s, t in zip(scores, truth):
+        for s, t in scores:
             if t:
                 r_sum += s
                 r_sum2 += s * s
@@ -292,54 +289,49 @@ class Classifier(BaseClassifier):
         if self.verbosity > 0:
             self.report()
         fn = self.current_file.basename
-        probs = self.file_probabilities
-        gt = self.file_ground_truth
+        scores = self.file_scores
 
         if self.target_index:
             i, k = self.target_index
             if self.ground_truth_file:
-                a = [fn] + ['%d' % x for x in gt[i][k]]
+                a = [fn] + ['%d' % t for p, t in scores[i][k]]
                 print >>self.ground_truth_file, ','.join(a)
 
             if self.classification_file:
-                a = [fn] + ['%.5g' % x for x in probs[i][k]]
+                a = [fn] + ['%.5g' % p for p,t in scores[i][k]]
                 print >>self.classification_file, ','.join(a)
 
         if self.show_presence_roc:
             r = {}
             window = np.kaiser(15, 6)
-            for k, v in probs[0].items():
-                #v = np.array(v)
-                v = np.convolve(v, window)
-                vs = np.sort(v[10:])
-                r[k] = (vs[-70:][::-1], any(gt[0][k][10:]))
+            for k, v in scores[0].items():
+                gt = any([x[1] for x in v[10:]])
+                s = np.array([x[0] for x in v])
+                s = np.convolve(s, window)
+                ss = np.sort(s[10:])
+                r[k] = (ss[-70:][::-1], gt)
                 #print r[k]
             for k in r:
                 self.minute_results[k].append(r[k])
 
-        for scores, fscores in zip(self.scores, probs):
+        for scores, fscores in zip(self.scores, scores):
             for k in scores:
                 scores[k].extend(fscores[k])
-        for targets, ftargets in zip(self.score_targets, gt):
-            for k in targets:
-                targets[k].extend(ftargets[k])
+
         if 0:
             i, k = self.target_index
-            draw_roc_curve(probs[i][k],
-                           gt[i][k],
-                           k)
+            draw_roc_curve(scores[i][k], k)
             actually_show_roc()
 
         if not self.data:
             if self.show_roc:
                 if self.target_index:
                     i, k = self.target_index
-                    draw_roc_curve(self.scores[i][k], self.score_targets[i][k], k)
+                    draw_roc_curve(self.scores[i][k], k)
                 else:
                     for i, group in enumerate(self.classes):
                         for k in group[len(group) == 2:]:
-                            draw_roc_curve(self.scores[i][k],
-                                           self.score_targets[i][k], k)
+                            draw_roc_curve(self.scores[i][k], k)
                             if self.show_presence_roc:
                                 for n in (0, 4, 9, 16, 25, 36, 49, 64):
                                     draw_presence_roc(self.minute_results[k], n,
@@ -880,13 +872,12 @@ def process_common_args(c, args, random_seed=1, timed=True, load=True):
     random.shuffle(files)
     return files
 
-def draw_roc_curve(scores, truth, title='ROC'):
+def draw_roc_curve(results, title='ROC'):
     import matplotlib.pyplot as plt
-    results = zip(scores, truth)
     #print results
     results.sort()
-    sum_true = sum(1 for x in truth if x)
-    sum_false = len(truth) - sum_true
+    sum_true = sum(1 for s, t in results if t)
+    sum_false = len(results) - sum_true
 
     tp_scale = 1.0 / (sum_true or 1)
     fp_scale = 1.0 / (sum_false or 1)
