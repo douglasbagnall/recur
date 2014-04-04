@@ -291,15 +291,20 @@ class Classifier(BaseClassifier):
         fn = self.current_file.basename
         scores = self.file_scores
 
-        if self.target_index:
+        if self.target_index and (self.classification_file
+                                  or self.ground_truth_file):
             i, k = self.target_index
+            ground_truth = [fn]
+            classifications = [fn]
+            for s, t in scores[i][k]:
+                ground_truth.append('%d' % t)
+                classifications.append('%.5g' % s)
+
             if self.ground_truth_file:
-                a = [fn] + ['%d' % t for p, t in scores[i][k]]
-                print >>self.ground_truth_file, ','.join(a)
+                print >>self.ground_truth_file, ','.join(ground_truth)
 
             if self.classification_file:
-                a = [fn] + ['%.5g' % p for p,t in scores[i][k]]
-                print >>self.classification_file, ','.join(a)
+                print >>self.classification_file, ','.join(classifications)
 
         if self.show_presence_roc:
             r = {}
