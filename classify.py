@@ -336,7 +336,7 @@ class Classifier(BaseClassifier):
                                     draw_presence_roc(self.minute_results[k], n,
                                                       '%s-nth %s' % (k, n))
 
-                actually_show_roc()
+                actually_show_roc(title=self.getp('basename'))
 
             self.stop()
         else:
@@ -871,7 +871,7 @@ def process_common_args(c, args, random_seed=1, timed=True, load=True):
     random.shuffle(files)
     return files
 
-def draw_roc_curve(results, title='ROC'):
+def draw_roc_curve(results, label='ROC'):
     import matplotlib.pyplot as plt
     #print results
     results.sort()
@@ -939,7 +939,7 @@ def draw_roc_curve(results, title='ROC'):
     tp.reverse()
     print "~best %0.3f  %.3f true, %.3f false" % (cp, cy, cx)
     print "halfway 0.5  %.3f true, %.3f false" % (hy, hx)
-    plt.plot(fp, tp, label=title)
+    plt.plot(fp, tp, label=label)
     plt.annotate("95%% negative %.2g" % ep, (ex, ey), (0.7, 0.7),
                  arrowprops={'width':1, 'color': '#0088aa'},
                  )
@@ -958,13 +958,14 @@ def draw_roc_curve(results, title='ROC'):
                  arrowprops={'width':1, 'color': '#aa6600'},
                  )
 
-def actually_show_roc():
+def actually_show_roc(title='ROC'):
     import matplotlib.pyplot as plt
     plt.axes().set_aspect('equal')
+    plt.title(title)
     plt.legend(loc='lower right')
     plt.show()
 
-def draw_presence_roc(data, index=0, title='ROC'):
+def draw_presence_roc(data, index=0, label='presence'):
     import matplotlib.pyplot as plt
     scores = []
     for x in data:
@@ -1041,7 +1042,7 @@ def draw_presence_roc(data, index=0, title='ROC'):
     tp.reverse()
     print "~best %0.3f  %.3f true, %.3f false" % (cp, cy, cx)
     print "halfway 0.5  %.3f true, %.3f false" % (hy, hx)
-    plt.plot(fp, tp, label=title)
+    plt.plot(fp, tp, label=label)
     if 0:
         plt.annotate("95%% negative %.2g" % ep, (ex, ey), (0.7, 0.7),
                      arrowprops={'width':1, 'color': '#0088aa'},
