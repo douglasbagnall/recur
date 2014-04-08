@@ -37,7 +37,7 @@
 /* RNN_HIDDEN_PENALTY is subtracted from each hidden node, forcing low numbers to zero.
  1e-3f is safe, but less accurate than 1e-4f
 XXX this really ought to be adjustable or adjust itself */
-#define RNN_HIDDEN_PENALTY 1e-4f
+#define RNN_HIDDEN_PENALTY 1e-9f
 /*scaling for hidden and input numbers */
 #define HIDDEN_MEAN_SOFT_TOP 16.0f
 #define INPUT_MEAN_SOFT_TOP 4.0f
