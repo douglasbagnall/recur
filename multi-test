@@ -14,7 +14,7 @@ class MultiClassifier(BaseClassifier):
     verbosity = 1
     ground_truth_file = None
     classification_file = None
-
+    net_scales = None
     def build_pipeline(self, channels, sinkname, samplerate, n_classifiers):
         self.channels = channels
         self.sink = self.make_add_link(sinkname, None)
@@ -102,7 +102,11 @@ class MultiClassifier(BaseClassifier):
         s = msg.get_structure()
         if s.get_name() != "classify":
             return
-        #print s.to_string()
+        if self.net_scales is not None:
+            cname =  msg.src.get_property('basename')
+            scale = self.net_scales[cname]
+        else:
+            scale = 1.0
         v = s.get_value
         no_targets = not self.current_file.targets
         timestamp = msg.timestamp
@@ -114,7 +118,7 @@ class MultiClassifier(BaseClassifier):
             if no_targets:
                 for k in group:
                     results = self.timed_scores[k].setdefault(timestamp, [])
-                    res = (v(key + k), None)
+                    res = (v(key + k) * scale, None)
                     results.append(res)
                     scores[k].append(res)
             elif target is None:
@@ -122,7 +126,7 @@ class MultiClassifier(BaseClassifier):
             else:
                 for k in group:
                     results = self.timed_scores[k].setdefault(timestamp, [])
-                    res = (v(key + k), k == target)
+                    res = (v(key + k) * scale, k == target)
                     results.append(res)
                     scores[k].append(res)
                 self.file_results[i].append((target, correct))
@@ -310,6 +314,8 @@ def main():
                        help="Don't compare with canonical timings")
     group.add_argument('--presence-roc', action='store_true',
                        help="plot a ROC curve of presence (implies --roc)")
+    group.add_argument('--net-scales',
+                       help="colon separated list of scales for each net, in order")
     group.add_argument('nets', nargs='+',
                        help="use these nets")
 
@@ -330,6 +336,15 @@ def main():
     target = None
     if args.target_class:
         target=(args.target_group, args.target_class)
+
+    if args.net_scales:
+        c.net_scales = {}
+        scales = [float(x) for x in args.net_scales.split(':')]
+        norm = sum(scales) / len(scales)
+        scales = [x / norm for x in scales]
+        for cf, scale in zip(c.classifiers, scales):
+            basename = cf.get_property('basename')
+            c.net_scales[basename] = scale
 
     show_roc = args.roc or args.show_presence_roc
 
