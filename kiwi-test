@@ -45,7 +45,7 @@ def main():
     if args.target_class:
         target=(args.target_group, args.target_class)
 
-    show_roc = args.roc or args.show_presence_roc
+    show_roc = args.roc or args.presence_roc
 
     c.classify(timed_files, ground_truth_file=args.ground_truth_file,
                classification_file=args.classification_file, show_roc=show_roc,
