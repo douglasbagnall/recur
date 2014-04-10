@@ -60,6 +60,7 @@ enum
   PROP_INTENSITY_FEATURE,
   PROP_FORCE_LOAD,
   PROP_LAG,
+  PROP_IGNORE_START,
   PROP_GENERATION,
   PROP_LOAD_NET_NOW,
 
@@ -123,6 +124,9 @@ enum
 #define DEFAULT_PROP_LAG 0
 #define PROP_LAG_MIN -1
 #define PROP_LAG_MAX 1000
+#define DEFAULT_PROP_IGNORE_START 0
+#define PROP_IGNORE_START_MIN 0
+#define PROP_IGNORE_START_MAX 1e4
 
 #define PROP_WEIGHT_FAN_IN_SUM_MAX 99.0
 #define PROP_WEIGHT_FAN_IN_SUM_MIN 0.0
@@ -408,6 +412,13 @@ gst_classify_class_init (GstClassifyClass * klass)
           DEFAULT_PROP_LAG,
           G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
+  g_object_class_install_property (gobject_class, PROP_IGNORE_START,
+      g_param_spec_float("ignore-start", "ignore-start",
+          "Ignore this many seconds at the beginning of the file",
+          PROP_IGNORE_START_MIN, PROP_IGNORE_START_MAX,
+          DEFAULT_PROP_IGNORE_START,
+          G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
+
   g_object_class_install_property (gobject_class, PROP_MIN_FREQUENCY,
       g_param_spec_float("min-frequency", "min-frequency",
           "Lowest audio frequency to analyse",
@@ -576,6 +587,7 @@ gst_classify_init (GstClassify * self)
   self->momentum_soft_start = DEFAULT_PROP_MOMENTUM_SOFT_START;
   self->dropout = DEFAULT_PROP_DROPOUT;
   self->error_weight = NULL;
+  self->ignored_windows = 0;
   GST_INFO("gst classify init\n");
 }
 
@@ -1078,6 +1090,15 @@ parse_complex_target_string(GstClassify *self, const char *str){
 #define TIME_TO_WINDOW_NO(x) (((x) + self->lag) * time_to_window_no + 0.5)
 #define WINDOW_NO_TO_TIME(x) ((x) / time_to_window_no - self->lag)
 
+  const float ignore_start = PP_GET_FLOAT(self, PROP_IGNORE_START,
+      DEFAULT_PROP_IGNORE_START);
+
+  self->ignored_windows = TIME_TO_WINDOW_NO(ignore_start);
+  if (self->ignored_windows){
+    STDERR_DEBUG("ignoring times less than %f (window_no %d)",
+        ignore_start, self->ignored_windows);
+  }
+
   ClassifyClassEvent *ev;
   /* the number of characters in the string between a colon and a space,
      excluding equals signs, is the number of events.*/
@@ -1450,6 +1471,7 @@ gst_classify_set_property (GObject * object, guint prop_id, const GValue * value
     /*these ones can be set any time but only have effect in
       gst_classify_setup(). that is, after a net exists but possibly more than
       once.*/
+    case PROP_IGNORE_START:
     case PROP_LOG_FILE:
     case PROP_TARGET:
     case PROP_ERROR_WEIGHT:
@@ -1687,7 +1709,8 @@ train_channel(GstClassify *self, ClassifyChannel *c, int *win_count){
     float *group_error = error + o;
     float *group_answer = answer + o;
     int target = c->group_target[i];
-    if (target >= 0 && target < g->n_classes){
+    if (target >= 0 && target < g->n_classes &&
+        self->window_no >= self->ignored_windows){
       int winner = softmax_best_guess(group_error, group_answer, g->n_classes);
       c->group_winner[i] = winner;
       *win_count += winner == target;
@@ -1824,7 +1847,9 @@ emit_opinions(GstClassify *self, GstClockTime pts){
         }
       }
     }
-    send_message(self, n_err ? err_sum / n_err : 0, pts);
+    if (self->window_no >= self->ignored_windows){
+      send_message(self, n_err ? err_sum / n_err : 0, pts);
+    }
   }
 }
 

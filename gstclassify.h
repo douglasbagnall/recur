@@ -119,6 +119,7 @@ struct _GstClassify
   int class_events_index;
   int window_size;
   int window_no;
+  int ignored_windows;
   int training;
   int random_alignment;
   int momentum_style;

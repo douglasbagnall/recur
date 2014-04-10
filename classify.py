@@ -94,7 +94,8 @@ class BaseClassifier(object):
 
     def setup(self, mfccs, hsize, class_string, basename='classify',
               bottom_layer=0, window_size=None, min_freq=None,
-              knee_freq=None, max_freq=None, lag=0, delta_features=0,
+              knee_freq=None, max_freq=None, lag=0,
+              ignore_start=0, delta_features=0,
               focus_freq=0, intensity_feature=0):
         #put classes through a round trip, just to be sure it works
         self.setp('classes', class_string)
@@ -110,6 +111,7 @@ class BaseClassifier(object):
                               ('delta-features', delta_features),
                               ('intensity-feature', intensity_feature),
                               ('lag', lag),
+                              ('ignore-start', ignore_start),
                               ('basename', basename)):
             if pyarg is not None:
                 self.setp(gstarg, pyarg)
@@ -815,6 +817,8 @@ def add_common_args(parser):
                        help="use the overall intensity as a feature")
     group.add_argument('--lag', type=float, default=0.0,
                        help="add this much lag to loaded times")
+    group.add_argument('--ignore-start', type=float, default=0.0,
+                       help="ignore this many seconds at start of file")
     group.add_argument('--focus-frequency', type=float, default=0.0,
                        help="focus on frequencies around this")
     group.add_argument('--min-frequency', type=float, default=MIN_FREQUENCY,
@@ -848,6 +852,7 @@ def process_common_args(c, args, random_seed=1, timed=True, load=True):
                     knee_freq=args.knee_frequency,
                     focus_freq=args.focus_frequency,
                     lag=args.lag,
+                    ignore_start=args.ignore_start,
                     delta_features=args.delta_features,
                     intensity_feature=args.intensity_feature)
 
