@@ -1095,7 +1095,7 @@ parse_complex_target_string(GstClassify *self, const char *str){
   /*don't use macro because it includes lag*/
   self->ignored_windows = ignore_start * time_to_window_no + 0.5;
   if (self->ignored_windows){
-    STDERR_DEBUG("ignoring times less than %f (window_no %d)",
+    GST_DEBUG("ignoring times less than %f (window_no %d)",
         ignore_start, self->ignored_windows);
   }
 
