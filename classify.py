@@ -539,10 +539,16 @@ class Trainer(BaseClassifier):
 
     def save_named_net(self, tag='', dir=SAVE_LOCATION):
         basename = self.getp('basename')
-        fn = ("%s/%s-%s-%s.net" %
-              (dir, basename, time.time(), tag))
+        generation = self.getp('generation')
+        fn = ("%s/%s-gen-%s-%s.net" %
+              (dir, basename, generation, tag))
+
         if not os.path.exists(dir):
             os.makedirs(dir)
+
+        if os.path.exists(fn):
+            fn = f.replace('-gen', '-t%s-gen' % time.time())
+
         print "saving %s" % fn
         self.save_net(fn)
 
