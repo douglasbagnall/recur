@@ -1079,7 +1079,6 @@ cmp_class_event(const void *a, const void *b){
   All channels and categories start off in an untargetted state, as if they
   had been passed the '-' token.
  */
-//XXX look at test_backprop capital learning for multi-softmax.
 static inline int
 parse_complex_target_string(GstClassify *self, const char *str){
   char *e;
@@ -1583,13 +1582,14 @@ possibly_save_net(RecurNN *net, const char *filename)
 
 
 static inline void
-send_message(GstClassify *self, float mean_err, GstClockTime pts)
+send_message(GstClassify *self, float mean_err, float now, GstClockTime pts)
 {
   GstMessage *msg;
   char *name = "classify";
   GstStructure *s;
   s = gst_structure_new (name,
       "error", G_TYPE_FLOAT, mean_err,
+      "time", G_TYPE_FLOAT, now,
       NULL);
   for (int i = 0; i < self->n_channels; i++){
     char key[60];
@@ -1823,10 +1823,12 @@ static inline void
 emit_opinions(GstClassify *self, GstClockTime pts){
   int i, j;
   s16 *buffer;
+  const float window_no_to_secs = (float)self->window_size * 0.5f / CLASSIFY_RATE;
   for (buffer = prepare_next_chunk(self); buffer;
        buffer = prepare_next_chunk(self)){
     float err_sum = 0.0f;
     int n_err = 0;
+    float now = self->window_no * window_no_to_secs - self->lag;
     for (j = 0; j < self->n_channels; j++){
       ClassifyChannel *c = prepare_channel_features(self, buffer, j);
       RecurNN *net = c->net;
@@ -1847,7 +1849,7 @@ emit_opinions(GstClassify *self, GstClockTime pts){
       }
     }
     if (self->window_no >= self->ignored_windows){
-      send_message(self, n_err ? err_sum / n_err : 0, pts);
+      send_message(self, n_err ? err_sum / n_err : 0, now, pts);
     }
   }
 }

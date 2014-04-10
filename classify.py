@@ -152,9 +152,13 @@ class Classifier(BaseClassifier):
     verbosity = 1
     ground_truth_file = None
     classification_file = None
+    call_json_file = None
     def classify(self, data,
                  ground_truth_file=None,
-                 classification_file=None, show_roc=False,
+                 classification_file=None,
+                 show_roc=False,
+                 call_json_file=None,
+                 call_threshold=0,
                  show_presence_roc=False,
                  target_index=None):
         self.target_index = target_index
@@ -162,7 +166,9 @@ class Classifier(BaseClassifier):
             self.ground_truth_file = open(ground_truth_file, 'w')
         if classification_file:
             self.classification_file = open(classification_file, 'w')
-
+        if call_json_file:
+            self.call_json_file = open(call_json_file, 'w')
+        self.call_threshold = call_threshold
         self.show_roc = show_roc
         self.show_presence_roc = show_presence_roc
         self.data = list(reversed(data))
@@ -181,7 +187,6 @@ class Classifier(BaseClassifier):
         self.setp('target', targets)
         self.file_results = [[] for x in self.classes]
         self.file_scores = self.get_results_counter(0)
-
         self.pipeline.set_state(Gst.State.PLAYING)
 
 
@@ -191,6 +196,7 @@ class Classifier(BaseClassifier):
             return
         #print s.to_string()
         v = s.get_value
+        timestamp = v('time')
         no_targets = not self.current_file.targets
         for i, group in enumerate(self.classes):
             scores = self.file_scores[i]
@@ -199,12 +205,12 @@ class Classifier(BaseClassifier):
             target = v(key + 'target')
             if no_targets:
                 for k in group:
-                    scores[k].append((v(key + k), None))
+                    scores[k].append((v(key + k), None, timestamp))
             elif target is None:
                 continue
             else:
                 for k in group:
-                    scores[k].append((v(key + k), k == target))
+                    scores[k].append((v(key + k), k == target, timestamp))
                 self.file_results[i].append((target, correct))
 
 
@@ -251,7 +257,7 @@ class Classifier(BaseClassifier):
         r_sum2, w_sum2 = 0, 0
         r_count = 0
         w_count = 0
-        for s, t in scores:
+        for s, t, time in scores:
             if t:
                 r_sum += s
                 r_sum2 += s * s
@@ -298,7 +304,7 @@ class Classifier(BaseClassifier):
             i, k = self.target_index
             ground_truth = [fn]
             classifications = [fn]
-            for s, t in scores[i][k]:
+            for s, t, timestamp in scores[i][k]:
                 ground_truth.append('%d' % t)
                 classifications.append('%.5g' % s)
 
@@ -307,6 +313,28 @@ class Classifier(BaseClassifier):
 
             if self.classification_file:
                 print >>self.classification_file, ','.join(classifications)
+
+        if self.target_index and self.call_json_file:
+            i, k = self.target_index
+            threshold = self.call_threshold
+            row = [fn]
+            #XXX convolve
+            start = 0
+            end = 0
+            score = 0
+            for s, t, timestamp in scores[i][k]:
+                if score == 0.0:
+                    if s > threshold:
+                        start = timestamp
+                        score = s
+                elif s < threshold * 0.98:
+                    call = [start, timestamp, score]
+                    row.append(call)
+                    score = 0.0
+                else:
+                    score = max(score, s)
+
+            print >>self.call_json_file, json.dumps(row)
 
         if self.show_presence_roc:
             r = {}
@@ -889,7 +917,7 @@ def draw_roc_curve(results, label='ROC'):
     import matplotlib.pyplot as plt
     #print results
     results.sort()
-    sum_true = sum(1 for s, t in results if t)
+    sum_true = sum(1 for s, t, time in results if t)
     sum_false = len(results) - sum_true
 
     tp_scale = 1.0 / (sum_true or 1)
@@ -905,7 +933,7 @@ def draw_roc_curve(results, label='ROC'):
     dx, dy, dp = 0, 0, 0
     ex, ey, ep = 1.0, 1.0, 0.0
 
-    for score, target in results:
+    for score, target, time in results:
         false_positives -= not target
         true_positives -= target
         x = false_positives * fp_scale
