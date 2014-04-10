@@ -1092,8 +1092,8 @@ parse_complex_target_string(GstClassify *self, const char *str){
 
   const float ignore_start = PP_GET_FLOAT(self, PROP_IGNORE_START,
       DEFAULT_PROP_IGNORE_START);
-
-  self->ignored_windows = TIME_TO_WINDOW_NO(ignore_start);
+  /*don't use macro because it includes lag*/
+  self->ignored_windows = ignore_start * time_to_window_no + 0.5;
   if (self->ignored_windows){
     STDERR_DEBUG("ignoring times less than %f (window_no %d)",
         ignore_start, self->ignored_windows);
@@ -1146,7 +1146,6 @@ parse_complex_target_string(GstClassify *self, const char *str){
     GST_DEBUG("looking for 't', got '%c'", *e);
     s = e + 1;
     float time = strtod(s, &e);
-
     window_no = TIME_TO_WINDOW_NO(time);
     GST_DEBUG("time %f window_no %d", time, window_no);
 

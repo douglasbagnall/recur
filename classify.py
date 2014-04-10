@@ -87,9 +87,15 @@ class BaseClassifier(object):
         self.setp = self.classifier.set_property
         self.getp = self.classifier.get_property
 
-    def setup_from_file(self, filename):
+    def setup_from_file(self, filename, **kwargs):
         #XXX many arguments are quietly ignored.
         self.setp('net-filename', filename)
+        for gstarg, kwarg in (('ignore-start', 'ignore_start'),
+                              ):
+            val = kwargs.get(kwarg)
+            if val is not None:
+                self.setp(gstarg, val)
+
         self.classes = self.getp('classes').split(',')
 
     def setup(self, mfccs, hsize, class_string, basename='classify',
@@ -839,7 +845,8 @@ def process_common_args(c, args, random_seed=1, timed=True, load=True):
     if load:
         c.setp('force-load', args.force_load)
         if args.net_filename:
-            c.setup_from_file(args.net_filename)
+            c.setup_from_file(args.net_filename,
+                              ignore_start=args.ignore_start)
         else:
             c.setup(args.mfccs,
                     args.hidden_size,
