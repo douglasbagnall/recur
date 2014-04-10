@@ -495,16 +495,18 @@ class Trainer(BaseClassifier):
             rightness /= len(classes)
             output.append(" %s%.2f %s%.2f %s%.2f%s" %
                           (colours[int(rightness * 9.99)], rightness,
-                           colours[min(int(gap_p * 15), 9)], gap_p,
+                           colours[min(int(gap_p * 18), 9)], gap_p,
                            colours[min(int(ratio_p * 2), 9)], ratio_p,
                            COLOURS['Z']))
 
             output.extend(p_strings)
 
             print ''.join(output)
-            if rightness > 0.8 or ratio_p > 5:
+            if rightness > 0.8 or ratio_p > 5 or gap_p > 0.5:
                 self.save_named_net(tag='goodness-%d-%d-%d' %
-                                    (int(rightness * 100), int(gap_p * 15), int(ratio_p * 2)))
+                                    (int(rightness * 100 + 0.5),
+                                     int(gap_p * 100 + 0.5),
+                                     int(ratio_p + 0.5)))
 
 
     def save_named_net(self, tag='', dir=SAVE_LOCATION):
