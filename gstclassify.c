@@ -1599,10 +1599,6 @@ send_message(GstClassify *self, float mean_err, float now, GstClockTime pts)
       ClassifyClassGroup *g = &self->class_groups[j];
       int target = c->group_target[j];
       int winner = c->group_winner[j];
-      char t_char = g->classes[target];
-      char w_char = g->classes[winner];
-      //STDERR_DEBUG("classes %s target %d winner %d t_char %d w_char %d",
-      //    g->classes, target, winner, t_char, w_char);
       snprintf(id, sizeof(id), "channel %d, group %d", i, j);
       for (int k = 0; k < g->n_classes; k++){
         int t = g->classes[k];
@@ -1611,13 +1607,17 @@ send_message(GstClassify *self, float mean_err, float now, GstClockTime pts)
         gst_structure_set(s, key, G_TYPE_FLOAT, -error, NULL);
       }
       if (target >= 0 && target < g->n_classes){
+        char t_char = g->classes[target];
         snprintf(key, sizeof(key), "%s correct", id);
         gst_structure_set(s, key, G_TYPE_INT, winner == target, NULL);
         snprintf(key, sizeof(key), "%s target", id);
         gst_structure_set(s, key, G_TYPE_CHAR, t_char, NULL);
       }
-      snprintf(key, sizeof(key), "%s winner", id);
-      gst_structure_set(s, key, G_TYPE_CHAR, w_char, NULL);
+      if (winner >= 0 && winner < g->n_classes){
+        char w_char = g->classes[winner];
+        snprintf(key, sizeof(key), "%s winner", id);
+        gst_structure_set(s, key, G_TYPE_CHAR, w_char, NULL);
+      }
     }
   }
   msg = gst_message_new_element(GST_OBJECT(self), s);
