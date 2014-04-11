@@ -1022,6 +1022,14 @@ gst_classify_setup(GstAudioFilter *base, const GstAudioInfo *info){
           self->window_size, i, self->n_groups, self->delta_features);
     }
   }
+  const float ignore_start = PP_GET_FLOAT(self, PROP_IGNORE_START,
+      DEFAULT_PROP_IGNORE_START);
+  self->ignored_windows = ignore_start * CLASSIFY_RATE * 2.0f / self->window_size + 0.5f;
+  if (self->ignored_windows){
+    GST_DEBUG("ignoring times less than %f (window_no %d)",
+        ignore_start, self->ignored_windows);
+  }
+
   reset_channel_targets(self);
   maybe_start_logging(self);
   maybe_parse_target_string(self);
@@ -1088,15 +1096,6 @@ parse_complex_target_string(GstClassify *self, const char *str){
 
 #define TIME_TO_WINDOW_NO(x) (((x) + self->lag) * time_to_window_no + 0.5)
 #define WINDOW_NO_TO_TIME(x) ((x) / time_to_window_no - self->lag)
-
-  const float ignore_start = PP_GET_FLOAT(self, PROP_IGNORE_START,
-      DEFAULT_PROP_IGNORE_START);
-  /*don't use macro because it includes lag*/
-  self->ignored_windows = ignore_start * time_to_window_no + 0.5;
-  if (self->ignored_windows){
-    GST_DEBUG("ignoring times less than %f (window_no %d)",
-        ignore_start, self->ignored_windows);
-  }
 
   ClassifyClassEvent *ev;
   /* the number of characters in the string between a colon and a space,
