@@ -195,6 +195,7 @@ mfcc_slopes_dump2(RecurAudioBinner *ab){
     f[i].r = 0.0f;
     f[i].i = 0.0f;
   }
+  free(f);
   temporal_ppm_free(ppm);
 }
 
