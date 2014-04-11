@@ -173,8 +173,10 @@ class Classifier(BaseClassifier):
         self.show_presence_roc = show_presence_roc
         self.data = list(reversed(data))
         self.setp('training', False)
-        self.scores = self.get_results_counter(0)
-        self.minute_results = {x:[] for x in self.classes[0]}
+        if self.show_roc:
+            self.scores = self.get_results_counter(0)
+        if self.show_presence_roc:
+            self.minute_results = {x:[] for x in self.classes[0]}
         self.load_next_file()
         self.mainloop.run()
 
@@ -349,9 +351,10 @@ class Classifier(BaseClassifier):
             for k in r:
                 self.minute_results[k].append(r[k])
 
-        for scores, fscores in zip(self.scores, scores):
-            for k in scores:
-                scores[k].extend(fscores[k])
+        if self.show_roc:
+            for all_scores, fscores in zip(self.scores, scores):
+                for k in all_scores:
+                    all_scores[k].extend(fscores[k])
 
         if 0:
             i, k = self.target_index
