@@ -35,6 +35,11 @@ def main():
 
     args = parser.parse_args()
     timed = not args.no_timings
+    if any((args.call_json_file,
+            args.classification_file,
+            args.ground_truth_file)) and not args.target_class:
+        print >> sys.stderr, "writing classification/calls requires --target-group"
+        sys.exit(1)
 
     c = Classifier(channels=1)
     timed_files = process_common_args(c, args, timed=timed)

@@ -318,7 +318,7 @@ class Classifier(BaseClassifier):
             i, k = self.target_index
             threshold = self.call_threshold
             row = [fn]
-            #XXX convolve
+            #XXX convolve?
             start = 0
             end = 0
             score = 0
@@ -327,8 +327,8 @@ class Classifier(BaseClassifier):
                     if s > threshold:
                         start = timestamp
                         score = s
-                elif s < threshold * 0.98:
-                    call = [start, timestamp, score]
+                elif s < threshold * 0.9:
+                    call = [round(start, 2), round(timestamp, 2), round(score, 4)]
                     row.append(call)
                     score = 0.0
                 else:
