@@ -55,14 +55,18 @@ typedef s16 audio_sample;
 typedef struct _GstClassify GstClassify;
 typedef struct _GstClassifyClass GstClassifyClass;
 
+/*Do not reorder metadata, or insert things in the middle, even though the
+  packing is loose and the order haphazard. Only add things at the end, and
+  keep the same order in the metadata strings.
+*/
 struct ClassifyMetadata {
   const char *classes;
-  const char *basename;
   float min_freq;
   float max_freq;
   float knee_freq;
   int mfccs;
   int window_size;
+  const char *basename;
   int delta_features;
   float focus_freq;
   float lag;

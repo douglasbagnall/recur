@@ -662,12 +662,12 @@ static int parse_classes_string(GstClassify *self, const char *orig)
 
 #define CLASSIFY_METADATA_DEFAULTS(self) {                              \
     PP_GET_STRING(self, PROP_CLASSES, DEFAULT_PROP_CLASSES),            \
-    PP_GET_STRING(self, PROP_BASENAME, DEFAULT_BASENAME),               \
     PP_GET_FLOAT(self, PROP_MIN_FREQUENCY, DEFAULT_MIN_FREQUENCY),    \
     PP_GET_FLOAT(self, PROP_MAX_FREQUENCY, DEFAULT_MAX_FREQUENCY),    \
     PP_GET_FLOAT(self, PROP_KNEE_FREQUENCY, DEFAULT_KNEE_FREQUENCY),  \
     PP_GET_INT(self, PROP_MFCCS, DEFAULT_PROP_MFCCS),                   \
     PP_GET_INT(self, PROP_WINDOW_SIZE, DEFAULT_WINDOW_SIZE),            \
+    PP_GET_STRING(self, PROP_BASENAME, DEFAULT_BASENAME),               \
     PP_GET_INT(self, PROP_DELTA_FEATURES, DEFAULT_PROP_DELTA_FEATURES), \
     PP_GET_FLOAT(self, PROP_FOCUS_FREQUENCY, DEFAULT_FOCUS_FREQUENCY),  \
     PP_GET_FLOAT(self, PROP_LAG, DEFAULT_PROP_LAG),                     \
