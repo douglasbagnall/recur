@@ -371,9 +371,10 @@ class Classifier(BaseClassifier):
                         for k in group[len(group) == 2:]:
                             draw_roc_curve(self.scores[i][k], k)
                             if self.show_presence_roc:
-                                for n in (0, 4, 9, 16, 25, 36, 49, 64):
+                                for n in range(len(self.minute_results[k][0])):
+                                    index = n * (n + 1)
                                     draw_presence_roc(self.minute_results[k], n,
-                                                      '%s-nth %s' % (k, n))
+                                                      '%s-nth %s' % (k, index))
 
                 actually_show_roc(title=self.getp('basename'))
 
