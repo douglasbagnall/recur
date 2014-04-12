@@ -177,6 +177,7 @@ class Classifier(BaseClassifier):
             self.scores = self.get_results_counter(0)
         if self.show_presence_roc:
             self.minute_results = {x:[] for x in self.classes[0]}
+            self.minute_gt = {x:[] for x in self.classes[0]}
         self.load_next_file()
         self.mainloop.run()
 
@@ -339,17 +340,18 @@ class Classifier(BaseClassifier):
             print >>self.call_json_file, json.dumps(row)
 
         if self.show_presence_roc:
-            r = {}
             window = np.kaiser(15, 6)
             for k, v in scores[0].items():
                 gt = any([x[1] for x in v[10:]])
                 s = np.array([x[0] for x in v])
                 s = np.convolve(s, window)
                 ss = np.sort(s[10:])
-                r[k] = (ss[-70:][::-1], gt)
-                #print r[k]
-            for k in r:
-                self.minute_results[k].append(r[k])
+                squares = [ss[-x * (x + 1)] for x in range(1, 10)]
+                #print squares
+                self.minute_results[k].append(squares)
+                self.minute_gt[k].append(gt)
+                #print self.minute_results
+                #print self.minute_gt
 
         if self.show_roc:
             for all_scores, fscores in zip(self.scores, scores):
@@ -371,9 +373,12 @@ class Classifier(BaseClassifier):
                         for k in group[len(group) == 2:]:
                             draw_roc_curve(self.scores[i][k], k)
                             if self.show_presence_roc:
-                                for n in range(len(self.minute_results[k][0])):
-                                    index = n * (n + 1)
-                                    draw_presence_roc(self.minute_results[k], n,
+                                results = zip(*self.minute_results[k])
+                                #import pdb; pdb.set_trace()
+
+                                for i, row in enumerate(results):
+                                    index = (i + 2) * (i + 1) - 1
+                                    draw_presence_roc(zip(row, self.minute_gt[k]),
                                                       '%s-nth %s' % (k, index))
 
                 actually_show_roc(title=self.getp('basename'))
@@ -1017,18 +1022,10 @@ def actually_show_roc(title='ROC'):
     plt.legend(loc='lower right')
     plt.show()
 
-def draw_presence_roc(data, index=0, label='presence'):
+def draw_presence_roc(scores, label='presence'):
     import matplotlib.pyplot as plt
-    scores = []
-    for x in data:
-        s = x[0]
-        b = bool(x[1])
-        if len(s) > index:
-            scores.append((s[index], b))
-        elif len(s):
-            scores.append((s[-1], b))
+    #print scores
     scores.sort()
-
     sum_true = sum(x[1] for x in scores)
     sum_false = len(scores) - sum_true
 
