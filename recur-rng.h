@@ -49,7 +49,7 @@ init_rand64_maybe_randomly(rand_ctx *ctx, u64 seed)
   if (seed == RECUR_RNG_RANDOM_SEED){
     struct timespec t;
     clock_gettime(CLOCK_REALTIME, &t);
-    seed = (t.tv_nsec + t.tv_sec) ^ (u64)ctx;
+    seed = (u64)(t.tv_nsec + t.tv_sec) ^ (u64)ctx;
     DEBUG("seeding with %zx\n", seed);
   }
   init_rand64(ctx, seed);

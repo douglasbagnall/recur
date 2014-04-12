@@ -4,9 +4,9 @@
 #include <unistd.h>
 #include <errno.h>
 
-const char *FORMAT_VERSION = "save_format_version";
+static const char *FORMAT_VERSION = "save_format_version";
 
-const uint MAX_METADATA_SIZE = 100 * 1000 * 1000;
+static const uint MAX_METADATA_SIZE = 100 * 1000 * 1000;
 
 int
 rnn_save_net(RecurNN *net, const char *filename, int backup){
@@ -42,7 +42,7 @@ rnn_save_net(RecurNN *net, const char *filename, int backup){
 #define SAVE_SCALAR(obj, attr) do {                                     \
     char *key = (version >= 4) ? QUOTE(obj) "." QUOTE(attr) :          \
       QUOTE(attr);                                                      \
-    ret = cdb_make_add(&cdbm, key, strlen(key),                         \
+    ret = cdb_make_add(&cdbm, key, (u32)strlen(key),                    \
         &obj->attr, sizeof(obj->attr));                                 \
     if (ret){                                                           \
       DEBUG("error %d saving '%s'", ret, key);                          \
