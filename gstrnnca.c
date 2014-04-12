@@ -750,11 +750,11 @@ maybe_learn(GstRnnca *self){
   rnn_apply_learning(net, RNN_MOMENTUM_WEIGHTED, momentum);
 
   if (PERIODIC_PGM_DUMP && (net->generation & PERIODIC_PGM_DUMP) == 0){
-    rnn_multi_pgm_dump(net, "how ihw");
+    rnn_multi_pgm_dump(net, "how ihw", "rnnca");
   }
 #if SPECIFIC_PGM_DUMP
   if (net->generation > 1400 && net->generation < 1410){
-    rnn_multi_pgm_dump(net, "how ihw hom ihm hod ihd");
+    rnn_multi_pgm_dump(net, "how ihw hom ihm hod ihd", "rnnca");
   }
 #endif
   rnn_log_net(net);

@@ -349,7 +349,7 @@ gst_parrot_set_property (GObject * object, guint prop_id, const GValue * value,
     switch (prop_id) {
     case PROP_PGM_DUMP:
       strvalue = g_value_get_string(value);
-      rnn_multi_pgm_dump(self->net, strvalue);
+      rnn_multi_pgm_dump(self->net, strvalue, "parrot");
       break;
 
     case PROP_SAVE_NET:
@@ -541,7 +541,7 @@ maybe_learn(GstParrot *self){
 
     RecurNN *net = self->training_nets[0];
     if (PERIODIC_PGM_DUMP && net->generation % PERIODIC_PGM_DUMP == 0){
-      rnn_multi_pgm_dump(net, "how ihw");
+      rnn_multi_pgm_dump(net, "how ihw", "parrot");
     }
     rnn_apply_learning(self->net, RNN_MOMENTUM_WEIGHTED, self->net->bptt->momentum);
     rnn_condition_net(self->net);

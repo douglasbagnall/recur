@@ -675,7 +675,7 @@ epoch(RecurNN **nets, int n_nets, RecurNN *confab_net, Ventropy *v,
         rnn_save_net(net, opt_filename, 1);
       }
       if (opt_periodic_pgm_dump){
-        rnn_multi_pgm_dump(net, "ihw how ihd hod ihm hom");
+        rnn_multi_pgm_dump(net, "ihw how ihd hod ihm hom", "text");
       }
       schedule->eval(schedule, net, ventropy);
     }
@@ -766,7 +766,7 @@ load_or_create_net(void){
       rnn_scale_initial_weights(net, opt_weight_scale_factor);
     }
     if (opt_periodic_pgm_dump){
-      rnn_multi_pgm_dump(net, "ihw how");
+      rnn_multi_pgm_dump(net, "ihw how", "text");
     }
   }
   else if (opt_override){

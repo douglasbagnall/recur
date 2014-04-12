@@ -166,7 +166,7 @@ possibly_save_state(RecurContext *context)
     DEBUG("in possibly_save_state with generation %d", context->net->generation);
   }
   if (PERIODIC_PGM_DUMP && net->generation % PERIODIC_PGM_DUMP == 0){
-    rnn_multi_pgm_dump(net, "hhw ihw");
+    rnn_multi_pgm_dump(net, "hhw ihw", "recur");
   }
 }
 

@@ -487,7 +487,7 @@ rnn_scale_initial_weights(RecurNN *net, float factor){
 }
 
 void
-rnn_multi_pgm_dump(RecurNN *net, const char *dumpees){
+rnn_multi_pgm_dump(RecurNN *net, const char *dumpees, const char *basename){
   RecurNNBPTT *bptt = net->bptt;
   char *working = strdupa(dumpees);
   char *token;
@@ -545,7 +545,18 @@ rnn_multi_pgm_dump(RecurNN *net, const char *dumpees){
       else
         continue;
     }
-    if (array)
-      dump_colour_weights_autoname(array, x, y, token, net->generation);
+    if (array){
+      if (! basename || ! basename[0]){
+        basename = "untitled";
+      }
+      char *name;
+      if (asprintf(&name, "%s-%s", basename, token) >= 0){
+        dump_colour_weights_autoname(array, x, y, name, net->generation);
+        free(name);
+      }
+      else {
+        STDERR_DEBUG("Can't asprintf in rnn_multi_pgm_dump; not dumping");
+      }
+    }
   }
 }

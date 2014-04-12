@@ -212,7 +212,7 @@ void rnn_delete_training_set(RecurNN **nets, int n_nets, int leave_prototype);
 
 float *rnn_opinion(RecurNN *net, const float *inputs, float dropout);
 
-void rnn_multi_pgm_dump(RecurNN *net, const char *dumpees);
+void rnn_multi_pgm_dump(RecurNN *net, const char *dumpees, const char *basename);
 
 RecurNN* rnn_load_net(const char *filename);
 int rnn_save_net(RecurNN *net, const char *filename, int backup);
