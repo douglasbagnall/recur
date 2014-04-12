@@ -32,6 +32,7 @@ typedef s16 audio_sample;
 #define RECUR_MFCC_MIN_FREQ 20
 #define RECUR_MFCC_MAX_FREQ (RECUR_AUDIO_RATE * 0.499)
 #define RECUR_MFCC_KNEE_FREQ 700
+#define RECUR_MFCC_FOCUS_FREQ 0
 
 
 #define RECUR_N_MFCCS 15
