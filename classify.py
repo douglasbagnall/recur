@@ -356,10 +356,13 @@ class Classifier(BaseClassifier):
                 gt = any([x[1] for x in v[10:]])
                 s = np.array([x[0] for x in v])
                 s = np.convolve(s, window)
-                ss = np.sort(s[10:])
-                squares = [ss[-x * (x + 1)] for x in range(1, 9)]
-                self.minute_results[k].append(squares)
-                self.minute_gt[k].append(gt)
+                s = np.sort(s[10:])
+                if len(s) > 72:
+                    squares = [s[-x * (x + 1)] for x in range(1, 9)]
+                    self.minute_results[k].append(squares)
+                    self.minute_gt[k].append(gt)
+                else:
+                    print >> sys.stderr, "ignoring presence results of length %d" % len(s)
 
         if self.show_roc:
             for k in self.scores:
