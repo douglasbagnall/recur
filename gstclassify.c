@@ -1632,22 +1632,20 @@ pcm_to_features(RecurAudioBinner *mf, ClassifyChannel *c, int mfccs,
   float *pcm = c->pcm_now;
   float *answer;
   int n_raw_features;
+  intensity_feature = intensity_feature ? 1 : 0;
   if (mfccs){
-    answer = recur_extract_mfccs(mf, pcm) + (intensity_feature ? 0 : 1);
-    n_raw_features = mfccs;
+    answer = recur_extract_mfccs(mf, pcm) + 1 - intensity_feature;
+    n_raw_features = mfccs + intensity_feature;
   }
   else {
     answer = recur_extract_log_freq_bins(mf, pcm);
+    n_raw_features = CLASSIFY_N_FFT_BINS + intensity_feature;
     if (intensity_feature){
       float sum = 0;
       for (int i = 0; i < CLASSIFY_N_FFT_BINS; i++){
         sum += answer[i];
       }
       answer[CLASSIFY_N_FFT_BINS] = sum / CLASSIFY_N_FFT_BINS;
-      n_raw_features = CLASSIFY_N_FFT_BINS + 1;
-    }
-    else {
-      n_raw_features = CLASSIFY_N_FFT_BINS;
     }
   }
   if (c->prev_features){
