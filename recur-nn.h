@@ -138,8 +138,8 @@ struct _RecurNN {
   rand_ctx rng;
   RecurNNBPTT *bptt; /*training struct*/
   RecurExtraLayer *bottom_layer;
-  u32 generation;
   char *metadata;
+  u32 generation;
 };
 
 struct _RecurNNBPTT {

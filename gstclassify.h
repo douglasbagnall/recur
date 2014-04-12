@@ -57,12 +57,12 @@ typedef struct _GstClassifyClass GstClassifyClass;
 
 struct ClassifyMetadata {
   const char *classes;
+  const char *basename;
   float min_freq;
   float max_freq;
   float knee_freq;
   int mfccs;
   int window_size;
-  const char *basename;
   int delta_features;
   float focus_freq;
   float lag;
@@ -103,8 +103,8 @@ struct _GstClassify
   RecurNN **subnets;
   ClassifyChannel *channels;
   int n_channels;
-  ClassifyClassGroup *class_groups;
   int n_groups;
+  ClassifyClassGroup *class_groups;
   s16 *audio_queue;
   int read_offset;
   int write_offset;
@@ -113,10 +113,10 @@ struct _GstClassify
   const char *basename;
   int queue_size;
   int mfccs;
-  float momentum_soft_start;
   ClassifyClassEvent *class_events;
   int n_class_events;
   int class_events_index;
+  float momentum_soft_start;
   int window_size;
   int window_no;
   int ignored_windows;

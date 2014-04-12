@@ -18,8 +18,8 @@ INC_DIR = /usr/include
 ### Alternative compilers
 #CC = nccgen -ncgcc -ncld -ncfabs
 #CC = /usr/bin/clang
-#CC = /usr/local/bin/clang
-#CC = /usr/local/bin/clang  -Weverything -Wno-documentation -Wno-system-headers -Wno-sign-conversion -Wno-conversion -Wno-gnu -Wno-variadic-macros -Wno-vla -Wno-disabled-macro-expansion
+#CC = /usr/bin/clang -Weverything -Wno-variadic-macros -Wno-gnu -Wno-vla
+#CC = /usr/bin/clang  -Weverything -Wno-documentation -Wno-system-headers -Wno-sign-conversion -Wno-conversion -Wno-gnu -Wno-variadic-macros -Wno-vla -Wno-disabled-macro-expansion -Wno-cast-align
 #CLANG_FLAGS = -fslp-vectorize-aggressive
 #CLANG_FLAGS =  -fplugin=/usr/lib/gcc/x86_64-linux-gnu/4.7/plugin/dragonegg.so
 #CC = clang -Xclang -analyze -Xclang -analyzer-checker=debug.ViewCallGraph
