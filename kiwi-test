@@ -24,8 +24,6 @@ def main():
                        help="show ROC curves")
     group.add_argument('--target-class',
                        help="use this class in reports and ROC")
-    group.add_argument('--target-group', type=int, default=0,
-                       help="use this class group in reports and ROC")
     group.add_argument('--min-changes', type=int, default=0,
                        help="only test files with at least this many class switches")
     group.add_argument('--no-timings', action='store_true',
@@ -38,7 +36,7 @@ def main():
     if any((args.call_json_file,
             args.classification_file,
             args.ground_truth_file)) and not args.target_class:
-        print >> sys.stderr, "writing classification/calls requires --target-group"
+        print >> sys.stderr, "writing classification/calls requires --target-class"
         sys.exit(1)
 
     c = Classifier(channels=1)
@@ -50,15 +48,11 @@ def main():
     if args.first_n:
         timed_files = timed_files[:args.first_n]
 
-    target = None
-    if args.target_class:
-        target=(args.target_group, args.target_class)
-
     show_roc = args.roc or args.presence_roc
 
     c.classify(timed_files, ground_truth_file=args.ground_truth_file,
                classification_file=args.classification_file, show_roc=show_roc,
                call_json_file=args.call_json_file, call_threshold=args.call_threshold,
-               show_presence_roc=args.presence_roc, target_index=target)
+               show_presence_roc=args.presence_roc, target_index=args.target_class)
 
 main()

@@ -95,17 +95,26 @@ class BaseClassifier(object):
             val = kwargs.get(kwarg)
             if val is not None:
                 self.setp(gstarg, val)
+        self._setup_classes()
 
-        self.classes = self.getp('classes').split(',')
+    def _setup_classes(self, class_string=None):
+        #put classes through a round trip, just to be sure it works
+        if class_string is not None:
+            self.setp('classes', class_string)
+        self.class_groups = self.getp('classes').split(',')
+        self.class_group_indices = {}
+        self.classes = []
+        for i, g in enumerate(self.class_groups):
+            for k in g:
+                self.classes.append(k)
+                self.class_group_indices[k] = i
 
     def setup(self, mfccs, hsize, class_string, basename='classify',
               bottom_layer=0, window_size=None, min_freq=None,
               knee_freq=None, max_freq=None, lag=0,
               ignore_start=0, delta_features=0,
               focus_freq=0, intensity_feature=0):
-        #put classes through a round trip, just to be sure it works
-        self.setp('classes', class_string)
-        self.classes = self.getp('classes').split(',')
+        self._setup_classes(class_string)
         for gstarg, pyarg in (('window-size', window_size),
                               ('mfccs', mfccs),
                               ('hidden-size', hsize),
@@ -140,11 +149,7 @@ class BaseClassifier(object):
         self.mainloop.quit()
 
     def get_results_counter(self, members=2):
-        groups = []
-        for group in self.classes:
-            groups.append({x: [0] * members for x in group})
-        return groups
-
+        return {x: [0] * members for x in self.classes}
 
 
 class Classifier(BaseClassifier):
@@ -161,7 +166,17 @@ class Classifier(BaseClassifier):
                  call_threshold=0,
                  show_presence_roc=False,
                  target_index=None):
-        self.target_index = target_index
+        if len(self.classes) == 2 and target_index is None:
+            self.target_index = self.classes[1]
+        else:
+            self.target_index = target_index
+
+        if self.target_index is None:
+            self.collected_classes = self.class_group_indices.items()
+        else:
+            self.collected_classes = [(self.target_index,
+                                      self.class_group_indices[self.target_index])]
+
         if ground_truth_file:
             self.ground_truth_file = open(ground_truth_file, 'w')
         if classification_file:
@@ -174,10 +189,10 @@ class Classifier(BaseClassifier):
         self.data = list(reversed(data))
         self.setp('training', False)
         if self.show_roc:
-            self.scores = self.get_results_counter(0)
+            self.scores = {x[0]:[] for x in self.collected_classes}
         if self.show_presence_roc:
-            self.minute_results = {x:[] for x in self.classes[0]}
-            self.minute_gt = {x:[] for x in self.classes[0]}
+            self.minute_results = {x[0]:[] for x in self.collected_classes}
+            self.minute_gt = {x[0]:[] for x in self.collected_classes}
         self.load_next_file()
         self.mainloop.run()
 
@@ -188,8 +203,8 @@ class Classifier(BaseClassifier):
         self.current_file = f
         self.filesrcs[0].set_property('location', f.fullname)
         self.setp('target', targets)
-        self.file_results = [[] for x in self.classes]
-        self.file_scores = self.get_results_counter(0)
+        self.file_results = [[] for x in self.class_groups]
+        self.file_scores = {x[0]:[] for x in self.collected_classes}
         self.pipeline.set_state(Gst.State.PLAYING)
 
 
@@ -201,20 +216,18 @@ class Classifier(BaseClassifier):
         v = s.get_value
         timestamp = v('time')
         no_targets = not self.current_file.targets
-        for i, group in enumerate(self.classes):
-            scores = self.file_scores[i]
+        for k, i in self.collected_classes:
             key = 'channel 0, group %d ' % i
             correct = v(key + 'correct')
             target = v(key + 'target')
             if no_targets:
-                for k in group:
-                    scores[k].append((v(key + k), None, timestamp))
+                self.file_scores[k].append((v(key + k), None, timestamp))
             elif target is None:
                 continue
             else:
-                for k in group:
-                    scores[k].append((v(key + k), k == target, timestamp))
-                self.file_results[i].append((target, correct))
+                self.file_scores[k].append((v(key + k), k == target, timestamp))
+                if self.verbosity:
+                    self.file_results[i].append((target, correct))
 
 
     def report(self):
@@ -223,7 +236,7 @@ class Classifier(BaseClassifier):
         colours = [COLOURS[x] for x in 'PPrrRRYYGgCC']
 
         for groupno, file_results in enumerate(self.file_results):
-            classes = self.classes[groupno]
+            classes = self.class_groups[groupno]
             step = len(file_results) / 100.0
             next_stop = 0
             #print file_results
@@ -250,11 +263,11 @@ class Classifier(BaseClassifier):
             out.extend((COLOURS['Z'], str(len(file_results)), '\n'))
 
         if self.target_index:
-            i, k = self.target_index
+            k = self.target_index
         else:
-            i, k = 0, self.classes[0][-1]
+            k = self.classes[-1]
 
-        scores = self.file_scores[i][k]
+        scores = self.file_scores[k]
         r_sum = 0
         w_sum = 0
         r_sum2, w_sum2 = 0, 0
@@ -304,10 +317,9 @@ class Classifier(BaseClassifier):
 
         if self.target_index and (self.classification_file
                                   or self.ground_truth_file):
-            i, k = self.target_index
             ground_truth = [fn]
             classifications = [fn]
-            for s, t, timestamp in scores[i][k]:
+            for s, t, timestamp in scores[self.target_index]:
                 ground_truth.append('%d' % t)
                 classifications.append('%.5g' % s)
 
@@ -318,14 +330,13 @@ class Classifier(BaseClassifier):
                 print >>self.classification_file, ','.join(classifications)
 
         if self.target_index and self.call_json_file:
-            i, k = self.target_index
             threshold = self.call_threshold
             row = [fn]
             #XXX convolve?
             start = 0
             end = 0
             score = 0
-            for s, t, timestamp in scores[i][k]:
+            for s, t, timestamp in scores[self.target_index]:
                 if score == 0.0:
                     if s > threshold:
                         start = timestamp
@@ -341,45 +352,35 @@ class Classifier(BaseClassifier):
 
         if self.show_presence_roc:
             window = np.kaiser(15, 6)
-            for k, v in scores[0].items():
+            for k, v in scores.items():
                 gt = any([x[1] for x in v[10:]])
                 s = np.array([x[0] for x in v])
                 s = np.convolve(s, window)
                 ss = np.sort(s[10:])
-                squares = [ss[-x * (x + 1)] for x in range(1, 10)]
-                #print squares
+                squares = [ss[-x * (x + 1)] for x in range(1, 9)]
                 self.minute_results[k].append(squares)
                 self.minute_gt[k].append(gt)
-                #print self.minute_results
-                #print self.minute_gt
 
         if self.show_roc:
-            for all_scores, fscores in zip(self.scores, scores):
-                for k in all_scores:
-                    all_scores[k].extend(fscores[k])
-
-        if 0:
-            i, k = self.target_index
-            draw_roc_curve(scores[i][k], k)
-            actually_show_roc()
+            for k in self.scores:
+                self.scores[k].extend(scores[k])
 
         if not self.data:
             if self.show_roc:
                 if self.target_index:
-                    i, k = self.target_index
-                    draw_roc_curve(self.scores[i][k], k)
+                    classes = [self.target_index]
                 else:
-                    for i, group in enumerate(self.classes):
-                        for k in group[len(group) == 2:]:
-                            draw_roc_curve(self.scores[i][k], k)
-                            if self.show_presence_roc:
-                                results = zip(*self.minute_results[k])
-                                #import pdb; pdb.set_trace()
+                    classes = self.classes
+                for k in classes:
+                    draw_roc_curve(self.scores[k], k)
+                    if self.show_presence_roc:
+                        results = zip(*self.minute_results[k])
+                        #import pdb; pdb.set_trace()
 
-                                for i, row in enumerate(results):
-                                    index = (i + 2) * (i + 1) - 1
-                                    draw_presence_roc(zip(row, self.minute_gt[k]),
-                                                      '%s-nth %s' % (k, index))
+                        for i, row in enumerate(results):
+                            index = (i + 2) * (i + 1) - 1
+                            draw_presence_roc(zip(row, self.minute_gt[k]),
+                                              '%s-nth %s' % (k, index))
 
                 actually_show_roc(title=self.getp('basename'))
 
@@ -439,9 +440,9 @@ class Trainer(BaseClassifier):
 
     def next_test_set(self):
         self.test_scores = [{x: 0 for x in y}
-                            for y in self.classes]
+                            for y in self.class_groups]
         self.test_runs = [{x: 0 for x in y}
-                          for y in self.classes]
+                          for y in self.class_groups]
         self.setp('dropout', 0)
         self.setp('forget', 0)
         self.setp('training', False)
@@ -466,7 +467,7 @@ class Trainer(BaseClassifier):
 
         self.probability_sums = []
         self.probability_counts = []
-        for group in self.classes:
+        for group in self.class_groups:
             self.probability_sums.append({x:[0.0, 0.0] for x in group})
             self.probability_counts.append({x:[0.0, 0.0] for x in group})
 
@@ -492,7 +493,7 @@ class Trainer(BaseClassifier):
     def evaluate_test(self):
         #print self.test_scores, self.classes, self.test_runs
         colours = [COLOURS[x] for x in 'PPrRYYGGgCC']
-        for classes, score, runs, probs, pcounts in zip(self.classes,
+        for classes, score, runs, probs, pcounts in zip(self.class_groups,
                                                         self.test_scores,
                                                         self.test_runs,
                                                         self.probability_sums,
@@ -597,7 +598,7 @@ class Trainer(BaseClassifier):
             self.test_n += self.channels
             v = s.get_value
             for i in range(self.channels):
-                for j, group in enumerate(self.classes):
+                for j, group in enumerate(self.class_groups):
                     target = v('channel %d, group %d target' % (i, j))
                     if target is None:
                         continue
@@ -674,10 +675,10 @@ class GTKClassifier(BaseClassifier):
             v = s.get_value
             winner = v('channel 0 winner')
             scores = []
-            for j, group in enumerate(self.classes):
+            for j, group in enumerate(self.class_groups):
                 for x in group:
                     scores.extend(v('channel 0, group %d %s' % (j, x))
-                                  for j in range(len(self.classes)))
+                                  for j in range(len(self.class_groups)))
             if self.reverse:
                 scores = scores[::-1]
             self.widget.notify_results((winner, scores))
@@ -917,10 +918,10 @@ def process_common_args(c, args, random_seed=1, timed=True, load=True):
         else:
             files = []
     elif args.classes_from_file_names:
-        files = load_timings_from_file_names(c.classes,
+        files = load_timings_from_file_names(c.class_groups,
                                              args.audio_directory)
     else:
-        files = load_timings(c.classes,
+        files = load_timings(c.class_groups,
                              args.timings,
                              args.audio_directory,
                              args.min_call_intensity,
