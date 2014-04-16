@@ -320,7 +320,7 @@ bptt_and_accumulate_error(RecurNN *net, float *restrict ih_delta,
     float *tmp = h_error;
     h_error = i_error;
     i_error = tmp;
-    if (error_sum < min_error_sum || error_sum > max_error_sum){
+    if (error_sum <= min_error_sum || error_sum > max_error_sum){
       break;
     }
   }
