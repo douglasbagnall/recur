@@ -24,7 +24,6 @@ INC_DIR = /usr/include
 #CLANG_FLAGS =  -fplugin=/usr/lib/gcc/x86_64-linux-gnu/4.7/plugin/dragonegg.so
 #CC = clang -Xclang -analyze -Xclang -analyzer-checker=debug.ViewCallGraph
 
-
 ALL_CFLAGS = -march=native -pthread $(WARNINGS) -pipe  -D_GNU_SOURCE $(INCLUDES) $(ARCH_CFLAGS) $(CFLAGS) $(DEV_CFLAGS) -ffast-math -funsafe-loop-optimizations $(CLANG_FLAGS) -std=gnu11 $(CFLAGS)
 ALL_LDFLAGS = $(LDFLAGS)
 
@@ -90,6 +89,10 @@ config.h: ccan/tools/configurator/configurator
 	$(CC)  -E  $(ALL_CFLAGS) $(CPPFLAGS) -o $@ $<
 
 %.c: %.h
+
+%.dot: %.c
+	clang -S  $(ALL_CFLAGS) -O0  -emit-llvm $^ -o - | opt-3.4 -analyze -dot-callgraph
+	mv callgraph.dot $@
 
 #recur-nn.o works better with -fprefetch-loop-arrays
 NN_SPECIAL_FLAGS =  -fprefetch-loop-arrays
