@@ -163,7 +163,8 @@ class Classifier(BaseClassifier):
                  classification_file=None,
                  show_roc=False,
                  call_json_file=None,
-                 call_threshold=0,
+                 call_edge_threshold=0,
+                 call_peak_threshold=0,
                  show_presence_roc=False,
                  target_index=None):
         if len(self.classes) == 2 and target_index is None:
@@ -183,7 +184,8 @@ class Classifier(BaseClassifier):
             self.classification_file = open(classification_file, 'w')
         if call_json_file:
             self.call_json_file = open(call_json_file, 'w')
-        self.call_threshold = call_threshold
+        self.call_edge_threshold = call_edge_threshold
+        self.call_peak_threshold = call_peak_threshold
         self.show_roc = show_roc
         self.show_presence_roc = show_presence_roc
         self.data = list(reversed(data))
@@ -330,7 +332,8 @@ class Classifier(BaseClassifier):
                 print >>self.classification_file, ','.join(classifications)
 
         if self.target_index and self.call_json_file:
-            threshold = self.call_threshold
+            edge_threshold = self.call_edge_threshold
+            peak_threshold = self.call_peak_threshold
             row = [fn]
             #XXX convolve?
             start = 0
@@ -338,12 +341,13 @@ class Classifier(BaseClassifier):
             score = 0
             for s, t, timestamp in scores[self.target_index]:
                 if score == 0.0:
-                    if s > threshold:
+                    if s > edge_threshold:
                         start = timestamp
                         score = s
-                elif s < threshold * 0.9:
+                elif s < edge_threshold:
                     call = [round(start, 2), round(timestamp, 2), round(score, 4)]
-                    row.append(call)
+                    if score > peak_threshold:
+                        row.append(call)
                     score = 0.0
                 else:
                     score = max(score, s)

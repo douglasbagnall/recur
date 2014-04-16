@@ -18,8 +18,10 @@ def main():
                        help="write classifications to this file")
     group.add_argument('--call-json-file',
                        help="write call locations to this file")
-    group.add_argument('--call-threshold', default=0.5, type=float,
-                       help="use this threshold for call-json-file")
+    group.add_argument('--call-edge-threshold', default=0.5, type=float,
+                       help="use this edge threshold for call-json-file")
+    group.add_argument('--call-peak-threshold', default=0.9, type=float,
+                       help="peak threshold for call-json-file")
     group.add_argument('--roc', action='store_true',
                        help="show ROC curves")
     group.add_argument('--target-class',
@@ -52,7 +54,9 @@ def main():
 
     c.classify(timed_files, ground_truth_file=args.ground_truth_file,
                classification_file=args.classification_file, show_roc=show_roc,
-               call_json_file=args.call_json_file, call_threshold=args.call_threshold,
+               call_json_file=args.call_json_file,
+               call_edge_threshold=args.call_edge_threshold,
+               call_peak_threshold=args.call_peak_threshold,
                show_presence_roc=args.presence_roc, target_index=args.target_class)
 
 main()
