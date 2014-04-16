@@ -165,6 +165,7 @@ class Classifier(BaseClassifier):
                  call_json_file=None,
                  call_edge_threshold=0,
                  call_peak_threshold=0,
+                 call_duration_threshold=0,
                  show_presence_roc=False,
                  target_index=None):
         if len(self.classes) == 2 and target_index is None:
@@ -186,6 +187,7 @@ class Classifier(BaseClassifier):
             self.call_json_file = open(call_json_file, 'w')
         self.call_edge_threshold = call_edge_threshold
         self.call_peak_threshold = call_peak_threshold
+        self.call_duration_threshold = call_duration_threshold
         self.show_roc = show_roc
         self.show_presence_roc = show_presence_roc
         self.data = list(reversed(data))
@@ -334,6 +336,7 @@ class Classifier(BaseClassifier):
         if self.target_index and self.call_json_file:
             edge_threshold = self.call_edge_threshold
             peak_threshold = self.call_peak_threshold
+            duration_threshold = self.call_duration_threshold
             row = [fn]
             #XXX convolve?
             start = 0
@@ -345,8 +348,8 @@ class Classifier(BaseClassifier):
                         start = timestamp
                         score = s
                 elif s < edge_threshold:
-                    call = [round(start, 2), round(timestamp, 2), round(score, 4)]
-                    if score > peak_threshold:
+                    if score > peak_threshold and timestamp - start > duration_threshold:
+                        call = [round(start, 2), round(timestamp, 2), round(score, 4)]
                         row.append(call)
                     score = 0.0
                 else:
