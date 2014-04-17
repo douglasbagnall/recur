@@ -591,8 +591,20 @@ gst_classify_init (GstClassify * self)
   GST_INFO("gst classify init\n");
 }
 
-#define N_FEATURES(self) ((((self)->mfccs ? (self)->mfccs : CLASSIFY_N_FFT_BINS) \
-      + self->intensity_feature) * (1 + (self)->delta_features))
+static inline int
+get_n_features(GstClassify *self){
+  int n;
+  if (self->mfccs){
+    n = self->mfccs;
+  }
+  else {
+    n = CLASSIFY_N_FFT_BINS;
+  }
+  n += self->intensity_feature;
+  n *= (1 + self->delta_features);
+  return n;
+}
+
 
 static void
 set_net_filename(GstClassify *self, int hidden_size, int bottom_layer,
@@ -603,7 +615,7 @@ set_net_filename(GstClassify *self, int hidden_size, int bottom_layer,
   for (uint i = 0; i < len; i++){
     sig ^= ROTATE(sig - metadata[i], 13) + metadata[i];
   }
-  int n_features = N_FEATURES(self);
+  int n_features = get_n_features(self);
   if (bottom_layer > 0){
     snprintf(s, sizeof(s), "%s-%0x-i%d-b%d-h%d-o%d-b%d-%dHz-w%d.net",
         self->basename, sig, n_features, bottom_layer, hidden_size, top_layer_size,
@@ -763,7 +775,7 @@ setup_audio(GstClassify *self, int window_size, int mfccs, float min_freq,
 
   self->window_size = window_size;
   self->delta_features = delta_features;
-  self->intensity_feature = intensity_feature;
+  self->intensity_feature = intensity_feature ? 1 : 0;
   self->lag = lag;
   GST_LOG("mfccs: %d", mfccs);
   self->mfccs = mfccs;
@@ -820,7 +832,7 @@ create_net(GstClassify *self, int bottom_layer_size,
         " has been set up. It won't work.");
   }
   RecurNN *net;
-  int n_features = N_FEATURES(self);
+  int n_features = get_n_features(self);
   u32 flags = CLASSIFY_RNN_FLAGS;
   int weight_sparsity = PP_GET_INT(self, PROP_WEIGHT_SPARSITY,
       DEFAULT_PROP_WEIGHT_SPARSITY);
@@ -1632,7 +1644,6 @@ pcm_to_features(RecurAudioBinner *mf, ClassifyChannel *c, int mfccs,
   float *pcm = c->pcm_now;
   float *answer;
   int n_raw_features;
-  intensity_feature = intensity_feature ? 1 : 0;
   if (mfccs){
     answer = recur_extract_mfccs(mf, pcm) + 1 - intensity_feature;
     n_raw_features = mfccs + intensity_feature;
