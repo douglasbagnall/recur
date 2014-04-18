@@ -1,3 +1,4 @@
+/* Copyright 2014 Douglas Bagnall <douglas@halo.gen.nz> LGPL/MPL2 */
 #ifndef _GOT_RECUR_RNG_H
 #define _GOT_RECUR_RNG_H 1
 #include "recur-common.h"

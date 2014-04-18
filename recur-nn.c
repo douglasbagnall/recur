@@ -1,3 +1,4 @@
+/* Copyright 2014 Douglas Bagnall <douglas@halo.gen.nz> LGPL/MPL2 */
 #include "recur-nn.h"
 #include "recur-nn-helpers.h"
 

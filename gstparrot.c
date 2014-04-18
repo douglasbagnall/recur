@@ -1,8 +1,4 @@
-/* Gstreamer parrot plugin
- * Copyright (C) <2013> Douglas Bagnall <douglas@halo.gen.nz>
- *
- */
-
+/* Copyright 2013 Douglas Bagnall <douglas@halo.gen.nz> LGPL/MPL2 */
 #include "gstparrot.h"
 #include "audio-common.h"
 #include <string.h>

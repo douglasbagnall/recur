@@ -1,6 +1,6 @@
 /*
  * This file is adapted from Xiph.org's libvorbis. For license terms, see
- * COPYING.mdct. (BSDish).
+ * licenses/COPYING.mdct. (BSDish).
  *
  * COPYRIGHT 1994-2009 Xiph.Org Foundation http://www.xiph.org/
  *

@@ -1,3 +1,7 @@
+/*Copyright 2014 Douglas Bagnall <douglas@halo.gen.nz> LGPL/MPL2
+
+This is a GTK app that runs the RNNCA plugin.
+*/
 #include "player-common.h"
 
 #define WIDTH  288

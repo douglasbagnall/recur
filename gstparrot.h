@@ -1,3 +1,4 @@
+/* Copyright 2013 Douglas Bagnall <douglas@halo.gen.nz> LGPL/MPL2 */
 #ifndef __GST_AUDIO_PARROT_H__
 #define __GST_AUDIO_PARROT_H__
 

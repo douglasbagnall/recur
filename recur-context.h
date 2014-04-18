@@ -1,7 +1,4 @@
-/* GStreamer
- * Copyright (C) <2013> Douglas Bagnall <douglas@halo.gen.nz>
- *
- */
+/* Copyright 2013 Douglas Bagnall <douglas@halo.gen.nz> LGPL/MPL2 */
 #ifndef HAVE_RECUR_CONTEXT_H
 #define HAVE_RECUR_CONTEXT_H
 

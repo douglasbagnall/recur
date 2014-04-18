@@ -1,3 +1,15 @@
+/* Copyright (C) 2014 Douglas Bagnall <douglas@halo.gen.nz> GPL2+
+
+This uses the RNN to predict the next character in a text sequence.
+
+Unlike most of the Recur repository, this file is licensed under the GNU
+General Public License, version 2 or greater. That is because it is linked to
+ccan/opt which is also GPL2+ (originally GPL3+, but relicensed, see
+http://git.ozlabs.org/?p=ccan;a=commit;h=79715b8).
+
+Because of ccan/opt, --help will tell you something.
+*/
+
 #include "recur-nn.h"
 #include "recur-nn-helpers.h"
 #include <math.h>

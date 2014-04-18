@@ -1,3 +1,4 @@
+/* Copyright 2014 Douglas Bagnall <douglas@halo.gen.nz> LGPL/MPL2 */
 #ifndef HAVE_BADMATHS_H
 #define HAVE_BADMATHS_H
 /*XXX it would be possible to vectorise and do 4 at a time */

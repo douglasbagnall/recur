@@ -1,3 +1,4 @@
+/* Copyright 2013 Douglas Bagnall <douglas@halo.gen.nz> LGPL/MPL2 */
 #ifndef __GOT_RNNCA_H__
 #define __GOT_RNNCA_H__
 

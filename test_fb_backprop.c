@@ -1,3 +1,10 @@
+/*Copyright 2014 Douglas Bagnall <douglas@halo.gen.nz> LGPL/MPL2
+
+This tests a toy classifier on the "FizzBuzz" task.
+
+The FB1 and FB2 constants below set the period, with 3 and 5 being standard.
+*/
+
 #define PERIODIC_PGM_DUMP 1
 #include "recur-nn.h"
 #include "pgm_dump.h"

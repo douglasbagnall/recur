@@ -1,7 +1,6 @@
-/* Copyright (C) 2013 Douglas Bagnall <douglas@halo.gen.nz>
+/* Copyright (C) 2013 Douglas Bagnall <douglas@halo.gen.nz>  LGPL/MPL2
 
    These are mostly-private variables and helpers for recur-nn.
-
 */
 #ifndef _GOT_RECUR_NN_HELPERS_H
 #define _GOT_RECUR_NN_HELPERS_H 1

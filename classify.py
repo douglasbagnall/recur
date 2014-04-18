@@ -1,3 +1,4 @@
+# Copyright 2013 Douglas Bagnall <douglas@halo.gen.nz> LGPL/MPL2
 import os, sys
 import random
 import itertools

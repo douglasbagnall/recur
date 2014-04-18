@@ -1,3 +1,8 @@
+/*Copyright 2014 Douglas Bagnall <douglas@halo.gen.nz> LGPL/MPL2
+
+This is a gtk app that runs the recur plugin. Try --help.
+*/
+
 #include "player-common.h"
 
 #define WIDTH  800

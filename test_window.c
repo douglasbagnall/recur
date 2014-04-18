@@ -1,3 +1,4 @@
+/* Copyright 2014 Douglas Bagnall <douglas@halo.gen.nz> LGPL/MPL2 */
 #include "recur-common.h"
 #include <math.h>
 #include "badmaths.h"
