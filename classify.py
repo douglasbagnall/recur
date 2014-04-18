@@ -358,11 +358,11 @@ class Classifier(BaseClassifier):
             print >>self.call_json_file, json.dumps(row)
 
         if self.show_presence_roc:
-            window = np.kaiser(15, 6)
+            #window = np.kaiser(15, 6)
             for k, v in scores.items():
                 gt = any([x[1] for x in v[10:]])
                 s = np.array([x[0] for x in v])
-                s = np.convolve(s, window)
+                #s = np.convolve(s, window)
                 s = np.sort(s[10:])
                 if len(s) > 72:
                     squares = [s[-x * (x + 1)] for x in range(1, 9)]
@@ -389,8 +389,9 @@ class Classifier(BaseClassifier):
 
                         for i, row in enumerate(results):
                             index = (i + 2) * (i + 1) - 1
+                            le = (0.1 if i == 6 else 0)
                             draw_presence_roc(zip(row, self.minute_gt[k]),
-                                              '%s-nth %s' % (k, index))
+                                              '%s-nth %s' % (k, index), label_every=le)
 
                 actually_show_roc(title=self.getp('basename'))
 
@@ -1033,7 +1034,7 @@ def actually_show_roc(title='ROC'):
     plt.legend(loc='lower right')
     plt.show()
 
-def draw_presence_roc(scores, label='presence'):
+def draw_presence_roc(scores, label='presence', label_every=0.0):
     import matplotlib.pyplot as plt
     #print scores
     scores.sort()
@@ -1047,47 +1048,23 @@ def draw_presence_roc(scores, label='presence'):
     false_positives = sum_false
     true_positives = sum_true
     half = 0
-    ax, ay, ad, ap = 0, 0, 0, 0
-    bx, by, bd, bp = 0, 0, 99, 0
-    cx, cy, cd, cp = 0, 0, 0, 0
-    dx, dy, dp = 0, 0, 0
-    ex, ey, ep = 1.0, 1.0, 0.0
-    #print scores
+    if label_every:
+        step = len(scores) * label_every
+    else:
+        step =  1e555
+    next_label = step
+    labels = []
 
-    for score, target in scores:
+    for i, st in enumerate(scores):
+        score, target = st
         false_positives -= not target
         true_positives -= target
         x = false_positives * fp_scale
         y = true_positives * tp_scale
         half += score < 0.5
-        d = (1 - x) * (1 - x) + y * y
-        if d > ad:
-            ad = d
-            ax = x
-            ay = y
-            ap = score
-        d = x * x + (1 - y) * (1 - y)
-        if d < bd:
-            bd = d
-            bx = x
-            by = y
-            bp = score
-        d = y - x
-        if d > cd:
-            cd = d
-            cx = x
-            cy = y
-            cp = score
-        if dx == 0 and y > 20.0 * x:
-            #print x, y
-            dx = x
-            dy = y
-            dp = score
-        if 1.0 - x > 20.0 * (1.0 - y):
-            #print x, y, (1.0 - y) / (1.0 - x)
-            ex = x
-            ey = y
-            ep = score
+        if i > next_label:
+            labels.append((score, x, y))
+            next_label += step
         fp.append(x)
         tp.append(y)
 
@@ -1100,24 +1077,8 @@ def draw_presence_roc(scores, label='presence'):
 
     fp.reverse()
     tp.reverse()
-    print "~best %0.3f  %.3f true, %.3f false" % (cp, cy, cx)
-    print "halfway 0.5  %.3f true, %.3f false" % (hy, hx)
     plt.plot(fp, tp, label=label)
-    if 0:
-        plt.annotate("95%% negative %.2g" % ep, (ex, ey), (0.7, 0.7),
-                     arrowprops={'width':1, 'color': '#0088aa'},
-                     )
-        plt.annotate("95%% positive %.2g" % dp, (dx, dy), (0.2, 0.2),
-                     arrowprops={'width':1, 'color': '#8800aa'},
-                     )
-        plt.annotate("0.5", (hx, hy), (0.4, 0.4),
-                     arrowprops={'width':1, 'color': '#00cc00'})
-        plt.annotate("furthest from all bad %.2g" % ap, (ax, ay), (0.3, 0.3),
-                     arrowprops={'width':1, 'color': '#00cccc'},
-                     )
-        plt.annotate("closest to all good %.2g" % bp, (bx, by), (0.6, 0.6),
-                     arrowprops={'width':1, 'color': '#cc0000'},
-                     )
-        plt.annotate("furthest from diagonal %.2g" % cp, (cx, cy), (0.5, 0.5),
-                     arrowprops={'width':1, 'color': '#aa6600'},
-                     )
+    if label_every:
+        for score, x, y in labels:
+            plt.annotate("%.2f" % score, xy=(x, y), xytext=(-5, 5), ha='right',
+                         textcoords='offset points')
