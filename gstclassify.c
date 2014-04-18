@@ -1067,6 +1067,7 @@ gst_classify_setup(GstAudioFilter *base, const GstAudioInfo *info){
     self->write_offset = 0;
     self->read_offset = 0;
   }
+  GST_DEBUG("finished setup()");
   return TRUE;
 }
 
