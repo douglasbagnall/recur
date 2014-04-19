@@ -1,0 +1,111 @@
+#!/usr/bin/python
+#Copyright 2014 Douglas Bagnall <douglas@halo.gen.nz> LGPL/MPL2
+
+import sys
+import struct, array
+import cdb
+
+def read_int(n, key, unsigned=False):
+    v = n[key]
+    format = ' bh i   q'[len(v)]
+    if format == ' ':
+        raise ValueError("%r has invalid size %d" % (key, len(v)))
+    if unsigned:
+        format = format.upper()
+    return struct.unpack('<' + format, v)[0]
+
+def read_uint(*args):
+    return read_int(*args, unsigned=True)
+
+def read_flags(n, key):
+    v = n[key]
+    bitlen = len(v) * 8
+    i = read_int(n, key, True)
+    bits = []
+    for x in range(bitlen):
+        bits.append('.X'[i & 1])
+        i >>= 1
+    return ''.join(bits[::-1])
+
+def read_float(n, key):
+    v = n[key]
+    format = '    f   d'[len(v)]
+    if format == ' ':
+        raise ValueError("%r has invalid size %d" % (key, len(v)))
+    return struct.unpack('<' + format, v)[0]
+
+def read_float_array(n, key):
+    pass
+
+def read_string(n, key):
+    return '\n' + n[key]
+
+def read_rng(*args):
+    pass
+
+KEYS = {'net.i_size': (read_int, True),
+        'net.h_size': (read_int, True),
+        'net.o_size': (read_int, True),
+        'net.input_size': (read_int, True),
+        'net.hidden_size': (read_int, True),
+        'net.output_size': (read_int, True),
+        'net.ih_size': (read_int, True),
+        'net.ho_size': (read_int, True),
+        'net.bias': (read_int, True),
+        'net.flags': (read_flags, True),
+        'net.ih_weights': (read_float_array, False),
+        'net.ho_weights': (read_float_array, False),
+        'bottom_layer.input_size': (read_int, True),
+        'bottom_layer.output_size': (read_int, True),
+        'bottom_layer.i_size': (read_int, True),
+        'bottom_layer.o_size': (read_int, True),
+        'bottom_layer.overlap': (read_int, True),
+        'bottom_layer.weights': (read_float_array, False),
+        'net.generation': (read_uint, True),
+        'bptt.depth': (read_int, True),
+        'bptt.index': (read_int, True),
+        'bptt.ih_scale': (read_float, True),
+        'bptt.ho_scale': (read_float, True),
+        'bptt.momentum': (read_float, True),
+        'bptt.momentum_weight': (read_float, True),
+        'bptt.learn_rate': (read_float, True),
+        'bptt.min_error_factor': (read_float, True),
+        #'net.rng': (read_rng, False),
+
+        'save_format_version': (read_int, True),
+        'net.metadata': (read_string, True),
+
+        #older versions
+        'bias': (read_int, True),
+        'depth': (read_int, True),
+        'flags': (read_int, True),
+        'h_size': (read_int, True),
+        'hidden_size': (read_int, True),
+        'ho_size': (read_int, True),
+        'ho_weights': (read_float_array, False),
+        'i_size': (read_int, True),
+        'ih_size': (read_int, True),
+        'ih_weights': (read_float_array, False),
+        'input_size': (read_int, True),
+        'o_size': (read_int, True),
+        'output_size': (read_int, True),
+        'generation': (read_int, True),
+}
+
+
+def read(fn, *keys):
+    n = cdb.init(fn)
+    if not keys:
+        keys = sorted(n.keys())
+    for k in keys:
+        try:
+            fn, show = KEYS[k]
+            if show:
+                print "%24s: %s" % (k, fn(n, k))
+        except KeyError:
+            print "unknown key '%s'" % k
+
+def main():
+    read(*sys.argv[1:])
+
+main()
