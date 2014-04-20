@@ -333,8 +333,15 @@ void
 rnn_randomise_weights_auto(RecurNN *net){
   /*heuristically choose an initialisation scheme for the size of net */
   /*initial heuristic is very simple*/
+#if 0
   float ratio = net->input_size  * 1.0f / net->hidden_size;
   rnn_randomise_weights_fan_in(net, 2.0, 0.3, 0.1, ratio);
+#endif
+
+  rnn_randomise_weights(net, RNN_INITIAL_WEIGHT_VARIANCE_FACTOR / net->h_size,
+      1, 0);
+  memset(net->ih_weights, 0, net->h_size * net->h_size * sizeof(float));
+  rnn_initialise_long_loops(net, 15, sqrtf(net->ih_size) / 2, 0.2);
 }
 
 static inline float
@@ -456,6 +463,66 @@ void rnn_emphasise_diagonal(RecurNN *net, float magnitude, float proportion){
   }
 }
 
+static inline void
+long_loop(RecurNN *net, int len, float target_gain){
+  int hsize = net->hidden_size;
+  int loop[hsize];
+  int i, j;
+  len = MIN(len, hsize);
+  float gain = 1.0f;
+  float weight;
+  float target_gain_per_round = powf(target_gain, 1.0f / len);
+  float target_gain_running = 1.0f;
+  const float sqrt_half_pi = 1.2533141373155f;
+
+  /*construct then shuffle the loop, 1 based to account for bias*/
+  for (i = 0; i < hsize; i++){
+    loop[i] = i;
+  }
+
+  j = RAND_SMALL_INT_RANGE(&net->rng, 0, hsize);
+  int s;
+  int e = j + 1;
+  loop[j] = 0;
+  int beginning = e;
+  STDERR_DEBUG("beginning loop of %d, gain %f", len, target_gain);
+  for (i = 1; i < len; i++){
+    s = e;
+    j = RAND_SMALL_INT_RANGE(&net->rng, i, hsize);
+    e = loop[j] + 1;
+    loop[j] = loop[i];
+
+    target_gain_running *= target_gain_per_round;
+    float current_target_gain = target_gain_running / gain;
+    do {
+      /*Gaussian magnitude has expected value/mean of sqrt(2/pi) ~ 0.7979
+        (not counting the zero avoidance in while clause).
+        We want it to be target_gain_running / gain, so scale it
+        accordingly.
+      */
+      weight = cheap_gaussian_noise(&net->rng) * sqrt_half_pi * current_target_gain;
+    } while (fabsf(weight) < 0.05 || fabsf(weight) > 10);
+    /*XXX += or = ? -- clobber the other or not? */
+    net->ih_weights[s * net->h_size + e] += weight;
+    gain *= weight;
+    STDERR_DEBUG(" leg %3d: weight %.3f total gain %.3f", i, weight, gain);
+  }
+  /*now to complete the loop, link back to the beginning with the appropriate
+    gain. */
+  weight = target_gain / gain;
+  s = e;
+  net->ih_weights[s * net->h_size + beginning] += weight;
+  gain *= weight;
+  STDERR_DEBUG(" leg %3d: weight %.3f total gain %.3f", i, weight, gain);
+}
+
+
+void rnn_initialise_long_loops(RecurNN* net, int loop_len, int n_loops, float gain){
+  for (int i = 0; i < n_loops; i++){
+    STDERR_DEBUG(" loop number %d", i);
+    long_loop(net, loop_len, gain);
+  }
+}
 
 void
 rnn_scale_initial_weights(RecurNN *net, float factor){

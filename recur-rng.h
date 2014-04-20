@@ -94,6 +94,9 @@ rand_small_int(rand_ctx *rng, int cap){
   return (int)d;
 }
 
+#define RAND_SMALL_INT_RANGE(rng, start, cap) \
+  ((start) + rand_small_int(rng, (cap) - (start)))
+
 /*recipricals of 1<<31, 1<<62 */
 #define RECIP31f 4.656612873077393e-10f
 #define RECIP62f 2.168404344971009e-19f
