@@ -42,7 +42,6 @@ Because of ccan/opt, --help will tell you something.
 #define DEFAULT_MOMENTUM 0.95
 #define DEFAULT_MOMENTUM_WEIGHT RNN_MOMENTUM_WEIGHT
 #define DEFAULT_MOMENTUM_SOFT_START 0
-#define DEFAULT_BIAS 1
 #define DEFAULT_RNG_SEED 1
 #define DEFAULT_STOP 0
 #define DEFAULT_BATCH_SIZE 1
@@ -100,7 +99,6 @@ static char * opt_alphabet = NET_TO_CHAR;
 static char * opt_collapse_chars = HASH_CHARS;
 static char * opt_textfile = DICKENS_SHUFFLED_TEXT;
 static char * opt_dump_collapsed_text = DEFAULT_DUMP_COLLAPSED_TEXT;
-static bool opt_bias = DEFAULT_BIAS;
 static bool opt_reload = DEFAULT_RELOAD;
 static float opt_dropout = DEFAULT_DROPOUT;
 static float opt_momentum_weight = DEFAULT_MOMENTUM_WEIGHT;
@@ -192,10 +190,6 @@ static struct opt_table options[] = {
       &opt_quiet, "print less (twice for even less)"),
   OPT_WITHOUT_ARG("-v|--verbose", opt_dec_intval,
       &opt_quiet, "print more, if possible"),
-  OPT_WITHOUT_ARG("--bias", opt_set_bool,
-      &opt_bias, "use bias (default)"),
-  OPT_WITHOUT_ARG("--no-bias", opt_set_invbool,
-      &opt_bias, "Don't use bias"),
   OPT_WITHOUT_ARG("-R|--reload", opt_set_bool,
       &opt_reload, "try to reload the net"),
   OPT_WITHOUT_ARG("-N|--no-reload", opt_set_invbool,
@@ -714,14 +708,14 @@ construct_net_filename(void){
     sig ^= ROTATE(sig - s[i], 13) + s[i];
   }
   if (opt_bottom_layer){
-    snprintf(s, sizeof(s), "text-s%0x-i%d-b%d-h%d-o%d-b%d-c%d.net",
+    snprintf(s, sizeof(s), "text-s%0x-i%d-b%d-h%d-o%d-c%d.net",
         sig, input_size, opt_bottom_layer, opt_hidden_size, output_size,
-        opt_bias, opt_learn_capitals);
+        opt_learn_capitals);
   }
   else{
-    snprintf(s, sizeof(s), "text-s%0x-i%d-h%d-o%d-b%d-c%d.net",
+    snprintf(s, sizeof(s), "text-s%0x-i%d-h%d-o%d-c%d.net",
         sig, input_size, opt_hidden_size, output_size,
-        opt_bias, opt_learn_capitals);
+        opt_learn_capitals);
   }
   DEBUG("filename: %s", s);
   return strdup(s);
@@ -746,7 +740,7 @@ load_or_create_net(void){
       input_size++;
       output_size += 2;
     }
-    u32 flags = opt_bias ? RNN_NET_FLAG_STANDARD : RNN_NET_FLAG_NO_BIAS;
+    u32 flags = RNN_NET_FLAG_STANDARD;
     if (opt_bptt_adaptive_min){/*on by default*/
       flags |= RNN_NET_FLAG_BPTT_ADAPTIVE_MIN_ERROR;
     }

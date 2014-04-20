@@ -237,9 +237,9 @@ gst_parrot_init (GstParrot * self)
 static void
 reset_net_filename(GstParrot *self){
   char s[200];
-  snprintf(s, sizeof(s), "parrot-i%d-h%d-o%d-b%d-%dHz.net",
+  snprintf(s, sizeof(s), "parrot-i%d-h%d-o%d-%dHz.net",
       PARROT_N_FEATURES, self->hidden_size, PARROT_WINDOW_SIZE,
-      PARROT_BIAS, PARROT_RATE);
+      PARROT_RATE);
   if (self->net_filename){
     free(self->net_filename);
   }

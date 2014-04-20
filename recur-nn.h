@@ -75,7 +75,7 @@ enum {
 enum {
   RNN_NET_FLAG_OWN_BPTT = 1,
   RNN_NET_FLAG_OWN_WEIGHTS = 2,
-  RNN_NET_FLAG_BIAS = 4,
+  //RNN_NET_FLAG_BIAS = 4, /*reserved for a while */
   RNN_NET_FLAG_LOG_APPEND = 8,
   RNN_NET_FLAG_LOG_HIDDEN_SUM = 16, /*log the hidden sum */
   RNN_NET_FLAG_LOG_WEIGHT_SUM = 32, /*log the weight sum (can be expensive)*/
@@ -95,8 +95,7 @@ enum {
   /*more flags can fit after 1 << 24 or so */
 
   RNN_NET_FLAG_STANDARD = (RNN_NET_FLAG_OWN_BPTT | RNN_NET_FLAG_OWN_WEIGHTS \
-       | RNN_COND_USE_ZERO | RNN_NET_FLAG_BIAS | RNN_NET_FLAG_LOG_HIDDEN_SUM),
-  RNN_NET_FLAG_NO_BIAS = RNN_NET_FLAG_STANDARD & ~ RNN_NET_FLAG_BIAS
+       | RNN_COND_USE_ZERO | RNN_NET_FLAG_LOG_HIDDEN_SUM),
 };
 
 
@@ -126,7 +125,6 @@ struct _RecurNN {
   /*matrix sizes */
   int ih_size;
   int ho_size;
-  int bias;
   u32 flags;
   FILE *log;
   float *mem;

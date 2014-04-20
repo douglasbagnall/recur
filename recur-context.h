@@ -35,11 +35,10 @@ typedef s16 audio_sample;
 #define RECUR_N_MFCCS 15
 #define RECUR_N_VIDEO_FEATURES ((RECUR_INPUT_HEIGHT + 2) * (RECUR_INPUT_WIDTH + 2) * 3)
 #define RECUR_N_HIDDEN 199
-#define RECUR_BIAS 1
 #define RECUR_BPTT_DEPTH 20
 #define RECUR_RNG_SEED -1
 
-#define NET_FILENAME "recur-" QUOTE(RECUR_N_HIDDEN) "-" QUOTE(RECUR_BIAS) ".net"
+#define NET_FILENAME "recur-" QUOTE(RECUR_N_HIDDEN) ".net"
 #define PERIODIC_SAVE_NET 1
 #define TRY_RELOAD 1
 

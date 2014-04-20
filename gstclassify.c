@@ -614,14 +614,14 @@ set_net_filename(GstClassify *self, int hidden_size, int bottom_layer,
   }
   int n_features = get_n_features(self);
   if (bottom_layer > 0){
-    snprintf(s, sizeof(s), "%s-%0x-i%d-b%d-h%d-o%d-b%d-%dHz-w%d.net",
+    snprintf(s, sizeof(s), "%s-%0x-i%d-b%d-h%d-o%d-%dHz-w%d.net",
         self->basename, sig, n_features, bottom_layer, hidden_size, top_layer_size,
-        CLASSIFY_BIAS, CLASSIFY_RATE, self->window_size);
+        CLASSIFY_RATE, self->window_size);
   }
   else {
-    snprintf(s, sizeof(s), "%s-%0x-i%d-h%d-o%d-b%d-%dHz-w%d.net",
+    snprintf(s, sizeof(s), "%s-%0x-i%d-h%d-o%d-%dHz-w%d.net",
         self->basename, sig, n_features, hidden_size, top_layer_size,
-        CLASSIFY_BIAS, CLASSIFY_RATE, self->window_size);
+        CLASSIFY_RATE, self->window_size);
   }
   self->net_filename = strdup(s);
 }

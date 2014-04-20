@@ -70,16 +70,14 @@ rnn_new(uint input_size, uint hidden_size, uint output_size, u32 flags,
     u64 rng_seed, const char *log_file, int bptt_depth, float learn_rate,
     float momentum){
   RecurNN *net = calloc(1, sizeof(RecurNN));
-  int bias = !! (flags & RNN_NET_FLAG_BIAS);
   float *fm;
   /*sizes */
-  size_t i_size = ALIGNED_VECTOR_LEN(hidden_size + input_size + bias, float);
-  size_t h_size = ALIGNED_VECTOR_LEN(hidden_size + bias, float);
+  size_t i_size = ALIGNED_VECTOR_LEN(hidden_size + input_size + 1, float);
+  size_t h_size = ALIGNED_VECTOR_LEN(hidden_size + 1, float);
   size_t o_size = ALIGNED_VECTOR_LEN(output_size, float);
   size_t ih_size = i_size * h_size;
   size_t ho_size = h_size * o_size;
   /*scalar attributes */
-  net->bias = bias;
   net->i_size = i_size;
   net->h_size = h_size;
   net->o_size = o_size;
@@ -119,7 +117,7 @@ rnn_new(uint input_size, uint hidden_size, uint output_size, u32 flags,
     rnn_bptt_advance(net);
   }
   else {
-    net->real_inputs = net->input_layer + net->hidden_size + net->bias;
+    net->real_inputs = net->input_layer + net->hidden_size + 1;
   }
 
   if (log_file){
@@ -146,14 +144,13 @@ rnn_new_extra_layer(int input_size, int output_size, int overlap,
     u32 flags)
 {
   RecurExtraLayer *layer = zalloc_aligned_or_die(sizeof(RecurExtraLayer));
-  int bias = !! (flags & RNN_NET_FLAG_BIAS);
   layer->input_size = input_size;
   layer->output_size = output_size;
   layer->input_size = input_size;
   layer->output_size = output_size;
   layer->overlap = overlap;
   layer->learn_rate_scale = 1.0;
-  layer->i_size = ALIGNED_VECTOR_LEN(input_size + bias, float);
+  layer->i_size = ALIGNED_VECTOR_LEN(input_size + 1, float);
   layer->o_size = ALIGNED_VECTOR_LEN(output_size, float);
   int matrix_size = layer->i_size * layer->o_size;
 
@@ -274,18 +271,12 @@ rnn_set_log_file(RecurNN *net, const char *log_file, int append_dont_truncate){
   struct matching the parent's in structure but not inheriting momentum,
   history, and so forth.
 
-  the RNN_NET_FLAG_BIAS has no effect: the parent net's bias is used.
  */
 
 RecurNN *
 rnn_clone(RecurNN *parent, u32 flags,
     u64 rng_seed, const char *log_file){
   RecurNN *net;
-  if (parent->bias)
-    flags |= RNN_NET_FLAG_BIAS;
-  else
-    flags &= ~RNN_NET_FLAG_BIAS;
-
   if (rng_seed == RECUR_RNG_SUBSEED){
     do {
       rng_seed = rand64(&parent->rng);
@@ -373,14 +364,14 @@ rnn_randomise_weights(RecurNN *net, float variance, int shape, double perforatio
   else if (perforation >= 1.0){
     return; /*perforation of 1 means entirely zeros */
   }
-  for (y = 0; y < net->input_size + net->hidden_size + net->bias; y++){
-    for (x = net->bias; x < net->hidden_size + net->bias; x++){
+  for (y = 0; y < net->input_size + net->hidden_size + 1; y++){
+    for (x = 1; x <= net->hidden_size; x++){
       if (rand_double(&net->rng) > perforation){
         net->ih_weights[y * net->h_size + x] = gaussian_power(&net->rng, variance, shape);
       }
     }
   }
-  for (y = 0; y < net->hidden_size + net->bias; y++){
+  for (y = 0; y <= net->hidden_size; y++){
     for (x = 0; x < net->output_size; x++){
       if (rand_double(&net->rng) > perforation){
         net->ho_weights[y * net->o_size + x] = gaussian_power(&net->rng, variance, shape);
@@ -424,16 +415,16 @@ rnn_randomise_weights_fan_in(RecurNN *net, float sum, float kurtosis,
     float margin, float inputs_weight_ratio){
   memset(net->ih_weights, 0, net->ih_size * sizeof(float));
   memset(net->ho_weights, 0, net->ho_size * sizeof(float));
-  int hsize = net->bias + net->hidden_size;
+  int hsize = 1 + net->hidden_size;
   if (inputs_weight_ratio > 0){
-    randomise_weights_fan_in(&net->rng, net->ih_weights + net->bias,
+    randomise_weights_fan_in(&net->rng, net->ih_weights + 1,
         net->hidden_size, hsize, net->h_size, sum, kurtosis, margin);
-    randomise_weights_fan_in(&net->rng, net->ih_weights + hsize * net->h_size + net->bias,
+    randomise_weights_fan_in(&net->rng, net->ih_weights + hsize * net->h_size + 1,
         net->hidden_size, net->input_size, net->h_size,
         sum * inputs_weight_ratio, kurtosis, margin);
   }
   else {
-    randomise_weights_fan_in(&net->rng, net->ih_weights + net->bias,
+    randomise_weights_fan_in(&net->rng, net->ih_weights + 1,
         net->hidden_size, hsize + net->input_size, net->h_size,
         sum, kurtosis, margin);
   }
@@ -444,7 +435,7 @@ rnn_randomise_weights_fan_in(RecurNN *net, float sum, float kurtosis,
     RecurExtraLayer *bl = net->bottom_layer;
     memset(bl->weights, 0, bl->i_size * bl->o_size * sizeof(float));
     randomise_weights_fan_in(&net->rng, bl->weights, bl->output_size,
-        bl->input_size + net->bias, bl->o_size,
+        bl->input_size + 1, bl->o_size,
         sum, kurtosis, margin);
   }
 }
@@ -457,9 +448,9 @@ void rnn_perforate_weights(RecurNN *net, float p){
 
 void rnn_emphasise_diagonal(RecurNN *net, float magnitude, float proportion){
   int i;
-  int n = MIN(net->hidden_size * proportion + net->bias, net->hidden_size);
+  int n = MIN(net->hidden_size * proportion + 1, net->hidden_size);
 
-  for (i = net->bias; i < n; i++){
+  for (i = 1; i < n; i++){
     int offset = i * (net->h_size + 1);
     net->ih_weights[offset] += rand_double(&net->rng) * 2 * magnitude - magnitude;
   }

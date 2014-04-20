@@ -51,7 +51,7 @@ KEYS = {'net.i_size': (read_int, True),
         'net.output_size': (read_int, True),
         'net.ih_size': (read_int, True),
         'net.ho_size': (read_int, True),
-        'net.bias': (read_int, True),
+        'net.bias': (read_int, True), #obsolete
         'net.flags': (read_flags, True),
         'net.ih_weights': (read_float_array, False),
         'net.ho_weights': (read_float_array, False),

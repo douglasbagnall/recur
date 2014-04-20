@@ -2,12 +2,13 @@
 #include "recur-nn.h"
 #include "recur-nn-helpers.h"
 
+#define INPUT_OFFSET(net) ((net)->hidden_size + 1)
 
 void
 rnn_forget_history(RecurNN *net, int bptt_too){
   zero_aligned_array(net->hidden_layer, net->h_size);
   /*zero aligned array doesn't work on possibly unaligned length */
-  memset(net->input_layer, 0, (net->hidden_size + net->bias) * sizeof(float));
+  memset(net->input_layer, 0, INPUT_OFFSET(net) * sizeof(float));
   if (bptt_too && net->bptt){
     zero_aligned_array(net->bptt->history, net->bptt->depth * net->i_size);
   }
@@ -105,16 +106,13 @@ rnn_opinion(RecurNN *net, const float *inputs, float dropout){
   /*If inputs is NULL, assume the inputs have already been set. If dropout is
     non-zero, dropout that many recurrent nodes. If there is a bottom layer,
     it is not dropped out.*/
-  int bias = net->bias;
 
   if (net->bottom_layer){
     /*possible bottom layer */
     RecurExtraLayer *layer = net->bottom_layer;
-    if (bias){
-      layer->inputs[0] = 1.0f;
-    }
+    layer->inputs[0] = 1.0f; /*bias*/
     if (inputs){
-      memcpy(layer->inputs + bias, inputs, layer->input_size * sizeof(float));
+      memcpy(layer->inputs + 1, inputs, layer->input_size * sizeof(float));
     }
     calculate_interlayer(layer->inputs, layer->i_size, layer->outputs, layer->o_size,
         layer->weights);
@@ -125,16 +123,16 @@ rnn_opinion(RecurNN *net, const float *inputs, float dropout){
   }
 
   /*copy in hiddens */
-  int hsize = net->hidden_size + net->bias;
-  memcpy(net->input_layer, net->hidden_layer, hsize * sizeof(float));
+  memcpy(net->input_layer, net->hidden_layer,
+      INPUT_OFFSET(net) * sizeof(float));
 
   /* possibly dropout */
   if (dropout){
-    dropout_array(net->input_layer + bias, net->hidden_size, dropout, &net->rng);
+    dropout_array(net->input_layer + 1, net->hidden_size, dropout, &net->rng);
   }
 
-  if (bias)
-    net->input_layer[0] = 1.0f;
+  /*bias, possibly unnecessary */
+  net->input_layer[0] = 1.0f;
 
   /* in emergencies, clamp the scale of the input vector */
   maybe_scale_inputs(net);
@@ -145,7 +143,7 @@ rnn_opinion(RecurNN *net, const float *inputs, float dropout){
   ASSUME_ALIGNED(net->hidden_layer);
 
   if (dropout){
-    float s = net->hidden_size + net->bias + net->input_size;
+    float s = net->hidden_size + 1 + net->input_size;
     float dropout_scale = s / (s - net->hidden_size * dropout);
     for (int i = 0; i < net->h_size; i++){
       float h = net->hidden_layer[i] - RNN_HIDDEN_PENALTY;
@@ -160,13 +158,11 @@ rnn_opinion(RecurNN *net, const float *inputs, float dropout){
   }
 
   maybe_scale_hiddens(net);
+  net->hidden_layer[0] = 1.0f;
 
-  if (net->bias){
-    net->hidden_layer[0] = 1.0f;
-  }
   /*wipe any left over inputs from the previous generation (up to 3, depending
     on alignment) */
-  for (int i = net->hidden_size + net->bias; i < net->h_size; i++){
+  for (int i = INPUT_OFFSET(net); i < net->h_size; i++){
     net->hidden_layer[i] = 0;
   }
   calculate_interlayer(net->hidden_layer, net->h_size,
@@ -182,8 +178,7 @@ backprop_single_layer(
     float *restrict i_error,
     int i_size,
     const float *restrict o_error,
-    int o_size,
-    int bias)
+    int o_size)
 {
   int x, y;
   float error_sum = 0.0f;
@@ -192,7 +187,7 @@ backprop_single_layer(
   ASSUME_ALIGNED(o_error);
   ASSUME_ALIGNED(weights);
 
-  for (y = bias; y < i_size; y++){
+  for (y = 1; y < i_size; y++){
     float e = 0.0f;
     if (inputs[y]){
       const float *restrict row = weights + y * o_size;
@@ -218,8 +213,7 @@ backprop_top_layer(RecurNN *net)
       net->bptt->h_error,
       net->h_size,
       net->bptt->o_error,
-      net->o_size,
-      net->bias);
+      net->o_size);
 }
 
 /*single_layer_sgd does gradient descent for a single layer (i.e., top layer
@@ -272,10 +266,8 @@ bptt_and_accumulate_error(RecurNN *net, float *restrict ih_delta,
     int offset = (t + bptt->index) % bptt->depth;
     const float *restrict inputs = bptt->history + offset * net->i_size;
     ASSUME_ALIGNED(inputs);
-    if (net->bias){
-      h_error[0] = 0.0;
-    }
-    for (int i = net->hidden_size + net->bias; i < net->h_size; i++){
+    h_error[0] = 0.0;
+    for (int i = INPUT_OFFSET(net); i < net->h_size; i++){
       h_error[i] = 0.0;
     }
     for (y = 0; y < net->i_size; y++){
@@ -313,7 +305,7 @@ bptt_and_accumulate_error(RecurNN *net, float *restrict ih_delta,
       }
     }
     if (cumulative_input_error){
-      float *input_error = i_error + net->hidden_size + net->bias;
+      float *input_error = i_error + INPUT_OFFSET(net);
       for (y = 0; y < net->input_size; y++){
         cumulative_input_error[y] += input_error[y];
       }
@@ -504,7 +496,7 @@ rnn_bptt_advance(RecurNN *net){
   if (bptt->index == bptt->depth)
     bptt->index -= bptt->depth;
   net->input_layer = bptt->history + bptt->index * net->i_size;
-  net->real_inputs = net->input_layer + net->bias + net->hidden_size;
+  net->real_inputs = net->input_layer + INPUT_OFFSET(net);
 }
 
 
@@ -617,7 +609,7 @@ rnn_condition_net(RecurNN *net)
       }
       else {
         int col = t % net->h_size;
-        if (col >= net->bias && col < net->hidden_size + net->bias){
+        if (col >= 1 && col < INPUT_OFFSET(net)){
           net->ih_weights[t] += damage;
         }
       }
@@ -705,10 +697,7 @@ apply_sgd_top_layer(RecurNN *net){
 
   int y, x;
 
-  if (net->bias){
-    hiddens[0] = 1.0f;
-  }
-
+  hiddens[0] = 1.0f;
   error_sum = backprop_top_layer(net);
 
   for (y = 0; y < net->h_size; y++){

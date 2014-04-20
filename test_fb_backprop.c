@@ -19,7 +19,6 @@ The FB1 and FB2 constants below set the period, with 3 and 5 being standard.
 #define BPTT_DEPTH 30
 #define CONFAB_SIZE 70
 #define LEARN_RATE 0.002
-#define BIAS 1
 #define HIDDEN_SIZE 39
 #define INPUT_SIZE 2
 #define BATCH_SIZE 1
@@ -35,8 +34,7 @@ static const char CONFAB_LUT[] = " |S$";
 
 static inline void
 load_char_input(RecurNN *net, int c){
-  if (net->bias)
-    net->input_layer[0] = 1.0f;
+  net->input_layer[0] = 1.0f;
   net->real_inputs[0] = (c & 1);
   net->real_inputs[1] = (c & 2) >> 1;
 }
@@ -121,12 +119,10 @@ void dump_parameters(void){
   DEBUG(
       "HIDDEN_SIZE %d\n"
       "LEARN_RATE %f\n"
-      "BIAS %d\n"
       "MOMENTUM %f\n"
       ,
       HIDDEN_SIZE,
       LEARN_RATE,
-      BIAS,
       MOMENTUM);
 }
 
@@ -135,7 +131,7 @@ main(void){
   dump_parameters();
   feenableexcept(FE_DIVBYZERO | FE_INVALID | FE_OVERFLOW);
   RecurNN *net = rnn_new(INPUT_SIZE, HIDDEN_SIZE,
-      INPUT_SIZE, BIAS ? RNN_NET_FLAG_STANDARD : RNN_NET_FLAG_NO_BIAS,
+      INPUT_SIZE, RNN_NET_FLAG_STANDARD,
       1, NET_LOG_FILE, BPTT_DEPTH, LEARN_RATE, MOMENTUM);
   rnn_randomise_weights_auto(net);
   START_TIMER(epoch);

@@ -77,7 +77,6 @@ rnn_save_net(RecurNN *net, const char *filename, int backup){
   SAVE_SCALAR(net, output_size);
   SAVE_SCALAR(net, ih_size);
   SAVE_SCALAR(net, ho_size);
-  SAVE_SCALAR(net, bias);
   SAVE_SCALAR(net, generation);
   SAVE_SCALAR(net, flags);
   SAVE_SCALAR(net, rng); /* a struct, should work? */
@@ -189,7 +188,6 @@ rnn_load_net(const char *filename){
 
   READ_SCALAR(net, ih_size);
   READ_SCALAR(net, ho_size);
-  READ_SCALAR(net, bias);
   READ_SCALAR(net, rng);
   READ_SCALAR(net, generation);
   READ_SCALAR(net, flags);
@@ -258,7 +256,6 @@ rnn_load_net(const char *filename){
 
   CHECK_SCALAR(net, tmpnet, ih_size);
   CHECK_SCALAR(net, tmpnet, ho_size);
-  CHECK_SCALAR(net, tmpnet, bias);
 
   CHECK_SCALAR(net, tmpnet, rng.a);
   CHECK_SCALAR(net, tmpnet, rng.b);

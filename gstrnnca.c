@@ -45,7 +45,7 @@ enum
 #define DEFAULT_PROP_PLAYING 1
 #define DEFAULT_PROP_TRAINING 1
 #define DEFAULT_PROP_EDGES 0
-#define DEFAULT_HIDDEN_SIZE (52 - RNNCA_BIAS)
+#define DEFAULT_HIDDEN_SIZE (52 - 1)
 #define DEFAULT_LEARN_RATE 3e-3
 #define MIN_HIDDEN_SIZE 1
 #define MAX_HIDDEN_SIZE 1000000
@@ -259,9 +259,9 @@ static void
 reset_net_filename(GstRnnca *self){
   char s[200];
   int input_size = self->len_Y + self->len_C * 2 + self->len_pos;
-  snprintf(s, sizeof(s), "rnnca-i%d-h%d-o%d-b%d-y%d-uv%d-x%d-%s.net",
+  snprintf(s, sizeof(s), "rnnca-i%d-h%d-o%d-y%d-uv%d-x%d-%s.net",
       input_size, self->hidden_size, 3,
-      RNNCA_BIAS, self->len_Y, self->len_C, self->len_pos, self->offset_pattern);
+      self->len_Y, self->len_C, self->len_pos, self->offset_pattern);
   if (self->net_filename){
     free(self->net_filename);
   }
