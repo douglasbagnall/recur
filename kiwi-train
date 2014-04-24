@@ -45,7 +45,7 @@ def main():
                        help="Depth of BPTT training")
     group.add_argument('--activity-bias', type=int, default=1,
                        help="Train more on examples with changing classes")
-    group.add_argument('-P', '--prioritise', type=int, default=False,
+    group.add_argument('-P', '--prioritise', action='store_true',
                        help="Do not renice downwards")
 
     args = parser.parse_args()
