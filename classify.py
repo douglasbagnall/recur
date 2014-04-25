@@ -5,6 +5,7 @@ import itertools
 import time
 import json
 import numpy as np
+from math import sqrt
 
 _dirname = os.path.dirname(os.path.abspath(__file__))
 os.environ['GST_PLUGIN_PATH'] = _dirname
@@ -477,12 +478,10 @@ class Trainer(BaseClassifier):
                    (self.counter, self.iterations, generation, r, dropout)),
             self.setp('learn_rate', r)
 
-        self.probability_sums = []
-        self.probability_counts = []
+        self.probability_stats = []
         for group in self.class_groups:
-            self.probability_sums.append({x:[0.0, 0.0] for x in group})
-            self.probability_counts.append({x:[0.0, 0.0] for x in group})
-
+            self.probability_stats.append({x:([0.0, 0.0], [0.0, 0.0], [0.0, 0.0])
+                                           for x in group})
         self.next_set(self.trainers)
 
 
@@ -505,29 +504,36 @@ class Trainer(BaseClassifier):
     def evaluate_test(self):
         #print self.test_scores, self.classes, self.test_runs
         colours = [COLOURS[x] for x in 'PPrRYYGGgCC']
-        for classes, score, runs, probs, pcounts in zip(self.class_groups,
-                                                        self.test_scores,
-                                                        self.test_runs,
-                                                        self.probability_sums,
-                                                        self.probability_counts):
+        for (classes, score, runs, pstats) in zip(self.class_groups,
+                                                  self.test_scores,
+                                                  self.test_runs,
+                                                  self.probability_stats):
             #classes is a string
             #score and runs are dicts indexed by chars in classes
             output = [self.getp('basename'), ': ']
             rightness = 0
-            p_strings = [" scores (right/wrong)"]
+            p_strings = [" means:"]
             gap_p = 0
             ratio_p = 0
             count_p = 0
+            dprime = 0
             for c in classes:
-                wrong, right = probs[c]
-                wrong_c, right_c = pcounts[c]
-                right_p = right / right_c if right_c else 0.0
-                wrong_p = wrong / wrong_c if wrong_c else 0.0
+                pmeans, pvars, pcounts = pstats[c]
+                wrong_p, right_p = pmeans
+                wrong_c, right_c = pcounts
                 p_strings.append(" %s %.2f/%.2f " % (c, right_p, wrong_p))
-                if right_c and wrong_c and wrong_p:
-                    gap_p += right_p - wrong_p
+                wrong_var = pvars[0] / (wrong_c or 1e99)
+                right_var = pvars[1] / (right_c or 1e99)
+                gap_p += right_p - wrong_p
+                if wrong_p:
                     ratio_p += right_p / wrong_p
                     count_p += 1
+
+                gap = right_p - wrong_p
+                dp = gap / sqrt(0.5 * (right_var + wrong_var) or 1e99)
+                dprime += dp
+                print dp, dprime
+
                 s = score[c]
                 r = runs[c]
                 if r:
@@ -540,13 +546,16 @@ class Trainer(BaseClassifier):
                 else:
                     output.append('%s --- %d/0 ' % (c, s,))
             if count_p:
-                gap_p /= count_p
                 ratio_p /= count_p
+
+            dprime /= len(classes)
+            gap_p /= len(classes)
             rightness /= len(classes)
-            output.append(" %s%.2f %s%.2f %s%.2f%s" %
+            output.append(" %s%.2f %s%.2f %s%.2f %sd'%s%.2f%s" %
                           (colours[int(rightness * 9.99)], rightness,
                            colours[min(int(gap_p * 18), 9)], gap_p,
-                           colours[min(int(ratio_p * 2), 9)], ratio_p,
+                           colours[min(int(ratio_p * 2), 9)], ratio_p, COLOURS['Z'],
+                           colours[min(int(dprime * 3), 9)], dprime,
                            COLOURS['Z']))
 
             output.extend(p_strings)
@@ -618,12 +627,18 @@ class Trainer(BaseClassifier):
                     #print group, target, correct
                     self.test_scores[j][target] += correct
                     self.test_runs[j][target] += 1
+                    pstats = self.probability_stats[j]
                     for x in group:
+                        correct = x == target
+                        pmeans, pvars, pcounts = pstats[x]
+                        n = pcounts[correct] + 1
+                        pcounts[correct] = n
                         p = v('channel %d, group %d %s' % (i, j, x))
-                        #print x, target, p
-                        self.probability_sums[j][x][x == target] += p
-                        self.probability_counts[j][x][x == target] += 1.0
-
+                        mean = pmeans[correct]
+                        delta = p - mean
+                        mean += delta / n
+                        pvars[correct] += delta * (p - mean)
+                        pmeans[correct] = mean
 
 def negate_exponent(x):
     m, e = ("%.9e" % x).split('e')
