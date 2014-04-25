@@ -555,17 +555,18 @@ class Trainer(BaseClassifier):
                           (colours[int(rightness * 9.99)], rightness,
                            colours[min(int(gap_p * 18), 9)], gap_p,
                            colours[min(int(ratio_p * 2), 9)], ratio_p, COLOURS['Z'],
-                           colours[min(int(dprime * 3), 9)], dprime,
+                           colours[min(int(dprime * 4), 9)], dprime,
                            COLOURS['Z']))
 
             output.extend(p_strings)
 
             print ''.join(output)
-            if rightness > 0.8 or ratio_p > 5 or gap_p > 0.5:
-                self.save_named_net(tag='win-%d-gap-%d-ratio-%d' %
+            if rightness > 0.8 or ratio_p > 5 or gap_p > 0.5 or dprime > 1.5:
+                self.save_named_net(tag='win-%d-gap-%d-ratio-%d-dprime-%d' %
                                     (int(rightness * 100 + 0.5),
                                      int(gap_p * 100 + 0.5),
-                                     int(ratio_p + 0.5)))
+                                     int(ratio_p + 0.5),
+                                     int(dprime * 10 + 0.5)))
 
 
     def save_named_net(self, tag='', dir=SAVE_LOCATION):
