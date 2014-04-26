@@ -304,7 +304,7 @@ gst_classify_class_init (GstClassifyClass * klass)
       g_param_spec_string("net-filename", "net-filename",
           "Load net from here (and save here)",
           NULL,
-          G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
+          G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class, PROP_PGM_DUMP,
       g_param_spec_string("pgm-dump", "pgm-dump",
@@ -1543,6 +1543,11 @@ gst_classify_get_property (GObject * object, guint prop_id, GValue * value,
   case PROP_CLASSES:
     NET_OR_PP(self->class_groups[0].classes, string, 0, 0);
     break;
+  case PROP_NET_FILENAME:
+    NET_OR_PP(self->net_filename, string, 0, 0);
+    break;
+
+
 
 #undef NET_OR_PP
 

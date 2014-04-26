@@ -35,6 +35,8 @@ def main():
                        help="Don't compare with canonical timings")
     group.add_argument('--presence-roc', action='store_true',
                        help="plot a ROC curve of presence (implies --roc)")
+    group.add_argument('--summary', action='store_true',
+                       help="print short message indicating goodness")
 
     args = parser.parse_args()
     timed = not args.no_timings
@@ -61,6 +63,7 @@ def main():
                call_edge_threshold=args.call_edge_threshold,
                call_peak_threshold=args.call_peak_threshold,
                call_duration_threshold=args.call_duration_threshold,
-               show_presence_roc=args.presence_roc, target_index=args.target_class)
+               show_presence_roc=args.presence_roc, target_index=args.target_class,
+               summarise=args.summary)
 
 main()

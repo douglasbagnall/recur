@@ -169,7 +169,8 @@ class Classifier(BaseClassifier):
                  call_peak_threshold=0,
                  call_duration_threshold=0,
                  show_presence_roc=False,
-                 target_index=None):
+                 target_index=None,
+                 summarise=False):
         if len(self.classes) == 2 and target_index is None:
             self.target_index = self.classes[1]
         else:
@@ -192,11 +193,12 @@ class Classifier(BaseClassifier):
         self.call_duration_threshold = call_duration_threshold
         self.show_roc = show_roc
         self.show_presence_roc = show_presence_roc
+        self.summarise = summarise
         self.data = list(reversed(data))
         self.setp('training', False)
-        if self.show_roc:
+        if self.show_roc or self.summarise:
             self.scores = {x[0]:[] for x in self.collected_classes}
-        if self.show_presence_roc:
+        if self.show_presence_roc or self.summarise:
             self.minute_results = {x[0]:[] for x in self.collected_classes}
             self.minute_gt = {x[0]:[] for x in self.collected_classes}
         self.load_next_file()
@@ -359,9 +361,13 @@ class Classifier(BaseClassifier):
 
             print >>self.call_json_file, json.dumps(row)
 
-        if self.show_presence_roc:
+        if self.show_presence_roc or self.summarise:
             #window = np.kaiser(15, 6)
-            for k, v in scores.items():
+            if self.target_index:
+                items = [(self.target_index, scores[self.target_index])]
+            else:
+                items = scores.items()
+            for k, v in items:
                 gt = any([x[1] for x in v[10:]])
                 s = np.array([x[0] for x in v])
                 #s = np.convolve(s, window)
@@ -373,11 +379,19 @@ class Classifier(BaseClassifier):
                 else:
                     print >> sys.stderr, "ignoring presence results of length %d" % len(s)
 
-        if self.show_roc:
+        if self.show_roc or self.summarise:
             for k in self.scores:
                 self.scores[k].extend(scores[k])
 
         if not self.data:
+            if self.summarise and self.target_index:
+                import json
+                stats = calc_stats(self.scores[self.target_index],
+                                   self.minute_results[self.target_index],
+                                   self.minute_gt[self.target_index])
+                stats['filename'] = self.getp('net-filename')
+                print json.dumps(stats)
+
             if self.show_roc:
                 if self.target_index:
                     classes = [self.target_index]
@@ -396,7 +410,6 @@ class Classifier(BaseClassifier):
                                               '%s-nth %s' % (k, index), label_every=le)
 
                 actually_show_roc(title=self.getp('basename'))
-
             self.stop()
         else:
             self.load_next_file()
@@ -740,7 +753,6 @@ def load_binary_timings(fn, all_classes, default_state=0, classes=None,
     if classes == None:
         classes = all_classes[0]
 
-    print "loading %s with classes %s" % (fn, classes)
     target_string = 'c%%dt%f:%s'
     group_string = '%s' + '=' * (len(all_classes) - 1)
     def add_event(state, t):
@@ -957,19 +969,25 @@ def process_common_args(c, args, random_seed=1, timed=True, load=True):
     random.shuffle(files)
     return files
 
-def draw_roc_curve(results, label='ROC'):
-    import matplotlib.pyplot as plt
-    #print results
+
+def prepare_roc_data(results):
     results.sort()
-    sum_true = sum(1 for s, t, time in results if t)
+    sum_true = sum(1 for x in results if x[1])
     sum_false = len(results) - sum_true
 
     tp_scale = 1.0 / (sum_true or 1)
     fp_scale = 1.0 / (sum_false or 1)
+    return results, sum_true, sum_false, tp_scale, fp_scale
+
+
+def draw_roc_curve(results, label='ROC'):
+    import matplotlib.pyplot as plt
+
+    results, true_positives, false_positives, \
+        tp_scale, fp_scale = prepare_roc_data(results)
+
     tp = []
     fp = []
-    false_positives = sum_false
-    true_positives = sum_true
     half = 0
     ax, ay, ad, ap = 0, 0, 0, 0
     bx, by, bd, bp = 0, 0, 99, 0
@@ -1044,6 +1062,95 @@ def draw_roc_curve(results, label='ROC'):
                  arrowprops={'width':1, 'color': '#aa6600'},
                  )
 
+def _calc_stats(results):
+    from math import sqrt
+    (results, true_positives, false_positives,
+     tp_scale, fp_scale) = prepare_roc_data(results)
+    auc = 0
+    sum_dfd = 0 #distance from diagonal (but signed)
+    max_dfd = 0
+    sum_dfc2 = 0 #distance from centre, squared
+    max_dfc2 = 0
+    sum_dfb, min_dfb = 0, 1e99 #distance from best
+
+    px, py = 0, 0 # previous position for area calculation
+
+    for score, target in results:
+        false_positives -= not target
+        true_positives -= target
+        x = false_positives * fp_scale
+        y = true_positives * tp_scale
+
+        #area under ROC curve
+        dx = x - px
+        dy = y - py
+        auc += px * dy       # bottom rectangle
+        auc += dx * dy * 0.5 # top triangle
+        px = x
+        py = y
+
+        #distance from diagonal
+        d = (y - x) * 0.7071067811865475244
+        sum_dfd += d
+        if d > max_dfd:
+            max_dfd = d
+
+        # distance from centre, squared
+        # (x - 0.5) * (x - 0.5) + (y - 0.5) * (y - 0.5)
+        d = x * x - x + y * y - y + 0.5
+        sum_dfc2 += d
+        if d > max_dfc2:
+            max_dfc2 = d
+
+        #distance from best corner
+        d = sqrt((1.0 - y) * (1.0 - y) + x * x)
+        sum_dfb += d
+        if d < min_dfb:
+            min_dfb = d
+    #do the last little bit of area under curve
+    dx = 1.0 - px
+    dy = 1.0 - py
+    auc += px * dy       # bottom rectangle
+    auc += dx * dy * 0.5 # top triangle
+
+    #calculating mean and variance
+    mean_data = [[0,0,0], [0,0,0]]
+    for score, target in results:
+        mean, n, nvar = mean_data[target]
+        n += 1
+        delta = score - mean
+        mean += delta / n
+        nvar += delta * (score - mean)
+        mean_data[target] = [mean, n, nvar]
+
+    mean_true, n, nvar = mean_data[1]
+    var_true = nvar / n
+    mean_false, n, nvar = mean_data[0]
+    var_false = nvar / n
+    dprime = (mean_true - mean_false) / sqrt(0.5 * (var_true + var_false))
+    return {
+        'mean_dfd' : sum_dfd / len(results),
+        'max_dfd': max_dfd,
+        'rms_dfc': sqrt(sum_dfc2 / len(results)),
+        'max_dfc': sqrt(max_dfc2),
+        'mean_dfb': sum_dfb / len(results),
+        'min_dfb': min_dfb,
+        'auc': auc,
+        'dprime': dprime,
+    }
+
+
+def calc_stats(results, presence_results, presence_gt):
+    instantaneous_stats = _calc_stats([x[:2] for x in results])
+    p1 = zip([x[1] for x in presence_results], presence_gt)
+    presence_1_stats = _calc_stats(p1)
+
+    stats = instantaneous_stats
+    for k, v in presence_1_stats.iteritems():
+        stats['p.' + k] = v
+
+    return stats
+
 def actually_show_roc(title='ROC'):
     import matplotlib.pyplot as plt
     plt.axes().set_aspect('equal')
@@ -1054,16 +1161,11 @@ def actually_show_roc(title='ROC'):
 def draw_presence_roc(scores, label='presence', label_every=0.0):
     import matplotlib.pyplot as plt
     #print scores
-    scores.sort()
-    sum_true = sum(x[1] for x in scores)
-    sum_false = len(scores) - sum_true
 
-    tp_scale = 1.0 / (sum_true or 1)
-    fp_scale = 1.0 / (sum_false or 1)
+    scores, true_positives, false_positives, \
+        tp_scale, fp_scale = prepare_roc_data(scores)
     tp = []
     fp = []
-    false_positives = sum_false
-    true_positives = sum_true
     half = 0
     if label_every:
         step = len(scores) * label_every
