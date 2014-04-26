@@ -1064,7 +1064,7 @@ def draw_roc_curve(results, label='ROC'):
 
 def _calc_stats(results):
     from math import sqrt
-    (results, true_positives, false_positives,
+    (results, sum_true, sum_false,
      tp_scale, fp_scale) = prepare_roc_data(results)
     auc = 0
     sum_dfd = 0 #distance from diagonal (but signed)
@@ -1074,7 +1074,9 @@ def _calc_stats(results):
     sum_dfb, min_dfb = 0, 1e99 #distance from best
 
     px, py = 0, 0 # previous position for area calculation
-
+    true_positives, false_positives = sum_true, sum_false
+    best_tp = true_positives
+    best_fp = false_positives
     for score, target in results:
         false_positives -= not target
         true_positives -= target
@@ -1089,29 +1091,51 @@ def _calc_stats(results):
         px = x
         py = y
 
-        #distance from diagonal
-        d = (y - x) * 0.7071067811865475244
+        #distance from diagonal (needs scaling by .707)
+        d = y - x
         sum_dfd += d
         if d > max_dfd:
             max_dfd = d
+            best_tp = true_positives
+            best_fp = false_positives
 
         # distance from centre, squared
         # (x - 0.5) * (x - 0.5) + (y - 0.5) * (y - 0.5)
         d = x * x - x + y * y - y + 0.5
         sum_dfc2 += d
-        if d > max_dfc2:
-            max_dfc2 = d
 
         #distance from best corner
         d = sqrt((1.0 - y) * (1.0 - y) + x * x)
         sum_dfb += d
         if d < min_dfb:
             min_dfb = d
+
     #do the last little bit of area under curve
     dx = 1.0 - px
     dy = 1.0 - py
     auc += px * dy       # bottom rectangle
     auc += dx * dy * 0.5 # top triangle
+
+    # Matthews correlation coefficient/ Phi coefficient at ROC tip
+    best_tn = sum_false - best_fp
+    best_fn = sum_true - best_tp
+    mcc_bottom = ((best_tp + best_fp) *
+                  (best_tp + best_fn) *
+                  (best_tn + best_fp) *
+                  (best_tn + best_fp))
+    if mcc_bottom:
+        mcc_top = best_tp * best_tn - best_fp * best_fn
+        mcc = mcc_top / sqrt(mcc_bottom)
+    else:
+        mcc = 0
+
+    #f1 = precision * sensitivity / (precision + sensitivity)
+    if best_tp:
+        best_p = best_tp / float(best_tp + best_fp)
+        best_s = best_tp / float(sum_true)
+        f1 = best_p * best_s / (best_p + best_s)
+    else:
+        f1 = 0
 
     #calculating mean and variance
     mean_data = [[0,0,0], [0,0,0]]
@@ -1128,15 +1152,17 @@ def _calc_stats(results):
     mean_false, n, nvar = mean_data[0]
     var_false = nvar / n
     dprime = (mean_true - mean_false) / sqrt(0.5 * (var_true + var_false))
+    sqrt_half =  0.7071067811865475244
     return {
-        'mean_dfd' : sum_dfd / len(results),
-        'max_dfd': max_dfd,
+        'mean_dfd' : sum_dfd / len(results)  * sqrt_half,
+        'max_dfd': max_dfd  * sqrt_half,
         'rms_dfc': sqrt(sum_dfc2 / len(results)),
-        'max_dfc': sqrt(max_dfc2),
         'mean_dfb': sum_dfb / len(results),
         'min_dfb': min_dfb,
         'auc': auc,
         'dprime': dprime,
+        'mcc': mcc,
+        'f1': f1,
     }
 
 
