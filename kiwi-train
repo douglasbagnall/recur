@@ -7,7 +7,7 @@ import time
 import argparse
 
 DEFAULT_LEARN_RATE = 3e-5
-DEFAULT_LEARN_RATE_DECAY = 3e-5
+DEFAULT_LEARN_RATE_DECAY = 1e-6
 DEFAULT_LEARN_RATE_MIN = 1e-8
 DEFAULT_DROPOUT = 0
 DEFAULT_DROPOUT_DECAY = 0
@@ -50,7 +50,8 @@ def main():
 
     args = parser.parse_args()
 
-    lr = lr_sqrt_exp(args.learn_rate, args.learn_rate_decay, args.learn_rate_min)
+    lr = lr_sqrt_exp(args.learn_rate, args.learn_rate_decay,
+                     min(args.learn_rate_min, args.learn_rate))
     dropout = lr_sqrt_exp(args.dropout, args.dropout_decay, args.dropout_min, 0)
 
 
