@@ -1,5 +1,8 @@
-DEV_CFLAGS = -ggdb -O3 -ftree-vectorizer-verbose=0 -fno-inline -fno-omit-frame-pointer
-ARCH_CFLAGS = -fPIC -DPIC -m64
+DEV_CFLAGS = -ggdb -O3 -ftree-vectorizer-verbose=0 -fno-inline
+ARCH_CFLAGS = -fPIC -DPIC -m64 -D_FILE_OFFSET_BITS=64
+
+#recur-nn.o works better with -fprefetch-loop-arrays
+NN_SPECIAL_FLAGS =  -fprefetch-loop-arrays
 
 ARCH = x86_64
 

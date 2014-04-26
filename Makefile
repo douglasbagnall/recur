@@ -94,9 +94,6 @@ config.h: ccan/tools/configurator/configurator
 	clang -S  $(ALL_CFLAGS) -O0  -emit-llvm $^ -o - | opt-3.4 -analyze -dot-callgraph
 	mv callgraph.dot $@
 
-#recur-nn.o works better with -fprefetch-loop-arrays
-NN_SPECIAL_FLAGS =  -fprefetch-loop-arrays
-
 recur-nn.o: recur-nn.c
 	$(CC)  -c -MMD $(ALL_CFLAGS) $(CPPFLAGS) $(NN_SPECIAL_FLAGS) -o $@ $<
 
