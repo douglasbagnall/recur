@@ -1072,6 +1072,8 @@ def _calc_stats(results):
     sum_dfc2 = 0 #distance from centre, squared
     max_dfc2 = 0
     sum_dfb, min_dfb = 0, 1e99 #distance from best
+    pos_95 = 0
+    neg_95 = 0
 
     px, py = 0, 0 # previous position for area calculation
     true_positives, false_positives = sum_true, sum_false
@@ -1109,6 +1111,13 @@ def _calc_stats(results):
         sum_dfb += d
         if d < min_dfb:
             min_dfb = d
+
+        # 95% positive
+        if dx == 0 and y > 20.0 * x:
+            pos_95 = y
+
+        if 1.0 - x > 20.0 * (1.0 - y):
+            neg_95 = 1.0 - x
 
     #do the last little bit of area under curve
     dx = 1.0 - px
@@ -1163,6 +1172,8 @@ def _calc_stats(results):
         'dprime': dprime,
         'mcc': mcc,
         'f1': f1,
+        'pos_95': pos_95,
+        'neg_95': neg_95,
     }
 
 
