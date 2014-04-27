@@ -204,7 +204,10 @@ void rnn_randomise_weights(RecurNN *net, float variance, int power, double perfo
 void rnn_scale_initial_weights(RecurNN *net, float factor);
 void rnn_randomise_weights_fan_in(RecurNN *net, float sum, float kurtosis, float margin,
     float inputs_weight_ratio);
-void rnn_initialise_long_loops(RecurNN* net, int loop_len, int n_loops, float gain);
+
+void rnn_initialise_long_loops(RecurNN* net, int loop_len, int n_loops, float gain,
+    float input_probability, float input_magnitude);
+
 
 void rnn_delete_net(RecurNN *net);
 RecurNN ** rnn_new_training_set(RecurNN *prototype, int n_nets);
