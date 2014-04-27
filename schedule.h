@@ -9,12 +9,12 @@ struct Schedule_ {
   int timeout;
   float learn_rate_mul;
   float learn_rate_min;
-  void (*eval)(Schedule *s, RecurNN *net, float score);
+  void (*eval)(Schedule *s, RecurNN *net, float score, int verbose);
 };
 
 
 static void
-eval_simple(Schedule *s, RecurNN *net, float score){
+eval_simple(Schedule *s, RecurNN *net, float score, int verbose){
   int i, j;
   RecurNNBPTT *bptt = net->bptt;
   if (bptt->learn_rate <= s->learn_rate_min){
@@ -36,10 +36,12 @@ eval_simple(Schedule *s, RecurNN *net, float score){
   }
   s->timeout = s->recent_len;
   bptt->learn_rate = MAX(s->learn_rate_min, bptt->learn_rate * s->learn_rate_mul);
-  DEBUG("generation %7d: entropy %.4g exceeds %d recent samples (margin %.2g)."
-      " setting learn_rate to %.3g. momentum %.3g",
-      net->generation, score, sample_size, s->margin,
-      bptt->learn_rate, net->bptt->momentum);
+  if (verbose){
+    DEBUG("generation %7d: entropy %.4g exceeds %d recent samples (margin %.2g)."
+        " setting learn_rate to %.3g. momentum %.3g",
+        net->generation, score, sample_size, s->margin,
+        bptt->learn_rate, net->bptt->momentum);
+  }
 }
 
 static void

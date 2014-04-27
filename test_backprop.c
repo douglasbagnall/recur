@@ -570,7 +570,7 @@ finish(RecurNN *net, Ventropy *v){
   if (opt_filename && opt_save_net){
     rnn_save_net(net, opt_filename, 1);
   }
-  BELOW_QUIET_LEVEL(2){
+  BELOW_QUIET_LEVEL(3){
     float ventropy = calc_ventropy(v, 0);
     DEBUG("final entropy %.3f; learn rate %.2g; momentum %.2g",
         ventropy, net->bptt->learn_rate, net->bptt->momentum);
@@ -683,7 +683,7 @@ epoch(RecurNN **nets, int n_nets, RecurNN *confab_net, Ventropy *v,
       if (opt_periodic_pgm_dump){
         rnn_multi_pgm_dump(net, "ihw how ihd hod ihm hom", "text");
       }
-      schedule->eval(schedule, net, ventropy);
+      schedule->eval(schedule, net, ventropy, opt_quiet < 2);
     }
     if (opt_stop && (int)net->generation >= opt_stop){
       finish(net, v);
