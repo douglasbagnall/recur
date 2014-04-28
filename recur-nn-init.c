@@ -340,10 +340,15 @@ rnn_randomise_weights_auto(RecurNN *net){
 #else
   rnn_randomise_weights(net, RNN_INITIAL_WEIGHT_VARIANCE_FACTOR / net->h_size, 1, 0);
   memset(net->ih_weights, 0, net->ih_size * sizeof(float));
+#if 0
   for (uint i = 2; i < 11; i++){
     int n_loops = net->h_size / 5;
-    rnn_initialise_long_loops(net, i, n_loops, powf(0.35, i), 0.006, 0.5);
+    rnn_initialise_long_loops(net, i, n_loops, 0.12, 0.4, 0.5);
   }
+#else
+  rnn_initialise_runs(net, net->h_size * 3, 0.35, 0.001, 1.0);
+#endif
+
 #endif
 }
 
@@ -466,92 +471,120 @@ void rnn_emphasise_diagonal(RecurNN *net, float magnitude, float proportion){
   }
 }
 
-static inline void
-long_loop(RecurNN *net, int len, float target_gain,
-    float input_probability, float input_magnitude){
-  int hsize = net->hidden_size;
-  int loop[hsize];
-  int i, j;
-  len = MIN(len, hsize);
-  float gain = 1.0f;
-  float weight;
-  float target_gain_per_round = powf(target_gain, 1.0f / len);
-  float target_gain_running = 1.0f;
-  const float weight_max = target_gain_per_round * 6;
-  const float weight_min = target_gain_per_round / 6;
+static inline float
+bounded_log_normal_random_sign(rand_ctx *rng, float mean, float stddev, float bound)
+{
+  /*stddev is std deviation in log space; bound is standard deviations.*/
+  float x, w;
+  do {
+    x = cheap_gaussian_noise(rng);
+  } while(fabsf(x) > bound);
+  w = mean * fast_expf(x * stddev);
+  return (rand64(rng) & 1) ? w : -w;
+}
 
-  /*construct then shuffle the loop, 1 based to account for bias*/
-  for (i = 0; i < hsize; i++){
-    loop[i] = i;
+static inline void
+weight_run(RecurNN *net, const float gain_per_step,
+    const float min_gain, float const input_magnitude){
+  int i, j, s, e;
+  float weight;
+  float gain = 1.0f;
+
+  int unused[net->hidden_size + 1];
+  for (i = 0; i <= net->hidden_size; i++){
+    unused[i] = i;
   }
-  j = RAND_SMALL_INT_RANGE(&net->rng, 0, hsize);
-  int s;
-  int e = j + 1;
-  loop[j] = 0;
-  int beginning = e;
-  float max = 0;
-  float min = 1e99;
-  if (rand_double(&net->rng) < input_probability){
-    /* add a input into beginning of loop */
+
+  j = RAND_SMALL_INT_RANGE(&net->rng, 0, net->hidden_size) + 1;
+  e = j;
+
+  if (input_magnitude) {
     int input = RAND_SMALL_INT_RANGE(&net->rng, 0, net->input_size);
-    net->ih_weights[(hsize + 1 + input) * net->h_size + e] =    \
+    net->ih_weights[(net->hidden_size + 1 + input) * net->h_size + e] = \
       cheap_gaussian_noise(&net->rng) * input_magnitude;
   }
-  for (i = 1; i < len; i++){
+
+  for(i = 1; i <= net->hidden_size; i++){
+    unused[j] = unused[i];
     s = e;
-    j = RAND_SMALL_INT_RANGE(&net->rng, i, hsize);
-    e = loop[j] + 1;
-    loop[j] = loop[i];
+    j = RAND_SMALL_INT_RANGE(&net->rng, i, net->hidden_size) + 1;
+    e = unused[j];
 
-    target_gain_running *= target_gain_per_round;
-    float current_target_gain = target_gain_running / gain;
-    do {
-      /*Gaussian magnitude has expected value/mean of sqrt(2/pi) ~ 0.7979
-        (not counting the zero avoidance in while clause).
-        We want it to be target_gain_running / gain, so scale it
-        accordingly.
-      */
-      float scale = fast_expf(cheap_gaussian_noise(&net->rng) * 0.25);
-      weight = current_target_gain * scale;
-    } while (fabsf(weight) < weight_min || fabsf(weight) > weight_max);
-    if (rand64(&net->rng) & 1){
-      weight = -weight;
-    }
-
-    /*XXX += or = ? -- clobber the other or not? */
+    weight = bounded_log_normal_random_sign(&net->rng, gain_per_step, 0.25, 3.0);
+    gain *= fabsf(weight);
     net->ih_weights[s * net->h_size + e] = weight;
-    gain *= weight;
-    max = MAX(fabsf(weight), max);
-    min = MIN(fabsf(weight), min);
-    if (rand_double(&net->rng) > input_probability){
-      /* add a input into beginning of loop */
-      int input = RAND_SMALL_INT_RANGE(&net->rng, 0, net->input_size);
-      net->ih_weights[(hsize + 1 + input) * net->h_size + e] =  \
-        cheap_gaussian_noise(&net->rng) * input_magnitude;
+    if (gain < min_gain){
+      break;
     }
   }
-  /*now to complete the loop, link back to the beginning with the appropriate
-    gain. */
-  weight = MIN(MAX(fabsf(target_gain / gain), weight_min), weight_max);
-  if (rand64(&net->rng) & 1){
-    weight = -weight;
+}
+
+void
+rnn_initialise_runs(RecurNN* net, int n_runs, float gain_per_step,
+    float min_gain, float input_magnitude){
+  STDERR_DEBUG("n_runs %d gain_per_step %g, min_gain %g, input_magnitude %g",
+      n_runs, gain_per_step, min_gain, input_magnitude);
+  for (int i = 0; i < n_runs; i++){
+    weight_run(net, gain_per_step, min_gain, input_magnitude);
   }
-  max = MAX(fabsf(weight), max);
-  min = MIN(fabsf(weight), min);
-  s = e;
-  net->ih_weights[s * net->h_size + beginning] = weight;
-  gain *= weight;
-  MAYBE_DEBUG(" loop of %d, target gain %.3f. actual gain %.3f"
-      " max %.3f min %.3f",
-      len, target_gain, gain, max, min);
+}
+
+
+/*loop_link is a helper for long_loop().
+  It connects the hidden node <s> to the hidden node <e>, with
+  approximately <gain> strength, and maybe adds in an input.
+*/
+
+static inline void
+loop_link(RecurNN *net, int s, int e,
+    const float gain, const float input_probability,
+    float const input_magnitude){
+  float weight = bounded_log_normal_random_sign(&net->rng, gain, 0.25, 3.0);
+  net->ih_weights[s * net->h_size + e] = weight;
+  if (rand_double(&net->rng) < input_probability){
+    int input = RAND_SMALL_INT_RANGE(&net->rng, 0, net->input_size);
+    net->ih_weights[(net->hidden_size + 1 + input) * net->h_size + e] = \
+      cheap_gaussian_noise(&net->rng) * input_magnitude;
+  }
+}
+
+static inline void
+long_loop(RecurNN *net, int len, const float gain_per_step,
+    const float input_probability, float const input_magnitude){
+  int i, j, s, e, beginning;
+  len = MIN(len, net->hidden_size);
+  /*unused is a one-based list of unused nodes. At step i, unused[i+1:]
+    contains all the previously unused nodes. This is the same as a basic
+    shuffle algorithm, but there is no need to save the already shuffled
+    nodes.*/
+  int unused[net->hidden_size + 1];
+  for (i = 0; i <= net->hidden_size; i++){
+    unused[i] = i;
+  }
+  j = RAND_SMALL_INT_RANGE(&net->rng, 0, net->hidden_size) + 1;
+  beginning = e = j;
+
+  for (i = 1; i <= len; i++){
+    unused[j] = unused[i];
+    s = e;
+    j = RAND_SMALL_INT_RANGE(&net->rng, i, net->hidden_size) + 1;
+    e = unused[j];
+    loop_link(net, s, e, gain_per_step, input_probability, input_magnitude);
+  }
+  /*now to complete the loop, link back to the beginning.*/
+  loop_link(net, e, beginning, gain_per_step, input_probability, input_magnitude);
 }
 
 
 void
-rnn_initialise_long_loops(RecurNN* net, int loop_len, int n_loops, float gain,
+rnn_initialise_long_loops(RecurNN* net, int loop_len, int n_loops, float gain_per_step,
     float input_probability, float input_magnitude){
+  STDERR_DEBUG("n_loops %d loop_len %d, gain_per_step %g, input_probability %g,"
+      " input_magnitude %g",
+      n_loops, loop_len, gain_per_step, input_probability,  input_magnitude);
+
   for (int i = 0; i < n_loops; i++){
-    long_loop(net, loop_len, gain, input_probability, input_magnitude);
+    long_loop(net, loop_len, gain_per_step, input_probability, input_magnitude);
   }
 }
 
