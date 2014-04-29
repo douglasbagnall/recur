@@ -1063,7 +1063,7 @@ def draw_roc_curve(results, label='ROC'):
                  )
 
 def _calc_stats(results):
-    from math import sqrt
+    from math import sqrt, log
     (results, sum_true, sum_false,
      tp_scale, fp_scale) = prepare_roc_data(results)
     auc = 0
@@ -1074,6 +1074,8 @@ def _calc_stats(results):
     sum_dfb, min_dfb = 0, 1e99 #distance from best
     pos_95 = 0
     neg_95 = 0
+    briar = 0
+    cross_entropy = 0
 
     px, py = 0, 0 # previous position for area calculation
     true_positives, false_positives = sum_true, sum_false
@@ -1112,18 +1114,26 @@ def _calc_stats(results):
         if d < min_dfb:
             min_dfb = d
 
-        # 95% positive
+        # 95% positive and negative
+        # intersections with 1:20 lines from the end corners
         if dx == 0 and y > 20.0 * x:
             pos_95 = y
 
         if 1.0 - x > 20.0 * (1.0 - y):
             neg_95 = 1.0 - x
 
+        # briar score
+        briar += (score - target) * (score - target)
+        cross_entropy -= log((score if target else (1.0 - score)), 2.0)
+
     #do the last little bit of area under curve
     dx = 1.0 - px
     dy = 1.0 - py
     auc += px * dy       # bottom rectangle
     auc += dx * dy * 0.5 # top triangle
+
+    briar /= len(results)
+    cross_entropy /= len(results)
 
     # Matthews correlation coefficient/ Phi coefficient at ROC tip
     best_tn = sum_false - best_fp
@@ -1174,6 +1184,8 @@ def _calc_stats(results):
         'f1': f1,
         'pos_95': pos_95,
         'neg_95': neg_95,
+        'briar': briar,
+        'cross_entropy': cross_entropy,
     }
 
 
