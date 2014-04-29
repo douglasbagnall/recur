@@ -864,7 +864,7 @@ create_net(GstClassify *self, int bottom_layer_size,
     rnn_randomise_weights_fan_in(net, fan_in_sum, fan_in_kurtosis, 0.1f, 0);
   }
   else {
-    rnn_randomise_weights(net, RNN_INITIAL_WEIGHT_VARIANCE_FACTOR / net->h_size,
+    rnn_randomise_weights_flat(net, RNN_INITIAL_WEIGHT_VARIANCE_FACTOR / net->h_size,
         weight_sparsity, 0.5);
   }
 

@@ -757,12 +757,11 @@ load_or_create_net(void){
           opt_momentum);
     }
     if (opt_dense_weights){
-      rnn_randomise_weights(net, RNN_INITIAL_WEIGHT_VARIANCE_FACTOR / net->h_size,
+      rnn_randomise_weights_flat(net, RNN_INITIAL_WEIGHT_VARIANCE_FACTOR / net->h_size,
           opt_dense_weights, opt_perforate_weights);
     }
     else {
       rnn_randomise_weights_auto(net);
-      //rnn_randomise_weights_fan_in(net, 2.0f, 0.3f, 0.1f, 1.0);
     }
     if (opt_diagonal_boost){
       rnn_emphasise_diagonal(net, 0.25, opt_diagonal_boost);

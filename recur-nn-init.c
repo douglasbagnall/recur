@@ -329,27 +329,98 @@ rnn_clone(RecurNN *parent, u32 flags,
   return net;
 }
 
+static inline void
+maybe_randomise_using_submethod(RecurNN *net, struct RecurInitialisationParameters *p)
+{
+  if (p->submethod != p->method){
+    /*randomise top layer and using submethod
+      (presumably FLAT or FAN_IN)*/
+    p->method = p->submethod;
+    rnn_randomise_weights_clever(net, p);
+    p->method = RNN_INIT_RUNS;
+    STDERR_DEBUG("used submethod %d, bias too %d", p->submethod, p->bias_uses_submethod);
+  }
+  if (p->bias_uses_submethod){
+    memset(net->ih_weights + net->h_size, 0,
+        (net->ih_size - net->h_size) * sizeof(float));
+  }
+  else {
+    memset(net->ih_weights, 0, net->ih_size * sizeof(float));
+  }
+}
+
+
+void
+rnn_randomise_weights_clever(RecurNN *net, struct RecurInitialisationParameters *p){
+  if (p->method == RNN_INIT_FAN_IN){
+    rnn_randomise_weights_fan_in(net,
+        p->fan_in_sum,
+        p->fan_in_step,
+        p->fan_in_min,
+        p->fan_in_ratio);
+  }
+  else if (p->method == RNN_INIT_FLAT){
+    rnn_randomise_weights_flat(net,
+        p->flat_variance,
+        p->flat_shape,
+        p->flat_perforation
+    );
+  }
+  else if (p->method == RNN_INIT_LOOPS){
+    maybe_randomise_using_submethod(net, p);
+    rnn_initialise_long_loops(net,
+        p->loop_n,
+        p->loop_len_mean,
+        p->loop_len_stddev,
+        p->loop_gain,
+        p->loop_input_probability,
+        p->loop_input_magnitude);
+  }
+  else if (p->method == RNN_INIT_RUNS){
+    maybe_randomise_using_submethod(net, p);
+    rnn_initialise_runs(net,
+        p->runs_n,
+        p->runs_gain,
+        p->runs_min_gain,
+        p->runs_input_magnitude,
+        p->runs_avoid_loops);
+  }
+}
 
 void
 rnn_randomise_weights_auto(RecurNN *net){
   /*heuristically choose an initialisation scheme for the size of net */
   /*initial heuristic is very simple*/
-#if 0
-  float ratio = net->input_size  * 1.0f / net->hidden_size;
-  rnn_randomise_weights_fan_in(net, 3.0, 0.3, 0.1, ratio);
-#else
-  rnn_randomise_weights(net, RNN_INITIAL_WEIGHT_VARIANCE_FACTOR / net->h_size, 1, 0);
-  memset(net->ih_weights, 0, net->ih_size * sizeof(float));
-#if 0
-  for (uint i = 2; i < 11; i++){
-    int n_loops = net->h_size / 5;
-    rnn_initialise_long_loops(net, i, n_loops, 0.12, 0.4, 0.5);
-  }
-#else
-  rnn_initialise_runs(net, net->h_size * 3, 0.35, 0.001, 1.0);
-#endif
+  const rnn_init_method method = RNN_INIT_RUNS;
 
-#endif
+  struct RecurInitialisationParameters p = {
+    .method = method,
+    .submethod = RNN_INIT_FLAT,
+    .bias_uses_submethod = 0,
+
+    .runs_n = 5 * net->h_size,
+    .runs_gain = 0.12,
+    .runs_min_gain = 1e-6,
+    .runs_input_magnitude = 0.7,
+    .runs_avoid_loops = 0,
+
+    .fan_in_ratio = net->input_size  * 1.0f / net->hidden_size,
+    .fan_in_sum = 3.0,
+    .fan_in_step = 0.3,
+    .fan_in_min = 0.1,
+
+    .flat_variance = RNN_INITIAL_WEIGHT_VARIANCE_FACTOR / net->h_size,
+    .flat_shape = 1,
+    .flat_perforation = 0.0,
+
+    .loop_input_probability = 0.12,
+    .loop_input_magnitude = 0.4,
+    .loop_gain = 0.17,
+    .loop_len_mean = 7.0,
+    .loop_len_stddev = 2.0,
+    .loop_n = net->h_size * 3
+  };
+  rnn_randomise_weights_clever(net, &p);
 }
 
 static inline float
@@ -361,7 +432,7 @@ gaussian_power(rand_ctx *rng, float a, int power){
 }
 
 void
-rnn_randomise_weights(RecurNN *net, float variance, int shape, double perforation){
+rnn_randomise_weights_flat(RecurNN *net, float variance, int shape, double perforation){
   int x, y;
   memset(net->ih_weights, 0, net->ih_size * sizeof(float));
   memset(net->ho_weights, 0, net->ho_size * sizeof(float));
@@ -483,20 +554,22 @@ bounded_log_normal_random_sign(rand_ctx *rng, float mean, float stddev, float bo
   return (rand64(rng) & 1) ? w : -w;
 }
 
-static inline void
+static inline int
 weight_run(RecurNN *net, const float gain_per_step,
-    const float min_gain, float const input_magnitude){
+    const float min_gain, float const input_magnitude, int avoid_loops){
   int i, j, s, e;
   float weight;
   float gain = 1.0f;
 
   int unused[net->hidden_size + 1];
-  for (i = 0; i <= net->hidden_size; i++){
-    unused[i] = i;
-  }
 
-  j = RAND_SMALL_INT_RANGE(&net->rng, 0, net->hidden_size) + 1;
-  e = j;
+  e = RAND_SMALL_INT_RANGE(&net->rng, 0, net->hidden_size) + 1;
+  if (avoid_loops){
+    j = e;
+    for (i = 0; i <= net->hidden_size; i++){
+      unused[i] = i;
+    }
+  }
 
   if (input_magnitude) {
     int input = RAND_SMALL_INT_RANGE(&net->rng, 0, net->input_size);
@@ -505,11 +578,15 @@ weight_run(RecurNN *net, const float gain_per_step,
   }
 
   for(i = 1; i <= net->hidden_size; i++){
-    unused[j] = unused[i];
     s = e;
-    j = RAND_SMALL_INT_RANGE(&net->rng, i, net->hidden_size) + 1;
-    e = unused[j];
-
+    if (avoid_loops){
+      unused[j] = unused[i];
+      j = RAND_SMALL_INT_RANGE(&net->rng, i, net->hidden_size) + 1;
+      e = unused[j];
+    }
+    else {
+      e = RAND_SMALL_INT_RANGE(&net->rng, 0, net->hidden_size) + 1;
+    }
     weight = bounded_log_normal_random_sign(&net->rng, gain_per_step, 0.25, 3.0);
     gain *= fabsf(weight);
     net->ih_weights[s * net->h_size + e] = weight;
@@ -517,16 +594,20 @@ weight_run(RecurNN *net, const float gain_per_step,
       break;
     }
   }
+  return i;
 }
 
 void
 rnn_initialise_runs(RecurNN* net, int n_runs, float gain_per_step,
-    float min_gain, float input_magnitude){
-  STDERR_DEBUG("n_runs %d gain_per_step %g, min_gain %g, input_magnitude %g",
-      n_runs, gain_per_step, min_gain, input_magnitude);
+    float min_gain, float input_magnitude, int avoid_loops){
+  STDERR_DEBUG("n_runs %d gain_per_step %g, min_gain %g, "
+      "input_magnitude %g avoid_loops %d",
+      n_runs, gain_per_step, min_gain, input_magnitude, avoid_loops);
+  int len = 0;
   for (int i = 0; i < n_runs; i++){
-    weight_run(net, gain_per_step, min_gain, input_magnitude);
+    len += weight_run(net, gain_per_step, min_gain, input_magnitude, avoid_loops);
   }
+  STDERR_DEBUG("mean run length %2g", len / (double)n_runs);
 }
 
 
@@ -577,14 +658,16 @@ long_loop(RecurNN *net, int len, const float gain_per_step,
 
 
 void
-rnn_initialise_long_loops(RecurNN* net, int loop_len, int n_loops, float gain_per_step,
-    float input_probability, float input_magnitude){
-  STDERR_DEBUG("n_loops %d loop_len %d, gain_per_step %g, input_probability %g,"
-      " input_magnitude %g",
-      n_loops, loop_len, gain_per_step, input_probability,  input_magnitude);
+rnn_initialise_long_loops(RecurNN* net, int n_loops, int len_mean, int len_stddev,
+    float gain, float input_probability, float input_magnitude){
+  STDERR_DEBUG("n_loops %d len_mean %d, len_stddev %d, gain %g, "
+      "input_probability %g, input_magnitude %g",
+      n_loops, len_mean, len_stddev, gain, input_probability, input_magnitude);
 
   for (int i = 0; i < n_loops; i++){
-    long_loop(net, loop_len, gain_per_step, input_probability, input_magnitude);
+    int len = cheap_gaussian_noise(&net->rng) * len_stddev + len_mean + 0.5;
+    len = MAX(2, len);
+    long_loop(net, len, gain, input_probability, input_magnitude);
   }
 }
 
