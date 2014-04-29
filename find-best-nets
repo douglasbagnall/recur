@@ -1,0 +1,74 @@
+#!/usr/bin/python
+
+import json
+import sys
+from collections import defaultdict
+
+SMALLER_IS_BETTER = ['mean_dfb', 'min_dfb', 'cross_entropy', 'briar']
+SMALLER_IS_BETTER += ['p.' + x for x in SMALLER_IS_BETTER]
+
+def print_summary(nets, n, cutoff):
+    """print a semi-human-readable summary of the indicator metrics."""
+    n = min(n, len(nets))
+    summary = defaultdict(int)
+    for k in sorted(nets[0].keys()):
+        if k == 'filename':
+            continue
+        data = [(x[k], x['filename']) for x in nets]
+        data.sort(reverse=(k not in SMALLER_IS_BETTER))
+        print
+        print k
+        print "=" * len(k)
+        for i in range(n):
+            v, fn = data[i]
+            summary[fn] += 1
+            print "%2d: %.4g %s" % (i + 1, v, fn)
+
+    best = [(v, k) for k, v in summary.iteritems()]
+    best.sort(reverse=True)
+    print "\nsummary\n========"
+    for i, x in enumerate(best):
+        v, fn = x
+        if v < cutoff:
+            break
+        print "%2d: %.4g %s" % (i + 1, v, fn)
+
+
+def print_list(nets, n, cutoff):
+    """print only filenames of nets that appear in the top n of at least
+    cutoff indicators."""
+    n = min(n, len(nets))
+    summary = defaultdict(int)
+    for k in nets[0].keys():
+        if k == 'filename':
+            continue
+        data = [(x[k], x['filename']) for x in nets]
+        data.sort(reverse=(k not in SMALLER_IS_BETTER))
+        for v, fn in data[:n]:
+            summary[fn] += 1
+
+    best = [(v, k) for k, v in summary.iteritems()]
+    best.sort(reverse=True)
+    for i, x in enumerate(best):
+        v, fn = x
+        if v < cutoff:
+            break
+        print fn
+
+
+def summarise_nets(fn, n=10, list_only=False, cutoff=2):
+    nets = []
+    f = open(fn)
+    for line in f:
+        stats = json.loads(line)
+        nets.append(stats)
+    f.close()
+    if list_only:
+        print_list(nets, n, cutoff)
+    else:
+        print_summary(nets, n, cutoff)
+
+
+
+#summarise_nets(sys.argv[1])
+summarise_nets(sys.argv[1], 10, True, 1)
