@@ -193,6 +193,7 @@ struct RecurInitialisationParameters {
   rnn_init_method method;
   rnn_init_method submethod;
   int bias_uses_submethod;
+  int inputs_use_submethod;
   /*fan in */
   float fan_in_sum;
   float fan_in_step;

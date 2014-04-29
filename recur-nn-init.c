@@ -340,13 +340,13 @@ maybe_randomise_using_submethod(RecurNN *net, struct RecurInitialisationParamete
     p->method = RNN_INIT_RUNS;
     STDERR_DEBUG("used submethod %d, bias too %d", p->submethod, p->bias_uses_submethod);
   }
+  float *mem = net->ih_weights;
+  size_t rows = p->inputs_use_submethod ? net->h_size : net->i_size;
   if (p->bias_uses_submethod){
-    memset(net->ih_weights + net->h_size, 0,
-        (net->ih_size - net->h_size) * sizeof(float));
+    rows--;
+    mem += net->h_size;
   }
-  else {
-    memset(net->ih_weights, 0, net->ih_size * sizeof(float));
-  }
+  memset(mem, 0, rows * net->h_size * sizeof(float));
 }
 
 
@@ -392,11 +392,13 @@ rnn_randomise_weights_auto(RecurNN *net){
   /*heuristically choose an initialisation scheme for the size of net */
   /*initial heuristic is very simple*/
   const rnn_init_method method = RNN_INIT_RUNS;
+  //const rnn_init_method method = RNN_INIT_LOOPS;
 
   struct RecurInitialisationParameters p = {
     .method = method,
     .submethod = RNN_INIT_FLAT,
     .bias_uses_submethod = 0,
+    .inputs_use_submethod = 0,
 
     .runs_n = 5 * net->h_size,
     .runs_gain = 0.12,
@@ -663,12 +665,14 @@ rnn_initialise_long_loops(RecurNN* net, int n_loops, int len_mean, int len_stdde
   STDERR_DEBUG("n_loops %d len_mean %d, len_stddev %d, gain %g, "
       "input_probability %g, input_magnitude %g",
       n_loops, len_mean, len_stddev, gain, input_probability, input_magnitude);
-
+  int sum = 0;
   for (int i = 0; i < n_loops; i++){
     int len = cheap_gaussian_noise(&net->rng) * len_stddev + len_mean + 0.5;
     len = MAX(2, len);
+    sum += len;
     long_loop(net, len, gain, input_probability, input_magnitude);
   }
+  STDERR_DEBUG("mean loop len %3g", (double)sum / n_loops);
 }
 
 void
