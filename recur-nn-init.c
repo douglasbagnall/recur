@@ -338,7 +338,10 @@ maybe_randomise_using_submethod(RecurNN *net, struct RecurInitialisationParamete
     p->method = p->submethod;
     rnn_randomise_weights_clever(net, p);
     p->method = RNN_INIT_RUNS;
-    STDERR_DEBUG("used submethod %d, bias too %d", p->submethod, p->bias_uses_submethod);
+    STDERR_DEBUG("used submethod %d%s%s", p->submethod,
+        p->bias_uses_submethod ? ", bias too" : "",
+        p->inputs_use_submethod ? ", inputs too" : ""
+    );
   }
   float *mem = net->ih_weights;
   size_t rows = p->inputs_use_submethod ? net->h_size : net->i_size;
