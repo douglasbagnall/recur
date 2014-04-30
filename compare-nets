@@ -90,7 +90,7 @@ def main():
     if args.shuffle:
         random.shuffle(files)
     if args.n_nets:
-        del files[n_nets:]
+        del files[args.n_nets:]
 
     for fn in files:
         #print cmd
