@@ -1,0 +1,100 @@
+#!/usr/bin/python
+
+import sys, os
+import argparse
+import subprocess
+import json
+import re
+import random
+# like this:
+#
+#for f in $dir/*.net;
+#  do ./kiwi-test \
+#    -t ~/nocturnal-calls/morepork-test-with-intensities.txt \
+#    -d ~/nocturnal-calls/morepork-minutes -C 500 --summary\
+#    --ignore-start=1 -v0 --min-call-intensity=4.3 -f $f \
+#   >> morepork-scores-intensity-4.3-best.txt; \
+#done
+#
+#but if $f has already been done, ignore it.
+
+
+def load_excluded_files(filename):
+    excluded = set()
+    if filename is not None:
+        f = open(filename)
+        for line in f:
+            if line[0] == '{':
+                excluded.add(os.path.basename(json.loads(line)['filename']))
+            else:
+                excluded.update(os.path.basename(x) for x in line.split()
+                                if x.endswith('.net'))
+    excluded = set(x.encode('utf-8') for x in excluded)
+    return excluded
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-C', '--first-n', type=int, default=0,
+                        help="use this many audio files")
+    parser.add_argument('-c', '--n-nets', type=int, default=0,
+                        help="test this many nets")
+    parser.add_argument('-t', '--timings', action='append',
+                       help='read timings and intensities from here')
+    parser.add_argument('-d', '--audio-directory', action='append',
+                       help='find audio in this directory')
+    parser.add_argument('-D', '--net-directory', action='append',
+                       help='find nets in this directory')
+    parser.add_argument('-x', '--exclude-file',
+                       help='exclude files named in this file')
+    parser.add_argument('-S', '--shuffle', action='store_true',
+                        help='process files in a more random order')
+    parser.add_argument('-r', '--include-regex',
+                       help='included files must meet this regex')
+    parser.add_argument('-i', '--min-call-intensity', type=float, default=0.0,
+                       help='only consider calls with this intensity or higher')
+    parser.add_argument('--ignore-start', type=float, default=0.0,
+                       help="ignore this many seconds at start of each file")
+    args = parser.parse_args()
+    #print >>sys.stderr, args
+
+    excluded_files = load_excluded_files(args.exclude_file)
+    #print >>sys.stderr, len(excluded_files)
+    files = set()
+    for d in args.net_directory:
+        files.update(os.path.join(d, x) for x in os.listdir(d)
+                     if x.endswith('.net') and
+                     os.path.basename(x) not in excluded_files)
+    #print >>sys.stderr, len(files)
+
+    if args.include_regex:
+        print args.include_regex
+        r = re.compile(args.include_regex)
+        files = set(x for x in files if r.search(x))
+    print >>sys.stderr, "looking at %d files" % len(files)
+    cmd = ["./kiwi-test", "--summary", "-v0"]
+    for arg, val in (("-C", args.first_n),
+                     ("--ignore-start", args.ignore_start),
+                     ("--min-call-intensity", args.min_call_intensity)):
+        if val is not None:
+            cmd.append(arg)
+            cmd.append(str(val))
+
+    for arg, vals in (("-t", args.timings),
+                      ("-d", args.audio_directory)):
+        if vals:
+            for v in vals:
+                cmd.append(arg)
+                cmd.append(v)
+
+    files = list(files)
+    if args.shuffle:
+        random.shuffle(files)
+    if args.n_nets:
+        del files[n_nets:]
+
+    for fn in files:
+        #print cmd
+        subprocess.check_call(cmd + ["-f", fn])
+
+
+main()
