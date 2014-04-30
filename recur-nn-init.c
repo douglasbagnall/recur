@@ -561,7 +561,7 @@ bounded_log_normal_random_sign(rand_ctx *rng, float mean, float stddev, float bo
 
 static inline int
 weight_run(RecurNN *net, const float gain_per_step,
-    const float min_gain, float const input_magnitude, int avoid_loops){
+    const float min_gain, float const input_magnitude, const int avoid_loops){
   int i, j, s, e;
   float weight;
   float gain = 1.0f;
@@ -569,8 +569,8 @@ weight_run(RecurNN *net, const float gain_per_step,
   int unused[net->hidden_size + 1];
 
   e = RAND_SMALL_INT_RANGE(&net->rng, 0, net->hidden_size) + 1;
+  j = e;
   if (avoid_loops){
-    j = e;
     for (i = 0; i <= net->hidden_size; i++){
       unused[i] = i;
     }
