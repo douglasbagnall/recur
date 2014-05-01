@@ -3,6 +3,8 @@
 import json
 import sys
 from collections import defaultdict
+import argparse
+
 
 SMALLER_IS_BETTER = ['mean_dfb', 'min_dfb', 'cross_entropy', 'briar']
 SMALLER_IS_BETTER += ['p.' + x for x in SMALLER_IS_BETTER]
@@ -70,5 +72,18 @@ def summarise_nets(fn, n=10, list_only=False, cutoff=2):
 
 
 
-#summarise_nets(sys.argv[1])
-summarise_nets(sys.argv[1], 10, True, 1)
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-n', '--top-n', type=int, default=10,
+                        help="list this many top nets per category")
+    parser.add_argument('-l', '--list-only', action="store_true",
+                        help="only list the top filenames")
+    parser.add_argument('-c', '--cutoff', type=int, default=1,
+                        help='how many top-n listings a net needs to be in summary')
+    parser.add_argument('file', help='JSON file to use')
+    args = parser.parse_args()
+
+    summarise_nets(args.file, n=args.top_n, list_only=args.list_only,
+                             cutoff=args.cutoff)
+
+main()
