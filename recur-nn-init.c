@@ -686,7 +686,7 @@ rnn_initialise_long_loops(RecurNN* net, int n_loops, int len_mean, int len_stdde
   int sum = 0;
   for (int i = 0; i < n_loops; i++){
     int len = cheap_gaussian_noise(&net->rng) * len_stddev + len_mean + 0.5;
-    len = MAX(2, len);
+    len = MIN(MAX(2, len), net->hidden_size);
     sum += len;
     long_loop(net, len, gain, input_probability, input_magnitude);
   }
