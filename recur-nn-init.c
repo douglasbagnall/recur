@@ -388,6 +388,14 @@ rnn_randomise_weights_clever(RecurNN *net, struct RecurInitialisationParameters 
         p->runs_input_magnitude,
         p->runs_avoid_loops);
   }
+  else if (p->method == RNN_INIT_DISCONNECT){
+    maybe_randomise_using_submethod(net, p);
+    rnn_initialise_disconnected(net,
+        p->disconnect_connections,
+        p->disconnect_magnitude,
+        p->disconnect_input_probability,
+        p->disconnect_input_magnitude);
+  }
 }
 
 void
@@ -397,6 +405,8 @@ rnn_randomise_weights_auto(RecurNN *net){
   const rnn_init_method method = RNN_INIT_RUNS;
   //const rnn_init_method method = RNN_INIT_LOOPS;
 
+void
+rnn_randomise_weights_simple(RecurNN *net, const rnn_init_method method){
   struct RecurInitialisationParameters p = {
     .method = method,
     .submethod = RNN_INIT_FLAT,
@@ -424,6 +434,11 @@ rnn_randomise_weights_auto(RecurNN *net){
     .loop_len_mean = 7.0,
     .loop_len_stddev = 2.0,
     .loop_n = net->h_size * 3
+
+    .disconnect_connections = 15 * net->h_size,
+    .disconnect_magnitude = 0.1,
+    .disconnect_input_probability = 0.35,
+    .disconnect_input_magnitude = 0.1,
   };
   rnn_randomise_weights_clever(net, &p);
 }
@@ -677,6 +692,57 @@ rnn_initialise_long_loops(RecurNN* net, int n_loops, int len_mean, int len_stdde
   }
   STDERR_DEBUG("mean loop len %3g", (double)sum / n_loops);
 }
+
+
+static inline int
+add_disconnected_weights(RecurNN *net, int n_connections, float magnitude,
+    const float input_probability, float const input_magnitude){
+  int i, j, s, e, n;
+  int unused[net->hidden_size + 1];
+  for (i = 0; i <= net->hidden_size; i++){
+    unused[i] = i;
+  }
+  j = RAND_SMALL_INT_RANGE(&net->rng, 0, net->hidden_size) + 1;
+
+  for (i = 1, n = 0; i + 2 < net->hidden_size && n < n_connections; n++){
+    j = RAND_SMALL_INT_RANGE(&net->rng, i, net->hidden_size) + 1;
+    s = unused[j];
+    unused[j] = unused[i];
+    i++;
+    j = RAND_SMALL_INT_RANGE(&net->rng, i, net->hidden_size) + 1;
+    e = unused[j];
+    unused[j] = unused[i];
+    i++;
+
+    float weight = bounded_log_normal_random_sign(&net->rng, magnitude, 0.25, 3.0);
+    net->ih_weights[s * net->h_size + e] = weight;
+
+    if (rand_double(&net->rng) < input_probability){
+      j = RAND_SMALL_INT_RANGE(&net->rng, i, net->hidden_size) + 1;
+      e = unused[j];
+      unused[j] = unused[i];
+      i++;
+      int input = RAND_SMALL_INT_RANGE(&net->rng, 0, net->input_size);
+      net->ih_weights[(net->hidden_size + 1 + input) * net->h_size + e] = \
+        cheap_gaussian_noise(&net->rng) * input_magnitude;
+    }
+  }
+  return n;
+}
+
+
+void
+rnn_initialise_disconnected(RecurNN* net, int n_connections, float magnitude,
+    float input_probability, float input_magnitude){
+  STDERR_DEBUG("n_connections %d, magnitude %g, input_prob %g input mag %g",
+      n_connections, magnitude, input_probability, input_magnitude);
+  do {
+    n_connections -= add_disconnected_weights(net, n_connections, magnitude,
+        input_probability, input_magnitude);
+  } while(n_connections > 0);
+}
+
+
 
 void
 rnn_scale_initial_weights(RecurNN *net, float factor){

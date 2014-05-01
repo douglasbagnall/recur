@@ -115,6 +115,7 @@ typedef enum {
   RNN_INIT_LOOPS,
   RNN_INIT_RUNS,
   RNN_INIT_FLAT,
+  RNN_INIT_DISCONNECT,
 } rnn_init_method;
 
 
@@ -219,6 +220,13 @@ struct RecurInitialisationParameters {
   float loop_len_mean;
   float loop_len_stddev;
   int loop_n;
+
+  /*disconnect*/
+  int disconnect_connections;
+  float disconnect_magnitude;
+  float disconnect_input_probability;
+  float disconnect_input_magnitude;
+
 };
 
 /* functions */
@@ -242,20 +250,21 @@ RecurNN *rnn_new_with_bottom_layer(int n_inputs, int r_input_size,
 void rnn_set_log_file(RecurNN *net, const char * log_file, int append_dont_truncate);
 
 void rnn_randomise_weights_clever(RecurNN *net, struct RecurInitialisationParameters *p);
+void rnn_randomise_weights_simple(RecurNN *net, const rnn_init_method method);
 void rnn_randomise_weights_auto(RecurNN *net);
+
 void rnn_randomise_weights_flat(RecurNN *net, float variance, int power,
     double perforation);
+void rnn_initialise_runs(RecurNN* net, int n_loops, float gain_per_step,
+    float min_gain, float input_magnitude, int avoid_loops);
+void rnn_initialise_long_loops(RecurNN* net, int n_loops, int len_mean, int len_stddev,
+    float gain, float input_probability, float input_magnitude);
+void rnn_initialise_disconnected(RecurNN* net, int n_connections, float magnitude,
+    float input_probability, float input_magnitude);
+
 void rnn_scale_initial_weights(RecurNN *net, float factor);
 void rnn_randomise_weights_fan_in(RecurNN *net, float sum, float kurtosis, float margin,
     float inputs_weight_ratio);
-
-void rnn_initialise_runs(RecurNN* net, int n_loops, float gain_per_step,
-    float min_gain, float input_magnitude, int avoid_loops);
-
-void rnn_initialise_long_loops(RecurNN* net, int n_loops, int len_mean, int len_stddev,
-    float gain, float input_probability, float input_magnitude);
-
-
 
 void rnn_delete_net(RecurNN *net);
 RecurNN ** rnn_new_training_set(RecurNN *prototype, int n_nets);
