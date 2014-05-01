@@ -1131,7 +1131,9 @@ def _calc_stats(results):
 
         # briar score
         briar += (score - target) * (score - target)
-        cross_entropy -= log((score if target else (1.0 - score)), 2.0)
+        error = max(score if target else (1.0 - score), 1e-20)
+
+        cross_entropy -= log(error, 2.0)
 
     #do the last little bit of area under curve
     dx = 1.0 - px
