@@ -443,6 +443,7 @@ class Trainer(BaseClassifier):
         self.learn_rate_fn = learn_rate_fn
         self.dropout_fn = dropout_fn
         self.counter = 0
+        self.save_threshold_adjust = 1.0
         self.iterations = iterations
         self.trainers = eternal_shuffler(trainers)
         testers = eternal_alternator(testers)
@@ -545,7 +546,6 @@ class Trainer(BaseClassifier):
                 gap = right_p - wrong_p
                 dp = gap / sqrt(0.5 * (right_var + wrong_var) or 1e99)
                 dprime += dp
-                print dp, dprime
 
                 s = score[c]
                 r = runs[c]
@@ -574,12 +574,19 @@ class Trainer(BaseClassifier):
             output.extend(p_strings)
 
             print ''.join(output)
-            if rightness > 0.8 or ratio_p > 5 or gap_p > 0.5 or dprime > 1.5:
+            adj = min(1.0, self.save_threshold_adjust)
+            if (rightness > 0.8 * adj or
+                ratio_p > 6.0 * adj or
+                gap_p > 0.5 * adj or
+                dprime > 1.45  * adj):
+                self.save_threshold_adjust = 1.03
                 self.save_named_net(tag='win-%d-gap-%d-ratio-%d-dprime-%d' %
                                     (int(rightness * 100 + 0.5),
                                      int(gap_p * 100 + 0.5),
                                      int(ratio_p + 0.5),
                                      int(dprime * 10 + 0.5)))
+            else:
+                self.save_threshold_adjust *= 0.995
 
 
     def save_named_net(self, tag='', dir=SAVE_LOCATION):
