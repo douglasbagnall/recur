@@ -385,7 +385,6 @@ class Classifier(BaseClassifier):
 
         if not self.data:
             if self.summarise and self.target_index:
-                import json
                 stats = calc_stats(self.scores[self.target_index],
                                    self.minute_results[self.target_index],
                                    self.minute_gt[self.target_index])
