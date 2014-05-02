@@ -1179,7 +1179,11 @@ def _calc_stats(results):
     var_true = nvar / n
     mean_false, n, nvar = mean_data[0]
     var_false = nvar / n
-    dprime = (mean_true - mean_false) / sqrt(0.5 * (var_true + var_false))
+    if var_true + var_false:
+        dprime = (mean_true - mean_false) / sqrt(0.5 * (var_true + var_false))
+    else:
+        #zero variance is in practice a sign of degeneracy
+        dprime = 0.0
     sqrt_half =  0.7071067811865475244
     return {
         'mean_dfd' : sum_dfd / len(results)  * sqrt_half,
