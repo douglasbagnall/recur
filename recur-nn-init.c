@@ -402,9 +402,10 @@ void
 rnn_randomise_weights_auto(RecurNN *net){
   /*heuristically choose an initialisation scheme for the size of net */
   /*initial heuristic is very simple*/
-  const rnn_init_method method = RNN_INIT_RUNS;
-  //const rnn_init_method method = RNN_INIT_LOOPS;
+  //const rnn_init_method method = RNN_INIT_RUNS;
+  const rnn_init_method method = RNN_INIT_LOOPS;
   rnn_randomise_weights_simple(net, method);
+}
 
 void
 rnn_randomise_weights_simple(RecurNN *net, const rnn_init_method method){
@@ -414,11 +415,11 @@ rnn_randomise_weights_simple(RecurNN *net, const rnn_init_method method){
     .bias_uses_submethod = 0,
     .inputs_use_submethod = 0,
 
-    .runs_n = 5 * net->h_size,
-    .runs_gain = 0.12,
-    .runs_min_gain = 1e-6,
-    .runs_input_magnitude = 0.7,
-    .runs_avoid_loops = 0,
+    .runs_n = 7 * net->h_size,
+    .runs_gain = 0.021,
+    .runs_min_gain = 1e-12,
+    .runs_input_magnitude = 0.021,
+    .runs_avoid_loops = 1,
 
     .fan_in_ratio = net->input_size  * 1.0f / net->hidden_size,
     .fan_in_sum = 3.0,
@@ -429,16 +430,16 @@ rnn_randomise_weights_simple(RecurNN *net, const rnn_init_method method){
     .flat_shape = 1,
     .flat_perforation = 0.0,
 
-    .loop_input_probability = 0.12,
-    .loop_input_magnitude = 0.4,
+    .loop_input_probability = .17,
+    .loop_input_magnitude = 0.2,
     .loop_gain = 0.17,
-    .loop_len_mean = 7.0,
-    .loop_len_stddev = 2.0,
-    .loop_n = net->h_size * 3
+    .loop_len_mean = net->hidden_size / 1,
+    .loop_len_stddev = net->hidden_size / 3,
+    .loop_n = net->h_size * 0.085,
 
     .disconnect_connections = 15 * net->h_size,
     .disconnect_magnitude = 0.1,
-    .disconnect_input_probability = 0.35,
+    .disconnect_input_probability = 0.25,
     .disconnect_input_magnitude = 0.1,
   };
   rnn_randomise_weights_clever(net, &p);
