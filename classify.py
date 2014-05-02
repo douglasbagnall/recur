@@ -438,7 +438,7 @@ class Trainer(BaseClassifier):
     trainers = None
     no_save_net = False
     def train(self, trainers, testers, learn_rate_fn, dropout_fn=None,
-              iterations=100, log_file='auto', properties=()):
+              iterations=100, log_file='auto', properties=(), stat_target=None):
         self.learn_rate_fn = learn_rate_fn
         self.dropout_fn = dropout_fn
         self.counter = 0
@@ -455,8 +455,9 @@ class Trainer(BaseClassifier):
         self.setp('log-file', log_file)
         for k, v in properties:
             self.setp(k, v)
-        #print >> sys.stderr, "in train()"
-
+        if len(self.classes) == 2 and stat_target is None:
+            stat_target = self.classes[1]
+        self.stat_target = stat_target
         self.setp('load-net-now', 1)
         self.next_training_set()
         #print >> sys.stderr, "setting PLAYING()"
@@ -469,6 +470,7 @@ class Trainer(BaseClassifier):
                             for y in self.class_groups]
         self.test_runs = [{x: 0 for x in y}
                           for y in self.class_groups]
+        self.stat_target_list = []
         self.setp('dropout', 0)
         self.setp('forget', 0)
         self.setp('training', False)
@@ -560,15 +562,46 @@ class Trainer(BaseClassifier):
             if count_p:
                 ratio_p /= count_p
 
+            stat_list = self.stat_target_list
+            stat_target = self.stat_target
+            if self.stat_target in classes and stat_list:
+                # AUC avoiding in-loop maths:
+                # start off with threshold 1, 0% true positives
+                # (and implicit 0% false positives).
+                # With each step the threshold lowers and one negative becomes positive
+                # if it is a true positive, the tp column grows
+                # if it is false, we march along the fp axis, adding the tp column
+                # XXX this seems to give the wrong numbers!
+                stat_list.sort(reverse=True)
+                n = len(stat_list)
+                p = sum(x[1] for x in stat_list)
+                area = p * (n - p) * 1.0
+                auc = 0
+                tp = 0
+                for p, t in stat_list:
+                    if t:
+                        tp += 1
+                    else:
+                        auc += tp
+
+                auc /= area
+                auc_string = " %sAUC%s%.2f" %  (COLOURS['Z'],
+                                                colours[int((auc - 0.5) * 20.0)], auc)
+            else:
+                auc = 0
+                auc_string = ''
+
             dprime /= len(classes)
             gap_p /= len(classes)
             rightness /= len(classes)
-            output.append(" %s%.2f %s%.2f %s%.2f %sd'%s%.2f%s" %
+            output.append(" %s%.2f %s%.2f %s%.2f %sd'%s%.2f%s%s" %
                           (colours[int(rightness * 9.99)], rightness,
                            colours[min(int(gap_p * 18), 9)], gap_p,
                            colours[min(int(ratio_p * 2), 9)], ratio_p, COLOURS['Z'],
                            colours[min(int(dprime * 4), 9)], dprime,
+                           auc_string,
                            COLOURS['Z']))
+
 
             output.extend(p_strings)
 
@@ -577,13 +610,15 @@ class Trainer(BaseClassifier):
             if (rightness > 0.8 * adj or
                 ratio_p > 6.0 * adj or
                 gap_p > 0.5 * adj or
-                dprime > 1.45  * adj):
+                dprime > 1.45  * adj or
+                auc > 0.92 * adj):
                 self.save_threshold_adjust = 1.03
-                self.save_named_net(tag='win-%d-gap-%d-ratio-%d-dprime-%d' %
+                self.save_named_net(tag='win-%d-gap-%d-ratio-%d-dprime-%d-auc-%d' %
                                     (int(rightness * 100 + 0.5),
                                      int(gap_p * 100 + 0.5),
                                      int(ratio_p + 0.5),
-                                     int(dprime * 10 + 0.5)))
+                                     int(dprime * 10 + 0.5),
+                                     int(auc * 100 + 0.5)))
             else:
                 self.save_threshold_adjust *= 0.995
 
@@ -636,6 +671,8 @@ class Trainer(BaseClassifier):
         #print s.to_string()
         name = s.get_name()
         if name == 'classify' and not self.getp('training'):
+            stat_target = self.stat_target
+            stat_list = self.stat_target_list
             self.test_n += self.channels
             v = s.get_value
             for i in range(self.channels):
@@ -659,6 +696,8 @@ class Trainer(BaseClassifier):
                         mean += delta / n
                         pvars[correct] += delta * (p - mean)
                         pmeans[correct] = mean
+                        if x == stat_target:
+                            stat_list.append((p, correct))
 
 def negate_exponent(x):
     m, e = ("%.9e" % x).split('e')
@@ -1098,6 +1137,8 @@ def _calc_stats(results):
         dy = y - py
         auc += px * dy       # bottom rectangle
         auc += dx * dy * 0.5 # top triangle
+        #XXX AUC never actually has a top triangle -- every step is
+        # either vertical or horizontal. There ought to be a better way.
         px = x
         py = y
 
