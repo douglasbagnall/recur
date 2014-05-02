@@ -404,6 +404,7 @@ rnn_randomise_weights_auto(RecurNN *net){
   /*initial heuristic is very simple*/
   const rnn_init_method method = RNN_INIT_RUNS;
   //const rnn_init_method method = RNN_INIT_LOOPS;
+  rnn_randomise_weights_simple(net, method);
 
 void
 rnn_randomise_weights_simple(RecurNN *net, const rnn_init_method method){
