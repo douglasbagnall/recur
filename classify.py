@@ -620,7 +620,7 @@ class Trainer(BaseClassifier):
                                      int(dprime * 10 + 0.5),
                                      int(auc * 100 + 0.5)))
             else:
-                self.save_threshold_adjust *= 0.995
+                self.save_threshold_adjust *= 0.99
 
 
     def save_named_net(self, tag='', dir=SAVE_LOCATION):
