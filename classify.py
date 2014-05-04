@@ -565,28 +565,31 @@ class Trainer(BaseClassifier):
             stat_list = self.stat_target_list
             stat_target = self.stat_target
             if self.stat_target in classes and stat_list:
+                #auc2 = _calc_stats(stat_list[:])['auc']
                 # AUC avoiding in-loop maths:
-                # start off with threshold 1, 0% true positives
-                # (and implicit 0% false positives).
-                # With each step the threshold lowers and one negative becomes positive
-                # if it is a true positive, the tp column grows
-                # if it is false, we march along the fp axis, adding the tp column
-                # XXX this seems to give the wrong numbers!
+                # start off with threshold 1.0, i.e. 0% positive
                 stat_list.sort(reverse=True)
-                n = len(stat_list)
-                p = sum(x[1] for x in stat_list)
-                area = p * (n - p) * 1.0
                 auc = 0
                 tp = 0
+                fp = 0
+                #as the threshold drops, either a true or false positive is revealed.
+                # if it is true, increment the true positive column (y++)
+                # if it is false, advance along the x axis
                 for p, t in stat_list:
                     if t:
                         tp += 1
                     else:
+                        fp += 1
                         auc += tp
-
+                #if the last one is true, add the last TP column
+                if stat_list[-1][1]:
+                    auc += tp
+                area = float(tp * fp)
                 auc /= area
+                #print auc, auc2, auc - auc2
                 auc_string = " %sAUC%s%.2f" %  (COLOURS['Z'],
-                                                colours[int((auc - 0.5) * 20.0)], auc)
+                                                colours[max(int((auc - 0.5) * 20.0), 0)],
+                                                auc)
             else:
                 auc = 0
                 auc_string = ''
