@@ -871,6 +871,9 @@ main(int argc, char *argv[]){
     opt_stop = net->generation - opt_stop;
   }
 
+  rnn_print_net_stats(net);
+
+
   BELOW_QUIET_LEVEL(2){
     START_TIMER(run);
     for (int i = 0;;i++){

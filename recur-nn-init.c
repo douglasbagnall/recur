@@ -879,3 +879,41 @@ rnn_multi_pgm_dump(RecurNN *net, const char *dumpees, const char *basename){
     }
   }
 }
+
+static inline void
+print_mean_and_variance(const float *array, int width, int height, int stride,
+    int offset, const char *name){
+  int x, y;
+  float mean = 0;
+  float var = 0;
+  float n = 0;
+  for (y = 0; y < height; y++){
+    for (x = offset; x < width + offset; x++){
+      n++;
+      float val = array[y * stride + x];
+      float delta = val - mean;
+      mean += delta / n;
+      var += delta * (val - mean);
+    }
+  }
+  var /= n;
+  STDERR_DEBUG("%s: mean %3g variance %3g (std dev %3g) n %d",
+      name, mean, var, sqrt(var), (int)n);
+}
+
+void
+rnn_print_net_stats(RecurNN *net){
+  print_mean_and_variance(net->ih_weights, net->hidden_size,
+      net->hidden_size + net->input_size + 1, net->h_size,
+      1, "ih_weights");
+  print_mean_and_variance(net->ho_weights, net->output_size,
+      net->hidden_size + 1, net->o_size,
+      0, "ho_weights");
+
+  if (net->bottom_layer){
+    RecurExtraLayer *bl = net->bottom_layer;
+    print_mean_and_variance(bl->weights, bl->output_size,
+        bl->input_size, bl->o_size,
+        1, "bottom weights");
+  }
+}
