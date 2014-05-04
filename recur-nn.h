@@ -292,7 +292,6 @@ void rnn_log_net(RecurNN *net);
 void rnn_forget_history(RecurNN *net, int bptt_too);
 
 void rnn_perforate_weights(RecurNN *net, float p);
-void rnn_emphasise_diagonal(RecurNN *net, float magnitude, float proportion);
 
 void rnn_apply_extra_layer_learning(RecurExtraLayer *layer);
 

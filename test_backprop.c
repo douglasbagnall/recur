@@ -64,7 +64,6 @@ Because of ccan/opt, --help will tell you something.
 #define DEFAULT_WEIGHT_SCALE_FACTOR 0
 #define DEFAULT_REPORT_INTERVAL 1024
 #define DEFAULT_CONFAB_ONLY 0
-#define DEFAULT_DIAGONAL_BOOST 0
 #define DEFAULT_BOTTOM_LAYER 0
 #define DEFAULT_TOP_LEARN_RATE_SCALE 1.0f
 #define DEFAULT_BOTTOM_LEARN_RATE_SCALE 1.0f
@@ -124,7 +123,6 @@ static int opt_momentum_style = DEFAULT_MOMENTUM_STYLE;
 static float opt_weight_scale_factor = DEFAULT_WEIGHT_SCALE_FACTOR;
 static uint opt_report_interval = DEFAULT_REPORT_INTERVAL;
 static uint opt_confab_only = DEFAULT_CONFAB_ONLY;
-static float opt_diagonal_boost = DEFAULT_DIAGONAL_BOOST;
 static uint opt_bottom_layer = DEFAULT_BOTTOM_LAYER;
 static float opt_top_learn_rate_scale = DEFAULT_TOP_LEARN_RATE_SCALE;
 static float opt_bottom_learn_rate_scale = DEFAULT_BOTTOM_LEARN_RATE_SCALE;
@@ -236,8 +234,6 @@ static struct opt_table options[] = {
       &opt_report_interval, "how often to validate and report"),
   OPT_WITH_ARG("--confab-only=<chars>", opt_set_uintval, opt_show_uintval,
       &opt_confab_only, "no training, only confabulate this many characters"),
-  OPT_WITH_ARG("--diagonal-boost=<float>", opt_set_floatval, opt_show_floatval,
-      &opt_diagonal_boost, "boost this portion of diagonal weights"),
   OPT_WITH_ARG("--bottom-layer=<nodes>", opt_set_uintval, opt_show_uintval,
       &opt_bottom_layer, "use a bottom layer with this many output nodes"),
   OPT_WITH_ARG("--top-learn-rate-scale=<float>", opt_set_floatval, opt_show_floatval,
@@ -762,9 +758,6 @@ load_or_create_net(void){
     }
     else {
       rnn_randomise_weights_auto(net);
-    }
-    if (opt_diagonal_boost){
-      rnn_emphasise_diagonal(net, 0.25, opt_diagonal_boost);
     }
     net->bptt->momentum_weight = opt_momentum_weight;
     if (opt_weight_scale_factor > 0){
