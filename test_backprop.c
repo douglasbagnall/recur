@@ -52,6 +52,7 @@ Because of ccan/opt, --help will tell you something.
 #define DEFAULT_DETERMINISTIC_CONFAB 0
 #define DEFAULT_SAVE_NET 1
 #define DEFAULT_LOG_FILE "bptt.log"
+#define DEFAULT_BASENAME "text"
 #define DEFAULT_START_CHAR -1
 #define DEFAULT_HIDDEN_SIZE 199
 #define DEFAULT_DENSE_WEIGHTS 0
@@ -94,6 +95,7 @@ static float opt_momentum = DEFAULT_MOMENTUM;
 static int opt_quiet = 0;
 static char * opt_filename = NULL;
 static char * opt_logfile = DEFAULT_LOG_FILE;
+static char * opt_basename = DEFAULT_BASENAME;
 static char * opt_alphabet = NET_TO_CHAR;
 static char * opt_collapse_chars = HASH_CHARS;
 static char * opt_textfile = DICKENS_SHUFFLED_TEXT;
@@ -202,6 +204,8 @@ static struct opt_table options[] = {
       "load/save net here"),
   OPT_WITH_ARG("--log-file=<file>", opt_set_charp, opt_show_charp, &opt_logfile,
       "log to this filename"),
+  OPT_WITH_ARG("-n|--basename=<tag>", opt_set_charp, opt_show_charp, &opt_basename,
+      "construct log, image, net filenames from this root"),
   OPT_WITH_ARG("-t|--text-file=<file>", opt_set_charp, opt_show_charp, &opt_textfile,
       "learn from this text"),
   OPT_WITH_ARG("-t|--dump-collapsed-text=<file>", opt_set_charp, opt_show_charp,
@@ -677,7 +681,7 @@ epoch(RecurNN **nets, int n_nets, RecurNN *confab_net, Ventropy *v,
         rnn_save_net(net, opt_filename, 1);
       }
       if (opt_periodic_pgm_dump){
-        rnn_multi_pgm_dump(net, "ihw how ihd hod ihm hom", "text");
+        rnn_multi_pgm_dump(net, "ihw how ihd ihm hom", opt_basename);
       }
       schedule->eval(schedule, net, ventropy, opt_quiet < 2);
     }
@@ -704,12 +708,12 @@ construct_net_filename(void){
     sig ^= ROTATE(sig - s[i], 13) + s[i];
   }
   if (opt_bottom_layer){
-    snprintf(s, sizeof(s), "text-s%0x-i%d-b%d-h%d-o%d-c%d.net",
+    snprintf(s, sizeof(s), "%s-s%0x-i%d-b%d-h%d-o%d-c%d.net", opt_basename,
         sig, input_size, opt_bottom_layer, opt_hidden_size, output_size,
         opt_learn_capitals);
   }
   else{
-    snprintf(s, sizeof(s), "text-s%0x-i%d-h%d-o%d-c%d.net",
+    snprintf(s, sizeof(s), "%s-s%0x-i%d-h%d-o%d-c%d.net", opt_basename,
         sig, input_size, opt_hidden_size, output_size,
         opt_learn_capitals);
   }
@@ -764,7 +768,7 @@ load_or_create_net(void){
       rnn_scale_initial_weights(net, opt_weight_scale_factor);
     }
     if (opt_periodic_pgm_dump){
-      rnn_multi_pgm_dump(net, "ihw how", "text");
+      rnn_multi_pgm_dump(net, "ihw how", opt_basename);
     }
   }
   else if (opt_override){
