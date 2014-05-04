@@ -14,6 +14,7 @@ DEFAULT_DROPOUT_DECAY = 0
 DEFAULT_DROPOUT_MIN = 0.1
 DEFAULT_MOMENTUM = 0.93
 DEFAULT_MOMENTUM_SOFT_START = 5000
+DEFAULT_LEARN_RATE_TIME_OFFSET = 2000.0
 
 from classify import gst_init
 from classify import Trainer, lr_sqrt_exp, lr_inverse_time
@@ -67,7 +68,8 @@ def main():
     elif args.learn_rate_schedule == "inverse-time" or args.learn_rate_time_offset:
         lr = lr_inverse_time(args.learn_rate,
                              min(args.learn_rate_min, args.learn_rate),
-                             offset=(args.learn_rate_time_offset or 1.0))
+                             offset=(args.learn_rate_time_offset or
+                                     DEFAULT_LEARN_RATE_TIME_OFFSET))
     else:
         if args.learn_rate_schedule != "sqrt-exponential":
             print >> sys.stderr, "assuming sqrt-exponential schedule"
