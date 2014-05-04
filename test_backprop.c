@@ -146,6 +146,20 @@ opt_set_floatval(const char *arg, float *f)
   return NULL;
 }
 
+/*restrict to 0-1 range (mostly for probabilities)*/
+static char *
+opt_set_floatval01(const char *arg, float *f){
+  char *msg = opt_set_floatval(arg, f);
+  if (msg == NULL && (*f < 0.0f || *f > 1.0f)){
+    char *s;
+    if (asprintf(&s, "We want a number between 0 and 1, not '%s'", arg) > 0){
+      return s;
+    }
+  }
+  return msg;
+}
+
+static
 void opt_show_floatval(char buf[OPT_SHOW_LEN], const float *f)
 {
   snprintf(buf, OPT_SHOW_LEN, "%g", *f);
@@ -164,7 +178,7 @@ static struct opt_table options[] = {
       &opt_batch_size, "bptt minibatch size"),
   OPT_WITH_ARG("--dense-weights=<n>", opt_set_uintval_bi, opt_show_uintval_bi,
       &opt_dense_weights, "no initial zero weights; > 1 for many near zero"),
-  OPT_WITH_ARG("--perforate-weights=<0-1>", opt_set_floatval, opt_show_floatval,
+  OPT_WITH_ARG("--perforate-weights=<0-1>", opt_set_floatval01, opt_show_floatval,
       &opt_perforate_weights, "Zero this portion of weights"),
   OPT_WITH_ARG("-V|--validate-chars=<n>", opt_set_intval_bi, opt_show_intval_bi,
       &opt_validate_chars, "Retain this many characters for validation"),
@@ -172,17 +186,17 @@ static struct opt_table options[] = {
       &opt_validation_overlap, "> 1 to use lapped validation (quicker)"),
   OPT_WITH_ARG("--start-char=<n>", opt_set_intval, opt_show_intval,
       &opt_start_char, "character to start epoch on (-1 for auto)"),
-  OPT_WITH_ARG("-l|--learn-rate=<0-1>", opt_set_floatval, opt_show_floatval,
+  OPT_WITH_ARG("-l|--learn-rate=<0-1>", opt_set_floatval01, opt_show_floatval,
       &opt_learn_rate, "initial learning rate"),
-  OPT_WITH_ARG("--learn-rate-min=<0-1>", opt_set_floatval, opt_show_floatval,
+  OPT_WITH_ARG("--learn-rate-min=<0-1>", opt_set_floatval01, opt_show_floatval,
       &opt_learn_rate_min, "minimum learning rate (>learn-rate is off)"),
   OPT_WITH_ARG("--learn-rate-inertia=<int>", opt_set_intval, opt_show_intval,
       &opt_learn_rate_inertia, "tardiness of learn-rate reduction (try 30-90)"),
   OPT_WITH_ARG("--learn-rate-scale=<int>", opt_set_floatval, opt_show_floatval,
       &opt_learn_rate_scale, "size of learn rate reductions"),
-  OPT_WITH_ARG("-m|--momentum=<float>", opt_set_floatval, opt_show_floatval,
+  OPT_WITH_ARG("-m|--momentum=<0-1>", opt_set_floatval01, opt_show_floatval,
       &opt_momentum, "momentum"),
-  OPT_WITH_ARG("--momentum-weight=<float>", opt_set_floatval, opt_show_floatval,
+  OPT_WITH_ARG("--momentum-weight=<0-1>", opt_set_floatval01, opt_show_floatval,
       &opt_momentum_weight, "momentum weight"),
   OPT_WITH_ARG("--momentum-soft-start=<float>", opt_set_floatval, opt_show_floatval,
       &opt_momentum_soft_start, "softness of momentum onset (0 for constant)"),
@@ -224,7 +238,7 @@ static struct opt_table options[] = {
       &opt_deterministic_confab, "Use best guess in confab, not random sampling"),
   OPT_WITHOUT_ARG("--no-save-net", opt_set_invbool,
       &opt_save_net, "Don't save learnt changes"),
-  OPT_WITH_ARG("--dropout=<0-1>", opt_set_floatval, opt_show_floatval,
+  OPT_WITH_ARG("--dropout=<0-1>", opt_set_floatval01, opt_show_floatval,
       &opt_dropout, "dropout this fraction of hidden nodes"),
   OPT_WITH_ARG("--multi-tap=<n>", opt_set_uintval, opt_show_uintval,
       &opt_multi_tap, "read at n evenly spaced points in parallel"),
