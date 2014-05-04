@@ -12,6 +12,8 @@ DEFAULT_LEARN_RATE_MIN = 1e-8
 DEFAULT_DROPOUT = 0
 DEFAULT_DROPOUT_DECAY = 0
 DEFAULT_DROPOUT_MIN = 0.1
+DEFAULT_MOMENTUM = 0.93
+DEFAULT_MOMENTUM_SOFT_START = 5000
 
 from classify import gst_init
 from classify import Trainer, lr_sqrt_exp, lr_inverse_time
@@ -24,6 +26,11 @@ def main():
     group = parser.add_argument_group('kiwi-train specific arguments')
     group.add_argument('-l', '--learn-rate', type=float, default=DEFAULT_LEARN_RATE,
                        help="learning rate")
+    group.add_argument('--momentum', type=float, default=DEFAULT_MOMENTUM,
+                       help="learning momentum")
+    group.add_argument('--momentum-soft-start', type=float,
+                       default=DEFAULT_MOMENTUM_SOFT_START,
+                       help="high numbers slowly build up momentum")
     group.add_argument('--learn-rate-decay', type=float, default=DEFAULT_LEARN_RATE_DECAY,
                        help="learning rate decay")
     group.add_argument('--learn-rate-time-offset', type=float,
@@ -101,8 +108,8 @@ def main():
     c.train(training_streams, validate_streams,
             iterations=args.iterations,
             learn_rate_fn=lr, dropout_fn=dropout,
-            properties=(('momentum-soft-start', 10000),
-                        ('momentum', 0.93),
+            properties=(('momentum-soft-start', args.momentum_soft_start),
+                        ('momentum', args.momentum),
                         #('momentum-style', 1),
                         ('weight-fan-in-sum', 4),
                         ('weight-fan-in-kurtosis', 0.15),
