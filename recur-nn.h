@@ -110,13 +110,11 @@ enum {
 };
 
 typedef enum {
+  RNN_INIT_FLAT = 1,
   RNN_INIT_FAN_IN,
-  RNN_INIT_LOOPS,
   RNN_INIT_RUNS,
-  RNN_INIT_FLAT,
-  RNN_INIT_DISCONNECT,
 
-  RNN_INIT_DEFAULT
+  RNN_INIT_LAST
 } rnn_init_method;
 
 typedef enum {
@@ -207,6 +205,7 @@ struct RecurInitialisationParameters {
   rnn_init_method submethod;
   int bias_uses_submethod;
   int inputs_use_submethod;
+
   /*fan in */
   float fan_in_sum;
   float fan_in_step;
@@ -219,26 +218,16 @@ struct RecurInitialisationParameters {
   double flat_perforation;
 
   /* runs */
-  int runs_n;
-  float runs_gain;
-  float runs_min_gain;
-  float runs_input_magnitude;
-  int runs_avoid_loops;
-
-  /* loops */
-  float loop_input_probability;
-  float loop_input_magnitude;
-  float loop_gain;
-  float loop_len_mean;
-  float loop_len_stddev;
-  int loop_n;
-
-  /*disconnect*/
-  int disconnect_connections;
-  float disconnect_magnitude;
-  float disconnect_input_probability;
-  float disconnect_input_magnitude;
-
+  float run_input_probability;
+  float run_input_magnitude;
+  float run_gain;
+  float run_len_mean;
+  float run_len_stddev;
+  int run_n;
+  int run_loop;
+  int run_crossing_paths;
+  int run_inputs_miss;
+  int run_input_at_start;
 };
 
 /* functions */
@@ -270,12 +259,6 @@ void rnn_init_default_weight_parameters(RecurNN *net, struct RecurInitialisation
 
 void rnn_randomise_weights_flat(RecurNN *net, float variance,
     rnn_init_distribution shape, double perforation);
-void rnn_initialise_runs(RecurNN* net, int n_loops, float gain_per_step,
-    float min_gain, float input_magnitude, int avoid_loops);
-void rnn_initialise_long_loops(RecurNN* net, int n_loops, int len_mean, int len_stddev,
-    float gain, float input_probability, float input_magnitude);
-void rnn_initialise_disconnected(RecurNN* net, int n_connections, float magnitude,
-    float input_probability, float input_magnitude);
 
 void rnn_scale_initial_weights(RecurNN *net, float factor);
 void rnn_randomise_weights_fan_in(RecurNN *net, float sum, float kurtosis, float margin,

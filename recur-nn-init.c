@@ -329,143 +329,9 @@ rnn_clone(RecurNN *parent, u32 flags,
   return net;
 }
 
-static inline void
-maybe_randomise_using_submethod(RecurNN *net, struct RecurInitialisationParameters *p)
-{
-  if (p->submethod != p->method){
-    /*randomise top layer and using submethod
-      (presumably FLAT or FAN_IN)*/
-    p->method = p->submethod;
-    rnn_randomise_weights_clever(net, p);
-    p->method = RNN_INIT_RUNS;
-    STDERR_DEBUG("used submethod %d%s%s", p->submethod,
-        p->bias_uses_submethod ? ", bias too" : "",
-        p->inputs_use_submethod ? ", inputs too" : ""
-    );
-  }
-  float *mem = net->ih_weights;
-  size_t rows = p->inputs_use_submethod ? net->h_size : net->i_size;
-  if (p->bias_uses_submethod){
-    rows--;
-    mem += net->h_size;
-  }
-  memset(mem, 0, rows * net->h_size * sizeof(float));
-}
 
 
-void
-rnn_randomise_weights_clever(RecurNN *net, struct RecurInitialisationParameters *p){
-  if (p->method == RNN_INIT_FAN_IN){
-    rnn_randomise_weights_fan_in(net,
-        p->fan_in_sum,
-        p->fan_in_step,
-        p->fan_in_min,
-        p->fan_in_ratio);
-  }
-  else if (p->method == RNN_INIT_FLAT){
-    rnn_randomise_weights_flat(net,
-        p->flat_variance,
-        p->flat_shape,
-        p->flat_perforation
-    );
-  }
-  else if (p->method == RNN_INIT_LOOPS){
-    maybe_randomise_using_submethod(net, p);
-    rnn_initialise_long_loops(net,
-        p->loop_n,
-        p->loop_len_mean,
-        p->loop_len_stddev,
-        p->loop_gain,
-        p->loop_input_probability,
-        p->loop_input_magnitude);
-  }
-  else if (p->method == RNN_INIT_RUNS){
-    maybe_randomise_using_submethod(net, p);
-    rnn_initialise_runs(net,
-        p->runs_n,
-        p->runs_gain,
-        p->runs_min_gain,
-        p->runs_input_magnitude,
-        p->runs_avoid_loops);
-  }
-  else if (p->method == RNN_INIT_DISCONNECT){
-    maybe_randomise_using_submethod(net, p);
-    rnn_initialise_disconnected(net,
-        p->disconnect_connections,
-        p->disconnect_magnitude,
-        p->disconnect_input_probability,
-        p->disconnect_input_magnitude);
-  }
-}
-
-void
-rnn_init_default_weight_parameters(RecurNN *net,
-    struct RecurInitialisationParameters *q){
-  struct RecurInitialisationParameters p = {
-    /*common to multiple methods */
-    .method = RNN_INIT_FLAT,
-    .submethod = RNN_INIT_FLAT,
-    .bias_uses_submethod = 0,
-    .inputs_use_submethod = 0,
-
-    /*used when .method == RNN_INIT_RUNS */
-    .runs_n = 7 * net->h_size,
-    .runs_gain = 0.021,
-    .runs_min_gain = 1e-12,
-    .runs_input_magnitude = 0.021,
-    .runs_avoid_loops = 1,
-
-    /*used when .method OR .submethod == RNN_INIT_FAN_IN */
-    .fan_in_ratio = net->input_size  * 1.0f / net->hidden_size,
-    .fan_in_sum = 3.0,
-    .fan_in_step = 0.3,
-    .fan_in_min = 0.1,
-
-    /*used when .method OR .submethod == RNN_INIT_FLAT */
-    .flat_variance = RNN_INITIAL_WEIGHT_VARIANCE_FACTOR / net->h_size,
-    .flat_shape = RNN_INIT_DIST_SEMICIRCLE,
-    .flat_perforation = 0.7,
-
-    /*RNN_INIT_LOOPS */
-    .loop_input_probability = .17,
-    .loop_input_magnitude = 0.2,
-    .loop_gain = 0.17,
-    .loop_len_mean = net->hidden_size / 1,
-    .loop_len_stddev = net->hidden_size / 3,
-    .loop_n = net->h_size * 0.085,
-
-    /*RNN_INIT_DISCONNECT */
-    .disconnect_connections = 15 * net->h_size,
-    .disconnect_magnitude = 0.1,
-    .disconnect_input_probability = 0.25,
-    .disconnect_input_magnitude = 0.1,
-  };
-  *q = p;
-}
-
-void
-rnn_randomise_weights_auto(RecurNN *net){
-  /*heuristically choose an initialisation scheme for the size of net */
-  /*initial heuristic is very simple*/
-  rnn_randomise_weights_simple(net, RNN_INIT_FLAT);
-}
-
-
-void
-rnn_randomise_weights_simple(RecurNN *net, const rnn_init_method method){
-  struct RecurInitialisationParameters p;
-  rnn_init_default_weight_parameters(net, &p);
-  p.method = RNN_INIT_FLAT;
-  rnn_randomise_weights_clever(net, &p);
-}
-
-static inline float
-gaussian_power(rand_ctx *rng, float a, int power){
-  for (int i = 0; i < power; i++){
-    a *= cheap_gaussian_noise(rng);
-  }
-  return a;
-}
+/* Weight initialisation */
 
 static inline float
 bounded_log_normal_random_sign(rand_ctx *rng, float mean, float stddev, float bound)
@@ -479,9 +345,107 @@ bounded_log_normal_random_sign(rand_ctx *rng, float mean, float stddev, float bo
   return (rand64(rng) & 1) ? w : -w;
 }
 
+/*link a random input node to a given hidden node */
+static inline void
+add_random_input(RecurNN *net, int dest, float deviation){
+  int input = RAND_SMALL_INT_RANGE(&net->rng, 0, net->input_size);
+  net->ih_weights[(net->hidden_size + 1 + input) * net->h_size + dest] =   \
+    cheap_gaussian_noise(&net->rng) * deviation;
+}
+
+/*loop_link is a helper for initialise_loops_or_runs().
+  It connects the hidden node <s> to the hidden node <e>, with
+  approximately <gain> strength, and maybe adds in an input.
+*/
+static inline void
+loop_link(RecurNN *net, int s, int e,
+    const float gain, const float input_probability,
+    float const input_magnitude){
+  float weight = bounded_log_normal_random_sign(&net->rng, gain, 0.25, 3.0);
+  net->ih_weights[s * net->h_size + e] = weight;
+  if (rand_double(&net->rng) < input_probability){
+    add_random_input(net, e, input_magnitude);
+  }
+}
+
+static void
+initialise_loops_or_runs(RecurNN* net, int n_loops, int len_mean, int len_stddev,
+    float gain, float input_probability, float input_magnitude,
+    int loop, int crossing_paths, int inputs_miss, int input_at_start){
+  STDERR_DEBUG("n_loops %d len_mean %d, len_stddev %d, gain %g, "
+      "input_probability %g, input_magnitude %g loop %d crossing_paths %d,"
+      " inputs_miss %d input_at_start %d",
+      n_loops, len_mean, len_stddev, gain, input_probability, input_magnitude,
+      loop, crossing_paths, inputs_miss, input_at_start);
+
+  int sum = 0;
+  int beginning, e, s, j;
+  int bound = net->hidden_size + 1;
+  int i = bound;
+  int unused[bound];
+
+  double linked_input_p =  inputs_miss ? 0 : input_probability;
+  double missing_input_p = inputs_miss ? input_probability : 0;
+
+  for (int loop_count = 0; loop_count < n_loops; loop_count++){
+    int len = cheap_gaussian_noise(&net->rng) * len_stddev + len_mean + 0.5;
+    len = MIN(MAX(2, len), net->hidden_size);
+
+    /* if it doesn't fit, or if non-exclusive paths have been requested, reset
+       the unused list. Always happens first round.
+
+       In the crossing_paths == 2 case, this work is unnecessary (but harmless).
+    */
+    if (i + len + inputs_miss >= bound || crossing_paths){
+      for (int k = 0; k < bound; k++){
+        unused[k] = k;
+      }
+      i = 1;
+    }
+
+    j = RAND_SMALL_INT_RANGE(&net->rng, i, bound);
+    beginning = e = unused[j];
+
+    if (input_at_start && input_magnitude) {
+      add_random_input(net, e, input_magnitude);
+    }
+
+    for (int m = 0; m < len; m++, i++){
+      unused[j] = unused[i];
+      s = e;
+      /*crossing_paths == 2 means path can self-cross*/
+      if (crossing_paths == 2){
+        e = RAND_SMALL_INT_RANGE(&net->rng, 1, bound);
+      }
+      else {
+        j = RAND_SMALL_INT_RANGE(&net->rng, i, bound);
+        e = unused[j];
+      }
+      loop_link(net, s, e, gain, linked_input_p, input_magnitude);
+    }
+
+    if (loop){
+      /*loop the end to the beginning */
+      loop_link(net, e, beginning, gain, linked_input_p, input_magnitude);
+    }
+
+    /* missing inputs, if they are wanted, land randomly outside of loops.*/
+    if (rand_double(&net->rng) < missing_input_p && i < bound){
+      j = RAND_SMALL_INT_RANGE(&net->rng, i, bound);
+      e = unused[j];
+      unused[j] = unused[i];
+      i++;
+      add_random_input(net, e, input_magnitude);
+    }
+    sum += len;
+  }
+  STDERR_DEBUG("mean loop len %3g", (double)sum / n_loops);
+}
+
+
 
 static inline void
-randomise_weights_flat(rand_ctx *rng, float *array,
+randomise_array_flat(rand_ctx *rng, float *array,
     const int width, const int height, const int stride,
     const int offset, const float variance,
     const rnn_init_distribution shape, const double perforation){
@@ -533,7 +497,7 @@ randomise_weights_flat(rand_ctx *rng, float *array,
 }
 
 void
-rnn_randomise_weights_flat(RecurNN *net, float variance,
+randomise_weights_flat(RecurNN *net, float variance,
     rnn_init_distribution shape, double perforation){
   memset(net->ih_weights, 0, net->ih_size * sizeof(float));
   memset(net->ho_weights, 0, net->ho_size * sizeof(float));
@@ -543,25 +507,25 @@ rnn_randomise_weights_flat(RecurNN *net, float variance,
   else if (perforation >= 1.0){
     return; /*perforation of 1 means entirely zeros */
   }
-  randomise_weights_flat(&net->rng, net->ih_weights,
+  randomise_array_flat(&net->rng, net->ih_weights,
       net->hidden_size, net->input_size + net->hidden_size + 1, net->h_size,
       1, variance, shape, perforation);
 
-  randomise_weights_flat(&net->rng, net->ho_weights,
+  randomise_array_flat(&net->rng, net->ho_weights,
       net->output_size, net->hidden_size + 1, net->o_size,
       0, variance, shape, perforation);
 
   if (net->bottom_layer){
     RecurExtraLayer *bl = net->bottom_layer;
     memset(bl->weights, 0, bl->i_size * bl->o_size * sizeof(float));
-    randomise_weights_flat(&net->rng, bl->weights,
+    randomise_array_flat(&net->rng, bl->weights,
         bl->output_size, bl->input_size, bl->o_size,
         1, variance, shape, perforation);
   }
 }
 
 static inline void
-randomise_weights_fan_in(rand_ctx *rng, float *weights, int width, int height, int stride,
+randomise_array_fan_in(rand_ctx *rng, float *weights, int width, int height, int stride,
     float sum, float kurtosis, float margin){
   int x, y, i;
   /*Each node gets input that adds, approximately, to <sum> */
@@ -579,34 +543,144 @@ randomise_weights_fan_in(rand_ctx *rng, float *weights, int width, int height, i
 }
 
 void
-rnn_randomise_weights_fan_in(RecurNN *net, float sum, float kurtosis,
+randomise_weights_fan_in(RecurNN *net, float sum, float kurtosis,
     float margin, float inputs_weight_ratio){
   memset(net->ih_weights, 0, net->ih_size * sizeof(float));
   memset(net->ho_weights, 0, net->ho_size * sizeof(float));
   int hsize = 1 + net->hidden_size;
   if (inputs_weight_ratio > 0){
-    randomise_weights_fan_in(&net->rng, net->ih_weights + 1,
+    randomise_array_fan_in(&net->rng, net->ih_weights + 1,
         net->hidden_size, hsize, net->h_size, sum, kurtosis, margin);
-    randomise_weights_fan_in(&net->rng, net->ih_weights + hsize * net->h_size + 1,
+    randomise_array_fan_in(&net->rng, net->ih_weights + hsize * net->h_size + 1,
         net->hidden_size, net->input_size, net->h_size,
         sum * inputs_weight_ratio, kurtosis, margin);
   }
   else {
-    randomise_weights_fan_in(&net->rng, net->ih_weights + 1,
+    randomise_array_fan_in(&net->rng, net->ih_weights + 1,
         net->hidden_size, hsize + net->input_size, net->h_size,
         sum, kurtosis, margin);
   }
-  randomise_weights_fan_in(&net->rng, net->ho_weights, net->output_size, net->hidden_size,
+  randomise_array_fan_in(&net->rng, net->ho_weights, net->output_size, net->hidden_size,
       net->o_size, sum, kurtosis, margin);
 
   if (net->bottom_layer){
     RecurExtraLayer *bl = net->bottom_layer;
     memset(bl->weights, 0, bl->i_size * bl->o_size * sizeof(float));
-    randomise_weights_fan_in(&net->rng, bl->weights, bl->output_size,
+    randomise_array_fan_in(&net->rng, bl->weights, bl->output_size,
         bl->input_size + 1, bl->o_size,
         sum, kurtosis, margin);
   }
 }
+
+
+
+static inline void
+maybe_randomise_using_submethod(RecurNN *net, struct RecurInitialisationParameters *p)
+{
+  if (p->submethod != p->method){
+    /*randomise top layer and using submethod
+      (presumably FLAT or FAN_IN)*/
+    p->method = p->submethod;
+    rnn_randomise_weights_clever(net, p);
+    p->method = RNN_INIT_RUNS;
+    STDERR_DEBUG("used submethod %d%s%s", p->submethod,
+        p->bias_uses_submethod ? ", bias too" : "",
+        p->inputs_use_submethod ? ", inputs too" : ""
+    );
+  }
+  float *mem = net->ih_weights;
+  size_t rows = p->inputs_use_submethod ? net->h_size : net->i_size;
+  if (p->bias_uses_submethod){
+    rows--;
+    mem += net->h_size;
+  }
+  memset(mem, 0, rows * net->h_size * sizeof(float));
+}
+
+
+void
+rnn_randomise_weights_clever(RecurNN *net, struct RecurInitialisationParameters *p){
+  if (p->method == RNN_INIT_FAN_IN){
+    randomise_weights_fan_in(net,
+        p->fan_in_sum,
+        p->fan_in_step,
+        p->fan_in_min,
+        p->fan_in_ratio);
+  }
+  else if (p->method == RNN_INIT_FLAT){
+    randomise_weights_flat(net,
+        p->flat_variance,
+        p->flat_shape,
+        p->flat_perforation
+    );
+  }
+  else if (p->method == RNN_INIT_RUNS){
+    maybe_randomise_using_submethod(net, p);
+    initialise_loops_or_runs(net,
+        p->run_n,
+        p->run_len_mean,
+        p->run_len_stddev,
+        p->run_gain,
+        p->run_input_probability,
+        p->run_input_magnitude,
+        p->run_loop,
+        p->run_crossing_paths,
+        p->run_inputs_miss,
+        p->run_input_at_start);
+  }
+}
+
+void
+rnn_init_default_weight_parameters(RecurNN *net,
+    struct RecurInitialisationParameters *q){
+  struct RecurInitialisationParameters p = {
+    /*common to multiple methods */
+    .method = RNN_INIT_FLAT,
+    .submethod = RNN_INIT_FLAT,
+    .bias_uses_submethod = 0,
+    .inputs_use_submethod = 0,
+
+    /*used when .method OR .submethod == RNN_INIT_FAN_IN */
+    .fan_in_ratio = net->input_size  * 1.0f / net->hidden_size,
+    .fan_in_sum = 3.0,
+    .fan_in_step = 0.3,
+    .fan_in_min = 0.1,
+
+    /*used when .method OR .submethod == RNN_INIT_FLAT */
+    .flat_variance = RNN_INITIAL_WEIGHT_VARIANCE_FACTOR / net->h_size,
+    .flat_shape = RNN_INIT_DIST_SEMICIRCLE,
+    .flat_perforation = 0.7,
+
+    /*RNN_INIT_RUNS */
+    .run_input_probability = .17,
+    .run_input_magnitude = 0.2,
+    .run_gain = 0.17,
+    .run_len_mean = net->hidden_size / 1,
+    .run_len_stddev = net->hidden_size / 3,
+    .run_n = net->h_size * 0.085,
+    .run_crossing_paths = 0,
+    .run_inputs_miss = 0,
+    .run_input_at_start = 0,
+  };
+  *q = p;
+}
+
+void
+rnn_randomise_weights_auto(RecurNN *net){
+  /*heuristically choose an initialisation scheme for the size of net */
+  /*initial heuristic is very simple*/
+  rnn_randomise_weights_simple(net, RNN_INIT_FLAT);
+}
+
+
+void
+rnn_randomise_weights_simple(RecurNN *net, const rnn_init_method method){
+  struct RecurInitialisationParameters p;
+  rnn_init_default_weight_parameters(net, &p);
+  p.method = method;
+  rnn_randomise_weights_clever(net, &p);
+}
+
 
 
 void rnn_perforate_weights(RecurNN *net, float p){
@@ -614,175 +688,11 @@ void rnn_perforate_weights(RecurNN *net, float p){
   dropout_array(net->ho_weights, net->ho_size, p, &net->rng);
 }
 
-static inline int
-weight_run(RecurNN *net, const float gain_per_step,
-    const float min_gain, float const input_magnitude, const int avoid_loops){
-  int i, j, s, e;
-  float weight;
-  float gain = 1.0f;
-
-  int unused[net->hidden_size + 1];
-
-  e = RAND_SMALL_INT_RANGE(&net->rng, 0, net->hidden_size) + 1;
-  j = e;
-  if (avoid_loops){
-    for (i = 0; i <= net->hidden_size; i++){
-      unused[i] = i;
-    }
-  }
-
-  if (input_magnitude) {
-    int input = RAND_SMALL_INT_RANGE(&net->rng, 0, net->input_size);
-    net->ih_weights[(net->hidden_size + 1 + input) * net->h_size + e] = \
-      cheap_gaussian_noise(&net->rng) * input_magnitude;
-  }
-
-  for(i = 1; i <= net->hidden_size; i++){
-    s = e;
-    if (avoid_loops){
-      unused[j] = unused[i];
-      j = RAND_SMALL_INT_RANGE(&net->rng, i, net->hidden_size) + 1;
-      e = unused[j];
-    }
-    else {
-      e = RAND_SMALL_INT_RANGE(&net->rng, 0, net->hidden_size) + 1;
-    }
-    weight = bounded_log_normal_random_sign(&net->rng, gain_per_step, 0.25, 3.0);
-    gain *= fabsf(weight);
-    net->ih_weights[s * net->h_size + e] = weight;
-    if (gain < min_gain){
-      break;
-    }
-  }
-  return i;
-}
-
-void
-rnn_initialise_runs(RecurNN* net, int n_runs, float gain_per_step,
-    float min_gain, float input_magnitude, int avoid_loops){
-  STDERR_DEBUG("n_runs %d gain_per_step %g, min_gain %g, "
-      "input_magnitude %g avoid_loops %d",
-      n_runs, gain_per_step, min_gain, input_magnitude, avoid_loops);
-  int len = 0;
-  for (int i = 0; i < n_runs; i++){
-    len += weight_run(net, gain_per_step, min_gain, input_magnitude, avoid_loops);
-  }
-  STDERR_DEBUG("mean run length %2g", len / (double)n_runs);
-}
 
 
-/*loop_link is a helper for long_loop().
-  It connects the hidden node <s> to the hidden node <e>, with
-  approximately <gain> strength, and maybe adds in an input.
-*/
 
-static inline void
-loop_link(RecurNN *net, int s, int e,
-    const float gain, const float input_probability,
-    float const input_magnitude){
-  float weight = bounded_log_normal_random_sign(&net->rng, gain, 0.25, 3.0);
-  net->ih_weights[s * net->h_size + e] = weight;
-  if (rand_double(&net->rng) < input_probability){
-    int input = RAND_SMALL_INT_RANGE(&net->rng, 0, net->input_size);
-    net->ih_weights[(net->hidden_size + 1 + input) * net->h_size + e] = \
-      cheap_gaussian_noise(&net->rng) * input_magnitude;
-  }
-}
-
-static inline int
-long_loop(RecurNN *net, int len, const float gain_per_step,
-    const float input_probability, float const input_magnitude){
-  int i, j, s, e, beginning;
-  len = MIN(len, net->hidden_size);
-  /*unused is a one-based list of unused nodes. At step i, unused[i+1:]
-    contains all the previously unused nodes. This is the same as a basic
-    shuffle algorithm, but there is no need to save the already shuffled
-    nodes.*/
-  int unused[net->hidden_size + 1];
-  for (i = 0; i <= net->hidden_size; i++){
-    unused[i] = i;
-  }
-  j = RAND_SMALL_INT_RANGE(&net->rng, 0, net->hidden_size) + 1;
-  beginning = e = j;
-
-  for (i = 1; i <= len; i++){
-    unused[j] = unused[i];
-    s = e;
-    j = RAND_SMALL_INT_RANGE(&net->rng, i, net->hidden_size) + 1;
-    e = unused[j];
-    loop_link(net, s, e, gain_per_step, input_probability, input_magnitude);
-  }
-  /*now to complete the loop, link back to the beginning.*/
-  loop_link(net, e, beginning, gain_per_step, input_probability, input_magnitude);
-  return len;
-}
-
-
-void
-rnn_initialise_long_loops(RecurNN* net, int n_loops, int len_mean, int len_stddev,
-    float gain, float input_probability, float input_magnitude){
-  STDERR_DEBUG("n_loops %d len_mean %d, len_stddev %d, gain %g, "
-      "input_probability %g, input_magnitude %g",
-      n_loops, len_mean, len_stddev, gain, input_probability, input_magnitude);
-  int sum = 0;
-  for (int i = 0; i < n_loops; i++){
-    int len = cheap_gaussian_noise(&net->rng) * len_stddev + len_mean + 0.5;
-    len = MAX(2, len);
-    sum += long_loop(net, len, gain, input_probability, input_magnitude);
-  }
-  STDERR_DEBUG("mean loop len %3g", (double)sum / n_loops);
-}
-
-
-static inline int
-add_disconnected_weights(RecurNN *net, int n_connections, float magnitude,
-    const float input_probability, float const input_magnitude){
-  int i, j, s, e, n;
-  int unused[net->hidden_size + 1];
-  for (i = 0; i <= net->hidden_size; i++){
-    unused[i] = i;
-  }
-  j = RAND_SMALL_INT_RANGE(&net->rng, 0, net->hidden_size) + 1;
-
-  for (i = 1, n = 0; i + 2 < net->hidden_size && n < n_connections; n++){
-    j = RAND_SMALL_INT_RANGE(&net->rng, i, net->hidden_size) + 1;
-    s = unused[j];
-    unused[j] = unused[i];
-    i++;
-    j = RAND_SMALL_INT_RANGE(&net->rng, i, net->hidden_size) + 1;
-    e = unused[j];
-    unused[j] = unused[i];
-    i++;
-
-    float weight = bounded_log_normal_random_sign(&net->rng, magnitude, 0.25, 3.0);
-    net->ih_weights[s * net->h_size + e] = weight;
-
-    if (rand_double(&net->rng) < input_probability){
-      j = RAND_SMALL_INT_RANGE(&net->rng, i, net->hidden_size) + 1;
-      e = unused[j];
-      unused[j] = unused[i];
-      i++;
-      int input = RAND_SMALL_INT_RANGE(&net->rng, 0, net->input_size);
-      net->ih_weights[(net->hidden_size + 1 + input) * net->h_size + e] = \
-        cheap_gaussian_noise(&net->rng) * input_magnitude;
-    }
-  }
-  return n;
-}
-
-
-void
-rnn_initialise_disconnected(RecurNN* net, int n_connections, float magnitude,
-    float input_probability, float input_magnitude){
-  STDERR_DEBUG("n_connections %d, magnitude %g, input_prob %g input mag %g",
-      n_connections, magnitude, input_probability, input_magnitude);
-  do {
-    n_connections -= add_disconnected_weights(net, n_connections, magnitude,
-        input_probability, input_magnitude);
-  } while(n_connections > 0);
-}
-
-
+/*rnn_scale_initial_weights() tries to scale the weights to give approximately
+  the right gain */
 
 void
 rnn_scale_initial_weights(RecurNN *net, float factor){
