@@ -730,6 +730,17 @@ def lr_sqrt_exp(start, scale, min_value, post_min_value=None):
             return v
     return fn
 
+def lr_inverse_time(start, min_value, offset=1.0, post_min_value=None):
+    if post_min_value is None:
+        post_min_value = min_value
+    offset = abs(offset)
+    def fn(generation):
+        v = offset * start / (generation + offset)
+        if v < min_value:
+            return post_min_value
+        return v
+    return fn
+
 def categorised_files(_dir, classes):
     files = [x for x in os.listdir(_dir) if x.endswith('.wav')]
     random.shuffle(files)
