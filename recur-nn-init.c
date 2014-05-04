@@ -399,37 +399,34 @@ rnn_randomise_weights_clever(RecurNN *net, struct RecurInitialisationParameters 
 }
 
 void
-rnn_randomise_weights_auto(RecurNN *net){
-  /*heuristically choose an initialisation scheme for the size of net */
-  /*initial heuristic is very simple*/
-  //const rnn_init_method method = RNN_INIT_RUNS;
-  const rnn_init_method method = RNN_INIT_LOOPS;
-  rnn_randomise_weights_simple(net, method);
-}
-
-void
-rnn_randomise_weights_simple(RecurNN *net, const rnn_init_method method){
+rnn_init_default_weight_parameters(RecurNN *net,
+    struct RecurInitialisationParameters *q){
   struct RecurInitialisationParameters p = {
-    .method = method,
+    /*common to multiple methods */
+    .method = RNN_INIT_FLAT,
     .submethod = RNN_INIT_FLAT,
     .bias_uses_submethod = 0,
     .inputs_use_submethod = 0,
 
+    /*used when .method == RNN_INIT_RUNS */
     .runs_n = 7 * net->h_size,
     .runs_gain = 0.021,
     .runs_min_gain = 1e-12,
     .runs_input_magnitude = 0.021,
     .runs_avoid_loops = 1,
 
+    /*used when .method OR .submethod == RNN_INIT_FAN_IN */
     .fan_in_ratio = net->input_size  * 1.0f / net->hidden_size,
     .fan_in_sum = 3.0,
     .fan_in_step = 0.3,
     .fan_in_min = 0.1,
 
+    /*used when .method OR .submethod == RNN_INIT_FLAT */
     .flat_variance = RNN_INITIAL_WEIGHT_VARIANCE_FACTOR / net->h_size,
-    .flat_shape = 1,
-    .flat_perforation = 0.0,
+    .flat_shape = RNN_INIT_DIST_SEMICIRCLE,
+    .flat_perforation = 0.7,
 
+    /*RNN_INIT_LOOPS */
     .loop_input_probability = .17,
     .loop_input_magnitude = 0.2,
     .loop_gain = 0.17,
@@ -437,11 +434,28 @@ rnn_randomise_weights_simple(RecurNN *net, const rnn_init_method method){
     .loop_len_stddev = net->hidden_size / 3,
     .loop_n = net->h_size * 0.085,
 
+    /*RNN_INIT_DISCONNECT */
     .disconnect_connections = 15 * net->h_size,
     .disconnect_magnitude = 0.1,
     .disconnect_input_probability = 0.25,
     .disconnect_input_magnitude = 0.1,
   };
+  *q = p;
+}
+
+void
+rnn_randomise_weights_auto(RecurNN *net){
+  /*heuristically choose an initialisation scheme for the size of net */
+  /*initial heuristic is very simple*/
+  rnn_randomise_weights_simple(net, RNN_INIT_FLAT);
+}
+
+
+void
+rnn_randomise_weights_simple(RecurNN *net, const rnn_init_method method){
+  struct RecurInitialisationParameters p;
+  rnn_init_default_weight_parameters(net, &p);
+  p.method = RNN_INIT_FLAT;
   rnn_randomise_weights_clever(net, &p);
 }
 
@@ -453,50 +467,96 @@ gaussian_power(rand_ctx *rng, float a, int power){
   return a;
 }
 
-void
-rnn_randomise_weights_flat(RecurNN *net, float variance, int shape, double perforation){
+static inline float
+bounded_log_normal_random_sign(rand_ctx *rng, float mean, float stddev, float bound)
+{
+  /*stddev is std deviation in log space; bound is standard deviations.*/
+  float x, w;
+  do {
+    x = cheap_gaussian_noise(rng);
+  } while(fabsf(x) > bound);
+  w = mean * fast_expf(x * stddev);
+  return (rand64(rng) & 1) ? w : -w;
+}
+
+
+static inline void
+randomise_weights_flat(rand_ctx *rng, float *array,
+    const int width, const int height, const int stride,
+    const int offset, const float variance,
+    const rnn_init_distribution shape, const double perforation){
   int x, y;
+  float stddev = sqrtf(variance);
+  STDERR_DEBUG("using method %d, variance %g", shape, variance);
+  for (y = 0; y < height; y++){
+    for (x = offset; x < width + offset; x++){
+      if (perforation == 0 ||
+          rand_double(rng) > perforation){
+        switch (shape){
+        case RNN_INIT_DIST_UNIFORM:
+          {
+            const double range = sqrtf(12.0f * variance);
+            array[y * stride + x] = range * rand_double(rng) - range * 0.5;
+          }
+          break;
+
+        default:
+        case RNN_INIT_DIST_GAUSSIAN:
+          array[y * stride + x] = stddev * cheap_gaussian_noise(rng);
+          break;
+
+        case RNN_INIT_DIST_LOG_NORMAL:
+          {
+            /*XXX variance is doing 2 things*/
+            float a = cheap_gaussian_noise(rng) * 0.33;
+            float b = 0.9 * stddev * fast_expf(a);
+            array[y * stride + x] = (rand64(rng) & 1) ? b : -b;
+          }
+          break;
+
+        case RNN_INIT_DIST_SEMICIRCLE:
+          {
+            /*sample from the square until we hit the circle.
+             variance = r^2/4 -- r = 4v */
+            double a, b;
+            do {
+              a = rand_double(rng) * 2.0 - 1.0;
+              b = rand_double(rng);
+            } while (a * a + b * b > 1.0);
+            array[y * stride + x] = stddev * 2 * a;
+          }
+          break;
+        }
+      }
+    }
+  }
+}
+
+void
+rnn_randomise_weights_flat(RecurNN *net, float variance,
+    rnn_init_distribution shape, double perforation){
   memset(net->ih_weights, 0, net->ih_size * sizeof(float));
   memset(net->ho_weights, 0, net->ho_size * sizeof(float));
-  /*higher shape indicates greater kurtosis. shape 0 means automatically
-    determine shape (crudely).*/
-  if (shape == 0){
-    shape = (int)(1.0f + sqrtf(net->h_size / 400.0));
-  }
-  if (shape > 10){
-    shape = 10;
-  }
   if (perforation < 0){
     perforation = 0;
   }
   else if (perforation >= 1.0){
     return; /*perforation of 1 means entirely zeros */
   }
-  for (y = 0; y < net->input_size + net->hidden_size + 1; y++){
-    for (x = 1; x <= net->hidden_size; x++){
-      if (rand_double(&net->rng) > perforation){
-        net->ih_weights[y * net->h_size + x] = gaussian_power(&net->rng, variance, shape);
-      }
-    }
-  }
-  for (y = 0; y <= net->hidden_size; y++){
-    for (x = 0; x < net->output_size; x++){
-      if (rand_double(&net->rng) > perforation){
-        net->ho_weights[y * net->o_size + x] = gaussian_power(&net->rng, variance, shape);
-      }
-    }
-  }
+  randomise_weights_flat(&net->rng, net->ih_weights,
+      net->hidden_size, net->input_size + net->hidden_size + 1, net->h_size,
+      1, variance, shape, perforation);
+
+  randomise_weights_flat(&net->rng, net->ho_weights,
+      net->output_size, net->hidden_size + 1, net->o_size,
+      0, variance, shape, perforation);
+
   if (net->bottom_layer){
     RecurExtraLayer *bl = net->bottom_layer;
     memset(bl->weights, 0, bl->i_size * bl->o_size * sizeof(float));
-    for (y = 0; y < bl->input_size; y++){
-      for (x = 0; x < bl->output_size; x++){
-        if (rand_double(&net->rng) > perforation){
-          bl->weights[y * bl->o_size + x] = gaussian_power(&net->rng,
-              variance, shape);
-        }
-      }
-    }
+    randomise_weights_flat(&net->rng, bl->weights,
+        bl->output_size, bl->input_size, bl->o_size,
+        1, variance, shape, perforation);
   }
 }
 
@@ -552,18 +612,6 @@ rnn_randomise_weights_fan_in(RecurNN *net, float sum, float kurtosis,
 void rnn_perforate_weights(RecurNN *net, float p){
   dropout_array(net->ih_weights, net->ih_size, p, &net->rng);
   dropout_array(net->ho_weights, net->ho_size, p, &net->rng);
-}
-
-static inline float
-bounded_log_normal_random_sign(rand_ctx *rng, float mean, float stddev, float bound)
-{
-  /*stddev is std deviation in log space; bound is standard deviations.*/
-  float x, w;
-  do {
-    x = cheap_gaussian_noise(rng);
-  } while(fabsf(x) > bound);
-  w = mean * fast_expf(x * stddev);
-  return (rand64(rng) & 1) ? w : -w;
 }
 
 static inline int
@@ -641,7 +689,7 @@ loop_link(RecurNN *net, int s, int e,
   }
 }
 
-static inline void
+static inline int
 long_loop(RecurNN *net, int len, const float gain_per_step,
     const float input_probability, float const input_magnitude){
   int i, j, s, e, beginning;
@@ -666,6 +714,7 @@ long_loop(RecurNN *net, int len, const float gain_per_step,
   }
   /*now to complete the loop, link back to the beginning.*/
   loop_link(net, e, beginning, gain_per_step, input_probability, input_magnitude);
+  return len;
 }
 
 
@@ -678,9 +727,8 @@ rnn_initialise_long_loops(RecurNN* net, int n_loops, int len_mean, int len_stdde
   int sum = 0;
   for (int i = 0; i < n_loops; i++){
     int len = cheap_gaussian_noise(&net->rng) * len_stddev + len_mean + 0.5;
-    len = MIN(MAX(2, len), net->hidden_size);
-    sum += len;
-    long_loop(net, len, gain, input_probability, input_magnitude);
+    len = MAX(2, len);
+    sum += long_loop(net, len, gain, input_probability, input_magnitude);
   }
   STDERR_DEBUG("mean loop len %3g", (double)sum / n_loops);
 }

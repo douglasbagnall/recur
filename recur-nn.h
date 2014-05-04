@@ -110,13 +110,25 @@ enum {
 };
 
 typedef enum {
-  RNN_INIT_DEFAULT = 0,
   RNN_INIT_FAN_IN,
   RNN_INIT_LOOPS,
   RNN_INIT_RUNS,
   RNN_INIT_FLAT,
   RNN_INIT_DISCONNECT,
+
+  RNN_INIT_DEFAULT
 } rnn_init_method;
+
+typedef enum {
+  /*if you change this, also change test_backprop's
+    --flat-init-distribution documentation*/
+  RNN_INIT_DIST_UNIFORM = 1,
+  RNN_INIT_DIST_GAUSSIAN,
+  RNN_INIT_DIST_LOG_NORMAL,
+  RNN_INIT_DIST_SEMICIRCLE,
+
+  RNN_INIT_DIST_DEFAULT
+} rnn_init_distribution;
 
 
 typedef struct _RecurNN RecurNN;
@@ -203,7 +215,7 @@ struct RecurInitialisationParameters {
 
   /*flat */
   float flat_variance;
-  int flat_shape;
+  rnn_init_distribution flat_shape;
   double flat_perforation;
 
   /* runs */
@@ -253,8 +265,11 @@ void rnn_randomise_weights_clever(RecurNN *net, struct RecurInitialisationParame
 void rnn_randomise_weights_simple(RecurNN *net, const rnn_init_method method);
 void rnn_randomise_weights_auto(RecurNN *net);
 
-void rnn_randomise_weights_flat(RecurNN *net, float variance, int power,
-    double perforation);
+void rnn_init_default_weight_parameters(RecurNN *net, struct RecurInitialisationParameters *q);
+
+
+void rnn_randomise_weights_flat(RecurNN *net, float variance,
+    rnn_init_distribution shape, double perforation);
 void rnn_initialise_runs(RecurNN* net, int n_loops, float gain_per_step,
     float min_gain, float input_magnitude, int avoid_loops);
 void rnn_initialise_long_loops(RecurNN* net, int n_loops, int len_mean, int len_stddev,
