@@ -78,7 +78,8 @@ softmax(float *restrict dest, const float *restrict src, int len){
   const float max_exp = 50.0f;
   const float min_exp = -60.0f;
   /* for safety, avoid really big numbers. Addition/subtraction of a constant
-     to the src vector doesn't affect the outcome.*/
+     to the src vector doesn't affect the outcome (difference here becomes
+     ratio post-exp). */
   for (i = 1; i < len; i++){
     max = MAX(max, src[i]);
     min = MIN(min, src[i]);
@@ -89,8 +90,14 @@ softmax(float *restrict dest, const float *restrict src, int len){
   else if (min < min_exp){
     adj = MIN(min_exp - min, max_exp - max);
   }
-  //else if (max - min < max_exp){
-  //  adj = -0.5 * (max - min);
+  /*shifting most numbers toward zero would actually speed things up, because
+    fast_expf would have less resizing to do in its loops -- but it is not
+    clear that the midpoint of max and min will shift most numbers toward
+    zero. Finding the mean might work better, though it is easy to imagine
+    pathological cases there.
+   */
+  //else {
+  //  adj = -0.5 * (max + min);
   //}
   for (i = 0; i < len; i++){
     float f = src[i] + adj;
