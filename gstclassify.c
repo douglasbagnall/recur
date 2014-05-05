@@ -44,7 +44,6 @@ enum
   PROP_DROPOUT,
   PROP_ERROR_WEIGHT,
   PROP_BPTT_DEPTH,
-  PROP_WEIGHT_SPARSITY,
   PROP_WEIGHT_FAN_IN_SUM,
   PROP_WEIGHT_FAN_IN_KURTOSIS,
   PROP_LAWN_MOWER,
@@ -90,7 +89,6 @@ enum
 #define DEFAULT_PROP_FORGET 0
 #define DEFAULT_PROP_FORCE_LOAD 0
 #define DEFAULT_PROP_BOTTOM_LAYER 0
-#define DEFAULT_PROP_WEIGHT_SPARSITY 1
 #define DEFAULT_PROP_RANDOM_ALIGNMENT 1
 #define DEFAULT_WINDOW_SIZE 256
 #define DEFAULT_HIDDEN_SIZE 199
@@ -110,8 +108,6 @@ enum
 #define MOMENTUM_MAX 1.0
 #define MOMENTUM_STYLE_MIN 0
 #define MOMENTUM_STYLE_MAX 2
-#define WEIGHT_SPARSITY_MIN 0
-#define WEIGHT_SPARSITY_MAX 10
 #define DEFAULT_PROP_WEIGHT_FAN_IN_SUM 0
 #define DEFAULT_PROP_WEIGHT_FAN_IN_KURTOSIS 0.3
 #define DEFAULT_PROP_LAG 0
@@ -357,13 +353,6 @@ gst_classify_class_init (GstClassifyClass * klass)
       g_param_spec_boolean("intensity-feature", "intensity-feature",
           "Use the total signal intensity as one input",
           DEFAULT_PROP_INTENSITY_FEATURE,
-          G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
-
-  g_object_class_install_property (gobject_class, PROP_WEIGHT_SPARSITY,
-      g_param_spec_int("weight-sparsity", "weight-sparsity",
-          "higher numbers for more initial weights near zero",
-          WEIGHT_SPARSITY_MIN, WEIGHT_SPARSITY_MAX,
-          DEFAULT_PROP_WEIGHT_SPARSITY,
           G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class, PROP_FORGET,
@@ -819,8 +808,6 @@ create_net(GstClassify *self, int bottom_layer_size,
   RecurNN *net;
   int n_features = get_n_features(self);
   u32 flags = CLASSIFY_RNN_FLAGS;
-  int weight_sparsity = PP_GET_INT(self, PROP_WEIGHT_SPARSITY,
-      DEFAULT_PROP_WEIGHT_SPARSITY);
   int bptt_depth = PP_GET_INT(self, PROP_BPTT_DEPTH, DEFAULT_PROP_BPTT_DEPTH);
   float momentum = PP_GET_FLOAT(self, PROP_MOMENTUM, DEFAULT_PROP_MOMENTUM);
   float learn_rate = PP_GET_FLOAT(self, PROP_LEARN_RATE, DEFAULT_LEARN_RATE);
@@ -846,13 +833,20 @@ create_net(GstClassify *self, int bottom_layer_size,
   net = rnn_new_with_bottom_layer(n_features, bottom_layer_size, hidden_size,
       top_layer_size, flags, rng_seed,
       NULL, bptt_depth, learn_rate, momentum, 0);
+
+  /*start off with a default set of parameters */
+  struct RecurInitialisationParameters p;
+  rnn_init_default_weight_parameters(net, &p);
   if (fan_in_sum){
-    rnn_randomise_weights_fan_in(net, fan_in_sum, fan_in_kurtosis, 0.1f, 0);
+    p.method = RNN_INIT_FAN_IN;
+    p.fan_in_sum = fan_in_sum;
+    p.fan_in_step = fan_in_kurtosis;
   }
   else {
-    rnn_randomise_weights_flat(net, RNN_INITIAL_WEIGHT_VARIANCE_FACTOR / net->h_size,
-        weight_sparsity, 0.5);
+    p.method = RNN_INIT_FLAT;
+    p.flat_perforation = 0.5;
   }
+  rnn_randomise_weights_clever(net, &p);
 
   net->bptt->ho_scale = top_learn_rate_scale;
   if (net->bottom_layer){
@@ -1444,7 +1438,6 @@ gst_classify_set_property (GObject * object, guint prop_id, const GValue * value
     case PROP_HIDDEN_SIZE:
     case PROP_BPTT_DEPTH:
     case PROP_LAWN_MOWER:
-    case PROP_WEIGHT_SPARSITY:
     case PROP_WEIGHT_FAN_IN_SUM:
     case PROP_WEIGHT_FAN_IN_KURTOSIS:
     case PROP_RNG_SEED:

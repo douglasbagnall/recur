@@ -254,18 +254,12 @@ void rnn_randomise_weights_clever(RecurNN *net, struct RecurInitialisationParame
 void rnn_randomise_weights_simple(RecurNN *net, const rnn_init_method method);
 void rnn_randomise_weights_auto(RecurNN *net);
 
-void rnn_init_default_weight_parameters(RecurNN *net, struct RecurInitialisationParameters *q);
-
-
-void rnn_randomise_weights_flat(RecurNN *net, float variance,
-    rnn_init_distribution shape, double perforation);
+void rnn_init_default_weight_parameters(RecurNN *net,
+    struct RecurInitialisationParameters *q);
 
 void rnn_scale_initial_weights(RecurNN *net, float factor);
-void rnn_randomise_weights_fan_in(RecurNN *net, float sum, float kurtosis, float margin,
-    float inputs_weight_ratio);
 
 void rnn_print_net_stats(RecurNN *net);
-
 
 void rnn_delete_net(RecurNN *net);
 RecurNN ** rnn_new_training_set(RecurNN *prototype, int n_nets);
