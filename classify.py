@@ -242,7 +242,7 @@ class Classifier(BaseClassifier):
         self.pipeline.set_state(Gst.State.READY)
         out = []
         colours = [COLOURS[x] for x in 'PPrrRRYYGgCC']
-
+        white = COLOURS['Z']
         for groupno, file_results in enumerate(self.file_results):
             classes = self.class_groups[groupno]
             step = len(file_results) / 100.0
@@ -268,7 +268,7 @@ class Classifier(BaseClassifier):
                 current_correct += correct
                 current_targets[t_index] += 1
 
-            out.extend((COLOURS['Z'], str(len(file_results)), '\n'))
+            out.extend((white, str(len(file_results)), '\n'))
 
         if self.target_index:
             k = self.target_index
@@ -309,11 +309,11 @@ class Classifier(BaseClassifier):
                         (diff > w_mean) + (diff > w_mean * 2) +
                         (diff > 0.1) + (diff > 0.5)]
         else:
-            c = COLOURS['Z']
+            c = white
         sigma = unichr(0x03c3).encode('utf-8')
         out.append("%s scores. %s%s %.2f (%s %.2f)   not-%s %.2f (%s %.2f)%s %s\n" %
                    (k, c, k, r_mean, sigma, r_stddev, k, w_mean, sigma,
-                    w_stddev, COLOURS['Z'], self.current_file.basename))
+                    w_stddev, white, self.current_file.basename))
 
         print ''.join(out)
 
@@ -518,7 +518,8 @@ class Trainer(BaseClassifier):
 
     def evaluate_test(self):
         #print self.test_scores, self.classes, self.test_runs
-        colours = [COLOURS[x] for x in 'PPrRYYGGgCC']
+        colours = [COLOURS[x] for x in 'PPrRYYGGgCCZ']
+        white = COLOURS['Z']
         for (classes, score, runs, pstats) in zip(self.class_groups,
                                                   self.test_scores,
                                                   self.test_runs,
@@ -555,7 +556,7 @@ class Trainer(BaseClassifier):
                     i = int(x * 9.99)
                     output.append(colours[i])
                     output.append(c)
-                    output.append(' %.2f%s %d/%d ' % (x, COLOURS['Z'], s, r))
+                    output.append(' %.2f%s %d/%d ' % (x, white, s, r))
                     rightness += x
                 else:
                     output.append('%s --- %d/0 ' % (c, s,))
@@ -587,9 +588,9 @@ class Trainer(BaseClassifier):
                 area = float(tp * fp)
                 auc /= area
                 #print auc, auc2, auc - auc2
-                auc_string = " %sAUC%s%.2f" %  (COLOURS['Z'],
-                                                colours[max(int((auc - 0.5) * 20.0), 0)],
-                                                auc)
+                auc_string = " %sAUC %s%d" %  (white,
+                                              colours[max(int((auc - 0.5) * 20.0), 0)],
+                                              int(auc * 1e2 + 0.5))
             else:
                 auc = 0
                 auc_string = ''
@@ -597,14 +598,12 @@ class Trainer(BaseClassifier):
             dprime /= len(classes)
             gap_p /= len(classes)
             rightness /= len(classes)
-            output.append(" %s%.2f %s%.2f %s%.2f %sd'%s%.2f%s%s" %
-                          (colours[int(rightness * 9.99)], rightness,
-                           colours[min(int(gap_p * 18), 9)], gap_p,
-                           colours[min(int(ratio_p * 2), 9)], ratio_p, COLOURS['Z'],
-                           colours[min(int(dprime * 4), 9)], dprime,
-                           auc_string,
-                           COLOURS['Z']))
-
+            output.append(" %s%d%% %s.%02d %s\xC3\x97%.1f %sd'%s%.2f%s%s" %
+                          (colours[int(rightness * 9.99)], int(rightness * 1e2 + 0.5),
+                           colours[min(int(gap_p * 18.), 9)], int(gap_p * 1e2 + 0.5),
+                           colours[min(int(ratio_p * 2.), 9)], ratio_p, white,
+                           colours[min(int(dprime * 4.), 9)], dprime,
+                           auc_string, white))
 
             output.extend(p_strings)
 
@@ -620,7 +619,7 @@ class Trainer(BaseClassifier):
                                     (int(rightness * 100 + 0.5),
                                      int(gap_p * 100 + 0.5),
                                      int(ratio_p + 0.5),
-                                     int(dprime * 10 + 0.5),
+                                     int(dprime * 100 + 0.5),
                                      int(auc * 100 + 0.5)))
             else:
                 self.save_threshold_adjust *= 0.99
