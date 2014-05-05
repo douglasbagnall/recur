@@ -903,6 +903,9 @@ load_or_create_net(GstClassify *self){
           bottom_layer_size, net->bottom_layer ? net->bottom_layer->output_size : 0,
           metadata, net->metadata);
     }
+    /*XXX need to get the likes of PROP_LEARN_RATE, PROP_TOP_LEARN_RATE_SCALE,
+      PROP_MOMENTUM, PROP_BOTTOM_LEARN_RATE_SCALE from gvalue store.
+    */
   }
   else {
     net = create_net(self, bottom_layer_size, hidden_size, top_layer_size, metadata);

@@ -459,6 +459,10 @@ class Trainer(BaseClassifier):
             stat_target = self.classes[1]
         self.stat_target = stat_target
         self.setp('load-net-now', 1)
+        #Now that the net should exist, try again to set properties,
+        #in case any of them require it to work (e.g. momentum).
+        for k, v in properties:
+            self.setp(k, v)
         self.next_training_set()
         #print >> sys.stderr, "setting PLAYING()"
         self.pipeline.set_state(Gst.State.PLAYING)
