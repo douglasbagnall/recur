@@ -55,8 +55,18 @@ Because of ccan/opt, --help will tell you something.
 #define DEFAULT_BASENAME "text"
 #define DEFAULT_START_CHAR -1
 #define DEFAULT_HIDDEN_SIZE 199
-#define DEFAULT_DENSE_WEIGHTS 0
+#define DEFAULT_INIT_METHOD RNN_INIT_FLAT
+#define DEFAULT_INIT_SUBMETHOD RNN_INIT_FLAT
+#define DEFAULT_FLAT_INIT_DISTRIBUTION RNN_INIT_DIST_GAUSSIAN
+/*Init parameters are negative for automatic */
+#define DEFAULT_INIT_VARIANCE -1.0f
+#define DEFAULT_INIT_INPUT_PROBABILITY -1.0f
+#define DEFAULT_INIT_INPUT_MAGNITUDE -1.0f
+#define DEFAULT_INIT_HIDDEN_GAIN -1.0f
+#define DEFAULT_INIT_HIDDEN_RUN_LENGTH -1.0f
+#define DEFAULT_INIT_HIDDEN_RUN_DEVIATION -1.0f
 #define DEFAULT_PERFORATE_WEIGHTS 0.0f
+
 #define DEFAULT_LEARN_CAPITALS 0
 #define DEFAULT_DUMP_COLLAPSED_TEXT NULL
 #define DEFAULT_MULTI_TAP 0
@@ -112,7 +122,15 @@ static int opt_start_char = DEFAULT_START_CHAR;
 static bool opt_override = DEFAULT_OVERRIDE;
 static bool opt_bptt_adaptive_min = DEFAULT_BPTT_ADAPTIVE_MIN;
 static uint opt_batch_size = DEFAULT_BATCH_SIZE;
-static uint opt_dense_weights = DEFAULT_DENSE_WEIGHTS;
+static int opt_init_method = DEFAULT_INIT_METHOD;
+static int opt_init_submethod = DEFAULT_INIT_SUBMETHOD;
+static int opt_flat_init_distribution = DEFAULT_FLAT_INIT_DISTRIBUTION;
+static float opt_init_variance = DEFAULT_INIT_VARIANCE;
+static float opt_init_input_probability = DEFAULT_INIT_INPUT_PROBABILITY;
+static float opt_init_input_magnitude = DEFAULT_INIT_INPUT_MAGNITUDE;
+static float opt_init_hidden_gain = DEFAULT_INIT_HIDDEN_GAIN;
+static float opt_init_hidden_run_length = DEFAULT_INIT_HIDDEN_RUN_LENGTH;
+static float opt_init_hidden_run_deviation = DEFAULT_INIT_HIDDEN_RUN_DEVIATION;
 static float opt_perforate_weights = DEFAULT_PERFORATE_WEIGHTS;
 static bool opt_temporal_pgm_dump = DEFAULT_TEMPORAL_PGM_DUMP;
 static bool opt_periodic_pgm_dump = DEFAULT_PERIODIC_PGM_DUMP;
@@ -176,8 +194,27 @@ static struct opt_table options[] = {
       &opt_stop, "Stop at generation n (0: no stop, negative means relative)"),
   OPT_WITH_ARG("--batch-size=<n>", opt_set_uintval_bi, opt_show_uintval_bi,
       &opt_batch_size, "bptt minibatch size"),
-  OPT_WITH_ARG("--dense-weights=<n>", opt_set_uintval_bi, opt_show_uintval_bi,
-      &opt_dense_weights, "no initial zero weights; > 1 for many near zero"),
+  OPT_WITH_ARG("--init-method=<n>", opt_set_intval, opt_show_intval,
+      &opt_init_method, "1: uniform-ish, 2: fan-in, 3: runs or loops"),
+  OPT_WITH_ARG("--init-submethod=<n>", opt_set_intval, opt_show_intval,
+      &opt_init_method, "initialisation for non-recurrent parts (1 or 2)"),
+  OPT_WITH_ARG("--flat-init-distribution=<n>", opt_set_intval, opt_show_intval,
+      &opt_flat_init_distribution, "1: uniform, 2: gaussian, 3: log-normal, 4: semicircle"
+  ),
+  OPT_WITH_ARG("--init-variance=<float>", opt_set_floatval, opt_show_floatval,
+      &opt_init_variance, "variance of initial weights"),
+  OPT_WITH_ARG("--init-input-probability=<0-1>", opt_set_floatval01, opt_show_floatval,
+      &opt_init_input_probability, "chance of input weights"),
+  OPT_WITH_ARG("--init-input-magnitude=<float>", opt_set_floatval, opt_show_floatval,
+      &opt_init_input_magnitude, "stddev of input weight strength"),
+  OPT_WITH_ARG("--init-hidden-gain=<float>", opt_set_floatval, opt_show_floatval,
+      &opt_init_hidden_gain, "average strength of hidden weights (in runs)"),
+  OPT_WITH_ARG("--init-hidden-run-length=<n>", opt_set_floatval, opt_show_floatval,
+      &opt_init_hidden_run_length, "average length of hidden weight runs"),
+  OPT_WITH_ARG("--init-hidden-run-deviation=<float>", opt_set_floatval, opt_show_floatval,
+      &opt_init_hidden_run_deviation, "deviation of hidden weight run length"),
+
+
   OPT_WITH_ARG("--perforate-weights=<0-1>", opt_set_floatval01, opt_show_floatval,
       &opt_perforate_weights, "Zero this portion of weights"),
   OPT_WITH_ARG("-V|--validate-chars=<n>", opt_set_intval_bi, opt_show_intval_bi,
@@ -735,6 +772,61 @@ construct_net_filename(void){
   return strdup(s);
 }
 
+static inline int
+bounded_init_method(int m){
+  if (m > 0 && m < RNN_INIT_LAST){
+    return m;
+  }
+  STDERR_DEBUG("ignoring bad init-method %d", m);
+  return DEFAULT_INIT_METHOD;
+}
+
+#define IN_RANGE_01(x) ((x) >= 0.0f && (x) <= 1.0f)
+
+static void
+initialise_net(RecurNN *net){
+  /*start off with a default set of parameters */
+  struct RecurInitialisationParameters p;
+  rnn_init_default_weight_parameters(net, &p);
+  p.method = bounded_init_method(opt_init_method);
+  p.submethod = bounded_init_method(opt_init_submethod);
+
+  /*When the initialisation is using some fancy loop method, the top and
+    possibly the bias and input weights use flat or fan-in initialisation.
+    That means we need to set flat and fan-in parameters in any case.
+  */
+  if (opt_flat_init_distribution){
+    p.flat_shape = opt_flat_init_distribution;
+  }
+  float variance = opt_init_variance;
+  if (variance < 0){
+    variance = RNN_INITIAL_WEIGHT_VARIANCE_FACTOR / net->h_size;
+  }
+  p.flat_variance = variance;
+  p.flat_perforation = opt_perforate_weights;
+
+  if (IN_RANGE_01(opt_init_input_probability)){
+    p.run_input_probability = opt_init_input_probability;
+  }
+  if (opt_init_input_magnitude > 0){
+    p.run_input_magnitude = opt_init_input_magnitude;
+  }
+  if (opt_init_hidden_gain > 0){
+    p.run_gain = opt_init_hidden_gain;
+  }
+  if (opt_init_hidden_run_length > 0){
+    p.run_len_mean = opt_init_hidden_run_length;
+  }
+  if (opt_init_hidden_run_deviation > 0){
+    p.run_len_stddev = opt_init_hidden_run_deviation;
+  }
+  rnn_randomise_weights_clever(net, &p);
+
+  if (opt_weight_scale_factor > 0){
+    rnn_scale_initial_weights(net, opt_weight_scale_factor);
+  }
+}
+
 static RecurNN *
 load_or_create_net(void){
   RecurNN *net = NULL;
@@ -770,17 +862,8 @@ load_or_create_net(void){
           opt_logfile, opt_bptt_depth, opt_learn_rate,
           opt_momentum);
     }
-    if (opt_dense_weights){
-      rnn_randomise_weights_flat(net, RNN_INITIAL_WEIGHT_VARIANCE_FACTOR / net->h_size,
-          opt_dense_weights, opt_perforate_weights);
-    }
-    else {
-      rnn_randomise_weights_auto(net);
-    }
+    initialise_net(net);
     net->bptt->momentum_weight = opt_momentum_weight;
-    if (opt_weight_scale_factor > 0){
-      rnn_scale_initial_weights(net, opt_weight_scale_factor);
-    }
     if (opt_periodic_pgm_dump){
       rnn_multi_pgm_dump(net, "ihw how", opt_basename);
     }
