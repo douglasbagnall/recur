@@ -32,8 +32,6 @@ COLOURS = {
     "W": "\033[01;37m",
 }
 
-TEST_INTERVAL = 3
-
 SAVE_LOCATION = 'nets/autosave'
 
 def gst_init():
@@ -437,6 +435,7 @@ def eternal_shuffler(iters, max_iterations=-1):
 class Trainer(BaseClassifier):
     trainers = None
     no_save_net = False
+    test_interval = 2
     def train(self, trainers, testers, learn_rate_fn, dropout_fn=None,
               iterations=100, log_file='auto', properties=(), stat_target=None):
         self.learn_rate_fn = learn_rate_fn
@@ -662,7 +661,7 @@ class Trainer(BaseClassifier):
             self.counter += 1
             if self.counter == self.iterations:
                 self.stop()
-            elif self.counter % TEST_INTERVAL:
+            elif self.counter % self.test_interval:
                 self.next_training_set()
             else:
                 self.next_test_set()

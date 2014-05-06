@@ -60,6 +60,8 @@ def main():
                        help="Train more on examples with changing classes")
     group.add_argument('-P', '--prioritise', action='store_true',
                        help="Do not renice downwards")
+    group.add_argument('--test-interval', type=int, default=0,
+                       help="Test after this many training cycles")
     args = parser.parse_args()
 
     if args.learn_rate_schedule == "flat":
@@ -89,6 +91,8 @@ def main():
     c.setp('random-alignment', args.random_alignment)
     if args.bptt_depth:
         c.setp('bptt-depth', args.bptt_depth)
+    if args.test_interval > 0:
+        c.test_interval = args.test_interval
 
     timed_files = process_common_args(c, args)
 
