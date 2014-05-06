@@ -9,6 +9,18 @@ import argparse
 SMALLER_IS_BETTER = ['mean_dfb', 'min_dfb', 'cross_entropy', 'briar']
 SMALLER_IS_BETTER += ['p.' + x for x in SMALLER_IS_BETTER]
 
+SCORE_ADJUST = {
+    'auc': 2.0,
+    'p.auc': 2.0,
+    'f1': 0.5,
+    'p.f1': 0.5,
+    'mcc': 0.5,
+    'p.mcc': 0.5,
+    #pos_95 calculation was flawed. leave at low value for now.
+    'pos_95': 0.0,
+    'p.pos_95': 0.0,
+}
+
 def print_summary(nets, n, cutoff):
     """print a semi-human-readable summary of the indicator metrics."""
     n = min(n, len(nets))
@@ -21,19 +33,29 @@ def print_summary(nets, n, cutoff):
         print
         print k
         print "=" * len(k)
+        best = data[0][0]
         for i in range(n):
             v, fn = data[i]
-            summary[fn] += 1
+            score = best / v if k in SMALLER_IS_BETTER else v / best
+            #score = 1
+            score *= SCORE_ADJUST.get(k, 1.0)
+            summary[fn] += score
             print "%2d: %.4g %s" % (i + 1, v, fn)
 
     best = [(v, k) for k, v in summary.iteritems()]
     best.sort(reverse=True)
     print "\nsummary\n========"
+    oldv = None
     for i, x in enumerate(best):
         v, fn = x
         if v < cutoff:
             break
-        print "%2d: %.4g %s" % (i + 1, v, fn)
+        if v != oldv:
+            rank = "%3d:" % (i + 1)
+        else:
+            rank = "    "
+        oldv = v
+        print "%s %.4g %s" % (rank, v, fn)
 
 
 def print_list(nets, n, cutoff):
@@ -78,7 +100,7 @@ def main():
                         help="list this many top nets per category")
     parser.add_argument('-l', '--list-only', action="store_true",
                         help="only list the top filenames")
-    parser.add_argument('-c', '--cutoff', type=int, default=1,
+    parser.add_argument('-c', '--cutoff', type=int, default=0,
                         help='how many top-n listings a net needs to be in summary')
     parser.add_argument('file', help='JSON file to use')
     args = parser.parse_args()
