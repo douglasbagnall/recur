@@ -1180,7 +1180,7 @@ def _calc_stats(results):
 
         # 95% positive and negative
         # intersections with 1:20 lines from the end corners
-        if dx == 0 and y > 20.0 * x:
+        if dx == 0 and y > 20.0 * x and not pos_95:
             pos_95 = y
 
         if 1.0 - x > 20.0 * (1.0 - y):
