@@ -21,6 +21,12 @@ SCORE_ADJUST = {
     'p.pos_95': 0.0,
 }
 
+def calc_score(k, v, best):
+        score = best / v if k in SMALLER_IS_BETTER else v / best
+        #score = 1
+        score *= SCORE_ADJUST.get(k, 1.0)
+        return score
+
 def print_summary(nets, n, cutoff):
     """print a semi-human-readable summary of the indicator metrics."""
     n = min(n, len(nets))
@@ -36,10 +42,7 @@ def print_summary(nets, n, cutoff):
         best = data[0][0]
         for i in range(n):
             v, fn = data[i]
-            score = best / v if k in SMALLER_IS_BETTER else v / best
-            #score = 1
-            score *= SCORE_ADJUST.get(k, 1.0)
-            summary[fn] += score
+            summary[fn] += calc_score(k, v, best)
             print "%2d: %.4g %s" % (i + 1, v, fn)
 
     best = [(v, k) for k, v in summary.iteritems()]
@@ -68,8 +71,9 @@ def print_list(nets, n, cutoff):
             continue
         data = [(x[k], x['filename']) for x in nets]
         data.sort(reverse=(k not in SMALLER_IS_BETTER))
+        best = data[0][0]
         for v, fn in data[:n]:
-            summary[fn] += 1
+            summary[fn] += calc_score(k, v, best)
 
     best = [(v, k) for k, v in summary.iteritems()]
     best.sort(reverse=True)
