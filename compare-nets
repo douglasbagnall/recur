@@ -19,18 +19,24 @@ import random
 #but if $f has already been done, ignore it.
 
 
-def load_excluded_files(filename):
-    excluded = set()
+def load_filelist(filename, strip=True):
+    files = set()
+    if strip:
+        bn = os.path.basename
+    else:
+        def bn(x):
+            return x
+
     if filename is not None:
         f = open(filename)
         for line in f:
             if line[0] == '{':
-                excluded.add(os.path.basename(json.loads(line)['filename']))
+                files.add(bn(json.loads(line)['filename']))
             else:
-                excluded.update(os.path.basename(x) for x in line.split()
-                                if x.endswith('.net'))
-    excluded = set(x.encode('utf-8') for x in excluded)
-    return excluded
+                files.update(bn(x) for x in line.split()
+                             if x.endswith('.net'))
+    files = set(x.encode('utf-8') for x in files)
+    return files
 
 def main():
     parser = argparse.ArgumentParser()
@@ -43,9 +49,11 @@ def main():
     parser.add_argument('-d', '--audio-directory', action='append',
                        help='find audio in this directory')
     parser.add_argument('-D', '--net-directory', action='append',
-                       help='find nets in this directory')
+                       help='test all nets in this directory')
+    parser.add_argument('-I', '--include-file',
+                       help='test nets named in this file')
     parser.add_argument('-x', '--exclude-file',
-                       help='exclude files named in this file')
+                       help='exclude nets named in this file')
     parser.add_argument('-S', '--shuffle', action='store_true',
                         help='process files in a more random order')
     parser.add_argument('-r', '--include-regex',
@@ -57,14 +65,13 @@ def main():
     args = parser.parse_args()
     #print >>sys.stderr, args
 
-    excluded_files = load_excluded_files(args.exclude_file)
-    #print >>sys.stderr, len(excluded_files)
-    files = set()
-    for d in args.net_directory:
-        files.update(os.path.join(d, x) for x in os.listdir(d)
-                     if x.endswith('.net') and
-                     os.path.basename(x) not in excluded_files)
-    #print >>sys.stderr, len(files)
+    excluded_files = load_filelist(args.exclude_file)
+    files = load_filelist(args.include_file, strip=False)
+    if args.net_directory:
+        for d in args.net_directory:
+            files.update(os.path.join(d, x) for x in os.listdir(d)
+                         if x.endswith('.net') and
+                         os.path.basename(x) not in excluded_files)
 
     if args.include_regex:
         print args.include_regex
