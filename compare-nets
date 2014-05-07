@@ -74,7 +74,7 @@ def main():
                          os.path.basename(x) not in excluded_files)
 
     if args.include_regex:
-        print args.include_regex
+        print >>sys.stderr, "restricting to regex /%s/" % args.include_regex
         r = re.compile(args.include_regex)
         files = set(x for x in files if r.search(x))
     print >>sys.stderr, "looking at %d files" % len(files)
