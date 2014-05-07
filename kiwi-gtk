@@ -18,11 +18,22 @@ def main():
                         help="reverse the order of classes")
     parser.add_argument('files', metavar='FILE', nargs='*',
                         help='files to process before --audio-directory')
+    parser.add_argument('--min-changes', type=int, default=0,
+                        help="only test files with at least this many class switches")
+
 
     args = parser.parse_args()
     c = GTKClassifier(sinkname='autoaudiosink')
-    untimed_files = process_common_args(c, args, timed=False)
-    files = args.files[:] + [x.fullname for x in untimed_files]
+
+    if args.min_changes:
+        files = process_common_args(c, args, timed=True)
+        files = [x for x in files
+                 if len(x.timings) >= args.min_changes]
+    else:
+        #by default ignore timings
+        files = process_common_args(c, args, timed=False)
+
+    files = args.files[:] + [x.fullname for x in files]
     run(c, files, args.reverse)
 
 main()
