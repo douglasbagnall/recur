@@ -16,9 +16,6 @@ SCORE_ADJUST = {
     'p.f1': 0.5,
     'mcc': 0.5,
     'p.mcc': 0.5,
-    #pos_95 calculation was flawed. leave at low value for now.
-    'pos_95': 0.0,
-    'p.pos_95': 0.0,
 }
 
 def calc_score(k, v, best):
