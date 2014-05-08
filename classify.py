@@ -168,7 +168,8 @@ class Classifier(BaseClassifier):
                  call_duration_threshold=0,
                  show_presence_roc=False,
                  target_index=None,
-                 summarise=False):
+                 summarise=False,
+                 presence_index=None):
         if len(self.classes) == 2 and target_index is None:
             self.target_index = self.classes[1]
         else:
@@ -192,6 +193,7 @@ class Classifier(BaseClassifier):
         self.show_roc = show_roc
         self.show_presence_roc = show_presence_roc
         self.summarise = summarise
+        self.presence_index = presence_index
         self.data = list(reversed(data))
         self.setp('training', False)
         if self.show_roc or self.summarise:
@@ -361,6 +363,13 @@ class Classifier(BaseClassifier):
 
         if self.show_presence_roc or self.summarise:
             #window = np.kaiser(15, 6)
+            if self.presence_index is None:
+                if self.summarise: # a historical default
+                    indices = [-6]
+                else:
+                    indices = [-x * (x + 1) for x in range(1, 9)]
+            else:
+                indices = [-self.presence_index - 1]
             if self.target_index:
                 items = [(self.target_index, scores[self.target_index])]
             else:
@@ -371,7 +380,7 @@ class Classifier(BaseClassifier):
                 #s = np.convolve(s, window)
                 s = np.sort(s[10:])
                 if len(s) > 72:
-                    squares = [s[-x * (x + 1)] for x in range(1, 9)]
+                    squares = [s[x] for x in indices]
                     self.minute_results[k].append(squares)
                     self.minute_gt[k].append(gt)
                 else:
@@ -400,11 +409,11 @@ class Classifier(BaseClassifier):
                         results = zip(*self.minute_results[k])
                         #import pdb; pdb.set_trace()
 
-                        for i, row in enumerate(results):
-                            index = (i + 2) * (i + 1) - 1
-                            le = (0.1 if i == 6 else 0)
+                        label_i = indices[len(indices) // 2]
+                        for i, row in zip(indices, results):
+                            le = (0.1 if i == label_i else 0)
                             draw_presence_roc(zip(row, self.minute_gt[k]),
-                                              '%s-nth %s' % (k, index), label_every=le)
+                                              '%s-nth %s' % (k, -i - 1), label_every=le)
 
                 actually_show_roc(title=self.getp('basename'))
             self.stop()
@@ -1258,13 +1267,13 @@ def _calc_stats(results):
     }
 
 
-def calc_stats(results, presence_results, presence_gt):
+def calc_stats(results, presence_results, presence_gt, presence_i=0):
     instantaneous_stats = _calc_stats([x[:2] for x in results])
-    p1 = zip([x[1] for x in presence_results], presence_gt)
-    presence_1_stats = _calc_stats(p1)
+    p1 = zip([x[presence_i] for x in presence_results], presence_gt)
+    presence_stats = _calc_stats(p1)
 
     stats = instantaneous_stats
-    for k, v in presence_1_stats.iteritems():
+    for k, v in presence_stats.iteritems():
         stats['p.' + k] = v
 
     return stats

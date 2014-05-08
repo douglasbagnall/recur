@@ -62,6 +62,8 @@ def main():
                        help='only consider calls with this intensity or higher')
     parser.add_argument('--ignore-start', type=float, default=0.0,
                        help="ignore this many seconds at start of each file")
+    parser.add_argument('--presence-index', type=int, default=5,
+                        help="Nth highest value to use as presence indicator")
     args = parser.parse_args()
     #print >>sys.stderr, args
 

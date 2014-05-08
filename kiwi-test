@@ -37,6 +37,8 @@ def main():
                        help="plot a ROC curve of presence (implies --roc)")
     group.add_argument('--summary', action='store_true',
                        help="print short message indicating goodness")
+    group.add_argument('--presence-index', type=int, default=None,
+                       help="index for presence stats (Nth best over whole file)")
 
     args = parser.parse_args()
     timed = not args.no_timings
@@ -64,6 +66,6 @@ def main():
                call_peak_threshold=args.call_peak_threshold,
                call_duration_threshold=args.call_duration_threshold,
                show_presence_roc=args.presence_roc, target_index=args.target_class,
-               summarise=args.summary)
+               summarise=args.summary, presence_index=args.presence_index)
 
 main()
