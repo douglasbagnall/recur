@@ -62,6 +62,8 @@ def main():
                        help="Do not renice downwards")
     group.add_argument('--test-interval', type=int, default=0,
                        help="Test after this many training cycles")
+    group.add_argument('--log-file', default="auto",
+                       help="log to this file (default: based on net basename)")
     args = parser.parse_args()
 
     if args.learn_rate_schedule == "flat":
@@ -114,6 +116,7 @@ def main():
     c.train(training_streams, validate_streams,
             iterations=args.iterations,
             learn_rate_fn=lr, dropout_fn=dropout,
+            log_file=args.log_file,
             properties=(('momentum-soft-start', args.momentum_soft_start),
                         ('momentum', args.momentum),
                         #('momentum-style', 1),
