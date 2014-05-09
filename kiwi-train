@@ -117,8 +117,9 @@ def main():
             properties=(('momentum-soft-start', args.momentum_soft_start),
                         ('momentum', args.momentum),
                         #('momentum-style', 1),
-                        ('weight-fan-in-sum', 4),
-                        ('weight-fan-in-kurtosis', 0.15),
+                        #('weight-fan-in-sum', 4),
+                        #('weight-fan-in-kurtosis', 0.15),
+                        ('weight-init-method', 3),
                     ))
 
 main()
