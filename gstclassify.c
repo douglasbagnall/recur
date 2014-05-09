@@ -44,6 +44,7 @@ enum
   PROP_DROPOUT,
   PROP_ERROR_WEIGHT,
   PROP_BPTT_DEPTH,
+  PROP_WEIGHT_INIT_METHOD,
   PROP_WEIGHT_FAN_IN_SUM,
   PROP_WEIGHT_FAN_IN_KURTOSIS,
   PROP_LAWN_MOWER,
@@ -117,6 +118,8 @@ enum
 #define PROP_IGNORE_START_MIN 0
 #define PROP_IGNORE_START_MAX 1e4
 
+#define PROP_WEIGHT_INIT_METHOD_MIN RNN_INIT_FLAT
+#define PROP_WEIGHT_INIT_METHOD_MAX (RNN_INIT_LAST - 1)
 #define PROP_WEIGHT_FAN_IN_SUM_MAX 99.0
 #define PROP_WEIGHT_FAN_IN_SUM_MIN 0.0
 #define PROP_WEIGHT_FAN_IN_KURTOSIS_MAX 1.5
@@ -456,6 +459,14 @@ gst_classify_class_init (GstClassifyClass * klass)
           DROPOUT_MIN, DROPOUT_MAX,
           DEFAULT_PROP_DROPOUT,
           G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+
+  g_object_class_install_property (gobject_class, PROP_WEIGHT_INIT_METHOD,
+      g_param_spec_float("weight-init-method", "weight-init-method",
+          "initialisation method. 1:flat, 2:fan in, 3: runs or loops",
+          PROP_WEIGHT_INIT_METHOD_MIN,
+          PROP_WEIGHT_INIT_METHOD_MAX,
+          RNN_INIT_FLAT, /* not used; uses recur-nn default.*/
+          G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class, PROP_WEIGHT_FAN_IN_SUM,
       g_param_spec_float("weight-fan-in-sum", "weight-fan-in-sum",
@@ -798,6 +809,31 @@ load_specified_net(GstClassify *self, const char *filename){
   return net;
 }
 
+static inline void
+initialise_net(GstClassify *self, RecurNN *net)
+{
+  /*start off with a default set of parameters */
+  struct RecurInitialisationParameters p;
+
+  rnn_init_default_weight_parameters(net, &p);
+  /*if the init-method is not set, guess based on related properties (for
+    back-compatibility and possibly DWIMery).*/
+  if (PP_IS_SET(self, PROP_WEIGHT_INIT_METHOD)){
+    p.method = PP_GET_INT(self, PROP_WEIGHT_INIT_METHOD, p.method);
+  }
+  else if (PP_IS_SET(self, PROP_WEIGHT_FAN_IN_SUM)){
+    p.method = RNN_INIT_FAN_IN;
+  }
+
+  p.fan_in_sum = PP_GET_FLOAT(self, PROP_WEIGHT_FAN_IN_SUM, p.fan_in_sum);
+  p.fan_in_step = PP_GET_FLOAT(self, PROP_WEIGHT_FAN_IN_KURTOSIS,
+      p.fan_in_step);
+
+  p.flat_perforation = 0.5;
+
+  rnn_randomise_weights_clever(net, &p);
+}
+
 static RecurNN *
 create_net(GstClassify *self, int bottom_layer_size,
     int hidden_size, int top_layer_size, char *metadata){
@@ -815,10 +851,6 @@ create_net(GstClassify *self, int bottom_layer_size,
       DEFAULT_BOTTOM_LEARN_RATE_SCALE);
   float top_learn_rate_scale = PP_GET_FLOAT(self, PROP_TOP_LEARN_RATE_SCALE,
       DEFAULT_TOP_LEARN_RATE_SCALE);
-  float fan_in_sum = PP_GET_FLOAT(self, PROP_WEIGHT_FAN_IN_SUM,
-      DEFAULT_PROP_WEIGHT_FAN_IN_SUM);
-  float fan_in_kurtosis = PP_GET_FLOAT(self, PROP_WEIGHT_FAN_IN_KURTOSIS,
-      DEFAULT_PROP_WEIGHT_FAN_IN_KURTOSIS);
   u64 rng_seed = get_gvalue_u64(PENDING_PROP(self, PROP_RNG_SEED), DEFAULT_RNG_SEED);
   GST_DEBUG("rng seed %lu", rng_seed);
 
@@ -834,19 +866,7 @@ create_net(GstClassify *self, int bottom_layer_size,
       top_layer_size, flags, rng_seed,
       NULL, bptt_depth, learn_rate, momentum, 0);
 
-  /*start off with a default set of parameters */
-  struct RecurInitialisationParameters p;
-  rnn_init_default_weight_parameters(net, &p);
-  if (fan_in_sum){
-    p.method = RNN_INIT_FAN_IN;
-    p.fan_in_sum = fan_in_sum;
-    p.fan_in_step = fan_in_kurtosis;
-  }
-  else {
-    p.method = RNN_INIT_FLAT;
-    p.flat_perforation = 0.5;
-  }
-  rnn_randomise_weights_clever(net, &p);
+  initialise_net(self, net);
 
   net->bptt->ho_scale = top_learn_rate_scale;
   if (net->bottom_layer){
@@ -1438,6 +1458,7 @@ gst_classify_set_property (GObject * object, guint prop_id, const GValue * value
     case PROP_HIDDEN_SIZE:
     case PROP_BPTT_DEPTH:
     case PROP_LAWN_MOWER:
+    case PROP_WEIGHT_INIT_METHOD:
     case PROP_WEIGHT_FAN_IN_SUM:
     case PROP_WEIGHT_FAN_IN_KURTOSIS:
     case PROP_RNG_SEED:

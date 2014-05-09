@@ -13,6 +13,9 @@ PENDING_PROP(GstClassify *self, int prop) {
 }
 #endif
 
+
+#define PP_IS_SET(self, id) (G_IS_VALUE(PENDING_PROP(self, id)))
+
 #define PP_GET_FLOAT(self, id, def) get_gvalue_float(PENDING_PROP(self, id), def)
 #define PP_GET_INT(self, id, def) get_gvalue_int(PENDING_PROP(self, id), def)
 #define PP_GET_STRING(self, id, def) get_gvalue_string(PENDING_PROP(self, id), def)
