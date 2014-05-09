@@ -19,7 +19,7 @@ import random
 #but if $f has already been done, ignore it.
 
 
-def load_filelist(filename, strip=True):
+def load_filelist(filename, strip=True, exclude=set()):
     files = set()
     if strip:
         bn = os.path.basename
@@ -31,10 +31,12 @@ def load_filelist(filename, strip=True):
         f = open(filename)
         for line in f:
             if line[0] == '{':
-                files.add(bn(json.loads(line)['filename']))
+                fn = bn(json.loads(line)['filename'])
+                if fn not in exclude:
+                    files.add(fn)
             else:
-                files.update(bn(x) for x in line.split()
-                             if x.endswith('.net'))
+                fns = [bn(x) for x in line.split() if x.endswith('.net')]
+                files.update(x for x in fns if os.path.basename(x) not in exclude)
     files = set(x.encode('utf-8') for x in files)
     return files
 
@@ -68,7 +70,7 @@ def main():
     #print >>sys.stderr, args
 
     excluded_files = load_filelist(args.exclude_file)
-    files = load_filelist(args.include_file, strip=False)
+    files = load_filelist(args.include_file, strip=False, exclude=excluded_files)
     if args.net_directory:
         for d in args.net_directory:
             files.update(os.path.join(d, x) for x in os.listdir(d)
