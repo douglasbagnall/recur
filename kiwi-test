@@ -19,6 +19,8 @@ def main():
                        help="write classifications to this file")
     group.add_argument('--call-json-file',
                        help="write call locations to this file")
+    group.add_argument('--score-file',
+                       help="write best scores to this file")
     group.add_argument('--call-edge-threshold', default=0.5, type=float,
                        help="use this edge threshold for call-json-file")
     group.add_argument('--call-peak-threshold', default=0.9, type=float,
@@ -66,6 +68,7 @@ def main():
                call_peak_threshold=args.call_peak_threshold,
                call_duration_threshold=args.call_duration_threshold,
                show_presence_roc=args.presence_roc, target_index=args.target_class,
-               summarise=args.summary, presence_index=args.presence_index)
+               summarise=args.summary, presence_index=args.presence_index,
+               score_file=args.score_file)
 
 main()

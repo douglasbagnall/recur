@@ -160,6 +160,7 @@ class Classifier(BaseClassifier):
     ground_truth_file = None
     classification_file = None
     call_json_file = None
+    score_file = None
     def classify(self, data,
                  ground_truth_file=None,
                  classification_file=None,
@@ -171,7 +172,8 @@ class Classifier(BaseClassifier):
                  show_presence_roc=False,
                  target_index=None,
                  summarise=False,
-                 presence_index=None):
+                 presence_index=None,
+                 score_file=None):
         if len(self.classes) == 2 and target_index is None:
             self.target_index = self.classes[1]
         else:
@@ -189,6 +191,8 @@ class Classifier(BaseClassifier):
             self.classification_file = open(classification_file, 'w')
         if call_json_file:
             self.call_json_file = open(call_json_file, 'w')
+        if score_file:
+            self.score_file = open(score_file, 'w')
         self.call_edge_threshold = call_edge_threshold
         self.call_peak_threshold = call_peak_threshold
         self.call_duration_threshold = call_duration_threshold
@@ -362,6 +366,10 @@ class Classifier(BaseClassifier):
                     score = max(score, s)
 
             print >>self.call_json_file, json.dumps(row)
+
+        if self.target_index and self.score_file:
+            sorted_scores = sorted([x[0] for x in scores[self.target_index]], reverse=True)
+            print >>self.score_file, json.dumps([fn] + sorted_scores[:200])
 
         if self.show_presence_roc or self.summarise:
             #window = np.kaiser(15, 6)
