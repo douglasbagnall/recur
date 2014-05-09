@@ -461,7 +461,7 @@ gst_classify_class_init (GstClassifyClass * klass)
           G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class, PROP_WEIGHT_INIT_METHOD,
-      g_param_spec_float("weight-init-method", "weight-init-method",
+      g_param_spec_int("weight-init-method", "weight-init-method",
           "initialisation method. 1:flat, 2:fan in, 3: runs or loops",
           PROP_WEIGHT_INIT_METHOD_MIN,
           PROP_WEIGHT_INIT_METHOD_MAX,
