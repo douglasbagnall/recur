@@ -829,8 +829,6 @@ initialise_net(GstClassify *self, RecurNN *net)
   p.fan_in_step = PP_GET_FLOAT(self, PROP_WEIGHT_FAN_IN_KURTOSIS,
       p.fan_in_step);
 
-  p.flat_perforation = 0.5;
-
   rnn_randomise_weights_clever(net, &p);
 }
 
