@@ -32,3 +32,4 @@ convert-saved-net
 local.mak
 /bird-data/
 *.dot
+/data/
