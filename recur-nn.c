@@ -104,7 +104,7 @@ maybe_scale_inputs(RecurNN *net){
 
 static inline int
 calc_clockwork_size(RecurNN *net, uint t){
-  int r = net->clock_rates;
+  int r = net->clockwork_cycles;
   if (r < 2){
     return net->h_size;
   }
@@ -152,10 +152,10 @@ rnn_opinion(RecurNN *net, const float *inputs, float dropout){
   /* in emergencies, clamp the scale of the input vector */
   maybe_scale_inputs(net);
 
-  /*accounting for variable clock_rates */
+  /*accounting for variable clockwork_cycles */
   int target_h_size = calc_clockwork_size(net, net->clock);
-  MAYBE_DEBUG("clock %x clock_rates %d -> clockwork_size %d",
-      net->clock, net->clock_rates, target_h_size);
+  MAYBE_DEBUG("clock %x clockwork_cycles %d -> clockwork_size %d",
+      net->clock, net->clockwork_cycles, target_h_size);
   net->clock++;
 
   calculate_interlayer(net->input_layer, net->i_size,
@@ -283,7 +283,7 @@ bptt_and_accumulate_error(RecurNN *net, float *restrict ih_delta,
       min_error_gain);
   int t;
 
-  if (net->clock_rates){
+  if (net->clockwork_cycles){
     int clock = net->clock;
     /*Some of i_error might need to be zero to accumulate slower cycles.
       Blank only as much as necessary*/
