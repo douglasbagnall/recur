@@ -36,8 +36,9 @@ rnn_save_net(RecurNN *net, const char *filename, int backup){
    *    uses more qualified keys ("net.X", "bptt.X", vs "X")
    * 5: includes metadata
    * 6: doesn't save BPTT training arrays (e.g. momentum) or hidden state
+   * 7: includes net->clock_rates
    */
-  const int version = 6;
+  const int version = 7;
   cdb_make_add(&cdbm, FORMAT_VERSION, strlen(FORMAT_VERSION), &version, sizeof(version));
 
 #define SAVE_SCALAR(obj, attr) do {                                     \
@@ -80,6 +81,7 @@ rnn_save_net(RecurNN *net, const char *filename, int backup){
   SAVE_SCALAR(net, generation);
   SAVE_SCALAR(net, flags);
   SAVE_SCALAR(net, rng); /* a struct, should work? */
+  SAVE_SCALAR(net, clock_rates);
 
   SAVE_ARRAY(net, ih_weights, net->ih_size);
   SAVE_ARRAY(net, ho_weights, net->ho_size);
@@ -178,6 +180,16 @@ rnn_load_net(const char *filename){
     cdb_bread(fd, &obj->attr, vlen);                                    \
   } while (0)
 
+#define READ_SCALAR_IF_VERSION_ELSE_DEFAULT(obj, attr, min_version, default) \
+  do {                                                                  \
+    if (version >= min_version){                                        \
+      READ_SCALAR(obj, attr);                                           \
+    }                                                                   \
+    else{                                                               \
+      obj->attr = default;                                              \
+    }                                                                   \
+  }while (0)
+
   READ_SCALAR(net, i_size);
   READ_SCALAR(net, h_size);
   READ_SCALAR(net, o_size);
@@ -191,18 +203,19 @@ rnn_load_net(const char *filename){
   READ_SCALAR(net, rng);
   READ_SCALAR(net, generation);
   READ_SCALAR(net, flags);
+
+  READ_SCALAR_IF_VERSION_ELSE_DEFAULT(net, clock_rates, 7, 0);
+
   if (tmpnet.flags & RNN_NET_FLAG_OWN_BPTT){
     READ_SCALAR(bptt, depth);
     READ_SCALAR(bptt, learn_rate);
     READ_SCALAR(bptt, index);
     READ_SCALAR(bptt, momentum);
     READ_SCALAR(bptt, momentum_weight);
-    if (version >= 2){
-      READ_SCALAR(bptt, ho_scale);
-    }
-    if (version >= 3){
-      READ_SCALAR(bptt, min_error_factor);
-    }
+    READ_SCALAR_IF_VERSION_ELSE_DEFAULT(bptt, ho_scale, 2,
+        ((float)net->output_size) / net->hidden_size);
+    READ_SCALAR_IF_VERSION_ELSE_DEFAULT(bptt, min_error_factor, 3,
+        BASE_MIN_ERROR_FACTOR * net->h_size);
   }
   if ((tmpnet.flags & RNN_NET_FLAG_BOTTOM_LAYER) && version >= 4){
     READ_SCALAR(bottom_layer, learn_rate_scale);
@@ -217,12 +230,14 @@ rnn_load_net(const char *filename){
   if (tmpnet.flags & RNN_NET_FLAG_BOTTOM_LAYER){
     net = rnn_new_with_bottom_layer(tmpbl.input_size, tmpbl.output_size,
         tmpnet.hidden_size, tmpnet.output_size, tmpnet.flags, 0, NULL,
-        tmpbptt.depth, tmpbptt.learn_rate, tmpbptt.momentum, tmpbl.overlap);
+        tmpbptt.depth, tmpbptt.learn_rate, tmpbptt.momentum, tmpnet.clock_rates,
+        tmpbl.overlap);
   }
   else {
     net = rnn_new(tmpnet.input_size, tmpnet.hidden_size,
       tmpnet.output_size, tmpnet.flags, 0, NULL,
-      tmpbptt.depth, tmpbptt.learn_rate, tmpbptt.momentum);
+        tmpbptt.depth, tmpbptt.learn_rate, tmpbptt.momentum,
+        tmpnet.clock_rates);
   }
   bptt = net->bptt;
   bottom_layer = net->bottom_layer;
@@ -232,12 +247,8 @@ rnn_load_net(const char *filename){
   if (bptt){
     bptt->index = tmpbptt.index;
     bptt->momentum_weight = tmpbptt.momentum_weight;
-    if (version >= 2){
-      bptt->ho_scale = tmpbptt.ho_scale;
-    }
-    if (version >= 3){
-      bptt->min_error_factor = tmpbptt.min_error_factor;
-    }
+    bptt->ho_scale = tmpbptt.ho_scale;
+    bptt->min_error_factor = tmpbptt.min_error_factor;
   }
 #define CHECK_SCALAR(new, tmp, attr) do {                               \
     if (new->attr != tmp.attr){                                         \
@@ -264,22 +275,13 @@ rnn_load_net(const char *filename){
 
   CHECK_SCALAR(net, tmpnet, generation);
   CHECK_SCALAR(net, tmpnet, flags);
+  CHECK_SCALAR(net, tmpnet, clock_rates);
+
   if (bptt){
     CHECK_SCALAR(bptt, tmpbptt, depth);
     CHECK_SCALAR(bptt, tmpbptt, index);
-    if (version >= 2){
-      CHECK_SCALAR(bptt, tmpbptt, ho_scale);
-    }
-    else {
-      /*ho_scale wasn't originally saved. But it was always set as follows. */
-      bptt->ho_scale = ((float)tmpnet.output_size) / tmpnet.hidden_size;
-    }
-    if (version >= 3){
-      CHECK_SCALAR(bptt, tmpbptt, min_error_factor);
-    }
-    else {
-      bptt->min_error_factor = BASE_MIN_ERROR_FACTOR * net->h_size;
-    }
+    CHECK_SCALAR(bptt, tmpbptt, ho_scale);
+    CHECK_SCALAR(bptt, tmpbptt, min_error_factor);
   }
 
   if (net->bottom_layer && 0){//XXX

@@ -66,6 +66,7 @@ Because of ccan/opt, --help will tell you something.
 #define DEFAULT_INIT_HIDDEN_RUN_LENGTH -1.0f
 #define DEFAULT_INIT_HIDDEN_RUN_DEVIATION -1.0f
 #define DEFAULT_PERFORATE_WEIGHTS 0.0f
+#define DEFAULT_CLOCKWORK 0
 
 #define DEFAULT_LEARN_CAPITALS 0
 #define DEFAULT_DUMP_COLLAPSED_TEXT NULL
@@ -136,6 +137,7 @@ static bool opt_temporal_pgm_dump = DEFAULT_TEMPORAL_PGM_DUMP;
 static bool opt_periodic_pgm_dump = DEFAULT_PERIODIC_PGM_DUMP;
 static bool opt_deterministic_confab = DEFAULT_DETERMINISTIC_CONFAB;
 static bool opt_save_net = DEFAULT_SAVE_NET;
+static uint opt_clockwork = DEFAULT_CLOCKWORK;
 static bool opt_learn_capitals = DEFAULT_LEARN_CAPITALS;
 static uint opt_multi_tap = DEFAULT_MULTI_TAP;
 static bool opt_use_multi_tap_path = DEFAULT_USE_MULTI_TAP_PATH;
@@ -197,7 +199,7 @@ static struct opt_table options[] = {
   OPT_WITH_ARG("--init-method=<n>", opt_set_intval, opt_show_intval,
       &opt_init_method, "1: uniform-ish, 2: fan-in, 3: runs or loops"),
   OPT_WITH_ARG("--init-submethod=<n>", opt_set_intval, opt_show_intval,
-      &opt_init_method, "initialisation for non-recurrent parts (1 or 2)"),
+      &opt_init_submethod, "initialisation for non-recurrent parts (1 or 2)"),
   OPT_WITH_ARG("--flat-init-distribution=<n>", opt_set_intval, opt_show_intval,
       &opt_flat_init_distribution, "1: uniform, 2: gaussian, 3: log-normal, 4: semicircle"
   ),
@@ -295,6 +297,8 @@ static struct opt_table options[] = {
       &opt_top_learn_rate_scale, "top layer learn rate (relative)"),
   OPT_WITH_ARG("--bottom-learn-rate-scale=<float>", opt_set_floatval, opt_show_floatval,
       &opt_bottom_learn_rate_scale, "bottom layer learn rate (relative)"),
+  OPT_WITH_ARG("--clockwork=<n>", opt_set_uintval, opt_show_uintval,
+      &opt_clockwork, "number of clock rates (>1 for clockwork RNN)"),
 
   OPT_WITHOUT_ARG("-h|--help", opt_usage_and_exit,
       ": Rnn modelling of text at the character level",
@@ -854,13 +858,13 @@ load_or_create_net(void){
       net = rnn_new_with_bottom_layer(input_size, opt_bottom_layer,
           opt_hidden_size, output_size, flags, opt_rng_seed,
           opt_logfile, opt_bptt_depth, opt_learn_rate,
-          opt_momentum, 0);
+          opt_momentum, opt_clockwork, 0);
     }
     else{
       net = rnn_new(input_size, opt_hidden_size,
           output_size, flags, opt_rng_seed,
           opt_logfile, opt_bptt_depth, opt_learn_rate,
-          opt_momentum);
+          opt_momentum, opt_clockwork);
     }
     initialise_net(net);
     net->bptt->momentum_weight = opt_momentum_weight;

@@ -58,6 +58,7 @@ enum
   PROP_LAG,
   PROP_IGNORE_START,
   PROP_GENERATION,
+  PROP_CLOCKWORK,
   PROP_LOAD_NET_NOW,
 
   PROP_LAST
@@ -83,6 +84,7 @@ enum
 #define DEFAULT_MAX_FREQUENCY (CLASSIFY_RATE * 0.499)
 #define MINIMUM_AUDIO_FREQUENCY 0
 #define MAXIMUM_AUDIO_FREQUENCY (CLASSIFY_RATE * 0.5)
+#define DEFAULT_PROP_CLOCKWORK 0
 #define DEFAULT_PROP_GENERATION 0
 
 #define DEFAULT_PROP_CLASSES "01"
@@ -544,6 +546,13 @@ gst_classify_class_init (GstClassifyClass * klass)
           DEFAULT_RNG_SEED,
           G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
+  g_object_class_install_property (gobject_class, PROP_CLOCKWORK,
+      g_param_spec_int("clockwork", "clockwork",
+          "Use this many levels of clockwork",
+          0, G_MAXINT,
+          DEFAULT_PROP_CLOCKWORK,
+          G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
+
   g_object_class_install_property (gobject_class, PROP_GENERATION,
       g_param_spec_uint("generation", "generation",
           "Read the net's training generation",
@@ -843,6 +852,7 @@ create_net(GstClassify *self, int bottom_layer_size,
   int n_features = get_n_features(self);
   u32 flags = CLASSIFY_RNN_FLAGS;
   int bptt_depth = PP_GET_INT(self, PROP_BPTT_DEPTH, DEFAULT_PROP_BPTT_DEPTH);
+  int clockwork = PP_GET_INT(self, PROP_CLOCKWORK, DEFAULT_PROP_CLOCKWORK);
   float momentum = PP_GET_FLOAT(self, PROP_MOMENTUM, DEFAULT_PROP_MOMENTUM);
   float learn_rate = PP_GET_FLOAT(self, PROP_LEARN_RATE, DEFAULT_LEARN_RATE);
   float bottom_learn_rate_scale = PP_GET_FLOAT(self, PROP_BOTTOM_LEARN_RATE_SCALE,
@@ -859,10 +869,9 @@ create_net(GstClassify *self, int bottom_layer_size,
   else {
     flags &= ~RNN_COND_USE_LAWN_MOWER;
   }
-
   net = rnn_new_with_bottom_layer(n_features, bottom_layer_size, hidden_size,
       top_layer_size, flags, rng_seed,
-      NULL, bptt_depth, learn_rate, momentum, 0);
+      NULL, bptt_depth, learn_rate, momentum, clockwork, 0);
 
   initialise_net(self, net);
 
@@ -1464,6 +1473,7 @@ gst_classify_set_property (GObject * object, guint prop_id, const GValue * value
     case PROP_DELTA_FEATURES:
     case PROP_INTENSITY_FEATURE:
     case PROP_MFCCS:
+    case PROP_CLOCKWORK:
       if (self->net == NULL){
         copy_gvalue(PENDING_PROP(self, prop_id), value);
       }

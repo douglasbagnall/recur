@@ -260,7 +260,7 @@ load_or_create_net(GstParrot *self){
   if (net == NULL){
     net = rnn_new(PARROT_N_FEATURES, self->hidden_size,
         PARROT_N_FEATURES, PARROT_RNN_FLAGS, PARROT_RNG_SEED,
-        NULL, PARROT_BPTT_DEPTH, self->learn_rate, MOMENTUM);
+        NULL, PARROT_BPTT_DEPTH, self->learn_rate, MOMENTUM, 0);
     rnn_randomise_weights_auto(net);
   }
   else {

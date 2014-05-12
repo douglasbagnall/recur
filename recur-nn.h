@@ -159,6 +159,8 @@ struct _RecurNN {
   RecurExtraLayer *bottom_layer;
   char *metadata;
   u32 generation;
+  int clock_rates;
+  u32 clock;
 };
 
 struct _RecurNNBPTT {
@@ -234,7 +236,7 @@ struct RecurInitialisationParameters {
 
 RecurNN * rnn_new(uint input_size, uint hidden_size, uint output_size,
     u32 flags, u64 rng_seed, const char *log_file, int depth, float learn_rate,
-    float momentum);
+    float momentum, int clock_rates);
 
 RecurNN * rnn_clone(RecurNN *parent, u32 flags,
     u64 rng_seed, const char *log_file);
@@ -245,7 +247,7 @@ RecurExtraLayer *rnn_new_extra_layer(int input_size, int output_size, int overla
 RecurNN *rnn_new_with_bottom_layer(int n_inputs, int r_input_size,
     int hidden_size, int output_size, u32 flags, u64 rng_seed,
     const char *log_file, int bptt_depth, float learn_rate,
-    float momentum, int convolutional_overlap);
+    float momentum, int clock_rates, int convolutional_overlap);
 
 
 void rnn_set_log_file(RecurNN *net, const char * log_file, int append_dont_truncate);

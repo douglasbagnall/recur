@@ -69,7 +69,7 @@ new_bptt(RecurNN *net, int depth, float learn_rate, float momentum, u32 flags){
 RecurNN *
 rnn_new(uint input_size, uint hidden_size, uint output_size, u32 flags,
     u64 rng_seed, const char *log_file, int bptt_depth, float learn_rate,
-    float momentum){
+    float momentum, int clock_rates){
   RecurNN *net = calloc(1, sizeof(RecurNN));
   float *fm;
   /*sizes */
@@ -89,8 +89,9 @@ rnn_new(uint input_size, uint hidden_size, uint output_size, u32 flags,
   net->ho_size = ho_size;
   net->generation = 0;
   net->flags = flags;
+  net->clock_rates = clock_rates;
+  net->clock = 0;
   init_rand64_maybe_randomly(&net->rng, rng_seed);
-
 
   size_t alloc_bytes = (i_size + h_size + o_size) * sizeof(float);
   if (flags & RNN_NET_FLAG_OWN_WEIGHTS)
@@ -178,7 +179,7 @@ rnn_new_extra_layer(int input_size, int output_size, int overlap,
 RecurNN *rnn_new_with_bottom_layer(int n_inputs, int r_input_size,
     int hidden_size, int output_size, u32 flags, u64 rng_seed,
     const char *log_file, int bptt_depth, float learn_rate,
-    float momentum, int convolutional_overlap)
+    float momentum, int clock_rates, int convolutional_overlap)
 {
   RecurNN *net;
   if (r_input_size == 0){
@@ -186,12 +187,14 @@ RecurNN *rnn_new_with_bottom_layer(int n_inputs, int r_input_size,
         "due to zero internal size");
     flags &= ~RNN_NET_FLAG_BOTTOM_LAYER;
     net = rnn_new(n_inputs, hidden_size, output_size,
-        flags, rng_seed, log_file, bptt_depth, learn_rate, momentum);
+        flags, rng_seed, log_file, bptt_depth, learn_rate, momentum,
+        clock_rates);
   }
   else {
     flags |= RNN_NET_FLAG_BOTTOM_LAYER;
     net = rnn_new(r_input_size, hidden_size, output_size,
-        flags, rng_seed, log_file, bptt_depth, learn_rate, momentum);
+        flags, rng_seed, log_file, bptt_depth, learn_rate, momentum,
+        clock_rates);
 
     net->bottom_layer = rnn_new_extra_layer(n_inputs, r_input_size,
         convolutional_overlap, net->flags);
@@ -302,7 +305,8 @@ rnn_clone(RecurNN *parent, u32 flags,
   }
 
   net = rnn_new(parent->input_size, parent->hidden_size, parent->output_size,
-      flags, rng_seed, log_file, bptt_depth, learn_rate, momentum);
+      flags, rng_seed, log_file, bptt_depth, learn_rate, momentum,
+      parent->clock_rates);
 
   if (parent->bptt && (flags & RNN_NET_FLAG_OWN_BPTT)){
     net->bptt->momentum_weight = parent->bptt->momentum_weight;

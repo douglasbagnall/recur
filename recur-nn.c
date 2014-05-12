@@ -18,6 +18,7 @@ static inline void
 calculate_interlayer(const float *restrict inputs,
     int input_size,
     float *restrict outputs,
+    int output_stride,
     int output_size,
     const float *restrict weights)
 {
@@ -36,7 +37,7 @@ calculate_interlayer(const float *restrict inputs,
   memset(outputs, 0, output_size * sizeof(float));
   for (y = 0; y < input_size; y++){
     if (inputs[y]){
-      const float *row = weights + output_size * y;
+      const float *row = weights + output_stride * y;
       ASSUME_ALIGNED(row);
       for (x = 0; x < output_size; x++){
         outputs[x] += inputs[y] * row[x];
@@ -52,7 +53,7 @@ calculate_interlayer(const float *restrict inputs,
       output_size,
       1.0,
       weights,
-      output_size,  /*"LDA", stride*/
+      output_stride,  /*"LDA", stride*/
       inputs,
       1,
       0,
@@ -101,6 +102,20 @@ maybe_scale_inputs(RecurNN *net){
   }
 }
 
+static inline int
+calc_clockwork_size(RecurNN *net, uint t){
+  int r = net->clock_rates;
+  if (r < 2){
+    return net->h_size;
+  }
+  /*lowest 1 bit in generation sets off at that level and below, with zero 1
+    bits triggering them all.
+*/
+  int active = MIN(ffs(t), r);
+  int size = active * net->h_size / r;
+  return ALIGNED_VECTOR_LEN(size, float);
+}
+
 float *
 rnn_opinion(RecurNN *net, const float *inputs, float dropout){
   /*If inputs is NULL, assume the inputs have already been set. If dropout is
@@ -114,8 +129,8 @@ rnn_opinion(RecurNN *net, const float *inputs, float dropout){
     if (inputs){
       memcpy(layer->inputs + 1, inputs, layer->input_size * sizeof(float));
     }
-    calculate_interlayer(layer->inputs, layer->i_size, layer->outputs, layer->o_size,
-        layer->weights);
+    calculate_interlayer(layer->inputs, layer->i_size, layer->outputs,
+         layer->o_size, layer->o_size, layer->weights);
     memcpy(net->real_inputs, layer->outputs, net->input_size * sizeof(float));
   }
   else if (inputs){
@@ -137,8 +152,14 @@ rnn_opinion(RecurNN *net, const float *inputs, float dropout){
   /* in emergencies, clamp the scale of the input vector */
   maybe_scale_inputs(net);
 
+  /*accounting for variable clock_rates */
+  int target_h_size = calc_clockwork_size(net, net->clock);
+  MAYBE_DEBUG("clock %x clock_rates %d -> clockwork_size %d",
+      net->clock, net->clock_rates, target_h_size);
+  net->clock++;
+
   calculate_interlayer(net->input_layer, net->i_size,
-      net->hidden_layer, net->h_size, net->ih_weights);
+      net->hidden_layer, net->h_size, target_h_size, net->ih_weights);
 
   ASSUME_ALIGNED(net->hidden_layer);
 
@@ -166,7 +187,7 @@ rnn_opinion(RecurNN *net, const float *inputs, float dropout){
     net->hidden_layer[i] = 0;
   }
   calculate_interlayer(net->hidden_layer, net->h_size,
-      net->output_layer, net->o_size, net->ho_weights);
+      net->output_layer, net->o_size, net->o_size, net->ho_weights);
 
   return net->output_layer;
 }
@@ -261,62 +282,146 @@ bptt_and_accumulate_error(RecurNN *net, float *restrict ih_delta,
   float min_error_sum = MIN(bptt->min_error_factor / net->bptt->learn_rate,
       min_error_gain);
   int t;
-  for (t = bptt->depth; t > 0; t--){
-    error_sum = 0.0f;
-    int offset = (t + bptt->index) % bptt->depth;
-    const float *restrict inputs = bptt->history + offset * net->i_size;
-    ASSUME_ALIGNED(inputs);
-    h_error[0] = 0.0;
-    for (int i = INPUT_OFFSET(net); i < net->h_size; i++){
-      h_error[i] = 0.0;
-    }
-    for (y = 0; y < net->i_size; y++){
-      if (inputs[y] != 0.0f){
-        float e;
-        const float *restrict w_row = weights + y * net->h_size;
-        float *restrict delta_row = ih_delta + y * net->h_size;
-        ASSUME_ALIGNED(w_row);
-        ASSUME_ALIGNED(delta_row);
+
+  if (net->clock_rates){
+    int clock = net->clock;
+    /*Some of i_error might need to be zero to accumulate slower cycles.
+      Blank only as much as necessary*/
+    int bp_size = calc_clockwork_size(net, clock);
+    memset(i_error + bp_size, 0, (net->h_size - bp_size) * sizeof(float));
+
+    int offset = bptt->index;
+    for (t = bptt->depth; t > 0;
+         t--, clock--, offset += offset ? -1 : bptt->depth - 1){
+      error_sum = 0.0f;
+      const float *restrict inputs = bptt->history + offset * net->i_size;
+      ASSUME_ALIGNED(inputs);
+      h_error[0] = 0.0;
+      for (int i = INPUT_OFFSET(net); i < net->h_size; i++){
+        h_error[i] = 0.0;
+      }
+      /*Only backprop the currently active nodes*/
+      bp_size = calc_clockwork_size(net, clock);
 #if VECTOR
-        v4ss *restrict vh_error = (v4ss*)h_error;
-        v4ss ve = {0, 0, 0, 0};
-        v4ss inv = {inputs[y], inputs[y], inputs[y], inputs[y]};
-        v4ss *restrict vd = (v4ss*)delta_row;
-        v4ss *restrict vw = (v4ss*)w_row;
-        for (x = 0; x < vhsize; x++){
-          v4ss vex = vh_error[x];
-          vd[x] += vex * inv;
-          ve += vw[x] * vex;
-        }
-        e = ve[0] + ve[1] + ve[2] + ve[3];
-#else
-        e = 0.0f;
-        for (x = 0; x < net->h_size; x++){
-          float ex = h_error[x];
-          delta_row[x] += ex * inputs[y];
-          e += w_row[x] * ex;
-        }
+      int vbp_size = bp_size / 4;
+      v4ss *restrict vh_error = (v4ss*)h_error;
 #endif
-        i_error[y] = e;
-        error_sum += e * e;
+      for (y = 0; y < net->i_size; y++){
+        if (inputs[y] != 0.0f){
+          float e;
+          const float *restrict w_row = weights + y * net->h_size;
+          float *restrict delta_row = ih_delta + y * net->h_size;
+          ASSUME_ALIGNED(w_row);
+          ASSUME_ALIGNED(delta_row);
+#if VECTOR
+          v4ss ve = {0, 0, 0, 0};
+          v4ss inv = {inputs[y], inputs[y], inputs[y], inputs[y]};
+          v4ss *restrict vd = (v4ss*)delta_row;
+          v4ss *restrict vw = (v4ss*)w_row;
+          for (x = 0; x < vbp_size; x++){
+            v4ss vex = vh_error[x];
+            vd[x] += vex * inv;
+            ve += vw[x] * vex;
+          }
+          e = ve[0] + ve[1] + ve[2] + ve[3];
+#else
+          e = 0.0f;
+          for (x = 0; x < bp_size; x++){
+            float ex = h_error[x];
+            delta_row[x] += ex * inputs[y];
+            e += w_row[x] * ex;
+          }
+#endif
+          i_error[y] = e;
+          error_sum += e * e;
+        }
+        else {
+          i_error[y] = 0;
+        }
       }
-      else {
-        i_error[y] = 0;
+      if (cumulative_input_error){
+        float *input_error = i_error + INPUT_OFFSET(net);
+        for (y = 0; y < net->input_size; y++){
+          cumulative_input_error[y] += input_error[y];
+        }
       }
-    }
-    if (cumulative_input_error){
-      float *input_error = i_error + INPUT_OFFSET(net);
-      for (y = 0; y < net->input_size; y++){
-        cumulative_input_error[y] += input_error[y];
+#if VECTOR
+      v4ss *restrict vi_error = (v4ss*)i_error;
+      for (x = vbp_size; x < vhsize; x++){
+        vi_error[x] += vh_error[x];
       }
-    }
-    float *tmp = h_error;
-    h_error = i_error;
-    i_error = tmp;
-    if (error_sum <= min_error_sum || error_sum > max_error_sum){
-      break;
+#else
+      for (x = bp_size; x < net->h_size; x++){
+        i_error[x] += h_error[x];
+      }
+#endif
+      float *tmp = h_error;
+      h_error = i_error;
+      i_error = tmp;
+      if (error_sum <= min_error_sum || error_sum > max_error_sum){
+        break;
+      }
     }
   }
+  else {/* no clockwork */
+    int offset = bptt->index;
+    for (t = bptt->depth; t > 0; t--, offset += offset ? -1 : bptt->depth - 1){
+      error_sum = 0.0f;
+      const float *restrict inputs = bptt->history + offset * net->i_size;
+      ASSUME_ALIGNED(inputs);
+      h_error[0] = 0.0;
+      for (int i = INPUT_OFFSET(net); i < net->h_size; i++){
+        h_error[i] = 0.0;
+      }
+      for (y = 0; y < net->i_size; y++){
+        if (inputs[y] != 0.0f){
+          float e;
+          const float *restrict w_row = weights + y * net->h_size;
+          float *restrict delta_row = ih_delta + y * net->h_size;
+          ASSUME_ALIGNED(w_row);
+          ASSUME_ALIGNED(delta_row);
+#if VECTOR
+          v4ss *restrict vh_error = (v4ss*)h_error;
+          v4ss ve = {0, 0, 0, 0};
+          v4ss inv = {inputs[y], inputs[y], inputs[y], inputs[y]};
+          v4ss *restrict vd = (v4ss*)delta_row;
+          v4ss *restrict vw = (v4ss*)w_row;
+          for (x = 0; x < vhsize; x++){
+            v4ss vex = vh_error[x];
+            vd[x] += vex * inv;
+            ve += vw[x] * vex;
+          }
+          e = ve[0] + ve[1] + ve[2] + ve[3];
+#else
+          e = 0.0f;
+          for (x = 0; x < net->h_size; x++){
+            float ex = h_error[x];
+            delta_row[x] += ex * inputs[y];
+            e += w_row[x] * ex;
+          }
+#endif
+          i_error[y] = e;
+          error_sum += e * e;
+        }
+        else {
+          i_error[y] = 0;
+        }
+      }
+      if (cumulative_input_error){
+        float *input_error = i_error + INPUT_OFFSET(net);
+        for (y = 0; y < net->input_size; y++){
+          cumulative_input_error[y] += input_error[y];
+        }
+      }
+      float *tmp = h_error;
+      h_error = i_error;
+      i_error = tmp;
+      if (error_sum <= min_error_sum || error_sum > max_error_sum){
+        break;
+      }
+    }
+  }
+
 
   if (error_sum > max_error_sum){
     bptt->ih_scale = soft_clip(error_sum, max_error_sum);
