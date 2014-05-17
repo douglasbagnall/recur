@@ -22,6 +22,8 @@ Because of ccan/opt, --help will tell you something.
 #include <fenv.h>
 #include <ctype.h>
 
+#define PGM_DUMP_STRING "ihw how"
+
 #define DICKENS_SHUFFLED_TEXT TEST_DATA_DIR "/dickens-shuffled.txt"
 #define DICKENS_TEXT TEST_DATA_DIR "/dickens.txt"
 #define EREWHON_TEXT TEST_DATA_DIR "/erewhon.txt"
@@ -736,7 +738,7 @@ epoch(RecurNN **nets, int n_nets, RecurNN *confab_net, Ventropy *v,
         rnn_save_net(net, opt_filename, 1);
       }
       if (opt_periodic_pgm_dump){
-        rnn_multi_pgm_dump(net, "ihw how ihd ihm hom", opt_basename);
+        rnn_multi_pgm_dump(net, PGM_DUMP_STRING, opt_basename);
       }
       schedule->eval(schedule, net, ventropy, opt_quiet < 2);
     }
@@ -869,7 +871,7 @@ load_or_create_net(void){
     initialise_net(net);
     net->bptt->momentum_weight = opt_momentum_weight;
     if (opt_periodic_pgm_dump){
-      rnn_multi_pgm_dump(net, "ihw how", opt_basename);
+      rnn_multi_pgm_dump(net, PGM_DUMP_STRING, opt_basename);
     }
   }
   else if (opt_override){
