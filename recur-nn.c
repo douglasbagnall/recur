@@ -278,7 +278,7 @@ bptt_and_accumulate_error(RecurNN *net, float *restrict ih_delta,
   int t;
 
   if (net->clockwork_cycles){
-    int clock = net->clock;
+    int clock = net->clock - 1;
     /*Some of i_error might need to be zero to accumulate slower cycles.
       Blank only as much as necessary*/
     int bp_size = calc_clockwork_size(net, clock);
