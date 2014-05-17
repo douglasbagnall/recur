@@ -499,7 +499,7 @@ randomise_array_flat(rand_ctx *rng, float *array,
   }
 }
 
-void
+static void
 randomise_weights_flat(RecurNN *net, float variance,
     rnn_init_distribution shape, double perforation){
   memset(net->ih_weights, 0, net->ih_size * sizeof(float));
@@ -545,7 +545,7 @@ randomise_array_fan_in(rand_ctx *rng, float *weights, int width, int height, int
   }
 }
 
-void
+static void
 randomise_weights_fan_in(RecurNN *net, float sum, float kurtosis,
     float margin, float inputs_weight_ratio){
   memset(net->ih_weights, 0, net->ih_size * sizeof(float));
