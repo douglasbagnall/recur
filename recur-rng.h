@@ -101,11 +101,15 @@ rand_small_int(rand_ctx *rng, int cap){
 #define RECIP31f 4.656612873077393e-10f
 #define RECIP62f 2.168404344971009e-19f
 
-
+/*Generate two standard normal numbers using what Wikipedia calls the
+  "Marsaglia polar method", using fixed point arithmetic. It turns out this is
+  slightly slower than using floating point, though it is possibly more
+  precise (because all 64 random bits are used).
+*/
 static inline void
 doublecheap_gaussian_noise_f(rand_ctx *ctx,
     float *restrict a, float *restrict b,
-    const float variance){
+    const float deviation){
   u64 r;
   s64 x, y;
   union {
@@ -122,15 +126,17 @@ doublecheap_gaussian_noise_f(rand_ctx *ctx,
       break;
   }
   float s = (float)r * RECIP62f;
-  float m = sqrtf(-2.0f * logf(s) / s) * RECIP31f * variance;
+  float m = sqrtf(-2.0f * logf(s) / s) * RECIP31f * deviation;
   *a = x * m;
   *b = y * m;
 }
 
-
+/*Generate two standard normal numbers using what Wikipedia calls the
+  "Marsaglia polar method", using floating point arithmetic.
+*/
 static inline void
 doublecheap2_gaussian_noise_f(rand_ctx *ctx, float *restrict a,
-    float *restrict b, const float variance){
+    float *restrict b, const float deviation){
   float s;
   union {
     float s[2];
@@ -149,10 +155,21 @@ doublecheap2_gaussian_noise_f(rand_ctx *ctx, float *restrict a,
     if (s < 1.0f && s != 0.0f)
       break;
   }
-  float m = sqrtf(-2.0f * logf(s) / s) * variance;
+  float m = sqrtf(-2.0f * logf(s) / s) * deviation;
   *a = c * m;
   *b = d * m;
 }
+
+
+/*cheap_gaussian_noise is actually an Irwin-Hall distribution (i.e. a
+  central-limit-theorem based discrete approximation of the standard normal).
+
+  It has low precision -- roughly 19 bits -- and hard limits at +/- 6 standard
+  deviations. In practice this is barely worse than the 32 bit float methods
+  (which are theoretically contrained at 6.6 bits), while being substantially
+  quicker and easier to use because it generates and returns one sample at a
+  time.
+*/
 
 static inline float
 cheap_gaussian_noise(rand_ctx *ctx){

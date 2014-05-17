@@ -22,56 +22,62 @@ scale_and_confine(float f, float scale, int centre, int min, int max){
 
 #define ITERATIONS 100000000
 
-#define time_fn(x) sum_a = sum_b = 0.0;                    \
-  START_TIMER(time_ ## x)                                  \
-  for (i = 0; i < ITERATIONS; i++){                        \
-    x(rng, &a, &b, 0.1f);                                  \
-    sum_a += a;                                            \
-    sum_b += b;                                                  \
-  }                                                              \
-  DEBUG_TIMER(time_ ## x);                                       \
-  DEBUG("(%d iterations) %f %f", ITERATIONS, sum_a, sum_b);
+void time_fn(rand_ctx *rng, void (*fn)(rand_ctx *, float *, float *, float),
+    const char *name){
+  float var_a = 0;
+  float var_b = 0;
+  float mean_a = 0;
+  float mean_b = 0;
+  float a, b, d;
+  START_TIMER(fn);
+  for (int i = 1; i <= ITERATIONS; i++){
+    fn(rng, &a, &b, 1e-7f);
+    d = a - mean_a;
+    mean_a += d / i;
+    var_a += d * (a - mean_a);
 
+    d = b - mean_b;
+    mean_b += d / i;
+    var_b += d * (b - mean_a);
+  }
+  var_a /= ITERATIONS;
+  var_b /= ITERATIONS;
+  DEBUG("%s %d iterations", name, ITERATIONS);
+  DEBUG_TIMER(fn);
+  DEBUG("mean   a %4e b %4e", mean_a, mean_b);
+  DEBUG("stddev a %4e b %4e", sqrtf(var_a), sqrtf(var_b));
+  //DEBUG("sum    a %4e b %4e", sum_a, sum_b);
+}
 
-static inline void
+static void
 singlecheap(rand_ctx *rng, float *restrict a,
-    float *restrict b, const float variance){
-  *a = cheap_gaussian_noise(rng) * variance;
-  *b = cheap_gaussian_noise(rng) * variance;
+    float *restrict b, const float deviation){
+  *a = cheap_gaussian_noise(rng) * deviation;
+  *b = cheap_gaussian_noise(rng) * deviation;
 }
 
 void test_gauss2(rand_ctx *rng){
-  int i;
-  float a, b;
-  float sum_a, sum_b;
-  time_fn(doublecheap_gaussian_noise_f);
-  //time_fn(doublecheap_gaussian_noise);
-  time_fn(doublecheap2_gaussian_noise_f);
-  //time_fn(doublecheap2_gaussian_noise);
-  //time_fn(doublecheap3_gaussian_noise_f);
-  //time_fn(doublecheap3_gaussian_noise);
-  time_fn(singlecheap);
+  time_fn(rng, doublecheap_gaussian_noise_f, "doublecheap");
+  time_fn(rng, doublecheap2_gaussian_noise_f, "doublecheap2");
+  time_fn(rng, singlecheap, "singlecheap");
 }
 
 
-
 void
-test_gauss(rand_ctx *rng, int res, int samples){
+test_gauss(rand_ctx *rng, int res, int samples,
+    void (*fn)(rand_ctx *, float *, float *, float),
+    char *filename){
   int i, x, y;
   float a, b;
   int len = res * 8;
   float zero = res * 4;
   int bins[len];
   memset(bins, 0, sizeof(bins));
-  START_TIMER(t);
   for (i = 0; i < samples / 2; i++){
-    doublecheap2_gaussian_noise_f(rng, &a, &b, 1.0f);
-    //a = cheap_gaussian_noise(rng);
-    //b = cheap_gaussian_noise(rng);
+    fn(rng, &a, &b, 0.8f);
     bins[scale_and_confine(a, res, zero, 0, len - 1)]++;
     bins[scale_and_confine(b, res, zero, 0, len - 1)]++;
   }
-  DEBUG_TIMER(t);
 
   int max = 0;
   for (i = 0; i < len; i++){
@@ -93,7 +99,7 @@ test_gauss(rand_ctx *rng, int res, int samples){
   }
 #endif
 
-  pgm_dump(plot, len, max, "gaussian.pgm");
+  pgm_dump(plot, len, max, filename);
   free(plot);
 }
 
@@ -103,5 +109,10 @@ main(void){
   rand_ctx rng;
   init_rand64(&rng, 12345);
   test_gauss2(&rng);
-  //test_gauss(&rng, PLOT_RESOLUTION, GAUSSIAN_SAMPLES);
+  test_gauss(&rng, PLOT_RESOLUTION, GAUSSIAN_SAMPLES, doublecheap_gaussian_noise_f,
+      "doublecheap.pgm");
+  test_gauss(&rng, PLOT_RESOLUTION, GAUSSIAN_SAMPLES, doublecheap2_gaussian_noise_f,
+      "doublecheap2.pgm");
+  test_gauss(&rng, PLOT_RESOLUTION, GAUSSIAN_SAMPLES, singlecheap,
+      "singlecheap.pgm");
 }
