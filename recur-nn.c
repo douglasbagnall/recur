@@ -454,11 +454,16 @@ bptt_and_accumulate_error(RecurNN *net, float *restrict ih_delta,
     if (net->flags & RNN_NET_FLAG_LOG_HIDDEN_SUM){
       float hidden_sum = 0;
       int hidden_zeros = 0;
+      float hidden_magnitude = 0;
+      float *restrict hiddens = net->hidden_layer;
       for (int i = 0; i < net->h_size; i++){
-        hidden_sum += net->hidden_layer[i];
-        hidden_zeros += (net->hidden_layer[i] == 0.0f);
+        float h = hiddens[i];
+        hidden_sum += h;
+        hidden_magnitude += h * h;
+        hidden_zeros += (h == 0.0f);
       }
       rnn_log_float(net, "hidden_sum", hidden_sum);
+      rnn_log_float(net, "hidden_magnitude", sqrtf(hidden_magnitude));
       rnn_log_float(net, "hidden_zeros", hidden_zeros / (float)net->hidden_size);
     }
     if (net->flags & RNN_NET_FLAG_LOG_WEIGHT_SUM){
