@@ -649,7 +649,7 @@ report_on_progress(RecurNN *net, RecurNN *confab_net, float ventropy,
         *entropy, ventropy,
         (int)(accuracy * 100 + 0.5), per_sec + 0.5, confab);
   }
-  rnn_log_float(net, "error", *error);
+  rnn_log_float(net, "t_error", *error);
   rnn_log_float(net, "t_entropy", *entropy);
   rnn_log_float(net, "v_entropy", ventropy);
   rnn_log_float(net, "momentum", net->bptt->momentum);
