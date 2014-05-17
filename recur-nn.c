@@ -118,11 +118,12 @@ calc_clockwork_size(RecurNN *net, uint t){
 }
 
 float *
-rnn_opinion(RecurNN *net, const float *inputs, float dropout){
+rnn_opinion(RecurNN *net, const float *restrict inputs, float dropout){
   /*If inputs is NULL, assume the inputs have already been set. If dropout is
     non-zero, dropout that many recurrent nodes. If there is a bottom layer,
     it is not dropped out.*/
-
+  float *restrict hiddens = net->hidden_layer;
+  ASSUME_ALIGNED(hiddens);
   if (net->bottom_layer){
     /*possible bottom layer */
     RecurExtraLayer *layer = net->bottom_layer;
@@ -139,15 +140,14 @@ rnn_opinion(RecurNN *net, const float *inputs, float dropout){
   }
 
   /*copy in hiddens */
-  memcpy(net->input_layer, net->hidden_layer,
-      INPUT_OFFSET(net) * sizeof(float));
+  memcpy(net->input_layer, hiddens, INPUT_OFFSET(net) * sizeof(float));
 
   /* possibly dropout */
   if (dropout){
     dropout_array(net->input_layer + 1, net->hidden_size, dropout, &net->rng);
   }
 
-  /*bias, possibly unnecessary */
+  /*bias, possibly unnecessary becuae it may not get overwritten */
   net->input_layer[0] = 1.0f;
 
   /* in emergencies, clamp the scale of the input vector */
@@ -160,34 +160,27 @@ rnn_opinion(RecurNN *net, const float *inputs, float dropout){
   net->clock++;
 
   calculate_interlayer(net->input_layer, net->i_size,
-      net->hidden_layer, net->h_size, target_h_size, net->ih_weights);
-
-  ASSUME_ALIGNED(net->hidden_layer);
+      hiddens, net->h_size, target_h_size, net->ih_weights);
 
   if (dropout){
     float s = net->hidden_size + 1 + net->input_size;
     float dropout_scale = s / (s - net->hidden_size * dropout);
-    for (int i = 0; i < net->h_size; i++){
-      float h = net->hidden_layer[i] - RNN_HIDDEN_PENALTY;
-      net->hidden_layer[i] = (h > 0.0f) ? h * dropout_scale : 0.0f;
+    for (int i = 1; i < net->h_size; i++){
+      float h = hiddens[i] - RNN_HIDDEN_PENALTY;
+      hiddens[i] = (h > 0.0f) ? h * dropout_scale : 0.0f;
     }
   }
   else {
-    for (int i = 0; i < net->h_size; i++){
-      float h = net->hidden_layer[i] - RNN_HIDDEN_PENALTY;
-      net->hidden_layer[i] = (h > 0.0f) ? h : 0.0f;
+    for (int i = 1; i < net->h_size; i++){
+      float h = hiddens[i] - RNN_HIDDEN_PENALTY;
+      hiddens[i] = (h > 0.0f) ? h : 0.0f;
     }
   }
 
   maybe_scale_hiddens(net);
-  net->hidden_layer[0] = 1.0f;
+  hiddens[0] = 1.0f;
 
-  /*wipe any left over inputs from the previous generation (up to 3, depending
-    on alignment) */
-  for (int i = INPUT_OFFSET(net); i < net->h_size; i++){
-    net->hidden_layer[i] = 0;
-  }
-  calculate_interlayer(net->hidden_layer, net->h_size,
+  calculate_interlayer(hiddens, net->h_size,
       net->output_layer, net->o_size, net->o_size, net->ho_weights);
 
   return net->output_layer;
