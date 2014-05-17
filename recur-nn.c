@@ -34,13 +34,14 @@ calculate_interlayer(const float *restrict inputs,
   ASSUME_ALIGNED(outputs);
   ASSUME_ALIGNED(weights);
   int x, y;
-  memset(outputs, 0, output_size * sizeof(float));
+  zero_aligned_array(outputs, output_size);
   for (y = 0; y < input_size; y++){
-    if (inputs[y]){
+    float input = inputs[y];
+    if (input){
       const float *row = weights + output_stride * y;
       ASSUME_ALIGNED(row);
       for (x = 0; x < output_size; x++){
-        outputs[x] += inputs[y] * row[x];
+        outputs[x] += input * row[x];
       }
     }
   }
