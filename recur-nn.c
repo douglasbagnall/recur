@@ -927,8 +927,11 @@ rnn_scale_initial_weights(RecurNN *net, float target_gain){
   float layer_in[h_size];
   float layer_out[h_size];
   int i;
-
-  for (float j = 2; j < 10000; j++){
+  double net_adjustment = 1.0;
+  double tail_in = 0;
+  double tail_out = 0;
+  const double generations = 10000;
+  for (double j = 1; j < generations; j++){
     float sum_out;
     float sum_in = 1;
     layer_in[0] = 1;
@@ -955,11 +958,17 @@ rnn_scale_initial_weights(RecurNN *net, float target_gain){
       layer_out[i] = h;
       sum_out += h * h;
     }
-    float ratio = sum_out / sum_in;
-    float adj = (target_gain + j) / (ratio + j);
+    double ratio = sum_out / sum_in;
+    double adj = (target_gain * 10 + j) / (ratio * 10 + j);
+    net_adjustment *= adj;
     scale_aligned_array(net->ih_weights, net->ih_size, adj);
-    MAYBE_DEBUG("j %f sum in %.2f out %.2f, ratio %.2f adj %.2f", j,
-        sum_in, sum_out, ratio, adj);
+    MAYBE_DEBUG("j %f sum in %.2f out %.2f, ratio %.2f adj %.2f net adj %.2f",
+        j, sum_in, sum_out, ratio, adj, net_adjustment);
+    if (j > generations * 0.95){
+      tail_in += sum_in;
+      tail_out += sum_out;
+    }
   }
-  DEBUG("scaled toward target gain %f", target_gain);
+  DEBUG("scaled toward target gain %.3f; hit roughly %.3f; adjusted by %.3f",
+      target_gain, tail_out / tail_in, net_adjustment);
 }
