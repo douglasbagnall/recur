@@ -791,7 +791,24 @@ load_metadata(const char *metadata, struct ClassifyMetadata *m){
 static void
 setup_audio(GstClassify *self, int window_size, int mfccs, float min_freq,
     float max_freq, float knee_freq, float focus_freq, int delta_features,
-    int intensity_feature, float lag){
+    int intensity_feature, float lag, float confirmation_lag){
+  /*List arguments to help make sure they have been passed in in the right
+    order!*/
+  STDERR_DEBUG("setting up audio thus:\n"
+      "window_size %d\n"
+      "mfccs %d\n"
+      "min_freq %f\n"
+      "max_freq %f\n"
+      "knee_freq %f\n"
+      "focus_freq %f\n"
+      "delta_features %d\n"
+      "intensity_feature %d\n"
+      "lag %f\n"
+      "confirmation_lag %f\n",
+      window_size, mfccs, min_freq,
+      max_freq, knee_freq, focus_freq, delta_features,
+      intensity_feature, lag, confirmation_lag);
+
   self->mfcc_factory = recur_audio_binner_new(window_size,
       RECUR_WINDOW_HANN,
       CLASSIFY_N_FFT_BINS,
@@ -804,6 +821,7 @@ setup_audio(GstClassify *self, int window_size, int mfccs, float min_freq,
   self->delta_features = delta_features;
   self->intensity_feature = intensity_feature ? 1 : 0;
   self->lag = lag;
+  self->confirmation_lag = confirmation_lag;
   GST_LOG("mfccs: %d", mfccs);
   self->mfccs = mfccs;
 }
@@ -846,7 +864,7 @@ load_specified_net(GstClassify *self, const char *filename){
   self->basename = strdup(m.basename);
   setup_audio(self, m.window_size, m.mfccs, m.min_freq,
       m.max_freq, m.knee_freq, m.focus_freq, m.delta_features,
-      m.intensity_feature, m.lag);
+      m.intensity_feature, m.lag, m.confirmation_lag);
   self->net = net;
   return net;
 }
@@ -1017,8 +1035,9 @@ load_or_create_net_and_audio(GstClassify *self)
       PP_GET_FLOAT(self, PROP_KNEE_FREQUENCY, DEFAULT_KNEE_FREQUENCY),
       PP_GET_FLOAT(self, PROP_FOCUS_FREQUENCY, DEFAULT_FOCUS_FREQUENCY),
       PP_GET_INT(self, PROP_DELTA_FEATURES, DEFAULT_PROP_DELTA_FEATURES),
+      PP_GET_BOOLEAN(self, PROP_INTENSITY_FEATURE, DEFAULT_PROP_INTENSITY_FEATURE),
       PP_GET_FLOAT(self, PROP_LAG, DEFAULT_PROP_LAG),
-      PP_GET_BOOLEAN(self, PROP_INTENSITY_FEATURE, DEFAULT_PROP_INTENSITY_FEATURE)
+      PP_GET_FLOAT(self, PROP_CONFIRMATION_LAG, DEFAULT_PROP_CONFIRMATION_LAG)
   );
   self->net = load_or_create_net(self);
 
