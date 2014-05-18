@@ -292,6 +292,7 @@ void rnn_perforate_weights(RecurNN *net, float p);
 
 void rnn_apply_extra_layer_learning(RecurExtraLayer *layer);
 
+void rnn_weight_noise(RecurNN *net, float deviation);
 
 
 static inline void

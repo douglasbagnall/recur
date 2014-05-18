@@ -81,6 +81,7 @@ Because of ccan/opt, --help will tell you something.
 #define DEFAULT_BOTTOM_LAYER 0
 #define DEFAULT_TOP_LEARN_RATE_SCALE 1.0f
 #define DEFAULT_BOTTOM_LEARN_RATE_SCALE 1.0f
+#define DEFAULT_PERIODIC_WEIGHT_NOISE 0
 
 
 #define BELOW_QUIET_LEVEL(quiet) if (opt_quiet < quiet)
@@ -150,7 +151,7 @@ static uint opt_confab_only = DEFAULT_CONFAB_ONLY;
 static uint opt_bottom_layer = DEFAULT_BOTTOM_LAYER;
 static float opt_top_learn_rate_scale = DEFAULT_TOP_LEARN_RATE_SCALE;
 static float opt_bottom_learn_rate_scale = DEFAULT_BOTTOM_LEARN_RATE_SCALE;
-
+static float opt_periodic_weight_noise = DEFAULT_PERIODIC_WEIGHT_NOISE;
 
 /* Following ccan/opt/helpers.c opt_set_longval, etc */
 static char *
@@ -301,6 +302,8 @@ static struct opt_table options[] = {
       &opt_bottom_learn_rate_scale, "bottom layer learn rate (relative)"),
   OPT_WITH_ARG("--clockwork=<n>", opt_set_uintval, opt_show_uintval,
       &opt_clockwork, "number of clock rates (>1 for clockwork RNN)"),
+  OPT_WITH_ARG("--periodic-weight-noise=<stddev>", opt_set_floatval, opt_show_floatval,
+      &opt_periodic_weight_noise, "periodically add this much gaussian noise to weights"),
 
   OPT_WITHOUT_ARG("-h|--help", opt_usage_and_exit,
       ": Rnn modelling of text at the character level",
@@ -744,6 +747,9 @@ epoch(RecurNN **nets, int n_nets, RecurNN *confab_net, Ventropy *v,
     }
     if (opt_stop && (int)net->generation >= opt_stop){
       finish(net, v);
+    }
+    if (opt_periodic_weight_noise){
+      rnn_weight_noise(net, opt_periodic_weight_noise);
     }
   }
   BELOW_QUIET_LEVEL(1){

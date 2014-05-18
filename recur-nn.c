@@ -748,6 +748,37 @@ rnn_condition_net(RecurNN *net)
   }
 }
 
+static inline void
+weight_noise(rand_ctx *rng, float *weights, int width, int stride, int height,
+    float deviation){
+  for (int y = 0; y < height; y++){
+    float *row = weights + y * stride;
+    for (int x = 0; x < width; x++){
+      float noise = cheap_gaussian_noise(rng) * deviation;
+      row[x] += noise;
+    }
+  }
+}
+
+void
+rnn_weight_noise(RecurNN *net, float deviation){
+
+  weight_noise(&net->rng, net->ih_weights + 1, net->hidden_size,
+      net->h_size, net->hidden_size + 1 + net->input_size,
+      deviation);
+
+  weight_noise(&net->rng, net->ho_weights, net->output_size,
+      net->o_size, net->hidden_size + 1,
+      deviation);
+
+  if (net->bottom_layer){
+    RecurExtraLayer *bl = net->bottom_layer;
+    weight_noise(&net->rng, bl->weights + 1, bl->input_size,
+        bl->i_size, bl->output_size,
+        deviation);
+  }
+}
+
 /*duplicates calculations already done elsewhere, but when the net is used in
   parallel, it would be messy to log every use. */
 void rnn_log_net(RecurNN *net)
