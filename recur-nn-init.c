@@ -692,33 +692,6 @@ void rnn_perforate_weights(RecurNN *net, float p){
   dropout_array(net->ho_weights, net->ho_size, p, &net->rng);
 }
 
-
-
-
-/*rnn_scale_initial_weights() tries to scale the weights to give approximately
-  the right gain */
-
-void
-rnn_scale_initial_weights(RecurNN *net, float factor){
-  float ih_sum = abs_sum_aligned_array(net->ih_weights, net->ih_size);
-  float ho_sum = abs_sum_aligned_array(net->ho_weights, net->ho_size);
-
-  factor *= (net->i_size + net->h_size + net->o_size);
-  float ih_ratio = sqrtf(factor * (net->h_size * net->i_size)) / ih_sum;
-  float ho_ratio = sqrtf(factor * (net->h_size * net->o_size)) / ho_sum;
-
-  scale_aligned_array(net->ih_weights, net->ih_size, ih_ratio);
-  scale_aligned_array(net->ho_weights, net->ho_size, ho_ratio);
-
-  DEBUG("ih sum was %.1f, now %.1f; ratio %.2g",
-      ih_sum, abs_sum_aligned_array(net->ih_weights, net->ih_size),
-      ih_ratio);
-
-  DEBUG("ho sum was %.1f, now %.1f; ratio %.2g",
-      ho_sum, abs_sum_aligned_array(net->ho_weights, net->ho_size),
-      ho_ratio);
-}
-
 void
 rnn_multi_pgm_dump(RecurNN *net, const char *dumpees, const char *basename){
   RecurNNBPTT *bptt = net->bptt;

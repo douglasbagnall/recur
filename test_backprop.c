@@ -83,7 +83,6 @@ Because of ccan/opt, --help will tell you something.
 #define DEFAULT_BOTTOM_LEARN_RATE_SCALE 1.0f
 #define DEFAULT_PERIODIC_WEIGHT_NOISE 0
 
-
 #define BELOW_QUIET_LEVEL(quiet) if (opt_quiet < quiet)
 
 #define Q_DEBUG(quiet, ...) do {                               \
@@ -289,7 +288,7 @@ static struct opt_table options[] = {
   OPT_WITH_ARG("--momentum-style=<n>", opt_set_intval, opt_show_intval,
       &opt_momentum_style, "0: weighted, 1: Nesterov, 2: simplified N., 3: classical"),
   OPT_WITH_ARG("--weight-scale-factor=<float>", opt_set_floatval, opt_show_floatval,
-      &opt_weight_scale_factor, "scale newly initialised weights (try ~0.5)"),
+      &opt_weight_scale_factor, "scale newly initialised weights (try ~1.0)"),
   OPT_WITH_ARG("--report-interval=<n>", opt_set_uintval_bi, opt_show_uintval_bi,
       &opt_report_interval, "how often to validate and report"),
   OPT_WITH_ARG("--confab-only=<chars>", opt_set_uintval, opt_show_uintval,

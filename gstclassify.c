@@ -60,6 +60,7 @@ enum
   PROP_GENERATION,
   PROP_CLOCKWORK,
   PROP_WEIGHT_NOISE,
+  PROP_WEIGHT_INIT_SCALE,
   PROP_LOAD_NET_NOW,
 
   PROP_LAST
@@ -87,6 +88,7 @@ enum
 #define MAXIMUM_AUDIO_FREQUENCY (CLASSIFY_RATE * 0.5)
 #define DEFAULT_PROP_CLOCKWORK 0
 #define DEFAULT_PROP_WEIGHT_NOISE 0.0f
+#define DEFAULT_PROP_WEIGHT_INIT_SCALE 0.0f
 #define DEFAULT_PROP_GENERATION 0
 
 #define DEFAULT_PROP_CLASSES "01"
@@ -562,6 +564,13 @@ gst_classify_class_init (GstClassifyClass * klass)
           DEFAULT_PROP_WEIGHT_NOISE,
           G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
+  g_object_class_install_property (gobject_class, PROP_WEIGHT_INIT_SCALE,
+      g_param_spec_float("weight-init-scale", "weight-init-scale",
+          "Scale recurrent weights to approximately this gain (0: no scaling)",
+          0, G_MAXFLOAT,
+          DEFAULT_PROP_WEIGHT_INIT_SCALE,
+          G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
+
   g_object_class_install_property (gobject_class, PROP_GENERATION,
       g_param_spec_uint("generation", "generation",
           "Read the net's training generation",
@@ -871,6 +880,8 @@ create_net(GstClassify *self, int bottom_layer_size,
       DEFAULT_TOP_LEARN_RATE_SCALE);
   u64 rng_seed = get_gvalue_u64(PENDING_PROP(self, PROP_RNG_SEED), DEFAULT_RNG_SEED);
   GST_DEBUG("rng seed %lu", rng_seed);
+  float weight_init_scale = PP_GET_FLOAT(self, PROP_WEIGHT_INIT_SCALE,
+    DEFAULT_PROP_WEIGHT_INIT_SCALE);
 
   int lawnmower = PP_GET_BOOLEAN(self, PROP_LAWN_MOWER, DEFAULT_PROP_LAWN_MOWER);
   if (lawnmower){
@@ -885,6 +896,9 @@ create_net(GstClassify *self, int bottom_layer_size,
 
   initialise_net(self, net);
 
+  if (weight_init_scale){
+    rnn_scale_initial_weights(net, weight_init_scale);
+  }
   net->bptt->ho_scale = top_learn_rate_scale;
   if (net->bottom_layer){
     net->bottom_layer->learn_rate_scale = bottom_learn_rate_scale;
@@ -1496,6 +1510,7 @@ gst_classify_set_property (GObject * object, guint prop_id, const GValue * value
     case PROP_INTENSITY_FEATURE:
     case PROP_MFCCS:
     case PROP_CLOCKWORK:
+    case PROP_WEIGHT_INIT_SCALE:
       if (self->net == NULL){
         copy_gvalue(PENDING_PROP(self, prop_id), value);
       }

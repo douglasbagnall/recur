@@ -914,3 +914,51 @@ rnn_bptt_calculate(RecurNN *net, uint batch_size){
   }
   rnn_condition_net(net);
 }
+
+
+
+
+/*rnn_scale_initial_weights() tries to scale the weights to give approximately
+  the right gain */
+
+void
+rnn_scale_initial_weights(RecurNN *net, float factor){
+  int h_size = net->h_size;
+  float layer_in[h_size];
+  float layer_out[h_size];
+  int i;
+
+  for (float j = 2; j < 10000; j++){
+    float sum_out;
+    float sum_in = 1;
+    layer_in[0] = 1;
+    for (i = 1; i < net->hidden_size; i++){
+      float n = MAX(cheap_gaussian_noise(&net->rng), 0);
+      layer_in[i] = n;
+      sum_in += n * n;
+    }
+    for (i = net->hidden_size; i < h_size; i++){
+      layer_in[i] = 0;
+      layer_out[i] = 0;
+    }
+    calculate_interlayer(layer_in,
+        net->hidden_size + 1,
+        layer_out,
+        h_size,
+        h_size,
+        net->ih_weights);
+    layer_out[0] = 1.0f;
+    sum_out = 0;
+    for (i = 0; i < net->hidden_size; i++){
+      float h = layer_out[i];
+      h = (h > 0.0f) ? h : 0.0f;
+      layer_out[i] = h;
+      sum_out += h * h;
+    }
+    float ratio = sum_out / sum_in;
+    float adj = (factor + j) / (ratio + j);
+    scale_aligned_array(net->ih_weights, net->ih_size, adj);
+    MAYBE_DEBUG("j %f sum in %.2f out %.2f, ratio %.2f adj %.2f", j,
+        sum_in, sum_out, ratio, adj);
+  }
+}
