@@ -66,6 +66,7 @@ struct ClassifyMetadata {
   float focus_freq;
   float lag;
   int intensity_feature;
+  float confirmation_lag;
 };
 
 typedef struct _ClassifyClassEvent {
@@ -129,6 +130,7 @@ struct _GstClassify
   int delta_features;
   int intensity_feature;
   float lag;
+  float confirmation_lag;
   float weight_noise;
 };
 

@@ -61,6 +61,7 @@ enum
   PROP_CLOCKWORK,
   PROP_WEIGHT_NOISE,
   PROP_WEIGHT_INIT_SCALE,
+  PROP_CONFIRMATION_LAG,
   PROP_LOAD_NET_NOW,
 
   PROP_LAST
@@ -118,6 +119,7 @@ enum
 #define DEFAULT_PROP_WEIGHT_FAN_IN_SUM 0
 #define DEFAULT_PROP_WEIGHT_FAN_IN_KURTOSIS 0.3
 #define DEFAULT_PROP_LAG 0
+#define DEFAULT_PROP_CONFIRMATION_LAG 0
 #define PROP_LAG_MIN -1
 #define PROP_LAG_MAX 1000
 #define DEFAULT_PROP_IGNORE_START 0
@@ -401,6 +403,13 @@ gst_classify_class_init (GstClassifyClass * klass)
           "Add this many seconds onto all timings",
           PROP_LAG_MIN, PROP_LAG_MAX,
           DEFAULT_PROP_LAG,
+          G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
+
+  g_object_class_install_property (gobject_class, PROP_CONFIRMATION_LAG,
+      g_param_spec_float("confirmation-lag", "confirmation-lag",
+          "Confirmation classification after this many seconds",
+          PROP_LAG_MIN, PROP_LAG_MAX,
+          DEFAULT_PROP_CONFIRMATION_LAG,
           G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class, PROP_IGNORE_START,
@@ -696,7 +705,8 @@ static int parse_classes_string(GstClassify *self, const char *orig)
     PP_GET_INT(self, PROP_DELTA_FEATURES, DEFAULT_PROP_DELTA_FEATURES), \
     PP_GET_FLOAT(self, PROP_FOCUS_FREQUENCY, DEFAULT_FOCUS_FREQUENCY),  \
     PP_GET_FLOAT(self, PROP_LAG, DEFAULT_PROP_LAG),                     \
-    PP_GET_BOOLEAN(self, PROP_INTENSITY_FEATURE, DEFAULT_PROP_INTENSITY_FEATURE) \
+    PP_GET_BOOLEAN(self, PROP_INTENSITY_FEATURE, DEFAULT_PROP_INTENSITY_FEATURE), \
+    PP_GET_FLOAT(self, PROP_CONFIRMATION_LAG, DEFAULT_PROP_CONFIRMATION_LAG), \
     }
 
 static char*
@@ -718,6 +728,7 @@ construct_metadata(GstClassify *self, struct ClassifyMetadata *m){
       "focus-frequency %f\n"
       "lag %f\n"
       "intensity-feature %d\n"
+      "confirmation-lag %f\n"
       ,
       m->classes,
       m->min_freq,
@@ -729,7 +740,8 @@ construct_metadata(GstClassify *self, struct ClassifyMetadata *m){
       m->delta_features,
       m->focus_freq,
       m->lag,
-      m->intensity_feature
+      m->intensity_feature,
+      m->confirmation_lag
   );
   STDERR_DEBUG("%s", metadata);
   if (ret == -1){
@@ -762,11 +774,13 @@ load_metadata(const char *metadata, struct ClassifyMetadata *m){
       "focus-frequency %f "
       "lag %f "
       "intensity-feature %d"
+      "confirmation-lag %f"
   );
   int n = sscanf(metadata, template, &m->classes,
       &m->min_freq, &m->max_freq, &m->knee_freq,
       &m->mfccs, &m->window_size, &m->basename, &m->delta_features,
-      &m->focus_freq, &m->lag, &m->intensity_feature);
+      &m->focus_freq, &m->lag, &m->intensity_feature,
+      &m->confirmation_lag);
   if (n != 11){
     GST_WARNING("Found only %d/%d metadata items", n, 11);
     return 11 - n;
@@ -1492,6 +1506,7 @@ gst_classify_set_property (GObject * object, guint prop_id, const GValue * value
     case PROP_FORCE_LOAD:
     case PROP_BASENAME:
     case PROP_LAG:
+    case PROP_CONFIRMATION_LAG:
     case PROP_MIN_FREQUENCY:
     case PROP_KNEE_FREQUENCY:
     case PROP_FOCUS_FREQUENCY:
