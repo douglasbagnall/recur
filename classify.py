@@ -657,7 +657,7 @@ class Trainer(BaseClassifier):
             os.makedirs(dir)
 
         if os.path.exists(fn):
-            fn = f.replace('-gen', '-t%s-gen' % time.time())
+            fn = fn.replace('-gen', '-t%s-gen' % time.time())
 
         print "saving %s" % fn
         self.save_net(fn)
