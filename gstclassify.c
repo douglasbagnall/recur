@@ -558,7 +558,7 @@ gst_classify_class_init (GstClassifyClass * klass)
   g_object_class_install_property (gobject_class, PROP_WEIGHT_NOISE,
       g_param_spec_float("weight-noise", "weight-noise",
           "Std dev of noise added to weights before each training cycle",
-          G_MINFLOAT, G_MAXFLOAT,
+          -G_MAXFLOAT, G_MAXFLOAT,
           DEFAULT_PROP_WEIGHT_NOISE,
           G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
