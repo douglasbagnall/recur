@@ -129,6 +129,7 @@ struct _GstClassify
   int delta_features;
   int intensity_feature;
   float lag;
+  float weight_noise;
 };
 
 struct _GstClassifyClass

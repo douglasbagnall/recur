@@ -59,6 +59,7 @@ enum
   PROP_IGNORE_START,
   PROP_GENERATION,
   PROP_CLOCKWORK,
+  PROP_WEIGHT_NOISE,
   PROP_LOAD_NET_NOW,
 
   PROP_LAST
@@ -85,6 +86,7 @@ enum
 #define MINIMUM_AUDIO_FREQUENCY 0
 #define MAXIMUM_AUDIO_FREQUENCY (CLASSIFY_RATE * 0.5)
 #define DEFAULT_PROP_CLOCKWORK 0
+#define DEFAULT_PROP_WEIGHT_NOISE 0.0f
 #define DEFAULT_PROP_GENERATION 0
 
 #define DEFAULT_PROP_CLASSES "01"
@@ -553,6 +555,13 @@ gst_classify_class_init (GstClassifyClass * klass)
           DEFAULT_PROP_CLOCKWORK,
           G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
+  g_object_class_install_property (gobject_class, PROP_WEIGHT_NOISE,
+      g_param_spec_float("weight-noise", "weight-noise",
+          "Std dev of noise added to weights before each training cycle",
+          G_MINFLOAT, G_MAXFLOAT,
+          DEFAULT_PROP_WEIGHT_NOISE,
+          G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+
   g_object_class_install_property (gobject_class, PROP_GENERATION,
       g_param_spec_uint("generation", "generation",
           "Read the net's training generation",
@@ -579,6 +588,7 @@ gst_classify_init (GstClassify * self)
   self->class_events_index = 0;
   self->n_class_events = 0;
   self->momentum_soft_start = DEFAULT_PROP_MOMENTUM_SOFT_START;
+  self->weight_noise = DEFAULT_PROP_WEIGHT_NOISE;
   self->dropout = DEFAULT_PROP_DROPOUT;
   self->error_weight = NULL;
   self->ignored_windows = 0;
@@ -1070,6 +1080,14 @@ gst_classify_setup(GstAudioFilter *base, const GstAudioInfo *info){
     self->write_offset = 0;
     self->read_offset = 0;
   }
+  if (self->training && self->weight_noise){
+    float wn = self->weight_noise;
+    if (wn < 0){
+      wn *= -self->net->bptt->learn_rate;
+    }
+    rnn_weight_noise(self->net, wn);
+  }
+
   GST_DEBUG("finished setup()");
   return TRUE;
 }
@@ -1416,6 +1434,10 @@ gst_classify_set_property (GObject * object, guint prop_id, const GValue * value
       self->momentum_soft_start = g_value_get_float(value);
       break;
 
+    case PROP_WEIGHT_NOISE:
+      self->weight_noise = g_value_get_float(value);
+      break;
+
     case PROP_MOMENTUM_STYLE:
       self->momentum_style = g_value_get_int(value);
       break;
@@ -1576,6 +1598,9 @@ gst_classify_get_property (GObject * object, guint prop_id, GValue * value,
     break;
   case PROP_MOMENTUM_SOFT_START:
     g_value_set_float(value, self->momentum_soft_start);
+    break;
+  case PROP_WEIGHT_NOISE:
+    g_value_set_float(value, self->weight_noise);
     break;
   case PROP_MOMENTUM_STYLE:
     g_value_set_int(value, self->momentum_style);
