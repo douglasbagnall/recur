@@ -744,12 +744,12 @@ epoch(RecurNN **nets, int n_nets, RecurNN *confab_net, Ventropy *v,
         rnn_multi_pgm_dump(net, PGM_DUMP_STRING, opt_basename);
       }
       schedule->eval(schedule, net, ventropy, opt_quiet < 2);
+      if (opt_periodic_weight_noise){
+        rnn_weight_noise(net, opt_periodic_weight_noise);
+      }
     }
     if (opt_stop && (int)net->generation >= opt_stop){
       finish(net, v);
-    }
-    if (opt_periodic_weight_noise){
-      rnn_weight_noise(net, opt_periodic_weight_noise);
     }
   }
   BELOW_QUIET_LEVEL(1){
