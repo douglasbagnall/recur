@@ -43,7 +43,7 @@ XXX this really ought to be adjustable or adjust itself */
 #define HIDDEN_MEAN_SOFT_TOP 16.0f
 #define INPUT_MEAN_SOFT_TOP 4.0f
 
-#define RNN_INITIAL_WEIGHT_VARIANCE_FACTOR 10.0f
+#define RNN_INITIAL_WEIGHT_VARIANCE_FACTOR 5.0f
 #define WEIGHT_SCALE (1.0f - 1e-6f)
 
 /*RNN_CONDITIONING_INTERVAL should be <= 32, ideally a power of 2 */

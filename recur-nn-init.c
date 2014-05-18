@@ -651,7 +651,7 @@ rnn_init_default_weight_parameters(RecurNN *net,
 
     /*used when .method OR .submethod == RNN_INIT_FLAT */
     .flat_variance = RNN_INITIAL_WEIGHT_VARIANCE_FACTOR / net->h_size,
-    .flat_shape = RNN_INIT_DIST_SEMICIRCLE,
+    .flat_shape = RNN_INIT_DIST_UNIFORM,
     .flat_perforation = 0.7,
 
     /*RNN_INIT_RUNS */
