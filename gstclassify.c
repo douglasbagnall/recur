@@ -1096,7 +1096,8 @@ gst_classify_setup(GstAudioFilter *base, const GstAudioInfo *info){
   }
   const float ignore_start = PP_GET_FLOAT(self, PROP_IGNORE_START,
       DEFAULT_PROP_IGNORE_START);
-  self->ignored_windows = ignore_start * CLASSIFY_RATE * 2.0f / self->window_size + 0.5f;
+  self->ignored_windows = (int)(ignore_start * CLASSIFY_RATE *
+          2.0f / self->window_size + 0.5f);
   if (self->ignored_windows){
     GST_DEBUG("ignoring times less than %f (window_no %d)",
         ignore_start, self->ignored_windows);
@@ -1906,7 +1907,7 @@ maybe_learn(GstClassify *self){
     }
 
     rnn_log_float(net, "error", err_sum / self->n_channels);
-    rnn_log_float(net, "correct", winners * 1.0 / self->n_channels);
+    rnn_log_float(net, "correct", winners * 1.0f / self->n_channels);
   }
 }
 
@@ -1919,7 +1920,7 @@ emit_opinions(GstClassify *self, GstClockTime pts){
        buffer = prepare_next_chunk(self)){
     float err_sum = 0.0f;
     int n_err = 0;
-    float now = self->window_no * window_no_to_secs - self->lag;
+    float now = (float)self->window_no * window_no_to_secs - self->lag;
     for (j = 0; j < self->n_channels; j++){
       ClassifyChannel *c = prepare_channel_features(self, buffer, j);
       RecurNN *net = c->net;
@@ -1940,7 +1941,7 @@ emit_opinions(GstClassify *self, GstClockTime pts){
       }
     }
     if (self->window_no >= self->ignored_windows){
-      send_message(self, n_err ? err_sum / n_err : 0, now, pts);
+      send_message(self, n_err ? err_sum / (float)n_err : 0, now, pts);
     }
   }
 }

@@ -59,7 +59,7 @@ pgm_dump_normalised_float(const float *data, u32 width, u32 height, const char *
       b = 0;
     else if (b > 255)
       b = 255;
-    bytes[i] = b;
+    bytes[i] = (u8)b;
   }
   pgm_dump(bytes, width, height, name);
 }

@@ -127,8 +127,8 @@ doublecheap_gaussian_noise_f(rand_ctx *ctx,
   }
   float s = (float)r * RECIP62f;
   float m = sqrtf(-2.0f * logf(s) / s) * RECIP31f * deviation;
-  *a = x * m;
-  *b = y * m;
+  *a = (float)x * m;
+  *b = (float)y * m;
 }
 
 /*Generate two standard normal numbers using what Wikipedia calls the
@@ -175,7 +175,7 @@ static inline float
 cheap_gaussian_noise(rand_ctx *ctx){
   s64 a = 0;
   u64 i = rand64(ctx);
-#define _add_16_bits() a += i & 0xffff; i >>= 16;
+#define _add_16_bits() a += (s64)(i & 0xffff); i >>= 16;
   _add_16_bits();
   _add_16_bits();
   _add_16_bits();
