@@ -66,6 +66,8 @@ def main():
                        help="Test after this many training cycles")
     group.add_argument('--weight-noise', type=float, default=0.0,
                        help="std dev of noise added to weights before each cycle")
+    group.add_argument('--weight-init-scale', type=float, default=0.0,
+                       help="scale weights to approximately this gain")
     group.add_argument('--log-file', default="auto",
                        help="log to this file (default: based on net basename)")
     args = parser.parse_args()
@@ -101,6 +103,7 @@ def main():
         c.test_interval = args.test_interval
     c.setp('clockwork', args.clockwork)
     c.setp('weight-noise', args.weight_noise)
+    c.setp('weight-init-scale', args.weight_init_scale)
     timed_files = process_common_args(c, args)
 
     validate_streams = [timed_files[:n_channels]]
