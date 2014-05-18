@@ -259,7 +259,7 @@ void rnn_randomise_weights_auto(RecurNN *net);
 void rnn_init_default_weight_parameters(RecurNN *net,
     struct RecurInitialisationParameters *q);
 
-void rnn_scale_initial_weights(RecurNN *net, float factor);
+void rnn_scale_initial_weights(RecurNN *net, float target_gain);
 
 void rnn_print_net_stats(RecurNN *net);
 

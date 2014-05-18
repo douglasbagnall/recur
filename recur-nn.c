@@ -922,7 +922,7 @@ rnn_bptt_calculate(RecurNN *net, uint batch_size){
   the right gain */
 
 void
-rnn_scale_initial_weights(RecurNN *net, float factor){
+rnn_scale_initial_weights(RecurNN *net, float target_gain){
   int h_size = net->h_size;
   float layer_in[h_size];
   float layer_out[h_size];
@@ -956,9 +956,10 @@ rnn_scale_initial_weights(RecurNN *net, float factor){
       sum_out += h * h;
     }
     float ratio = sum_out / sum_in;
-    float adj = (factor + j) / (ratio + j);
+    float adj = (target_gain + j) / (ratio + j);
     scale_aligned_array(net->ih_weights, net->ih_size, adj);
     MAYBE_DEBUG("j %f sum in %.2f out %.2f, ratio %.2f adj %.2f", j,
         sum_in, sum_out, ratio, adj);
   }
+  DEBUG("scaled toward target gain %f", target_gain);
 }
