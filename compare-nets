@@ -105,7 +105,9 @@ def main():
 
     for fn in files:
         #print cmd
-        subprocess.check_call(cmd + ["-f", fn])
-
+        try:
+            subprocess.check_call(cmd + ["-f", fn])
+        except CalledProcessError, e:
+            print >> sys.stderr, "could not process %s" % fn
 
 main()
