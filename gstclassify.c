@@ -1048,6 +1048,8 @@ load_or_create_net_and_audio(GstClassify *self)
   }
 }
 
+/*start() is called once by gstreamer just before the first call to setup()
+  below */
 static gboolean
 start(GstBaseTransform *trans){
   GstClassify *self = GST_CLASSIFY(trans);
@@ -1058,12 +1060,8 @@ start(GstBaseTransform *trans){
 }
 
 /*gst_classify_setup is called every time the pipeline starts up -- that is,
-  for every new set of input files. It is also the first hook after all the
-  initial properties have been dealt with. So it has two kinds of role: the
-  once-only setting up of net and audio feature extraction, and the repeated
-  adjustments and checks for each set of audio sources.
+  for every new set of input files.
  */
-
 static gboolean
 gst_classify_setup(GstAudioFilter *base, const GstAudioInfo *info){
   GST_INFO("gst_classify_setup\n");
@@ -1112,6 +1110,8 @@ gst_classify_setup(GstAudioFilter *base, const GstAudioInfo *info){
   GstMessage *msg = gst_message_new_element(GST_OBJECT(self), s);
   gst_element_post_message(GST_ELEMENT(self), msg);
 
+  /*A risk with this as written is that little bits of audio might end up
+    getting left behind or overwritten*/
   if (self->random_alignment && self->training){
     self->write_offset = 0;
     int offset = rand_small_int(&self->net->rng, self->window_size) - self->window_size / 2;
