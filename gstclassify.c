@@ -794,7 +794,7 @@ setup_audio(GstClassify *self, int window_size, int mfccs, float min_freq,
     int intensity_feature, float lag, float confirmation_lag){
   /*List arguments to help make sure they have been passed in in the right
     order!*/
-  STDERR_DEBUG("setting up audio thus:\n"
+  GST_DEBUG("setting up audio thus:\n"
       "window_size %d\n"
       "mfccs %d\n"
       "min_freq %f\n"
