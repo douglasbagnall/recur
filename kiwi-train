@@ -56,8 +56,6 @@ def main():
                        help="multiply output errors by these ratios")
     group.add_argument('--bptt-depth', type=int,
                        help="Depth of BPTT training")
-    group.add_argument('--clockwork', type=int, default=0,
-                       help="clockwork RNN rates (0 for plain RNN)")
     group.add_argument('--activity-bias', type=int, default=1,
                        help="Train more on examples with changing classes")
     group.add_argument('-P', '--prioritise', action='store_true',
@@ -101,7 +99,6 @@ def main():
         c.setp('bptt-depth', args.bptt_depth)
     if args.test_interval > 0:
         c.test_interval = args.test_interval
-    c.setp('clockwork', args.clockwork)
     c.setp('weight-noise', args.weight_noise)
     c.setp('weight-init-scale', args.weight_init_scale)
     timed_files = process_common_args(c, args)

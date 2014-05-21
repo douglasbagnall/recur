@@ -37,8 +37,9 @@ rnn_save_net(RecurNN *net, const char *filename, int backup){
    * 5: includes metadata
    * 6: doesn't save BPTT training arrays (e.g. momentum) or hidden state
    * 7: includes net->clockwork_cycles
+   * 8: drops net->clockwork_cycles
    */
-  const int version = 7;
+  const int version = 8;
   cdb_make_add(&cdbm, FORMAT_VERSION, strlen(FORMAT_VERSION), &version, sizeof(version));
 
 #define SAVE_SCALAR(obj, attr) do {                                     \
@@ -81,7 +82,6 @@ rnn_save_net(RecurNN *net, const char *filename, int backup){
   SAVE_SCALAR(net, generation);
   SAVE_SCALAR(net, flags);
   SAVE_SCALAR(net, rng); /* a struct, should work? */
-  SAVE_SCALAR(net, clockwork_cycles);
 
   SAVE_ARRAY(net, ih_weights, net->ih_size);
   SAVE_ARRAY(net, ho_weights, net->ho_size);
@@ -204,8 +204,6 @@ rnn_load_net(const char *filename){
   READ_SCALAR(net, generation);
   READ_SCALAR(net, flags);
 
-  READ_SCALAR_IF_VERSION_ELSE_DEFAULT(net, clockwork_cycles, 7, 0);
-
   if (tmpnet.flags & RNN_NET_FLAG_OWN_BPTT){
     READ_SCALAR(bptt, depth);
     READ_SCALAR(bptt, learn_rate);
@@ -230,14 +228,13 @@ rnn_load_net(const char *filename){
   if (tmpnet.flags & RNN_NET_FLAG_BOTTOM_LAYER){
     net = rnn_new_with_bottom_layer(tmpbl.input_size, tmpbl.output_size,
         tmpnet.hidden_size, tmpnet.output_size, tmpnet.flags, 0, NULL,
-        tmpbptt.depth, tmpbptt.learn_rate, tmpbptt.momentum, tmpnet.clockwork_cycles,
+        tmpbptt.depth, tmpbptt.learn_rate, tmpbptt.momentum,
         tmpbl.overlap);
   }
   else {
     net = rnn_new(tmpnet.input_size, tmpnet.hidden_size,
       tmpnet.output_size, tmpnet.flags, 0, NULL,
-        tmpbptt.depth, tmpbptt.learn_rate, tmpbptt.momentum,
-        tmpnet.clockwork_cycles);
+        tmpbptt.depth, tmpbptt.learn_rate, tmpbptt.momentum);
   }
   bptt = net->bptt;
   bottom_layer = net->bottom_layer;
@@ -275,7 +272,6 @@ rnn_load_net(const char *filename){
 
   CHECK_SCALAR(net, tmpnet, generation);
   CHECK_SCALAR(net, tmpnet, flags);
-  CHECK_SCALAR(net, tmpnet, clockwork_cycles);
 
   if (bptt){
     CHECK_SCALAR(bptt, tmpbptt, depth);
