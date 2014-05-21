@@ -266,9 +266,6 @@ bptt_and_accumulate_error(RecurNN *net, float *restrict ih_delta,
   ASSUME_ALIGNED(ih_delta);
   ASSUME_ALIGNED(h_error);
   ASSUME_ALIGNED(i_error);
-#if VECTOR
-  int vhsize = net->h_size / 4;
-#endif
 
   float error_sum = 0;
   float max_error_sum = MAX_ERROR_GAIN * top_error_sum;
@@ -358,6 +355,9 @@ bptt_and_accumulate_error(RecurNN *net, float *restrict ih_delta,
     }
   }
   else {/* no clockwork */
+#if VECTOR
+    int vhsize = net->h_size / 4;
+#endif
     int offset = bptt->index;
     for (t = bptt->depth; t > 0; t--, offset += offset ? -1 : bptt->depth - 1){
       error_sum = 0.0f;
@@ -368,7 +368,8 @@ bptt_and_accumulate_error(RecurNN *net, float *restrict ih_delta,
         h_error[i] = 0.0;
       }
       for (y = 0; y < net->i_size; y++){
-        if (inputs[y] != 0.0f){
+        float input = inputs[y];
+        if (input != 0.0f){
           float e;
           const float *restrict w_row = weights + y * net->h_size;
           float *restrict delta_row = ih_delta + y * net->h_size;
@@ -377,7 +378,7 @@ bptt_and_accumulate_error(RecurNN *net, float *restrict ih_delta,
 #if VECTOR
           v4ss *restrict vh_error = (v4ss*)h_error;
           v4ss ve = {0, 0, 0, 0};
-          v4ss inv = {inputs[y], inputs[y], inputs[y], inputs[y]};
+          v4ss inv = {input, input, input, input};
           v4ss *restrict vd = (v4ss*)delta_row;
           v4ss *restrict vw = (v4ss*)w_row;
           for (x = 0; x < vhsize; x++){
@@ -390,7 +391,7 @@ bptt_and_accumulate_error(RecurNN *net, float *restrict ih_delta,
           e = 0.0f;
           for (x = 0; x < net->h_size; x++){
             float ex = h_error[x];
-            delta_row[x] += ex * inputs[y];
+            delta_row[x] += ex * input;
             e += w_row[x] * ex;
           }
 #endif
