@@ -453,7 +453,7 @@ possibly_save_net(RecurNN *net, char *filename)
 
 static inline float *
 tanh_opinion(RecurNN *net, float *in){
-  float *answer = rnn_opinion(net, in, 0);
+  float *answer = rnn_opinion(net, in);
   for (int i = 0; i < net->output_size; i++){
     answer[i] = fast_tanhf(answer[i]);
   }

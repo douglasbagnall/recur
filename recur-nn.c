@@ -103,10 +103,8 @@ maybe_scale_inputs(RecurNN *net){
 }
 
 float *
-rnn_opinion(RecurNN *net, const float *restrict inputs, float dropout){
-  /*If inputs is NULL, assume the inputs have already been set. If dropout is
-    non-zero, dropout that many recurrent nodes. If there is a bottom layer,
-    it is not dropped out.*/
+rnn_opinion(RecurNN *net, const float *restrict inputs){
+  /*If inputs is NULL, assume the inputs have already been set.*/
   float *restrict hiddens = net->hidden_layer;
   ASSUME_ALIGNED(hiddens);
   if (net->bottom_layer){
@@ -127,11 +125,6 @@ rnn_opinion(RecurNN *net, const float *restrict inputs, float dropout){
   /*copy in hiddens */
   memcpy(net->input_layer, hiddens, INPUT_OFFSET(net) * sizeof(float));
 
-  /* possibly dropout */
-  if (dropout){
-    dropout_array(net->input_layer + 1, net->hidden_size, dropout, &net->rng);
-  }
-
   /*bias, possibly unnecessary becuae it may not get overwritten */
   net->input_layer[0] = 1.0f;
 
@@ -140,22 +133,10 @@ rnn_opinion(RecurNN *net, const float *restrict inputs, float dropout){
 
   calculate_interlayer(net->input_layer, net->i_size,
       hiddens, net->h_size, net->ih_weights);
-
-  if (dropout){
-    float s = net->hidden_size + 1 + net->input_size;
-    float dropout_scale = s / (s - net->hidden_size * dropout);
-    for (int i = 1; i < net->h_size; i++){
-      float h = hiddens[i] - RNN_HIDDEN_PENALTY;
-      hiddens[i] = (h > 0.0f) ? h * dropout_scale : 0.0f;
-    }
+  for (int i = 1; i < net->h_size; i++){
+    float h = hiddens[i] - RNN_HIDDEN_PENALTY;
+    hiddens[i] = (h > 0.0f) ? h : 0.0f;
   }
-  else {
-    for (int i = 1; i < net->h_size; i++){
-      float h = hiddens[i] - RNN_HIDDEN_PENALTY;
-      hiddens[i] = (h > 0.0f) ? h : 0.0f;
-    }
-  }
-
   maybe_scale_hiddens(net);
   hiddens[0] = 1.0f;
 

@@ -9,9 +9,6 @@ import argparse
 DEFAULT_LEARN_RATE = 3e-5
 DEFAULT_LEARN_RATE_DECAY = 1e-6
 DEFAULT_LEARN_RATE_MIN = 1e-8
-DEFAULT_DROPOUT = 0
-DEFAULT_DROPOUT_DECAY = 0
-DEFAULT_DROPOUT_MIN = 0.1
 DEFAULT_MOMENTUM = 0.93
 DEFAULT_MOMENTUM_SOFT_START = 5000
 DEFAULT_LEARN_RATE_TIME_OFFSET = 2000.0
@@ -40,12 +37,6 @@ def main():
                        help='"sqrt-exponential", "inverse-time", or "flat"')
     group.add_argument('--learn-rate-min', type=float, default=DEFAULT_LEARN_RATE_MIN,
                        help="learning rate decay stops here")
-    group.add_argument('--dropout', type=float, default=DEFAULT_DROPOUT,
-                       help="dropout rate")
-    group.add_argument('--dropout-decay', type=float, default=DEFAULT_DROPOUT_DECAY,
-                       help="dropout decay")
-    group.add_argument('--dropout-min', type=float, default=DEFAULT_DROPOUT_MIN,
-                       help="dropout drops to zero from here")
     group.add_argument('-N', '--no-save-net', action='store_true',
                        help="don't save the net, periodically or otherwise")
     group.add_argument('-C', '--channels', default=12, type=int,
@@ -84,8 +75,6 @@ def main():
         lr = lr_sqrt_exp(args.learn_rate, args.learn_rate_decay,
                          min(args.learn_rate_min, args.learn_rate))
 
-    dropout = lr_sqrt_exp(args.dropout, args.dropout_decay, args.dropout_min, 0)
-
 
     if not args.prioritise and hasattr(os, 'nice'):
         os.nice(10)
@@ -120,7 +109,7 @@ def main():
 
     c.train(training_streams, validate_streams,
             iterations=args.iterations,
-            learn_rate_fn=lr, dropout_fn=dropout,
+            learn_rate_fn=lr,
             log_file=args.log_file,
             properties=(('momentum-soft-start', args.momentum_soft_start),
                         ('momentum', args.momentum),

@@ -683,8 +683,8 @@ rnn_randomise_weights_simple(RecurNN *net, const rnn_init_method method){
 
 
 void rnn_perforate_weights(RecurNN *net, float p){
-  dropout_array(net->ih_weights, net->ih_size, p, &net->rng);
-  dropout_array(net->ho_weights, net->ho_size, p, &net->rng);
+  perforate_array(net->ih_weights, net->ih_size, p, &net->rng);
+  perforate_array(net->ho_weights, net->ho_size, p, &net->rng);
 }
 
 void

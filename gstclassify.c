@@ -41,7 +41,6 @@ enum
   PROP_TRAINING,
   PROP_WINDOW_SIZE,
   PROP_BASENAME,
-  PROP_DROPOUT,
   PROP_ERROR_WEIGHT,
   PROP_BPTT_DEPTH,
   PROP_WEIGHT_INIT_METHOD,
@@ -101,7 +100,6 @@ enum
 #define DEFAULT_LEARN_RATE 0.0001
 #define DEFAULT_TOP_LEARN_RATE_SCALE 1.0f
 #define DEFAULT_BOTTOM_LEARN_RATE_SCALE 1.0f
-#define DEFAULT_PROP_DROPOUT 0.0f
 #define MIN_PROP_BPTT_DEPTH 1
 #define MAX_PROP_BPTT_DEPTH 1000
 #define MIN_HIDDEN_SIZE 1
@@ -136,8 +134,6 @@ enum
 #define LEARN_RATE_SCALE_MAX 1e9f
 #define LEARN_RATE_SCALE_MIN 0
 
-#define DROPOUT_MIN 0.0
-#define DROPOUT_MAX 1.0
 #define PROP_DELTA_FEATURES_MIN 0
 #define PROP_DELTA_FEATURES_MAX 4
 #define MIN_PROP_MFCCS 0
@@ -466,13 +462,6 @@ gst_classify_class_init (GstClassifyClass * klass)
           DEFAULT_BOTTOM_LEARN_RATE_SCALE,
           G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
-  g_object_class_install_property (gobject_class, PROP_DROPOUT,
-      g_param_spec_float("dropout", "dropout",
-          "dropout this portion of neurons in training",
-          DROPOUT_MIN, DROPOUT_MAX,
-          DEFAULT_PROP_DROPOUT,
-          G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
-
   g_object_class_install_property (gobject_class, PROP_WEIGHT_INIT_METHOD,
       g_param_spec_int("weight-init-method", "weight-init-method",
           "initialisation method. 1:flat, 2:fan in, 3: runs or loops",
@@ -598,7 +587,6 @@ gst_classify_init (GstClassify * self)
   self->n_class_events = 0;
   self->momentum_soft_start = DEFAULT_PROP_MOMENTUM_SOFT_START;
   self->weight_noise = DEFAULT_PROP_WEIGHT_NOISE;
-  self->dropout = DEFAULT_PROP_DROPOUT;
   self->error_weight = NULL;
   self->ignored_windows = 0;
   GST_INFO("gst classify init\n");
@@ -1464,10 +1452,6 @@ gst_classify_set_property (GObject * object, guint prop_id, const GValue * value
       self->training = g_value_get_boolean(value);
       break;
 
-    case PROP_DROPOUT:
-      self->dropout = g_value_get_float(value);
-      break;
-
     case PROP_MOMENTUM_SOFT_START:
       self->momentum_soft_start = g_value_get_float(value);
       break;
@@ -1632,9 +1616,6 @@ gst_classify_get_property (GObject * object, guint prop_id, GValue * value,
   case PROP_MFCCS:
     g_value_set_int(value, self->mfccs);
     break;
-  case PROP_DROPOUT:
-    g_value_set_float(value, self->dropout);
-    break;
   case PROP_MOMENTUM_SOFT_START:
     g_value_set_float(value, self->momentum_soft_start);
     break;
@@ -1780,7 +1761,7 @@ prepare_channel_features(GstClassify *self, s16 *buffer_i, int j){
 static inline float
 train_channel(GstClassify *self, ClassifyChannel *c, int *win_count){
   RecurNN *net = c->net;
-  float *answer = rnn_opinion(net, c->features, self->dropout);
+  float *answer = rnn_opinion(net, c->features);
   float *error = net->bptt->o_error;
   float wrongness = 0;
   for (int i = 0; i < self->n_groups; i++){
@@ -1914,7 +1895,7 @@ emit_opinions(GstClassify *self, GstClockTime pts){
       ClassifyChannel *c = prepare_channel_features(self, buffer, j);
       RecurNN *net = c->net;
       float *error = net->bptt->o_error;
-      float *answer = rnn_opinion(net, c->features, 0);
+      float *answer = rnn_opinion(net, c->features);
       for (i = 0; i < self->n_groups; i++){
         ClassifyClassGroup *g = &self->class_groups[i];
         int o = g->offset;

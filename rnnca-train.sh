@@ -8,7 +8,6 @@ MOMENTUM=0.95
 MSS=4000
 LR=1e-6
 HS=59
-DROPOUT=0
 BASENAME=$(basename $URI)
 PATTERN=Y00011102C000111
 
@@ -30,7 +29,6 @@ for i in {1..20}; do
             ! video/x-raw, format=I420, width=288, height=192, framerate=20/1 \
 	    ! rnnca momentum-soft-start=$MSS momentum=$MOMENTUM learn-rate=$LR \
             hidden-size=$HS log-file=rnnca.log training=1 playing=0 offsets=$PATTERN \
-            dropout=$DROPOUT \
 	    ! fakesink
     done
 
@@ -43,6 +41,5 @@ for i in {1..20}; do
         ! video/x-raw, format=I420, width=288, height=192, framerate=20/1 \
 	! rnnca momentum-soft-start=$MSS momentum=$MOMENTUM learn-rate=$LR \
         hidden-size=$HS log-file=rnnca.log training=1 playing=1 offsets=$PATTERN \
-        dropout=$DROPOUT \
 	! videoconvert !  x264enc bitrate=512 ! mux.
 done

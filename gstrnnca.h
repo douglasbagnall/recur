@@ -104,7 +104,6 @@ struct _GstRnnca
   int len_C;
   int len_pos;
   char *offset_pattern;
-  float dropout;
 };
 
 struct _GstRnncaClass

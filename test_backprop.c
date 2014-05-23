@@ -49,7 +49,6 @@ Because of ccan/opt, --help will tell you something.
 #define DEFAULT_BATCH_SIZE 1
 #define DEFAULT_VALIDATE_CHARS 0
 #define DEFAULT_VALIDATION_OVERLAP 1
-#define DEFAULT_DROPOUT 0
 #define DEFAULT_OVERRIDE 0
 #define DEFAULT_DETERMINISTIC_CONFAB 0
 #define DEFAULT_SAVE_NET 1
@@ -113,7 +112,6 @@ static char * opt_collapse_chars = HASH_CHARS;
 static char * opt_textfile = DICKENS_SHUFFLED_TEXT;
 static char * opt_dump_collapsed_text = DEFAULT_DUMP_COLLAPSED_TEXT;
 static bool opt_reload = DEFAULT_RELOAD;
-static float opt_dropout = DEFAULT_DROPOUT;
 static float opt_momentum_weight = DEFAULT_MOMENTUM_WEIGHT;
 static float opt_momentum_soft_start = DEFAULT_MOMENTUM_SOFT_START;
 static u64 opt_rng_seed = DEFAULT_RNG_SEED;
@@ -277,8 +275,6 @@ static struct opt_table options[] = {
       &opt_deterministic_confab, "Use best guess in confab, not random sampling"),
   OPT_WITHOUT_ARG("--no-save-net", opt_set_invbool,
       &opt_save_net, "Don't save learnt changes"),
-  OPT_WITH_ARG("--dropout=<0-1>", opt_set_floatval01, opt_show_floatval,
-      &opt_dropout, "dropout this fraction of hidden nodes"),
   OPT_WITH_ARG("--multi-tap=<n>", opt_set_uintval, opt_show_uintval,
       &opt_multi_tap, "read at n evenly spaced points in parallel"),
   OPT_WITHOUT_ARG("--use-multi-tap-path", opt_set_bool,
@@ -431,7 +427,7 @@ one_hot_opinion(RecurNN *net, const int hot){
     inputs[len - 1] = 1.0f;
   }
   inputs[hot & 0x7f] = 1.0f;
-  return rnn_opinion(net, NULL, opt_dropout);
+  return rnn_opinion(net, NULL);
 }
 
 static inline float

@@ -455,10 +455,9 @@ class Trainer(BaseClassifier):
     trainers = None
     no_save_net = False
     test_interval = 2
-    def train(self, trainers, testers, learn_rate_fn, dropout_fn=None,
+    def train(self, trainers, testers, learn_rate_fn,
               iterations=100, log_file='auto', properties=(), stat_target=None):
         self.learn_rate_fn = learn_rate_fn
-        self.dropout_fn = dropout_fn
         self.counter = 0
         self.save_threshold_adjust = 1.0
         self.iterations = iterations
@@ -493,7 +492,6 @@ class Trainer(BaseClassifier):
         self.test_runs = [{x: 0 for x in y}
                           for y in self.class_groups]
         self.stat_target_list = []
-        self.setp('dropout', 0)
         self.setp('forget', 0)
         self.setp('training', False)
         self.next_set(iter(self.testset))
@@ -505,14 +503,10 @@ class Trainer(BaseClassifier):
         generation = self.getp('generation')
         #print >> sys.stderr, "generation is %d" % generation
 
-        if self.dropout_fn is not None:
-            dropout = self.dropout_fn(generation)
-            self.setp('dropout', dropout)
-
         if self.learn_rate_fn is not None:
             r = self.learn_rate_fn(generation)
-            print ("%s/%s gen %d; learn_rate %.4g dropout %.2g;" %
-                   (self.counter, self.iterations, generation, r, dropout)),
+            print ("%s/%s gen %d; learn_rate %.4g;" %
+                   (self.counter, self.iterations, generation, r)),
             self.setp('learn_rate', r)
 
         self.probability_stats = []

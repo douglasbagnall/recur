@@ -265,7 +265,7 @@ void rnn_delete_net(RecurNN *net);
 RecurNN ** rnn_new_training_set(RecurNN *prototype, int n_nets);
 void rnn_delete_training_set(RecurNN **nets, int n_nets, int leave_prototype);
 
-float *rnn_opinion(RecurNN *net, const float *inputs, float dropout);
+float *rnn_opinion(RecurNN *net, const float *inputs);
 
 void rnn_multi_pgm_dump(RecurNN *net, const char *dumpees, const char *basename);
 

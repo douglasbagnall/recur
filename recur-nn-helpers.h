@@ -80,7 +80,7 @@ add_aligned_arrays(float *restrict dest, int len, const float *restrict src,
 }
 
 static inline void
-dropout_array(float *array, int len, float dropout, rand_ctx *rng){
+perforate_array(float *array, int len, float dropout, rand_ctx *rng){
   int i;
   if (dropout == 0.5f){ /*special case using far fewer random numbers*/
     for (i = 0; i < len;){

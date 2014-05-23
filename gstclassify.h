@@ -123,7 +123,6 @@ struct _GstClassify
   int training;
   int random_alignment;
   int momentum_style;
-  float dropout;
   float *error_weight;
   GValue *pending_properties;
   TemporalPPM *error_image;
