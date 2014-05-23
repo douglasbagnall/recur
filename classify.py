@@ -626,9 +626,10 @@ class Trainer(BaseClassifier):
             print ''.join(output)
             adj = min(1.0, self.save_threshold_adjust)
             if (rightness > 0.8 * adj or
-                ratio_p > 6.0 * adj or
+                ratio_p > 8.0 * adj or
                 gap_p > 0.5 * adj or
-                dprime > 1.45  * adj or
+                ratio_p * gap_p * adj > 2.0 or
+                dprime > 1.5  * adj or
                 auc > 0.94 * adj):
                 self.save_threshold_adjust = 1.03
                 self.save_named_net(tag='win-%d-gap-%d-ratio-%d-dprime-%d-auc-%d' %
