@@ -304,11 +304,16 @@ rnn_load_net(const char *filename){
     cdb_bread(fd, obj->attr, size);                                     \
   } while (0)
 
-#define READ_FREE_SIZE_ARRAY(obj, attr, max_size) do {                  \
+#define READ_FREE_SIZE_ARRAY(obj, attr, max_size, zero_is_error) do {   \
     char *key = QUOTE(obj) "." QUOTE(attr);                             \
     ret = cdb_seek(fd, key, strlen(key), &vlen);                        \
-    if (ret < 1){ DEBUG("error %d loading '%s'", ret, key);             \
-      goto error;}                                                      \
+    if (ret < 1){                                                       \
+      DEBUG("error %d loading '%s'", ret, key);                         \
+      if (zero_is_error){                                               \
+        goto error;                                                     \
+      }                                                                 \
+      DEBUG("continuing anyway");                                       \
+    }                                                                   \
     if (vlen > max_size) {                                              \
       DEBUG("size of '%s'(%u) exceeds maximum %u",                      \
           key, vlen, max_size);                                         \
@@ -322,7 +327,7 @@ rnn_load_net(const char *filename){
   READ_ARRAY(net, ih_weights, net->ih_size * sizeof(float));
   READ_ARRAY(net, ho_weights, net->ho_size * sizeof(float));
   if (version >= 5){
-    READ_FREE_SIZE_ARRAY(net, metadata, MAX_METADATA_SIZE);
+    READ_FREE_SIZE_ARRAY(net, metadata, MAX_METADATA_SIZE, 0);
   }
   if (bottom_layer){
     READ_ARRAY(bottom_layer, weights,
