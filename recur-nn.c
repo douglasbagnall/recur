@@ -219,6 +219,7 @@ bptt_and_accumulate_error(RecurNN *net, float *restrict ih_delta,
 
   float error_sum = 0;
   float max_error_sum = MAX_ERROR_GAIN * top_error_sum;
+  float error_sum_ceiling = ERROR_GAIN_CEILING * top_error_sum;
   float min_error_gain = MIN_ERROR_GAIN * top_error_sum;
   float min_error_sum = MIN(bptt->min_error_factor / net->bptt->learn_rate,
       min_error_gain);
@@ -286,7 +287,7 @@ bptt_and_accumulate_error(RecurNN *net, float *restrict ih_delta,
   }
 
 
-  if (error_sum > max_error_sum){
+  if (error_sum > error_sum_ceiling){
     bptt->ih_scale = soft_clip(error_sum, max_error_sum);
     if (cumulative_input_error){
       for (y = 0; y < net->input_size; y++){

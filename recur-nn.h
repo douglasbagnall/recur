@@ -25,8 +25,10 @@
   See bptt_and_accumulate_error()
 */
 #define MAX_TOP_ERROR_FACTOR 2.0f
-/*if bptt error grows by more than MAX_ERROR_GAIN, abort and scale */
+/*if bptt error grows by more than MAX_ERROR_GAIN, abort the bptt loop */
 #define MAX_ERROR_GAIN 2.0f
+/*if final bptt error is greater than than ERROR_GAIN_CEILING, scale it down */
+#define ERROR_GAIN_CEILING 1.0f
 /*BASE_MIN_ERROR_FACTOR relates to initial minimum mean error*/
 #define BASE_MIN_ERROR_FACTOR 1e-12f
 /*MAX_MIN_ERROR_FACTOR puts a limit on the growth of min_error_factor*/
