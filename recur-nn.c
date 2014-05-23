@@ -229,6 +229,7 @@ bptt_and_accumulate_error(RecurNN *net, float *restrict ih_delta,
   int vhsize = net->h_size / 4;
 #endif
   int offset = bptt->index;
+  float cum_error = 0.0f;
   for (t = bptt->depth; t > 0; t--, offset += offset ? -1 : bptt->depth - 1){
     error_sum = 0.0f;
     const float *restrict inputs = bptt->history + offset * net->i_size;
@@ -278,6 +279,7 @@ bptt_and_accumulate_error(RecurNN *net, float *restrict ih_delta,
         cumulative_input_error[y] += input_error[y];
       }
     }
+    cum_error += sqrtf(error_sum);
     float *tmp = h_error;
     h_error = i_error;
     i_error = tmp;
@@ -315,6 +317,14 @@ bptt_and_accumulate_error(RecurNN *net, float *restrict ih_delta,
     rnn_log_float(net, "ih_scale", bptt->ih_scale);
     rnn_log_float(net, "min_error_threshold", min_error_sum);
     rnn_log_float(net, "min_error_factor", bptt->min_error_factor);
+    rnn_log_float(net, "cum_error", cum_error);
+    if (cumulative_input_error){
+      float cie = 0;
+      for (y = 0; y < net->input_size; y++){
+        cie += cumulative_input_error[y];
+      }
+      rnn_log_float(net, "cum_input_error", cie);
+    }
     if (net->flags & RNN_NET_FLAG_LOG_HIDDEN_SUM){
       float hidden_sum = 0;
       int hidden_zeros = 0;
