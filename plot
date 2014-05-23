@@ -80,6 +80,11 @@ def read_log(fn, names, step=1,
                 if len(gen) > length:
                     break
     f.close()
+    # don't begin plot at zero if series doesn't begin there.
+    if gen[0] == 0 and gen[1] != step:
+        for x in series.values():
+            if x:
+                x.pop(0)
     return series
 
 def graph(lists):
