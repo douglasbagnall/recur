@@ -13,7 +13,7 @@ def prepare_roc_data(results):
     return results, sum_true, sum_false, tp_scale, fp_scale
 
 
-def draw_roc_curve(results, label='ROC', arrows=True):
+def draw_roc_curve(results, label='ROC', arrows=1):
     import matplotlib.pyplot as plt
 
     results, true_positives, false_positives, \
@@ -22,11 +22,18 @@ def draw_roc_curve(results, label='ROC', arrows=True):
     tp = []
     fp = []
     half = 0
-    ax, ay, ad, ap = 0, 0, 0, 0
-    bx, by, bd, bp = 0, 0, 99, 0
-    cx, cy, cd, cp = 0, 0, 0, 0
-    dx, dy, dp = 0, 0, 0
-    ex, ey, ep = 1.0, 1.0, 0.0
+    #distance from best
+    dfb_p = (0, 0, 0)
+    dfb_d = 99
+    # distance from worst
+    dfw_p = (0, 0, 0)
+    dfw_d = 0
+    # distance from diagonal
+    dfd_p = (0, 0, 0)
+    dfd_d = 0
+    p95_p = None
+    n95_p = (1.0, 1.0, 1.0)
+
 
     prev = (None, None)
 
@@ -40,34 +47,33 @@ def draw_roc_curve(results, label='ROC', arrows=True):
         x = false_positives * fp_scale
         y = true_positives * tp_scale
         half += score < 0.5
-        d = (1 - x) * (1 - x) + y * y
-        if d > ad:
-            ad = d
-            ax = x
-            ay = y
-            ap = score
-        d = x * x + (1 - y) * (1 - y)
-        if d < bd:
-            bd = d
-            bx = x
-            by = y
-            bp = score
+        p = (x, y, score)
+
+        if arrows > 1:
+            #distance from worst
+            d = (1 - x) * (1 - x) + y * y
+            if d > dfw_d:
+                dfw_p = p
+                dfw_d = d
+            #distance from best
+            d = x * x + (1 - y) * (1 - y)
+            if d < dfb_d:
+                dfb_p = p
+                dfb_d = d
+        #distance from diagonal
         d = y - x
-        if d > cd:
-            cd = d
-            cx = x
-            cy = y
-            cp = score
-        if dx == 0 and y > 20.0 * x:
-            #print x, y
-            dx = x
-            dy = y
-            dp = score
+        if d > dfd_d:
+            dfd_p = p
+            dfd_d = d
+
+        #positive 95
+        if p95_p is None and y > 20.0 * x:
+            p95_p = p
+
+        # negative 95
         if 1.0 - x > 20.0 * (1.0 - y):
-            #print x, y, (1.0 - y) / (1.0 - x)
-            ex = x
-            ey = y
-            ep = score
+            n95_p = p
+
         fp.append(x)
         tp.append(y)
 
@@ -80,27 +86,33 @@ def draw_roc_curve(results, label='ROC', arrows=True):
 
     fp.reverse()
     tp.reverse()
-    print "~best %0.3f  %.3f true, %.3f false" % (cp, cy, cx)
-    print "halfway 0.5  %.3f true, %.3f false" % (hy, hx)
     plt.plot(fp, tp, label=label)
     if arrows:
-        plt.annotate("95%% negative %.2g" % ep, (ex, ey), (0.7, 0.7),
+        x, y, s = n95_p
+        plt.annotate("95%% negative %.2g" % x, (x, y), (0.7, 0.7),
                      arrowprops={'width':1, 'color': '#0088aa'},
                      )
-        plt.annotate("95%% positive %.2g" % dp, (dx, dy), (0.2, 0.2),
-                     arrowprops={'width':1, 'color': '#8800aa'},
+        if p95_p is not None:
+            x, y, s = p95_p
+            plt.annotate("95%% positive %.2g" % s, (x, y), (0.2, 0.2),
+                         arrowprops={'width':1, 'color': '#8800aa'},
                      )
         plt.annotate("0.5", (hx, hy), (0.4, 0.4),
                      arrowprops={'width':1, 'color': '#00cc00'})
-        plt.annotate("furthest from all bad %.2g" % ap, (ax, ay), (0.3, 0.3),
-                     arrowprops={'width':1, 'color': '#00cccc'},
-                     )
-        plt.annotate("closest to all good %.2g" % bp, (bx, by), (0.6, 0.6),
-                     arrowprops={'width':1, 'color': '#cc0000'},
-                     )
-        plt.annotate("furthest from diagonal %.2g" % cp, (cx, cy), (0.5, 0.5),
+        x, y, s = dfd_p
+        plt.annotate("furthest from diagonal %.2g" % s, (x, y), (0.5, 0.5),
                      arrowprops={'width':1, 'color': '#aa6600'},
                      )
+    if arrows > 1:
+        x, y, s = dfw_p
+        plt.annotate("furthest from all bad %.2g" % s, (x, y), (0.3, 0.3),
+                     arrowprops={'width':1, 'color': '#00cccc'},
+                     )
+        x, y, s = dfb_p
+        plt.annotate("closest to all good %.2g" % s, (x, y), (0.6, 0.6),
+                     arrowprops={'width':1, 'color': '#cc0000'},
+                     )
+
 
 def _calc_stats(results):
     from math import sqrt, log
