@@ -80,6 +80,7 @@ class BaseClassifier(object):
                                      "rate=%d, channels=%d"
                                      % (samplerate, channels))
         self.capsfilter.set_property("caps", caps)
+        #Gst.debug_bin_to_dot_file(self.pipeline, 0, "pipeline.dot")
 
     def __init__(self, channels=1, mainloop=None, sinkname='fakesink', samplerate=8000):
         if mainloop is None:
