@@ -104,7 +104,7 @@ def main():
         del files[args.n_nets:]
 
     for fn in files:
-        #print cmd
+        #print >> sys.stderr, ' '.join(cmd)
         try:
             subprocess.check_call(cmd + ["-f", fn])
         except subprocess.CalledProcessError, e:

@@ -90,10 +90,15 @@ def summarise_nets(fn, n=10, list_only=False, cutoff=2):
         stats = json.loads(line)
         nets.append(stats)
     f.close()
-    if list_only:
-        print_list(nets, n, cutoff)
-    else:
-        print_summary(nets, n, cutoff)
+    try:
+        if list_only:
+            print_list(nets, n, cutoff)
+        else:
+            print_summary(nets, n, cutoff)
+    except IOError, e:
+        #don't print traceback when piping to e.g. head
+        if 'Broken pipe' not in str(e):
+            raise
 
 
 
