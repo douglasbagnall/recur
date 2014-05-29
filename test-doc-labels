@@ -132,7 +132,8 @@ def main():
         gt = truth.get(k, False)
         data.append((v, gt))
 
-    draw_roc_curve(data, arrows=False)
+    draw_roc_curve(data, arrows=1)
+    print calc_stats(data)
     actually_show_roc()
 
 main()
