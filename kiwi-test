@@ -41,6 +41,8 @@ def main():
                        help="print short message indicating goodness")
     group.add_argument('--presence-index', type=int, default=None,
                        help="index for presence stats (Nth best over whole file)")
+    group.add_argument('--smooth-presence', type=int, default=None,
+                       help="Smooth presence results with a window of this size")
 
     args = parser.parse_args()
     timed = not args.no_timings
@@ -69,6 +71,6 @@ def main():
                call_duration_threshold=args.call_duration_threshold,
                show_presence_roc=args.presence_roc, target_index=args.target_class,
                summarise=args.summary, presence_index=args.presence_index,
-               score_file=args.score_file)
+               score_file=args.score_file, smooth_presence=args.smooth_presence)
 
 main()

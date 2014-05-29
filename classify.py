@@ -162,6 +162,7 @@ class Classifier(BaseClassifier):
     classification_file = None
     call_json_file = None
     score_file = None
+    smooth_presence = None
     def classify(self, data,
                  ground_truth_file=None,
                  classification_file=None,
@@ -174,7 +175,8 @@ class Classifier(BaseClassifier):
                  target_index=None,
                  summarise=False,
                  presence_index=None,
-                 score_file=None):
+                 score_file=None,
+                 smooth_presence=None):
         if len(self.classes) == 2 and target_index is None:
             self.target_index = self.classes[1]
         else:
@@ -201,6 +203,7 @@ class Classifier(BaseClassifier):
         self.show_presence_roc = show_presence_roc
         self.summarise = summarise
         self.presence_index = presence_index
+        self.smooth_presence = smooth_presence
         self.data = list(reversed(data))
         self.setp('training', False)
         if self.show_roc or self.summarise:
@@ -369,11 +372,13 @@ class Classifier(BaseClassifier):
             print >>self.call_json_file, json.dumps(row)
 
         if self.target_index and self.score_file:
-            sorted_scores = sorted([x[0] for x in scores[self.target_index]], reverse=True)
-            print >>self.score_file, json.dumps([fn] + sorted_scores[:200])
+            top_scores = peak_smoothed_scores(scores[self.target_index],
+                                              smooth=self.smooth_presence)
+            line = [fn]
+            line.extend(top_scores)
+            print >>self.score_file, json.dumps(line)
 
         if self.show_presence_roc or self.summarise:
-            #window = np.kaiser(15, 6)
             if self.presence_index is None:
                 if self.summarise: # a historical default
                     indices = [-6]
@@ -435,6 +440,18 @@ class Classifier(BaseClassifier):
     def on_error(self, bus, msg):
         pass
 
+
+def peak_smoothed_scores(scores, top_n=200, smooth=0, ignore_first=10, kaiser=7):
+    if smooth:
+        window = np.kaiser(smooth, kaiser)
+        s = np.array([x[0] for x in scores])
+        s = np.convolve(s, window)[ignore_first:]
+        top_scores = np.sort(s)[-top_n:]
+        top_scores = top_scores[::-1]
+    else:
+        s = sorted([x[0] for x in scores[ignore_first:]], reverse=True)
+        top_scores = s[:top_n]
+    return top_scores
 
 def eternal_alternator(iters, max_iterations=-1):
     cycles = [itertools.cycle(x) for x in iters]
