@@ -223,8 +223,12 @@ def _calc_stats(results):
         mean_data[target] = [mean, n, nvar]
 
     mean_true, n, nvar = mean_data[1]
+    if n == 0:
+        n = 1.0
     var_true = nvar / n
     mean_false, n, nvar = mean_data[0]
+    if n == 0:
+        n = 1.0
     var_false = nvar / n
     if var_true + var_false:
         dprime = (mean_true - mean_false) / sqrt(0.5 * (var_true + var_false))
@@ -249,14 +253,14 @@ def _calc_stats(results):
     }
 
 
-def calc_stats(results, presence_results, presence_gt, presence_i=0):
-    instantaneous_stats = _calc_stats([x[:2] for x in results])
-    p1 = zip([x[presence_i] for x in presence_results], presence_gt)
-    presence_stats = _calc_stats(p1)
+def calc_stats(results, presence_results=None, presence_gt=None, presence_i=0):
+    stats = _calc_stats([x[:2] for x in results])
 
-    stats = instantaneous_stats
-    for k, v in presence_stats.iteritems():
-        stats['p.' + k] = v
+    if presence_results is not None:
+        p1 = zip([x[presence_i] for x in presence_results], presence_gt)
+        presence_stats = _calc_stats(p1)
+        for k, v in presence_stats.iteritems():
+            stats['p.' + k] = v
 
     return stats
 
