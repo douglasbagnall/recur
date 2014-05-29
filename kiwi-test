@@ -29,6 +29,8 @@ def main():
                        help="min call length for call-json-file")
     group.add_argument('--roc', action='store_true',
                        help="show ROC curves")
+    group.add_argument('--roc-arrows', type=int, default=1,
+                       help="degree of arrow infestation on ROC curves")
     group.add_argument('--target-class',
                        help="use this class in reports and ROC")
     group.add_argument('--min-changes', type=int, default=0,
@@ -71,6 +73,7 @@ def main():
                call_duration_threshold=args.call_duration_threshold,
                show_presence_roc=args.presence_roc, target_index=args.target_class,
                summarise=args.summary, presence_index=args.presence_index,
-               score_file=args.score_file, smooth_presence=args.smooth_presence)
+               score_file=args.score_file, smooth_presence=args.smooth_presence,
+               roc_arrows=args.roc_arrows)
 
 main()

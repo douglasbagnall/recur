@@ -176,7 +176,8 @@ class Classifier(BaseClassifier):
                  summarise=False,
                  presence_index=None,
                  score_file=None,
-                 smooth_presence=None):
+                 smooth_presence=None,
+                 roc_arrows=1):
         if len(self.classes) == 2 and target_index is None:
             self.target_index = self.classes[1]
         else:
@@ -200,6 +201,7 @@ class Classifier(BaseClassifier):
         self.call_peak_threshold = call_peak_threshold
         self.call_duration_threshold = call_duration_threshold
         self.show_roc = show_roc
+        self.roc_arrows = roc_arrows
         self.show_presence_roc = show_presence_roc
         self.summarise = summarise
         self.presence_index = presence_index
@@ -421,7 +423,7 @@ class Classifier(BaseClassifier):
                     classes = self.classes
                 for k in classes:
                     label = "%s instantaneous" % k
-                    draw_roc_curve(self.scores[k], label)
+                    draw_roc_curve(self.scores[k], label, arrows=self.roc_arrows)
                     if self.show_presence_roc:
                         results = zip(*self.minute_results[k])
                         #import pdb; pdb.set_trace()
