@@ -34,14 +34,9 @@ def draw_roc_curve(results, label='ROC', arrows=1):
     p95_p = None
     n95_p = (1.0, 1.0, 1.0)
 
-
-    prev = (None, None)
-
     for result in results:
         score = result[0]
         target = result[1]
-        if prev == (score, target):
-            prev
         false_positives -= not target
         true_positives -= target
         x = false_positives * fp_scale
