@@ -51,6 +51,16 @@ def get_csv_species_presence(fn, species_re):
                 results[wav] = False
     return times, results
 
+def print_times_strings(name, times, f=None):
+    times = times.get(name, [])
+    print "  ", name, ' '.join(times)
+    if f:
+        print >> f, name,
+        for t in times:
+            n = float(t)
+            print >>f, "%.2f %.2f" % (n, n + 1.0),
+        print >>f
+
 
 def main():
     parser = argparse.ArgumentParser()
@@ -66,6 +76,13 @@ def main():
                         help="species to look for in DOC csv")
     parser.add_argument('--threshold', type=float,
                         help="threshold for simple calculations")
+    parser.add_argument('--sample-file', default='/tmp/doc-sample.txt',
+                        help="write samples to this file")
+    parser.add_argument('--sample-file-script', default='/tmp/doc-sample-server.sh',
+                        help="executable script to view samples in web")
+    parser.add_argument('--sample-file-server-dir', default='~/sonograms',
+                        help="path to clone of "
+                        "https://github.com/douglasbagnall/sonograms")
 
     args = parser.parse_args()
     if args.call_json:
@@ -81,13 +98,13 @@ def main():
         times.update(ftimes)
         truth.update(ftruth)
 
-    if args.threshold:        
+    if args.threshold:
         tp, fp, tn, fn = [], [], [], []
         not_in_csv, not_in_pred = 0, 0
-        for k in truth:            
+        for k in truth:
             not_in_pred += k not in predictions
-            if k not in predictions:
-                print k
+            #if k not in predictions:
+            #    print k
         for k, p in predictions.items():
             t = truth.get(k)
             predicted = p > args.threshold
@@ -114,16 +131,44 @@ def main():
         print "tn %d" % len(tn)
         print "missing from truth %d" % not_in_csv
         print "missing from predictions %d" % not_in_pred
-        
+
+        if args.sample_file:
+            sf = open(args.sample_file, 'w')
+        else:
+            sf = None
+
+
+        print "sample being written to %s" % args.sample_file
         print "10 random false negatives:"
         random.shuffle(fn)
-        for x in range(10):
-            print "   ", fn[x], times.get(fn[x], '-')
+        for i, x in enumerate(fn):
+            print_times_strings(x, times, f=sf)
+            if i >= 9: break
+
+
         print "10 random false positives:"
         random.shuffle(fp)
-        for x in range(10):
-            print "   ", fp[x]
+        for i, x in enumerate(fp):
+            print_times_strings(x, times, f=sf)
+            if i >= 9: break
+        if sf is not None:
+            sf.close()
 
+        if args.sample_file_script:
+            f = open(args.sample_file_script, 'w')
+            print >> f, "#!/bin/bash -x"
+            print >> f, "#execute this and look at http:127.0.0.1:5000"
+            print >> f, "dummy_dbm=$(mktemp -u --suffix=.dbm)"
+            print >> f, 'cd "%s"' % os.path.expanduser(args.sample_file_server_dir)
+            print >> f, ("./server.py -t '%s' --dbm-file=$dummy_dbm -s wideband "
+                         "--include-wav-dir=doc-training-2011-12 "
+                         "--include-wav-dir=doc-training-2012-13 "
+                         "--timed-files-only "
+                         % (args.sample_file, ))
+            print >> f, "rm $dummy_dbm"
+            f.close()
+            os.chmod(args.sample_file_script, 0755)
+            print "execute %s and look at http:127.0.0.1:5000" % args.sample_file_script
 
     #print truth
 
