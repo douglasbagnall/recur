@@ -267,7 +267,9 @@ def calc_stats(results, presence_results=None, presence_gt=None, presence_i=0):
 def actually_show_roc(title='ROC'):
     import matplotlib.pyplot as plt
     plt.axes().set_aspect('equal')
-    plt.title(title)
+    plt.title(title, verticalalignment='bottom')
+    plt.xlabel('false positive rate')
+    plt.ylabel('true positive rate')
     plt.legend(loc='lower right')
     plt.show()
 
@@ -309,8 +311,8 @@ def draw_presence_roc(scores, label='presence', label_every=0.0):
 
     fp.reverse()
     tp.reverse()
-    plt.plot(fp, tp, label=label)
+    colour = plt.plot(fp, tp, label=label)[0].get_color()
     if label_every:
         for score, x, y in labels:
-            plt.annotate("%.2f" % score, xy=(x, y), xytext=(-5, 5), ha='right',
-                         textcoords='offset points')
+            plt.annotate("%.2f" % score, xy=(x, y), xytext=(-3, 2), ha='right',
+                         textcoords='offset points', color=colour)

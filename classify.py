@@ -420,7 +420,8 @@ class Classifier(BaseClassifier):
                 else:
                     classes = self.classes
                 for k in classes:
-                    draw_roc_curve(self.scores[k], k)
+                    label = "%s instantaneous" % k
+                    draw_roc_curve(self.scores[k], label)
                     if self.show_presence_roc:
                         results = zip(*self.minute_results[k])
                         #import pdb; pdb.set_trace()
@@ -429,7 +430,8 @@ class Classifier(BaseClassifier):
                         for i, row in zip(indices, results):
                             le = (0.1 if i == label_i else 0)
                             draw_presence_roc(zip(row, self.minute_gt[k]),
-                                              '%s-nth %s' % (k, -i - 1), label_every=le)
+                                              '%s presence %s' % (k, -i - 1),
+                                              label_every=le)
 
                 actually_show_roc(title=self.getp('basename'))
             self.stop()
