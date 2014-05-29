@@ -130,8 +130,10 @@ realloc_or_die(void *p, size_t size){
 
 #ifndef __clang__
 #define ASSUME_ALIGNED(x)   (x) = __builtin_assume_aligned ((x), 16)
+#define ASSUME_ALIGNED_LENGTH(x) (x) = ((x) & ~3ULL)
 #else
 #define ASSUME_ALIGNED(x) /* x */
+#define ASSUME_ALIGNED_LENGTH(x) /* x */
 #endif
 
 static inline void

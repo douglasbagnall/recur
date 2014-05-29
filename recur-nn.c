@@ -32,6 +32,7 @@ calculate_interlayer(const float *restrict inputs,
   ASSUME_ALIGNED(inputs);
   ASSUME_ALIGNED(outputs);
   ASSUME_ALIGNED(weights);
+  ASSUME_ALIGNED_LENGTH(output_size);
   int x, y;
   zero_aligned_array(outputs, output_size);
   for (y = 0; y < input_size; y++){
@@ -115,7 +116,7 @@ rnn_opinion(RecurNN *net, const float *restrict inputs){
   /*copy in hiddens */
   memcpy(net->input_layer, hiddens, INPUT_OFFSET(net) * sizeof(float));
 
-  /*bias, possibly unnecessary becuae it may not get overwritten */
+  /*bias, possibly unnecessary because it may not get overwritten */
   net->input_layer[0] = 1.0f;
 
   /* in emergencies, clamp the scale of the input vector */
