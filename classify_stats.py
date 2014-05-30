@@ -109,13 +109,14 @@ def draw_roc_curve(results, label='ROC', arrows=1):
                      )
 
 
-def _calc_stats(results):
+def _calc_stats(results, include_scores=False):
     from math import sqrt, log
     (results, sum_true, sum_false,
      tp_scale, fp_scale) = prepare_roc_data(results)
     auc = 0
     sum_dfd = 0 #distance from diagonal (but signed)
     max_dfd = 0
+    best_dfd_score = 0
     sum_dfc2 = 0 #distance from centre, squared
     max_dfc2 = 0
     sum_dfb, min_dfb = 0, 1e99 #distance from best
@@ -123,6 +124,9 @@ def _calc_stats(results):
     neg_95 = 0
     briar = 0
     cross_entropy = 0
+    pos_95_score = 0
+    neg_95_score = 0
+    min_dfb_score = 0
 
     px, py = 0, 0 # previous position for area calculation
     true_positives, false_positives = sum_true, sum_false
@@ -151,6 +155,7 @@ def _calc_stats(results):
             max_dfd = d
             best_tp = true_positives
             best_fp = false_positives
+            best_dfd_score = score
 
         # distance from centre, squared
         # (x - 0.5) * (x - 0.5) + (y - 0.5) * (y - 0.5)
@@ -162,14 +167,17 @@ def _calc_stats(results):
         sum_dfb += d
         if d < min_dfb:
             min_dfb = d
+            min_dfb_score = score
 
         # 95% positive and negative
         # intersections with 1:20 lines from the end corners
         if dx == 0 and y > 20.0 * x and not pos_95:
             pos_95 = y
+            pos_95_score = score
 
         if 1.0 - x > 20.0 * (1.0 - y):
             neg_95 = 1.0 - x
+            neg_95_score = score
 
         # briar score
         briar += (score - target) * (score - target)
@@ -231,7 +239,7 @@ def _calc_stats(results):
         #zero variance is in practice a sign of degeneracy
         dprime = 0.0
     sqrt_half =  0.7071067811865475244
-    return {
+    d = {
         'mean_dfd' : sum_dfd / len(results)  * sqrt_half,
         'max_dfd': max_dfd  * sqrt_half,
         'rms_dfc': sqrt(sum_dfc2 / len(results)),
@@ -246,14 +254,20 @@ def _calc_stats(results):
         'briar': briar,
         'cross_entropy': cross_entropy,
     }
+    if include_scores:
+        d['best_dfd_score'] = best_dfd_score
+        d['pos_95_score'] = pos_95_score
+        d['neg_95_score'] = neg_95_score
+        d['min_dfb_score'] = min_dfb_score
 
+    return d
 
-def calc_stats(results, presence_results=None, presence_gt=None, presence_i=0):
-    stats = _calc_stats([x[:2] for x in results])
+def calc_stats(results, presence_results=None, presence_gt=None, presence_i=0, include_scores=False):
+    stats = _calc_stats([x[:2] for x in results], include_scores=include_scores)
 
     if presence_results is not None:
         p1 = zip([x[presence_i] for x in presence_results], presence_gt)
-        presence_stats = _calc_stats(p1)
+        presence_stats = _calc_stats(p1, include_scores=include_scores)
         for k, v in presence_stats.iteritems():
             stats['p.' + k] = v
 

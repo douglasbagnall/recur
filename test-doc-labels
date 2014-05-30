@@ -62,81 +62,45 @@ def print_times_strings(name, times, f=None):
         print >>f
 
 
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--csv', action='append',
-                        help="CSV of doc calls (possibly multiple)")
-    parser.add_argument('--call-json',
-                        help="JSON of classified calls")
-    parser.add_argument('--json',
-                        help="JSON of call top scores")
-    parser.add_argument('--score-index', type=int,
-                        help="Nth highest score to indicate presence")
-    parser.add_argument('--species-regex',
-                        help="species to look for in DOC csv")
-    parser.add_argument('--threshold', type=float,
-                        help="threshold for simple calculations")
-    parser.add_argument('--sample-file', default='/tmp/doc-sample.txt',
-                        help="write samples to this file")
-    parser.add_argument('--sample-file-script', default='/tmp/doc-sample-server.sh',
-                        help="executable script to view samples in web")
-    parser.add_argument('--sample-file-server-dir', default='~/sonograms',
-                        help="path to clone of "
-                        "https://github.com/douglasbagnall/sonograms")
-
-    args = parser.parse_args()
-    if args.call_json:
-        predictions = get_call_json_presence_scores_and_names(args.call_json)
-    else:
-        index = args.score_index
-        predictions = get_top_score_json_scores_and_names(args.json, index)
-
-    truth = {}
-    times = {}
-    for csvfn in args.csv:
-        ftimes, ftruth = get_csv_species_presence(csvfn, args.species_regex)
-        times.update(ftimes)
-        truth.update(ftruth)
-
-    if args.threshold:
-        tp, fp, tn, fn = [], [], [], []
-        not_in_csv, not_in_pred = 0, 0
-        for k in truth:
-            not_in_pred += k not in predictions
-            #if k not in predictions:
-            #    print k
-        for k, p in predictions.items():
-            t = truth.get(k)
-            predicted = p > args.threshold
-            if t is None:
-                not_in_csv += 1
-                if predicted:
-                    fp.append(k)
-                else:
-                    tn.append(k)
-            elif not t:
-                if predicted:
-                    fp.append(k)
-                else:
-                    tn.append(k)
+def count_and_sample_classifications(args, truth, predictions, times):
+    tp, fp, tn, fn = [], [], [], []
+    not_in_csv, not_in_pred = 0, 0
+    for k in truth:
+        not_in_pred += k not in predictions
+        #if k not in predictions:
+        #    print k
+    for k, p in predictions.items():
+        t = truth.get(k)
+        predicted = p > args.threshold
+        if t is None:
+            not_in_csv += 1
+            if predicted:
+                fp.append(k)
             else:
-                if predicted:
-                    tp.append(k)
-                else:
-                    fn.append(k)
+                tn.append(k)
+        elif not t:
+            if predicted:
+                fp.append(k)
+            else:
+                tn.append(k)
+        else:
+            if predicted:
+                tp.append(k)
+            else:
+                fn.append(k)
 
-        print "tp %d" % len(tp)
-        print "fp %d" % len(fp)
-        print "fn %d" % len(fn)
-        print "tn %d" % len(tn)
-        print "missing from truth %d" % not_in_csv
-        print "missing from predictions %d" % not_in_pred
+    print "tp %d" % len(tp)
+    print "fp %d" % len(fp)
+    print "fn %d" % len(fn)
+    print "tn %d" % len(tn)
+    print "missing from truth %d" % not_in_csv
+    print "missing from predictions %d" % not_in_pred
 
+    if not args.just_the_numbers:
         if args.sample_file:
             sf = open(args.sample_file, 'w')
         else:
             sf = None
-
 
         print "sample being written to %s" % args.sample_file
         print "10 random false negatives:"
@@ -144,7 +108,6 @@ def main():
         for i, x in enumerate(fn):
             print_times_strings(x, times, f=sf)
             if i >= 9: break
-
 
         print "10 random false positives:"
         random.shuffle(fp)
@@ -170,15 +133,66 @@ def main():
             os.chmod(args.sample_file_script, 0755)
             print "execute %s and look at http:127.0.0.1:5000" % args.sample_file_script
 
-    #print truth
+        #print truth
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--csv', action='append',
+                        help="CSV of doc calls (possibly multiple)")
+    parser.add_argument('--call-json',
+                        help="JSON of classified calls")
+    parser.add_argument('--json',
+                        help="JSON of call top scores")
+    parser.add_argument('--score-index', type=int,
+                        help="Nth highest score to indicate presence")
+    parser.add_argument('--species-regex',
+                        help="species to look for in DOC csv")
+    parser.add_argument('--threshold', type=float,
+                        help="threshold for simple calculations")
+    parser.add_argument('--just-the-numbers', action='store_true',
+                        help="don't do ROC curves or samples")
+    parser.add_argument('--sample-file', default='/tmp/doc-sample.txt',
+                        help="write samples to this file")
+    parser.add_argument('--sample-file-script', default='/tmp/doc-sample-server.sh',
+                        help="executable script to view samples in web")
+    parser.add_argument('--sample-file-server-dir', default='~/sonograms',
+                        help="path to clone of "
+                        "https://github.com/douglasbagnall/sonograms")
+
+    args = parser.parse_args()
+    if args.call_json:
+        predictions = get_call_json_presence_scores_and_names(args.call_json)
+    else:
+        index = args.score_index
+        predictions = get_top_score_json_scores_and_names(args.json, index)
+
+    truth = {}
+    times = {}
+    for csvfn in args.csv:
+        ftimes, ftruth = get_csv_species_presence(csvfn, args.species_regex)
+        times.update(ftimes)
+        truth.update(ftruth)
+
 
     data = []
     for k, v in predictions.iteritems():
         gt = truth.get(k, False)
         data.append((v, gt))
 
-    draw_roc_curve(data, arrows=1)
-    print calc_stats(data)
-    actually_show_roc()
+    stats = calc_stats(data, include_scores=True)
+    print stats
+    if args.threshold == 0:
+        #args.threshold = stats['best_dfd_score']
+        args.threshold = stats['pos_95_score']
+
+    if args.threshold:
+        print args.threshold
+        count_and_sample_classifications(args, truth, predictions, times)
+
+    if not args.just_the_numbers:
+        draw_roc_curve(data, arrows=1)
+        actually_show_roc()
+
 
 main()
