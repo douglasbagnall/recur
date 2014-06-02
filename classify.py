@@ -388,7 +388,8 @@ class Classifier(BaseClassifier):
                     self.minute_results[k].append(r)
                     self.minute_gt[k].append(gt)
                 if self.presence_file:
-                    j = json.dumps([self.current_file.basename] + r)
+                    j = json.dumps([self.current_file.basename] +
+                                   [round(x, 5) for x in r])
                     #print >> sys.stderr, "presence", j
                     print >> self.presence_file, j
             else:
