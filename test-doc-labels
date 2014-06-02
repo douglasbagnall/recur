@@ -62,7 +62,7 @@ def print_times_strings(name, times, f=None):
         print >>f
 
 
-def count_and_sample_classifications(args, truth, predictions, times):
+def count_and_sample_classifications(args, truth, predictions, times, do_roc):
     tp, fp, tn, fn = [], [], [], []
     not_in_csv, not_in_pred = 0, 0
     for k in truth:
@@ -96,7 +96,7 @@ def count_and_sample_classifications(args, truth, predictions, times):
     print "missing from truth %d" % not_in_csv
     print "missing from predictions %d" % not_in_pred
 
-    if not args.just_the_numbers:
+    if do_roc:
         if args.sample_file:
             sf = open(args.sample_file, 'w')
         else:
@@ -182,15 +182,19 @@ def main():
 
     stats = calc_stats(data, include_scores=True)
     print stats
+    do_roc = not args.just_the_numbers and args.mcc_threshold < stats['mcc']
+
     if args.threshold == 0:
         #args.threshold = stats['best_dfd_score']
         args.threshold = stats['pos_95_score']
 
     if args.threshold:
         print args.threshold
-        count_and_sample_classifications(args, truth, predictions, times)
+        count_and_sample_classifications(args, truth, predictions, times, do_roc)
+    else:
+        print "no threshold?"
 
-    if not args.just_the_numbers:
+    if do_roc:
         draw_roc_curve(data, arrows=1)
         actually_show_roc()
 
