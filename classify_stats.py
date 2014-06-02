@@ -124,7 +124,7 @@ def _calc_stats(results, include_scores=False):
     neg_95 = 0
     briar = 0
     cross_entropy = 0
-    pos_95_score = 0
+    pos_95_score = 1
     neg_95_score = 0
     min_dfb_score = 0
 
