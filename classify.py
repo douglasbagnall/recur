@@ -163,6 +163,8 @@ class Classifier(BaseClassifier):
     call_json_file = None
     score_file = None
     smooth_presence = None
+    presence_file = None
+    minute_results = None
     def classify(self, data,
                  ground_truth_file=None,
                  classification_file=None,
@@ -177,6 +179,10 @@ class Classifier(BaseClassifier):
                  presence_index=None,
                  score_file=None,
                  smooth_presence=None,
+                 presence_subsample=None,
+                 presence_run_length=None,
+                 presence_ignore_start=None,
+                 presence_file=None,
                  roc_arrows=1):
         if len(self.classes) == 2 and target_index is None:
             self.target_index = self.classes[1]
@@ -205,7 +211,12 @@ class Classifier(BaseClassifier):
         self.show_presence_roc = show_presence_roc
         self.summarise = summarise
         self.presence_index = presence_index
+        self.presence_subsample = presence_subsample
+        self.presence_run_length = presence_run_length
+        self.presence_ignore_start = presence_ignore_start
         self.smooth_presence = smooth_presence
+        if presence_file:
+            self.presence_file = open(presence_file, 'w')
         self.data = list(reversed(data))
         self.setp('training', False)
         if self.show_roc or self.summarise:
@@ -329,6 +340,62 @@ class Classifier(BaseClassifier):
 
         print ''.join(out)
 
+
+    def calc_presence(self, scores):
+        wps = self.getp('windows-per-second')
+        w_size = int(wps / (self.presence_subsample or wps) + 0.5)
+        #print >> sys.stderr, "windows per second: %s. w_size %d" % (wps, w_size)
+
+        if self.presence_run_length:
+            run_length = int(wps * self.presence_run_length / w_size)
+            rl_window = np.zeros(run_length) + 1.0 / run_length
+
+        if self.presence_ignore_start is None:
+            ignore_start  = 10
+        else:
+            ignore_start = int(self.presence_ignore_start * wps + 0.5)
+
+        if self.presence_index is None:
+            if self.presence_run_length:
+                indices = [-1]
+            elif self.summarise: # a historical default
+                indices = [-6]
+            else:
+                indices = [-x * (x + 1) for x in range(1, 9)]
+        else:
+            indices = [-self.presence_index - 1]
+
+        if self.target_index:
+            items = [(self.target_index, scores[self.target_index])]
+        else:
+            items = scores.items()
+
+        for k, v in items:
+            rounding = (len(v) - ignore_start) % w_size
+            v2 = v[ignore_start + rounding:]
+            gt = any([x[1] for x in v2])
+            s = np.array([x[0] for x in v2])
+            if w_size != 1:
+                s = np.mean(s.reshape(-1, w_size), 1)
+
+            if self.presence_run_length:
+                s = np.convolve(s, rl_window)
+
+            s = np.sort(s)
+            if len(s) > indices[-1]:
+                r = [s[x] for x in indices]
+                if self.minute_results:
+                    self.minute_results[k].append(r)
+                    self.minute_gt[k].append(gt)
+                if self.presence_file:
+                    j = json.dumps([self.current_file.basename] + r)
+                    #print >> sys.stderr, "presence", j
+                    print >> self.presence_file, j
+            else:
+                print >> sys.stderr, ("ignoring presence results of length %d" %
+                                      len(s))
+
+
     def on_eos(self, bus, msg):
         if self.verbosity > 0:
             self.report()
@@ -380,29 +447,8 @@ class Classifier(BaseClassifier):
             line.extend(top_scores)
             print >>self.score_file, json.dumps(line)
 
-        if self.show_presence_roc or self.summarise:
-            if self.presence_index is None:
-                if self.summarise: # a historical default
-                    indices = [-6]
-                else:
-                    indices = [-x * (x + 1) for x in range(1, 9)]
-            else:
-                indices = [-self.presence_index - 1]
-            if self.target_index:
-                items = [(self.target_index, scores[self.target_index])]
-            else:
-                items = scores.items()
-            for k, v in items:
-                gt = any([x[1] for x in v[10:]])
-                s = np.array([x[0] for x in v])
-                #s = np.convolve(s, window)
-                s = np.sort(s[10:])
-                if len(s) > 72:
-                    squares = [s[x] for x in indices]
-                    self.minute_results[k].append(squares)
-                    self.minute_gt[k].append(gt)
-                else:
-                    print >> sys.stderr, "ignoring presence results of length %d" % len(s)
+        if self.show_presence_roc or self.summarise or self.presence_file:
+            self.calc_presence(scores)
 
         if self.show_roc or self.summarise:
             for k in self.scores:

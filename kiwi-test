@@ -45,6 +45,14 @@ def main():
                        help="index for presence stats (Nth best over whole file)")
     group.add_argument('--smooth-presence', type=int, default=None,
                        help="Smooth presence results with a window of this size")
+    group.add_argument('--presence-subsample', type=float, default=None,
+                       help="resample to this Hz for presence calculations")
+    group.add_argument('--presence-run-length', type=float, default=None,
+                       help="mean of this many seconds for presence score")
+    group.add_argument('--presence-ignore-start', type=float, default=None,
+                       help="ignore this many initial scores for presence calculations")
+    group.add_argument('--presence-file',
+                       help="write presence data here")
 
     args = parser.parse_args()
     timed = not args.no_timings
@@ -74,6 +82,11 @@ def main():
                show_presence_roc=args.presence_roc, target_index=args.target_class,
                summarise=args.summary, presence_index=args.presence_index,
                score_file=args.score_file, smooth_presence=args.smooth_presence,
-               roc_arrows=args.roc_arrows)
+               roc_arrows=args.roc_arrows,
+               presence_subsample=args.presence_subsample,
+               presence_run_length=args.presence_run_length,
+               presence_ignore_start=args.presence_ignore_start,
+               presence_file=args.presence_file
+           )
 
 main()
