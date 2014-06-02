@@ -43,7 +43,7 @@ XXX this really ought to be adjustable or adjust itself */
 #define RNN_HIDDEN_PENALTY 1e-9f
 /*scaling for hidden and input numbers */
 #define HIDDEN_MEAN_SOFT_TOP 16.0f
-#define INPUT_MEAN_SOFT_TOP 4.0f
+#define INPUT_MEAN_SOFT_TOP 16.0f
 
 #define RNN_INITIAL_WEIGHT_VARIANCE_FACTOR 5.0f
 #define WEIGHT_SCALE (1.0f - 1e-6f)

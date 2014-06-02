@@ -65,20 +65,6 @@ calculate_interlayer(const float *restrict inputs,
 
 
 static inline void
-maybe_scale_hiddens(RecurNN *net){
-  float *hiddens = net->hidden_layer;
-  ASSUME_ALIGNED(hiddens);
-  float softclip = net->h_size * HIDDEN_MEAN_SOFT_TOP;
-  float sum = 0.0f;
-  for (int i = 0; i < net->h_size; i++){
-    sum += hiddens[i];
-  }
-  if (sum > softclip){
-    softclip_scale(sum, softclip, hiddens, net->h_size);
-  }
-}
-
-static inline void
 maybe_scale_inputs(RecurNN *net){
   float *inputs = net->input_layer;
   ASSUME_ALIGNED(inputs);
@@ -128,7 +114,7 @@ rnn_opinion(RecurNN *net, const float *restrict inputs){
     float h = hiddens[i] - RNN_HIDDEN_PENALTY;
     hiddens[i] = (h > 0.0f) ? h : 0.0f;
   }
-  maybe_scale_hiddens(net);
+
   hiddens[0] = 1.0f;
 
   calculate_interlayer(hiddens, net->h_size,
