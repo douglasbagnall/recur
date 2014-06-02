@@ -61,6 +61,7 @@ enum
   PROP_WEIGHT_INIT_SCALE,
   PROP_CONFIRMATION_LAG,
   PROP_LOAD_NET_NOW,
+  PROP_WINDOWS_PER_SECOND,
 
   PROP_LAST
 };
@@ -88,6 +89,7 @@ enum
 #define DEFAULT_PROP_WEIGHT_NOISE 0.0f
 #define DEFAULT_PROP_WEIGHT_INIT_SCALE 0.0f
 #define DEFAULT_PROP_GENERATION 0
+#define DEFAULT_PROP_WINDOWS_PER_SECOND 0
 
 #define DEFAULT_PROP_CLASSES "01"
 #define DEFAULT_PROP_BPTT_DEPTH 30
@@ -565,6 +567,13 @@ gst_classify_class_init (GstClassifyClass * klass)
           "Read the net's training generation",
           0, G_MAXUINT,
           DEFAULT_PROP_GENERATION,
+          G_PARAM_READABLE | G_PARAM_STATIC_STRINGS));
+
+  g_object_class_install_property (gobject_class, PROP_WINDOWS_PER_SECOND,
+      g_param_spec_double("windows-per-second", "windows-per-second",
+          "Expect this many classifications per second",
+          0, G_MAXDOUBLE,
+          DEFAULT_PROP_WINDOWS_PER_SECOND,
           G_PARAM_READABLE | G_PARAM_STATIC_STRINGS));
 
   trans_class->transform_ip = GST_DEBUG_FUNCPTR (gst_classify_transform_ip);
@@ -1628,6 +1637,10 @@ gst_classify_get_property (GObject * object, guint prop_id, GValue * value,
   case PROP_WINDOW_SIZE:
     g_value_set_int(value, self->window_size);
     break;
+
+  case PROP_WINDOWS_PER_SECOND:
+    g_value_set_double(value, CLASSIFY_RATE * 2.0f / self->window_size);
+  break;
 
   default:
     G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
