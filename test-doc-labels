@@ -152,8 +152,10 @@ def main():
                         help="threshold for simple calculations")
     parser.add_argument('--just-the-numbers', action='store_true',
                         help="don't do ROC curves or samples")
-    parser.add_argument('--mcc-threshold', type=float, default=-2,
+    parser.add_argument('--mcc-threshold', type=float, default=None,
                         help="do roc curves if mcc > this")
+    parser.add_argument('--auc-threshold', type=float, default=None,
+                        help="do roc curves if auc > this")
     parser.add_argument('--sample-file', default='/tmp/doc-sample.txt',
                         help="write samples to this file")
     parser.add_argument('--sample-file-script', default='/tmp/doc-sample-server.sh',
@@ -185,7 +187,9 @@ def main():
 
     stats = calc_stats(data, include_scores=True)
     print stats
-    do_roc = not args.just_the_numbers and args.mcc_threshold < stats['mcc']
+    do_roc = not (args.just_the_numbers or
+                  (args.mcc_threshold is not None and args.mcc_threshold < stats['mcc']) or
+                  (args.auc_threshold is not None and args.auc_threshold < stats['auc']))
 
     if args.threshold == 0:
         args.threshold = stats['best_dfd_score']
