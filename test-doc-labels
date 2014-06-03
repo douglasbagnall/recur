@@ -188,8 +188,8 @@ def main():
     stats = calc_stats(data, include_scores=True)
     print stats
     do_roc = not (args.just_the_numbers or
-                  (args.mcc_threshold is not None and args.mcc_threshold < stats['mcc']) or
-                  (args.auc_threshold is not None and args.auc_threshold < stats['auc']))
+                  (args.mcc_threshold is not None and args.mcc_threshold > stats['mcc']) or
+                  (args.auc_threshold is not None and args.auc_threshold > stats['auc']))
 
     if args.threshold == 0:
         args.threshold = stats['best_dfd_score']
