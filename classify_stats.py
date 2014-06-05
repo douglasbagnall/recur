@@ -284,8 +284,6 @@ def actually_show_roc(title='ROC'):
 
 def draw_presence_roc(scores, label='presence', label_every=0.0):
     import matplotlib.pyplot as plt
-    #print scores
-
     scores, true_positives, false_positives, \
         tp_scale, fp_scale = prepare_roc_data(scores)
     tp = []

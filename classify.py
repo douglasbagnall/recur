@@ -183,6 +183,7 @@ class Classifier(BaseClassifier):
                  presence_run_length=None,
                  presence_ignore_start=None,
                  presence_file=None,
+                 presence_csv=None,
                  roc_arrows=1):
         if len(self.classes) == 2 and target_index is None:
             self.target_index = self.classes[1]
@@ -217,6 +218,10 @@ class Classifier(BaseClassifier):
         self.smooth_presence = smooth_presence
         if presence_file:
             self.presence_file = open(presence_file, 'w')
+        if presence_csv:
+            self.presence_csv = open(presence_csv, 'w')
+            print >> self.presence_csv, 'filename,score,truth'
+
         self.data = list(reversed(data))
         self.setp('training', False)
         if self.show_roc or self.summarise:
@@ -387,15 +392,18 @@ class Classifier(BaseClassifier):
                 if self.minute_results:
                     self.minute_results[k].append(r)
                     self.minute_gt[k].append(gt)
+                fn = self.current_file.basename
                 if self.presence_file:
-                    j = json.dumps([self.current_file.basename] +
-                                   [round(x, 7) for x in r])
+                    j = json.dumps([fn] + [round(x, 7) for x in r])
                     #print >> sys.stderr, "presence", j
                     print >> self.presence_file, j
+                if self.presence_csv:
+                    row = "%s,%s,%s" % (fn, r[0], gt)
+                    print >> self.presence_csv, row
             else:
                 print >> sys.stderr, ("ignoring presence results of length %d" %
                                       len(s))
-
+        return indices
 
     def on_eos(self, bus, msg):
         if self.verbosity > 0:
@@ -449,7 +457,7 @@ class Classifier(BaseClassifier):
             print >>self.score_file, json.dumps(line)
 
         if self.show_presence_roc or self.summarise or self.presence_file:
-            self.calc_presence(scores)
+            indices = self.calc_presence(scores)
 
         if self.show_roc or self.summarise:
             for k in self.scores:
@@ -473,8 +481,6 @@ class Classifier(BaseClassifier):
                     draw_roc_curve(self.scores[k], label, arrows=self.roc_arrows)
                     if self.show_presence_roc:
                         results = zip(*self.minute_results[k])
-                        #import pdb; pdb.set_trace()
-
                         label_i = indices[len(indices) // 2]
                         for i, row in zip(indices, results):
                             le = (0.1 if i == label_i else 0)

@@ -51,6 +51,8 @@ def main():
                        help="mean of this many seconds for presence score")
     group.add_argument('--presence-ignore-start', type=float, default=None,
                        help="ignore this many initial scores for presence calculations")
+    group.add_argument('--presence-csv', default=None,
+                       help="write presence data here is CSV form")
     group.add_argument('--presence-file',
                        help="write presence data here")
 
@@ -86,7 +88,8 @@ def main():
                presence_subsample=args.presence_subsample,
                presence_run_length=args.presence_run_length,
                presence_ignore_start=args.presence_ignore_start,
-               presence_file=args.presence_file
+               presence_file=args.presence_file,
+               presence_csv=args.presence_csv
            )
 
 main()
