@@ -1,0 +1,14 @@
+Which licence applies where:
+
+* CC0 applies to some of the ccan modules (see ccan/*/LICENSE).
+
+* GPL-2+ applies to ccan/opt and test_backprop which depends on
+  ccan/opt. Files in ccan/opt refer to GPL3+, but that has been
+  changed to GPL2+ by the authors. 
+  (see https://lists.ozlabs.org/pipermail/ccan/2014-February/000608.html)
+
+* mdct.c is from libvorbis and comes with a BSD license (see
+  COPYING.mdct).
+
+* Everything else can be used under the terms of either the LGPL-2 or
+  the MPL2.
