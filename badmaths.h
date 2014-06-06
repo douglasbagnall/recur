@@ -140,5 +140,19 @@ softmax_best_guess(float *restrict error, const float *restrict src, int len)
   return best_i;
 }
 
+static inline void
+biased_softmax(float *restrict dest, const float *restrict src, int len, float bias){
+  if (bias == 0){
+    softmax(dest, src, len);
+  }
+  else {
+    float tmp[len];
+    softmax(tmp, src, len);
+    for (int i = 0; i < len; i++){
+      tmp[i] = tmp[i] * bias + src[i];
+    }
+    softmax(dest, tmp, len);
+  }
+}
 
 #endif

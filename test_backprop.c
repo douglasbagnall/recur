@@ -51,6 +51,7 @@ Because of ccan/opt, --help will tell you something.
 #define DEFAULT_VALIDATION_OVERLAP 1
 #define DEFAULT_OVERRIDE 0
 #define DEFAULT_DETERMINISTIC_CONFAB 0
+#define DEFAULT_CONFAB_BIAS 0
 #define DEFAULT_SAVE_NET 1
 #define DEFAULT_LOG_FILE "bptt.log"
 #define DEFAULT_BASENAME "text"
@@ -135,6 +136,7 @@ static float opt_perforate_weights = DEFAULT_PERFORATE_WEIGHTS;
 static bool opt_temporal_pgm_dump = DEFAULT_TEMPORAL_PGM_DUMP;
 static bool opt_periodic_pgm_dump = DEFAULT_PERIODIC_PGM_DUMP;
 static bool opt_deterministic_confab = DEFAULT_DETERMINISTIC_CONFAB;
+static float opt_confab_bias = DEFAULT_CONFAB_BIAS;
 static bool opt_save_net = DEFAULT_SAVE_NET;
 static bool opt_learn_capitals = DEFAULT_LEARN_CAPITALS;
 static uint opt_multi_tap = DEFAULT_MULTI_TAP;
@@ -273,6 +275,8 @@ static struct opt_table options[] = {
       &opt_learn_capitals, "learn to predict capitalisation"),
   OPT_WITHOUT_ARG("--deterministic-confab", opt_set_bool,
       &opt_deterministic_confab, "Use best guess in confab, not random sampling"),
+  OPT_WITH_ARG("--confab-bias", opt_set_floatval, opt_show_floatval,
+      &opt_confab_bias, "extra bias toward probable characters in confab"),
   OPT_WITHOUT_ARG("--no-save-net", opt_set_invbool,
       &opt_save_net, "Don't save learnt changes"),
   OPT_WITH_ARG("--multi-tap=<n>", opt_set_uintval, opt_show_uintval,
@@ -470,7 +474,7 @@ opinion_deterministic(RecurNN *net, int hot){
 }
 
 static inline int
-opinion_probabilistic(RecurNN *net, int hot){
+opinion_probabilistic(RecurNN *net, int hot, float bias){
   int i;
   float r;
   float *answer = one_hot_opinion(net, hot);
@@ -479,11 +483,11 @@ opinion_probabilistic(RecurNN *net, int hot){
   float error[net->output_size];
   if (opt_learn_capitals){
     r = rand_double(&net->rng);
-    softmax(error, answer + n_chars, 2);
+    biased_softmax(error, answer + n_chars, 2, bias);
     if (r > error[0])
       cap = 0x80;
   }
-  softmax(error, answer, n_chars);
+  biased_softmax(error, answer, n_chars, bias);
   /*outer loop in case error doesn't quite add to 1 */
   for(;;){
     r = rand_double(&net->rng);
@@ -519,14 +523,14 @@ validate(RecurNN *net, const u8 *text, int len){
 
 static void
 confabulate(RecurNN *net, char *text, int len,
-    int deterministic){
+    int deterministic, float bias){
   int i;
   static int n = 0;
   for (i = 0; i < len; i++){
     if (deterministic)
       n = opinion_deterministic(net, n);
     else
-      n = opinion_probabilistic(net, n);
+      n = opinion_probabilistic(net, n, bias);
     int cap = n & 0x80;
     n &= 0x7f;
     int c = opt_alphabet[n];
@@ -538,11 +542,11 @@ confabulate(RecurNN *net, char *text, int len,
 }
 
 static inline void
-long_confab(RecurNN *net, int len, int rows){
+long_confab(RecurNN *net, int len, int rows, float bias){
   int i, j;
   char confab[len * rows + 1];
   confab[len * rows] = 0;
-  confabulate(net, confab, len * rows, 0);
+  confabulate(net, confab, len * rows, 0, bias);
   for (i = 1; i < rows; i++){
     int target = i * len;
     int linebreak = target;
@@ -640,7 +644,7 @@ report_on_progress(RecurNN *net, RecurNN *confab_net, float ventropy,
   float accuracy = *correct * scale;
   double per_sec = 1.0 / scale / elapsed;
   BELOW_QUIET_LEVEL(1){
-    confabulate(confab_net, confab, CONFAB_SIZE, opt_deterministic_confab);
+    confabulate(confab_net, confab, CONFAB_SIZE, opt_deterministic_confab, opt_confab_bias);
     Q_DEBUG(1, "%5dk e.%02d t%.2f v%.2f a.%02d %.0f/s |%s|", k, (int)(*error * 100 + 0.5),
         *entropy, ventropy,
         (int)(accuracy * 100 + 0.5), per_sec + 0.5, confab);
@@ -744,7 +748,7 @@ epoch(RecurNN **nets, int n_nets, RecurNN *confab_net, Ventropy *v,
     }
   }
   BELOW_QUIET_LEVEL(1){
-    long_confab(confab_net, CONFAB_SIZE, 6);
+    long_confab(confab_net, CONFAB_SIZE, 6, opt_confab_bias);
   }
 }
 
@@ -904,7 +908,7 @@ main(int argc, char *argv[]){
   opt_multi_tap = MAX(opt_multi_tap, 1);
   RecurNN *net = load_or_create_net();
   if (opt_confab_only){
-    long_confab(net, opt_confab_only, 1);
+    long_confab(net, opt_confab_only, 1, opt_confab_bias);
     exit(0);
   }
 
