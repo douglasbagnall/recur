@@ -63,7 +63,7 @@ $(subdirs):
 all:: libgstclassify.so $(subdirs)
 
 clean:
-	rm -f *.so *.o *.a *.d *.s
+	rm -f *.so *.o *.a *.d *.s *.pyc
 	rm -f path.h config.h
 	rm -f ccan/*/*.[oad]
 
