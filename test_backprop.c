@@ -74,7 +74,7 @@ Because of ccan/opt, --help will tell you something.
 #define DEFAULT_MULTI_TAP 0
 #define DEFAULT_USE_MULTI_TAP_PATH 0
 #define DEFAULT_MOMENTUM_STYLE RNN_MOMENTUM_WEIGHTED
-#define DEFAULT_WEIGHT_SCALE_FACTOR 0
+#define DEFAULT_INIT_WEIGHT_SCALE 0
 #define DEFAULT_REPORT_INTERVAL 1024
 #define DEFAULT_CONFAB_ONLY 0
 #define DEFAULT_BOTTOM_LAYER 0
@@ -132,6 +132,7 @@ static float opt_init_input_magnitude = DEFAULT_INIT_INPUT_MAGNITUDE;
 static float opt_init_hidden_gain = DEFAULT_INIT_HIDDEN_GAIN;
 static float opt_init_hidden_run_length = DEFAULT_INIT_HIDDEN_RUN_LENGTH;
 static float opt_init_hidden_run_deviation = DEFAULT_INIT_HIDDEN_RUN_DEVIATION;
+static float opt_init_weight_scale = DEFAULT_INIT_WEIGHT_SCALE;
 static float opt_perforate_weights = DEFAULT_PERFORATE_WEIGHTS;
 static bool opt_temporal_pgm_dump = DEFAULT_TEMPORAL_PGM_DUMP;
 static bool opt_periodic_pgm_dump = DEFAULT_PERIODIC_PGM_DUMP;
@@ -142,7 +143,6 @@ static bool opt_learn_capitals = DEFAULT_LEARN_CAPITALS;
 static uint opt_multi_tap = DEFAULT_MULTI_TAP;
 static bool opt_use_multi_tap_path = DEFAULT_USE_MULTI_TAP_PATH;
 static int opt_momentum_style = DEFAULT_MOMENTUM_STYLE;
-static float opt_weight_scale_factor = DEFAULT_WEIGHT_SCALE_FACTOR;
 static uint opt_report_interval = DEFAULT_REPORT_INTERVAL;
 static uint opt_confab_only = DEFAULT_CONFAB_ONLY;
 static uint opt_bottom_layer = DEFAULT_BOTTOM_LAYER;
@@ -285,8 +285,8 @@ static struct opt_table options[] = {
       &opt_use_multi_tap_path, "use multi-tap code path on single-tap tasks"),
   OPT_WITH_ARG("--momentum-style=<n>", opt_set_intval, opt_show_intval,
       &opt_momentum_style, "0: weighted, 1: Nesterov, 2: simplified N., 3: classical"),
-  OPT_WITH_ARG("--weight-scale-factor=<float>", opt_set_floatval, opt_show_floatval,
-      &opt_weight_scale_factor, "scale newly initialised weights (try ~1.0)"),
+  OPT_WITH_ARG("--init-weight-scale=<float>", opt_set_floatval, opt_show_floatval,
+      &opt_init_weight_scale, "scale newly initialised weights (try ~1.0)"),
   OPT_WITH_ARG("--report-interval=<n>", opt_set_uintval_bi, opt_show_uintval_bi,
       &opt_report_interval, "how often to validate and report"),
   OPT_WITH_ARG("--confab-only=<chars>", opt_set_uintval, opt_show_uintval,
@@ -829,8 +829,8 @@ initialise_net(RecurNN *net){
   }
   rnn_randomise_weights_clever(net, &p);
 
-  if (opt_weight_scale_factor > 0){
-    rnn_scale_initial_weights(net, opt_weight_scale_factor);
+  if (opt_init_weight_scale > 0){
+    rnn_scale_initial_weights(net, opt_init_weight_scale);
   }
 }
 
