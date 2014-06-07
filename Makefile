@@ -24,7 +24,13 @@ INC_DIR = /usr/include
 #CLANG_FLAGS =  -fplugin=/usr/lib/gcc/x86_64-linux-gnu/4.7/plugin/dragonegg.so
 #CC = clang -Xclang -analyze -Xclang -analyzer-checker=debug.ViewCallGraph
 
-ALL_CFLAGS = -march=native -pthread $(WARNINGS) -pipe  -D_GNU_SOURCE $(INCLUDES) $(ARCH_CFLAGS) $(CFLAGS) $(DEV_CFLAGS) -ffast-math -funsafe-loop-optimizations $(CLANG_FLAGS) -std=gnu11 $(CFLAGS)
+ifdef USE_CBLAS
+BLAS_LINK = -lblas
+BLAS_FLAGS = -DUSE_CBLAS
+endif
+
+
+ALL_CFLAGS = -march=native -pthread $(WARNINGS) -pipe  -D_GNU_SOURCE $(INCLUDES) $(ARCH_CFLAGS) $(CFLAGS) $(DEV_CFLAGS) -ffast-math -funsafe-loop-optimizations $(CLANG_FLAGS) -std=gnu11 $(CFLAGS) $(BLAS_CFLAGS) $(LOCAL_FLAGS)
 ALL_LDFLAGS = $(LDFLAGS)
 
 GST_INCLUDES =  -isystem $(INC_DIR)/gstreamer-1.0\
@@ -44,7 +50,7 @@ GTK_INCLUDES = -isystem /usr/include/gtk-3.0 \
 INCLUDES = -I. $(GST_INCLUDES)
 
 COMMON_LINKS = -L/usr/local/lib  -lm -pthread -lrt \
-		 -lblas -lcdb
+		 $(BLAS_LINK) -lcdb
 
 GST_LINKS = -lgstbase-1.0 -lgstreamer-1.0 \
 	 -lgobject-2.0 -lglib-2.0 -lgstvideo-1.0  \

@@ -6,6 +6,16 @@ NN_SPECIAL_FLAGS =  -fprefetch-loop-arrays
 
 ARCH = x86_64
 
-# -Wunsafe-loop-optimizations  -ftree-vectorizer-verbose=2  -fno-inline
-# -fno-trapping-math
-# -fno-omit-frame-pointer
+# set USE_CBLAS to use BLAS library instead of specialised routines
+# (CBLAS is slower in tests on x64-64)
+
+#USE_CBLAS = 1
+
+# include -DVECTOR_ALL_THE_WAY in LOCAL_FLAGS to use explicit
+# vectorisation in places where GCC 4.7+ can already deduce efficient
+# vectorisation. This helps Clang in one or two places. On the other
+# hand, removing -DVECTOR removes vectorisation assistance that GCC
+# 4.8 still needs.
+
+LOCAL_FLAGS = -DVECTOR
+#LOCAL_FLAGS = -DVECTOR_ALL_THE_WAY -DVECTOR

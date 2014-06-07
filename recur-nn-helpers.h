@@ -7,7 +7,9 @@
 
 #include "recur-nn.h"
 
+#if USE_CBLAS
 #include <cblas.h>
+#endif
 #include "pgm_dump.h"
 
 #if VECTOR
@@ -22,7 +24,7 @@ scale_aligned_array(float *array, int len, float scale)
 {
   /*Using cblas might create denormal numbers -- unless the blas library has
     been compiled with -ffastmath. */
-#if 1
+#if ! USE_CBLAS
   ASSUME_ALIGNED(array);
   for (int i = 0; i < len; i++){
     array[i] *= scale;
@@ -38,7 +40,7 @@ add_aligned_arrays(float *restrict dest, int len, const float *restrict src,
 {
   /*dest = dest + src * scale
     cblas_saxpy can do it. */
-#if 1
+#if ! USE_CBLAS
   //XXX a prefetch would help
   ASSUME_ALIGNED(dest);
   ASSUME_ALIGNED(src);
@@ -62,7 +64,7 @@ add_aligned_arrays(float *restrict dest, int len, const float *restrict src,
     }
   }
 
-#else
+#else /*not VECTOR_ALL_THE_WAY*/
   if (scale == 1.0f){
     for (int i = 0; i < len; i++){
       dest[i] += src[i];

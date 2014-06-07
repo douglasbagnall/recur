@@ -21,7 +21,7 @@ calculate_interlayer(const float *restrict inputs,
     int output_size,
     const float *restrict weights)
 {
-#if 1
+#if ! USE_CBLAS
   /* Naive opinion tests ~25% quicker than cblas opinion for scarcely trained
      nets of all sizes, and 50% quicker for highly trained 1999 neuron
      nets.

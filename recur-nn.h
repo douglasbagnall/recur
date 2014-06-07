@@ -8,8 +8,9 @@
 #include "recur-common.h"
 #include "recur-rng.h"
 
-#define VECTOR 1
-#define VECTOR_ALL_THE_WAY (0 && VECTOR)
+/*VECTOR and VECTOR_ALL_THE_WAY now set in Makefile or local.mak */
+//#define VECTOR 1
+//#define VECTOR_ALL_THE_WAY (0 && VECTOR)
 
 #define RECUR_RNG_SUBSEED -2ULL
 
