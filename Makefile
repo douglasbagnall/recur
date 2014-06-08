@@ -175,6 +175,9 @@ gtk-recur.o rnnca-player.o: %.o: %.c
 rnnca-player gtk-recur: %: %.o
 	$(CC) -Wl,-O1 $^ $(INCLUDES) $(GTK_INCLUDES) $(DEFINES) $(LINKS) $(GTK_LINKS)   -o $@
 
+startup/%.desktop: startup/%.desktop.template
+	sed "s|{recur-root}|$(CURDIR)|g" < $< > $@
+	chmod a+x $@
 
 .PHONY: all test-pipeline clean pgm-clean
 

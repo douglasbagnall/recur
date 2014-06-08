@@ -1,8 +1,10 @@
 #!/bin/bash
 
-URI=file:///home/douglas/recur/test-video/lagos-288-192-20.avi
-RECORD_URI=file:///home/douglas/recur/test-video/lagos-288-192-20-short.avi
-#URI=file:///home/douglas/recur/test-video/rochester-288-192.avi
+HERE=$(git rev-parse --show-toplevel)
+
+URI=file://$HERE/test-video/lagos-288-192-20.avi
+RECORD_URI=file://$HERE/test-video/lagos-288-192-20-short.avi
+#URI=file://$HERE/test-video/rochester-288-192.avi
 
 MOMENTUM=0.95
 MSS=4000

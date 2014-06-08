@@ -1,8 +1,8 @@
 [Desktop Entry]
 Name=Recur Launcher
 Comment="Put this in ~/.config/autostart to launch Recur automatically"
-Exec="/home/douglas/recur/startup.sh"
-Path="/home/douglas/recur/"
+Exec="{recur-root}/startup/recur-startup.sh"
+Path="{recur-root}"
 Terminal=false
 Type=Application
 Categories=

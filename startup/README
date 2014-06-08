@@ -1,0 +1,11 @@
+The files here help run Recur video plugins in kiosk/gallery mode.
+Do this from the repository root:
+
+    make startup/rnnca.desktop
+    # or
+    make startup/recur.desktop
+
+and copy the desktop file to ~/.config/autostart on a Linux desktop.
+The next time you log in, the thing will start up automatically. but
+be warned that it will start up in full screen and *REALLY* ANNOYING
+if you do it on your work machine. It is for exhibition machines only.

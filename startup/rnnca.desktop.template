@@ -1,8 +1,8 @@
 [Desktop Entry]
 Name=RNNCA Launcher
 Comment="Put this in ~/.config/autostart to launch RNNCA automatically"
-Exec="/home/douglas/recur/rnnca-startup.sh"
-Path="/home/douglas/recur/"
+Exec="{recur-root}/startup/rnnca-startup.sh"
+Path="{recur-root}"
 Terminal=false
 Type=Application
 Categories=
