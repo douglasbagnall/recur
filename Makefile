@@ -108,19 +108,19 @@ RNN_OBJECTS =  recur-nn.o recur-nn-io.o recur-nn-init.o
 RECUR_OBJECTS = gstrecur_manager.o gstrecur_audio.o gstrecur_video.o \
 	recur-context.o context-recurse.o
 
-libgstrecur.so: $(RECUR_OBJECTS) $(RNN_OBJECTS) rescale.o mfcc.o
+libgstrecur.so: $(RECUR_OBJECTS) $(RNN_OBJECTS) rescale.o mfcc.o | nets images
 	$(CC) -shared -Wl,-O1 $+ $(INCLUDES) $(DEFINES) $(LINKS) -Wl,-soname -Wl,$@ \
 	  -o $@
 
-libgstrnnca.so: $(RNN_OBJECTS) gstrnnca.o rescale.o
+libgstrnnca.so: $(RNN_OBJECTS) gstrnnca.o rescale.o | nets images
 	$(CC) -shared -Wl,-O1 $+ $(INCLUDES) $(DEFINES) $(LINKS) -Wl,-soname -Wl,$@ \
 	  -o $@
 
-libgstparrot.so: $(RNN_OBJECTS)  mdct.o gstparrot.o mfcc.o
+libgstparrot.so: $(RNN_OBJECTS)  mdct.o gstparrot.o mfcc.o | nets images
 	$(CC) -shared -Wl,-O1 $+ $(INCLUDES) $(DEFINES) $(LINKS) -Wl,-soname -Wl,$@ \
 	  -o $@
 
-libgstclassify.so: $(RNN_OBJECTS) gstclassify.o mfcc.o
+libgstclassify.so: $(RNN_OBJECTS) gstclassify.o mfcc.o | nets images
 	$(CC) -shared -Wl,-O1 $+ $(INCLUDES) $(DEFINES) $(LINKS) -Wl,-soname -Wl,$@ \
 	  -o $@
 
@@ -144,7 +144,7 @@ test/test_window_functions test/test_dct: %: mfcc.o %.o
 test/test_simple_rescale test/test_rescale: %: rescale.o %.o
 	$(CC) -Wl,-O1 $^   -I. $(DEFINES)  $(COMMON_LINKS)  -o $@
 
-test_backprop test/test_fb_backprop: %: $(RNN_OBJECTS) %.o $(OPT_OBJECTS)
+test_backprop test/test_fb_backprop: %: $(RNN_OBJECTS) %.o $(OPT_OBJECTS)  | nets images
 	$(CC) -Iccan/opt/ -Wl,-O1 $(filter %.o,$^)   -I. $(DEFINES)  $(COMMON_LINKS)  -o $@
 
 convert-saved-net: %: $(RNN_OBJECTS) %.o
