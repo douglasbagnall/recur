@@ -62,7 +62,7 @@ GTK_LINKS =  -lgtk-3 -lgdk-3
 
 OPT_OBJECTS = ccan/opt/opt.o ccan/opt/parse.o ccan/opt/helpers.o ccan/opt/usage.o
 
-subdirs = images nets
+subdirs = images nets test-video
 $(subdirs):
 	mkdir -p $@
 
@@ -181,21 +181,36 @@ startup/%.desktop: startup/%.desktop.template
 
 .PHONY: all test-pipeline clean pgm-clean
 
+#base urls for fetching test video.
+IA_URL = https://archive.org/download
+NOAA_16_URL = http://docs.lib.noaa.gov/noaa_documents/video/NOAA_16mm
 
-VIDEO_DIR = $(CURDIR)/test-video
-VID_URI_1=file://$(VIDEO_DIR)/small/2004-08-08.avi
-VID_URI_2=file://$(VIDEO_DIR)/F30275.mov
-VID_URI_3=file://$(VIDEO_DIR)/rochester-pal.avi
-VID_URI_4=file://$(VIDEO_DIR)/DEC.flv
-VID_URI_5=file://$(VIDEO_DIR)/alowhum/vts_16_1.vob.avi
-VID_URI_LAGOS=file://$(VIDEO_DIR)/movies/louis-theroux-lagos/louis.theroux.law.and.disorder.in.lagos.ws.pdtv.xvid-waters.avi
-VID_URI_LAGOS_SMALL=file://$(VIDEO_DIR)/lagos-288-192-20.avi
-VID_URI_7=file://$(VIDEO_DIR)/movies/InBruges.avi
-VID_URI_TUBBIES=file://$(VIDEO_DIR)/teletubbies.avi
-VID_URI_ZION=file://$(VIDEO_DIR)/movies/louis-theroux-zionists/Louis.Theroux.Ultra.Zionists.WS.PDTV.XviD-PVR.avi
-VID_URI_EXIT=file://$(VIDEO_DIR)/movies/exit-through-the-gift-shop/Exit-Through-The-Gift-Shop.avi
+robbers-under-water_URL = $(IA_URL)/0330_Robbers_Under_Water_E01201_08_45_30_00/0330_Robbers_Under_Water_E01201_08_45_30_00.ogv
+rochester_URL = $(IA_URL)/Rochester_A_City_of_Quality/0103_Rochester_A_City_of_Quality_M05344_15_00_42_00_3mb.ogv
+white-pelican_URL = $(IA_URL)/0812_White_Pelican_00_43_03_00/0812_White_Pelican_00_43_03_00_3mb.ogv
+LA-colour_URL = $(IA_URL)/PET0981_R-2_LA_color/PET0981_R-2_LA_color.ogv
+filmcollectief-09-208_URL = $(IA_URL)/filmcollectief-09-208/filmcollectief-09-208.ogv
+filmcollectief-09-542_URL = $(IA_URL)/filmcollectief-09-542/filmcollectief-09-542.ogv
+
+camille_URL = $(NOAA_16_URL)/QC9452C3L331969.mov
+shrimp-tanks_URL = $(NOAA_16_URL)/QL444M33R631972pt1.mov
+QC875M671960_URL = $(NOAA_16_URL)/QC875M671960.mov
+plane-left-window_URL = $(NOAA_16_URL)/QC9452D3H871958film1.mov
+arctic_URL = $(NOAA_16_URL)/QB2812G461949.mov
+
+test-video/%.ogv test-video/%.mov: |test-video
+	wget "$($*_URL)" -O $@
+
 VID_W=288
 VID_H=192
+VID_FPS=20
+
+test-video/%-$(VID_W)x$(VID_H)-$(VID_FPS)fps.avi: test-video/%.ogv
+	./reduce-video.sh $< $@ $(VID_FPS) $(VID_W) $(VID_H)
+
+test-video/%-$(VID_W)x$(VID_H)-$(VID_FPS)fps.avi: test-video/%.mov
+	./reduce-video.sh $< $@ $(VID_FPS) $(VID_W) $(VID_H) 1
+
 VID_SPECS = video/x-raw, format=I420, width=$(VID_W), height=$(VID_H), framerate=20/1
 
 VID_TEST_SRC_1 = videotestsrc pattern=14 kt=2 kxt=1 kyt=3  kxy=3 !\
@@ -204,18 +219,6 @@ VID_TEST_SRC_1 = videotestsrc pattern=14 kt=2 kxt=1 kyt=3  kxy=3 !\
 VID_LINE=videoscale method=nearest-neighbour ! videoconvert ! $(VID_SPECS)
 AUD_LINE=audioconvert ! audioresample
 
-VID_FILE_SRC_1 = uridecodebin name=src uri=$(VID_URI_1) ! $(VID_LINE)
-VID_FILE_SRC_2 = uridecodebin name=src uri=$(VID_URI_2) ! $(VID_LINE)
-VID_FILE_SRC_3 = uridecodebin name=src uri=$(VID_URI_3) ! $(VID_LINE)
-VID_FILE_SRC_4 = uridecodebin name=src uri=$(VID_URI_4) ! $(VID_LINE)
-VID_FILE_SRC_5 = uridecodebin name=src uri=$(VID_URI_5) ! $(VID_LINE)
-VID_FILE_SRC_TUBBIES = uridecodebin name=src uri=$(VID_URI_TUBBIES) ! $(VID_LINE)
-VID_FILE_SRC_BRUGES = uridecodebin name=src uri=$(VID_URI_7) ! $(VID_LINE)
-VID_FILE_SRC_ZION = uridecodebin name=src uri=$(VID_URI_ZION) ! $(VID_LINE)
-VID_FILE_SRC_LAGOS = uridecodebin name=src uri=$(VID_URI_LAGOS) ! $(VID_LINE)
-VID_FILE_SRC_LAGOS_SMALL = uridecodebin name=src uri=$(VID_URI_LAGOS_SMALL) ! $(VID_LINE)
-VID_FILE_SRC_EXIT = uridecodebin name=src uri=$(VID_URI_EXIT) ! $(VID_LINE)
-
 #GST_DEBUG=uridecodebin:7
 #GST_DEBUG=recur*:5
 #TIMER = time -f '\nused %P CPU\n' timeout 10
@@ -223,37 +226,42 @@ VID_FILE_SRC_EXIT = uridecodebin name=src uri=$(VID_URI_EXIT) ! $(VID_LINE)
 #GDB=valgrind --tool=memcheck  --track-origins=yes
 VALGRIND = valgrind --tool=memcheck --log-file=valgrind.log --trace-children=yes --suppressions=valgrind-python.supp  --leak-check=full --show-reachable=yes
 
+DEFAULT_VIDEO = test-video/filmcollectief-09-542-288x192-20fps.avi
+#DEFAULT_VIDEO = test-video/camille-288x192-20fps.avi
+VID_FILE_SRC_DEFAULT = uridecodebin name=src uri=file://$(CURDIR)/$(DEFAULT_VIDEO) \
+	! $(VID_LINE)
+
 #RNNCA_DEBUG=GST_DEBUG=rnnca*:5,recur*:5
 
-test-rnnca: libgstrnnca.so $(subdirs)
+test-rnnca: libgstrnnca.so $(subdirs) $(DEFAULT_VIDEO)
 	$(RNNCA_DEBUG)	$(GDB) 	gst-launch-1.0  \
 	  --gst-plugin-path=$(CURDIR) \
-	$(VID_FILE_SRC_LAGOS_SMALL) \
+	$(VID_FILE_SRC_DEFAULT) \
 	! rnnca log-file=rnnca.log training=1 playing=1 edges=0  \
 	! videoconvert ! xvimagesink force-aspect-ratio=0
 
-train-rnnca: libgstrnnca.so $(subdirs)
+train-rnnca: libgstrnnca.so $(subdirs) $(DEFAULT_VIDEO)
 	$(RNNCA_DEBUG) $(GDB) 	gst-launch-1.0  \
 		  --gst-plugin-path=$(CURDIR) \
-		$(VID_FILE_SRC_LAGOS_SMALL) \
+		$(VID_FILE_SRC_DEFAULT) \
 		! rnnca log-file=rnnca.log training=1 playing=0 \
 		! fakesink ;\
 
 PROPER_RNNCA_PROPERTIES = momentum-soft-start=3000 momentum=0.95 learn-rate=3e-6 \
 	hidden-size=79 log-file=rnnca.log offsets=Y000111C000111
 
-train-rnnca-properly: libgstrnnca.so $(subdirs)
+train-rnnca-properly: libgstrnnca.so $(subdirs) $(DEFAULT_VIDEO)
 	$(RNNCA_DEBUG) $(GDB) 	gst-launch-1.0  \
 		  --gst-plugin-path=$(CURDIR) \
-		$(VID_FILE_SRC_LAGOS_SMALL) \
+		$(VID_FILE_SRC_DEFAULT) \
 		! rnnca $(PROPER_RNNCA_PROPERTIES) \
 		training=1 playing=0 \
 		! fakesink ;\
 
-test-rnnca-properly: libgstrnnca.so $(subdirs)
+test-rnnca-properly: libgstrnnca.so $(subdirs) $(DEFAULT_VIDEO)
 	$(RNNCA_DEBUG) $(GDB) 	gst-launch-1.0  \
 		  --gst-plugin-path=$(CURDIR) \
-		$(VID_FILE_SRC_LAGOS_SMALL) \
+		$(VID_FILE_SRC_DEFAULT) \
 		! rnnca $(PROPER_RNNCA_PROPERTIES) \
 		training=1 playing=1 \
 		!  xvimagesink force-aspect-ratio=0
@@ -294,20 +302,20 @@ record-rnnca: libgstrnnca.so
 
 TEST_PIPELINE_CORE = gst-launch-1.0  \
 	  --gst-plugin-path=$(CURDIR) \
-	$(VID_FILE_SRC_3) ! recur_manager name=recur osdebug=0 ! videoconvert \
+	$(VID_FILE_SRC_DEFAULT) ! recur_manager name=recur osdebug=0 ! videoconvert \
 	! xvimagesink force-aspect-ratio=false \
 	recur. ! autoaudiosink \
 	src. ! $(AUD_LINE) ! recur.
 
 
 
-test-pipeline: libgstrecur.so
+test-pipeline: libgstrecur.so  $(DEFAULT_VIDEO)
 	GST_DEBUG=$(GST_DEBUG) $(TIMER) $(GDB) $(TEST_PIPELINE_CORE)
 
-%-recur.ogv: libgstrecur.so
+%-recur.ogv: libgstrecur.so  $(DEFAULT_VIDEO)
 	timeout 30 gst-launch-1.0  \
 	  --gst-plugin-path=$(CURDIR) \
-	$(VID_FILE_SRC_3) ! recur_manager name=recur ! videoconvert ! queue ! theoraenc ! oggmux ! filesink location="$@" \
+	$(VID_FILE_SRC_DEFAULT) ! recur_manager name=recur ! videoconvert ! queue ! theoraenc ! oggmux ! filesink location="$@" \
 	recur. ! fakesink \
 	src. ! $(AUD_LINE) ! recur.
 
@@ -318,15 +326,15 @@ test-pipeline-kcachegrind: libgstrecur.so
 	kcachegrind &
 	valgrind --tool=callgrind $(TEST_PIPELINE_CORE) 2>callgrind.log
 
-train-pipeline:
+train-pipeline:  $(DEFAULT_VIDEO)
 	gst-launch-1.0  \
 	  --gst-plugin-path=$(CURDIR) \
-	$(VID_FILE_SRC_3) ! recur_manager name=recur ! videoconvert ! fakesink \
+	$(VID_FILE_SRC_DEFAULT) ! recur_manager name=recur ! videoconvert ! fakesink \
 	recur. ! fakesink \
 	src. ! $(AUD_LINE) ! recur.
 	gst-launch-1.0  \
 	  --gst-plugin-path=$(CURDIR) \
-	$(VID_FILE_SRC_3) ! recur_manager name=recur ! videoconvert ! fakesink \
+	$(VID_FILE_SRC_DEFAULT) ! recur_manager name=recur ! videoconvert ! fakesink \
 	recur. ! fakesink \
 	src. ! $(AUD_LINE) ! recur.
 
