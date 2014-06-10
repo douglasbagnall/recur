@@ -1,4 +1,4 @@
-/* Copyright 2013 Douglas Bagnall <douglas@halo.gen.nz> LGPL/MPL2 */
+/* Copyright 2013 Douglas Bagnall <douglas@halo.gen.nz> LGPL */
 #ifndef HAVE_RECUR_CONTEXT_H
 #define HAVE_RECUR_CONTEXT_H
 

@@ -1,4 +1,4 @@
-/* Copyright (c) 2013 Douglas Bagnall <douglas@halo.gen.nz> LGPL/MPL2*/
+/* Copyright (c) 2013 Douglas Bagnall <douglas@halo.gen.nz> LGPL*/
 #ifndef __RECUR_COMMON_H__
 #define __RECUR_COMMON_H__
 

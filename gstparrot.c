@@ -1,4 +1,4 @@
-/* Copyright 2013 Douglas Bagnall <douglas@halo.gen.nz> LGPL/MPL2 */
+/* Copyright 2013 Douglas Bagnall <douglas@halo.gen.nz> LGPL */
 #include "gstparrot.h"
 #include "audio-common.h"
 #include <string.h>

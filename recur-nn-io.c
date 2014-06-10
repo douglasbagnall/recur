@@ -1,4 +1,4 @@
-/* Copyright 2014 Douglas Bagnall <douglas@halo.gen.nz> LGPL/MPL2 */
+/* Copyright 2014 Douglas Bagnall <douglas@halo.gen.nz> LGPL */
 #include "recur-nn.h"
 #include <cdb.h>
 #include <fcntl.h>

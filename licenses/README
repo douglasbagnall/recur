@@ -4,11 +4,11 @@ Which licence applies where:
 
 * GPL-2+ applies to ccan/opt and test_backprop which depends on
   ccan/opt. Files in ccan/opt refer to GPL3+, but that has been
-  changed to GPL2+ by the authors. 
+  changed to GPL2+ by the authors.
   (see https://lists.ozlabs.org/pipermail/ccan/2014-February/000608.html)
 
 * mdct.c is from libvorbis and comes with a BSD license (see
   COPYING.mdct).
 
-* Everything else can be used under the terms of either the LGPL-2 or
-  the MPL2.
+* Everything else can be used under the terms of any version of the
+  Gnu LGPL.

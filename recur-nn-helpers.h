@@ -1,4 +1,4 @@
-/* Copyright (C) 2013 Douglas Bagnall <douglas@halo.gen.nz>  LGPL/MPL2
+/* Copyright (C) 2013 Douglas Bagnall <douglas@halo.gen.nz>  LGPL
 
    These are mostly-private variables and helpers for recur-nn.
 */

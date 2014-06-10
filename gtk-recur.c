@@ -1,4 +1,4 @@
-/*Copyright 2014 Douglas Bagnall <douglas@halo.gen.nz> LGPL/MPL2
+/*Copyright 2014 Douglas Bagnall <douglas@halo.gen.nz> LGPL
 
 This is a gtk app that runs the recur plugin. Try --help.
 */
