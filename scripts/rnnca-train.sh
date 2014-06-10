@@ -1,6 +1,7 @@
 #!/bin/bash
 
 HERE=$(git rev-parse --show-toplevel)
+cd "$HERE"
 
 URI=file://$HERE/test-video/lagos-288-192-20.avi
 RECORD_URI=file://$HERE/test-video/lagos-288-192-20-short.avi
