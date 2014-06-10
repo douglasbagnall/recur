@@ -62,6 +62,8 @@ GTK_LINKS =  -lgtk-3 -lgdk-3
 
 OPT_OBJECTS = ccan/opt/opt.o ccan/opt/parse.o ccan/opt/helpers.o ccan/opt/usage.o
 
+OPT_OBJECTS: config.h
+
 subdirs = images nets test-video
 $(subdirs):
 	mkdir -p $@
