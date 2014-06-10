@@ -210,10 +210,10 @@ VID_H=192
 VID_FPS=20
 
 test-video/%-$(VID_W)x$(VID_H)-$(VID_FPS)fps.avi: test-video/%.ogv
-	./reduce-video.sh $< $@ $(VID_FPS) $(VID_W) $(VID_H)
+	scripts/reduce-video.sh $< $@ $(VID_FPS) $(VID_W) $(VID_H)
 
 test-video/%-$(VID_W)x$(VID_H)-$(VID_FPS)fps.avi: test-video/%.mov
-	./reduce-video.sh $< $@ $(VID_FPS) $(VID_W) $(VID_H) 1
+	scripts/reduce-video.sh $< $@ $(VID_FPS) $(VID_W) $(VID_H) 1
 
 VID_SPECS = video/x-raw, format=I420, width=$(VID_W), height=$(VID_H), framerate=20/1
 
