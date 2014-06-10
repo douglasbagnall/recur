@@ -197,6 +197,10 @@ shrimp-tanks_URL = $(NOAA_16_URL)/QL444M33R631972pt1.mov
 QC875M671960_URL = $(NOAA_16_URL)/QC875M671960.mov
 plane-left-window_URL = $(NOAA_16_URL)/QC9452D3H871958film1.mov
 arctic_URL = $(NOAA_16_URL)/QB2812G461949.mov
+QC819O51958_URL = $(NOAA_16_URL)/QC819O51958.mov
+
+
+.PRECIOUS: test-video/%.ogv test-video/%.mov
 
 test-video/%.ogv test-video/%.mov: |test-video
 	wget "$($*_URL)" -O $@
