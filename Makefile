@@ -68,10 +68,14 @@ $(subdirs):
 
 all:: libgstclassify.so $(subdirs)
 
+
+ELF_EXECUTABLES = test_backprop convert-saved-net rnnca-player gtk-recur
+
 clean:
 	rm -f *.so *.o *.a *.d *.s *.pyc
 	rm -f path.h config.h
 	rm -f ccan/*/*.[oad]
+	rm -f $(ELF_EXECUTABLES)
 
 pgm-clean:
 	#find images -maxdepth 1 -name '*.p?m' | xargs rm -f
