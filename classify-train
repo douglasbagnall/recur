@@ -21,7 +21,7 @@ def main():
     gst_init()
     parser = argparse.ArgumentParser()
     add_common_args(parser)
-    group = parser.add_argument_group('kiwi-train specific arguments')
+    group = parser.add_argument_group('classify-train specific arguments')
     group.add_argument('-l', '--learn-rate', type=float, default=DEFAULT_LEARN_RATE,
                        help="learning rate")
     group.add_argument('--momentum', type=float, default=DEFAULT_MOMENTUM,

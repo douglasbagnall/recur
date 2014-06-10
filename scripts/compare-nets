@@ -9,7 +9,7 @@ import random
 # like this:
 #
 #for f in $dir/*.net;
-#  do ./kiwi-test \
+#  do ./classify-test \
 #    -t ~/nocturnal-calls/morepork-test-with-intensities.txt \
 #    -d ~/nocturnal-calls/morepork-minutes -C 500 --summary\
 #    --ignore-start=1 -v0 --min-call-intensity=4.3 -f $f \
@@ -68,7 +68,8 @@ def main():
                         help="Nth highest value to use as presence indicator")
     args = parser.parse_args()
     #print >>sys.stderr, args
-
+    #start from git root
+    os.chdir(os.path.relpath('..', os.path.dirname(__file__)))
     excluded_files = load_filelist(args.exclude_file)
     files = load_filelist(args.include_file, strip=False, exclude=excluded_files)
     if args.net_directory:
@@ -82,7 +83,7 @@ def main():
         r = re.compile(args.include_regex)
         files = set(x for x in files if r.search(x))
     print >>sys.stderr, "looking at %d files" % len(files)
-    cmd = ["./kiwi-test", "--summary", "-v0"]
+    cmd = ["./classify-test", "--summary", "-v0"]
     for arg, val in (("-C", args.first_n),
                      ("--ignore-start", args.ignore_start),
                      ("--min-call-intensity", args.min_call_intensity)):

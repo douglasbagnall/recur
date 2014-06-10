@@ -296,7 +296,7 @@ def main():
     gst_init()
     parser = argparse.ArgumentParser()
     add_common_args(parser)
-    group = parser.add_argument_group('kiwi-test specific arguments')
+    group = parser.add_argument_group('multi-test specific arguments')
     group.add_argument('-C', '--first-n', type=int, default=0,
                        help="classify this many files")
     group.add_argument('--ground-truth-file',

@@ -1,6 +1,6 @@
 # Copyright 2014 Douglas Bagnall <douglas@halo.gen.nz> LGPL/MPL2
 
-# used by kiwi-gtk
+# used by classify-gtk
 
 import os, sys
 import random
