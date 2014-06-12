@@ -21,6 +21,8 @@ def main(files, short=False):
         for c, n in chars.most_common():
             print("%2d '%s' %10d %10.3g" % (i, c, n, float(n) / len(s)))
             i += 1
+        print(''.join(c for c, n in chars.most_common()))
+
 
 if '-q' in sys.argv:
     sys.argv.remove('-q')

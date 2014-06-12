@@ -30,6 +30,21 @@ Because of ccan/opt, --help will tell you something.
 #define EREWHON_LONG_TEXT TEST_DATA_DIR "/erewhon-erewhon"\
   "-revisited-sans-gutenberg.txt"
 
+/*Default text and characters to use.
+
+  To see what characters are in a text, use
+    `./scripts/find-character-set $filename`.
+
+  The characters in DEFAULT_COLLAPSE_CHARS get collapsed into the first
+  character of DEFAULT_CHARSET. Typically it is used to avoid predicting
+  digits in cases where digits are rare and largely random (e.g. the phone
+  number and zip code of project gutenberg).
+*/
+
+#define DEFAULT_TEXT EREWHON_TEXT
+#define DEFAULT_CHARSET "8 etaonihsrdlucmwfygpb,v.k-;x\"qj'?:z)(_!*&"
+#define DEFAULT_COLLAPSE_CHARS "10872}{659/34][@"
+
 #define CONFAB_SIZE 80
 
 #define DEFAULT_PERIODIC_PGM_DUMP 0
@@ -90,10 +105,6 @@ Because of ccan/opt, --help will tell you something.
                                 } while(0)
 
 
-#define NET_TO_CHAR "#abcdefghijklmnopqrstuvwxyz,'- .\";:!?"
-#define HASH_CHARS "1234567890&@"
-
-
 static TemporalPPM *input_ppm;
 static TemporalPPM *error_ppm;
 
@@ -108,9 +119,9 @@ static int opt_quiet = 0;
 static char * opt_filename = NULL;
 static char * opt_logfile = DEFAULT_LOG_FILE;
 static char * opt_basename = DEFAULT_BASENAME;
-static char * opt_alphabet = NET_TO_CHAR;
-static char * opt_collapse_chars = HASH_CHARS;
-static char * opt_textfile = EREWHON_TEXT;
+static char * opt_alphabet = DEFAULT_CHARSET;
+static char * opt_collapse_chars = DEFAULT_COLLAPSE_CHARS;
+static char * opt_textfile = DEFAULT_TEXT;
 static char * opt_dump_collapsed_text = DEFAULT_DUMP_COLLAPSED_TEXT;
 static bool opt_reload = DEFAULT_RELOAD;
 static float opt_momentum_weight = DEFAULT_MOMENTUM_WEIGHT;
