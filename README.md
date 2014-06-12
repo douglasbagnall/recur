@@ -85,6 +85,8 @@ There is a GTK app to run it:
     make rnnca-player
     ./rnnca-player --help
 
+There is an example on [youtube](http://youtu.be/cs0w8XrpqIs).
+
 ### classify
 
 This learns to assign class probabilities to a stream of audio. To
