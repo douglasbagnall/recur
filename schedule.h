@@ -1,3 +1,5 @@
+#ifndef __SCHEDULE_H__
+#define __SCHEDULE_H__
 #include "recur-nn.h"
 
 typedef struct Schedule_ Schedule;
@@ -58,3 +60,5 @@ init_schedule(Schedule *s, int recent_len, float margin,
   s->timeout = s->recent_len;
   s->eval = eval_simple;
 }
+
+#endif
