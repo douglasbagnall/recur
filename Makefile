@@ -136,8 +136,6 @@ test/test_mfcc_table: %:  mfcc.o rescale.o %.o
 test/test_mfcc_bins: %: mfcc.o %.o
 	$(CC) -Wl,-O1 $^ $(INCLUDES) $(DEFINES) $(LINKS)  -o $@
 
-test_backprop.o: config.h
-
 #actually there are more path.h dependers.
 test_backprop.o test/test_fb_backprop.o test/test_rescale.o :path.h
 
@@ -150,7 +148,10 @@ test/test_window_functions test/test_dct: %: mfcc.o %.o
 test/test_simple_rescale test/test_rescale: %: rescale.o %.o
 	$(CC) -Wl,-O1 $^   -I. $(DEFINES)  $(COMMON_LINKS)  -o $@
 
-test_backprop test/test_fb_backprop: %: $(RNN_OBJECTS) %.o $(OPT_OBJECTS)  | nets images
+test/test_fb_backprop: %: $(RNN_OBJECTS) %.o $(OPT_OBJECTS)  | nets images
+	$(CC) -Iccan/opt/ -Wl,-O1 $(filter %.o,$^)   -I. $(DEFINES)  $(COMMON_LINKS)  -o $@
+
+test_backprop: %: $(RNN_OBJECTS) %.o charmodel.o $(OPT_OBJECTS)  config.h  | nets images
 	$(CC) -Iccan/opt/ -Wl,-O1 $(filter %.o,$^)   -I. $(DEFINES)  $(COMMON_LINKS)  -o $@
 
 convert-saved-net: %: $(RNN_OBJECTS) %.o
