@@ -177,7 +177,7 @@ BP(void) { asm (""); }
 
 
 static inline FILE *
-fopen_or_abort(char *name, char *mode){
+fopen_or_abort(const char *name, const char *mode){
   FILE *fh = fopen(name, mode);
   if (fh == NULL){
     DEBUG("could not open '%s' in mode '%s', aborting...", name, mode);
