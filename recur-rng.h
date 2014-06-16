@@ -19,8 +19,6 @@ typedef struct _rand_ctx {
   u64 d;
 } rand_ctx;
 
-#define ROTATE(x, k) (((x) << (k)) | ((x) >> (sizeof(x) * 8 - (k))))
-
 static inline u64
 rand64(rand_ctx *x)
 {

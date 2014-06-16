@@ -23,6 +23,8 @@
 
 #define VERBOSE_DEBUG 0
 
+#define ROTATE(x, k) (((x) << (k)) | ((x) >> (sizeof(x) * 8 - (k))))
+
 #define streq(a,b) (strcmp((a),(b)) == 0)
 
 #define QUOTE_(x) #x
@@ -182,6 +184,16 @@ fopen_or_abort(char *name, char *mode){
     abort();
   }
   return fh;
+}
+
+static inline u32
+rnn_hash32(const char *s){
+  u32 sig = 0;
+  uint len = strlen(s);
+  for (uint i = 0; i < len; i++){
+    sig ^= ROTATE(sig - s[i], 13) + s[i];
+  }
+  return sig;
 }
 
 #endif

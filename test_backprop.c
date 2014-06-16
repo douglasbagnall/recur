@@ -770,19 +770,15 @@ construct_net_filename(void){
   int alpha_size = strlen(opt_alphabet);
   int input_size = alpha_size + (opt_learn_capitals ? 1 : 0);
   int output_size = alpha_size + (opt_learn_capitals ? 2 : 0);
-  uint sig = 0;
   snprintf(s, sizeof(s), "%s--%s", opt_alphabet, opt_collapse_chars);
-  uint len = strlen(s);
-  for (uint i = 0; i < len; i++){
-    sig ^= ROTATE(sig - s[i], 13) + s[i];
-  }
+  u32 sig = rnn_hash32(s);
   if (opt_bottom_layer){
-    snprintf(s, sizeof(s), "%s-s%0x-i%d-b%d-h%d-o%d-c%d.net", opt_basename,
+    snprintf(s, sizeof(s), "%s-s%0" PRIx32 "-i%d-b%d-h%d-o%d-c%d.net", opt_basename,
         sig, input_size, opt_bottom_layer, opt_hidden_size, output_size,
         opt_learn_capitals);
   }
   else{
-    snprintf(s, sizeof(s), "%s-s%0x-i%d-h%d-o%d-c%d.net", opt_basename,
+    snprintf(s, sizeof(s), "%s-s%0" PRIx32 "-i%d-h%d-o%d-c%d.net", opt_basename,
         sig, input_size, opt_hidden_size, output_size,
         opt_learn_capitals);
   }

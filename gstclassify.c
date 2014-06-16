@@ -620,19 +620,15 @@ static void
 set_net_filename(GstClassify *self, int hidden_size, int bottom_layer,
     int top_layer_size, char *metadata){
   char s[200];
-  uint sig = 0;
-  uint len = strlen(metadata);
-  for (uint i = 0; i < len; i++){
-    sig ^= ROTATE(sig - metadata[i], 13) + metadata[i];
-  }
+  u32 sig = rnn_hash32(metadata);
   int n_features = get_n_features(self);
   if (bottom_layer > 0){
-    snprintf(s, sizeof(s), "%s-%0x-i%d-b%d-h%d-o%d-%dHz-w%d.net",
+    snprintf(s, sizeof(s), "%s-%0" PRIx32 "-i%d-b%d-h%d-o%d-%dHz-w%d.net",
         self->basename, sig, n_features, bottom_layer, hidden_size, top_layer_size,
         CLASSIFY_RATE, self->window_size);
   }
   else {
-    snprintf(s, sizeof(s), "%s-%0x-i%d-h%d-o%d-%dHz-w%d.net",
+    snprintf(s, sizeof(s), "%s-%0" PRIx32 "-i%d-h%d-o%d-%dHz-w%d.net",
         self->basename, sig, n_features, hidden_size, top_layer_size,
         CLASSIFY_RATE, self->window_size);
   }
