@@ -323,7 +323,7 @@ capped_log2f(float x){
 }
 
 static u8*
-new_char_lut(const char *alphabet, const u8 *collapse_chars){
+new_char_lut(const char *alphabet, const u8 *collapse_chars, int learn_caps){
   int i;
   int len = strlen(alphabet);
   int collapse_target = 0;
@@ -345,7 +345,7 @@ new_char_lut(const char *alphabet, const u8 *collapse_chars){
     u8 c = alphabet[i];
     ctn[c] = i;
     if (islower(c)){
-      if (opt_learn_capitals){
+      if (learn_caps){
         ctn[c - 32] = i | 0x80;
       }
       else {
@@ -358,9 +358,9 @@ new_char_lut(const char *alphabet, const u8 *collapse_chars){
 
 static inline u8*
 alloc_and_collapse_text(char *filename, const char *alphabet, const u8 *collapse_chars,
-    long *len){
+    long *len, int learn_caps){
   int i, j;
-  u8 *char_to_net = new_char_lut(alphabet, collapse_chars);
+  u8 *char_to_net = new_char_lut(alphabet, collapse_chars, learn_caps);
   FILE *f = fopen_or_abort(filename, "r");
   int err = fseek(f, 0, SEEK_END);
   *len = ftell(f);
@@ -392,17 +392,18 @@ alloc_and_collapse_text(char *filename, const char *alphabet, const u8 *collapse
 }
 
 static inline void
-dump_collapsed_text(u8 *text, int len, char *name)
+dump_collapsed_text(const u8 *text, int len, const char *name,
+    const char *alphabet)
 {
   int i;
   FILE *f = fopen_or_abort(name, "w");
   for (i = 0; i < len; i++){
     u8 c = text[i];
     if (c & 0x80){
-      fputc(toupper(opt_alphabet[c & 0x7f]), f);
+      fputc(toupper(alphabet[c & 0x7f]), f);
     }
     else{
-      fputc(opt_alphabet[c], f);
+      fputc(alphabet[c], f);
     }
   }
   fclose(f);
@@ -424,7 +425,7 @@ search_for_max(float *answer, int len){
 }
 
 static inline float*
-one_hot_opinion(RecurNN *net, const int hot){
+one_hot_opinion(RecurNN *net, int hot, int learn_caps){
   float *inputs;
   int len;
   if (net->bottom_layer){
@@ -438,7 +439,7 @@ one_hot_opinion(RecurNN *net, const int hot){
 
   //XXX could just set the previous one to zero (i.e. remember it)
   memset(inputs, 0, len * sizeof(float));
-  if (opt_learn_capitals && (hot & 0x80)){
+  if (learn_caps && (hot & 0x80)){
     inputs[len - 1] = 1.0f;
   }
   inputs[hot & 0x7f] = 1.0f;
@@ -446,11 +447,12 @@ one_hot_opinion(RecurNN *net, const int hot){
 }
 
 static inline float
-net_error_bptt(RecurNN *net, float *restrict error, int c, int next, int *correct){
+net_error_bptt(RecurNN *net, float *restrict error, int c, int next, int *correct,
+    int learn_caps){
   ASSUME_ALIGNED(error);
-  float *answer = one_hot_opinion(net, c);
+  float *answer = one_hot_opinion(net, c, learn_caps);
   int winner;
-  if (opt_learn_capitals){
+  if (learn_caps){
     int len = net->output_size - 2;
     float *cap_error = error + len;
     float *cap_answer = answer + len;
@@ -470,9 +472,9 @@ net_error_bptt(RecurNN *net, float *restrict error, int c, int next, int *correc
 
 
 static inline int
-opinion_deterministic(RecurNN *net, int hot){
-  float *answer = one_hot_opinion(net, hot);
-  if (opt_learn_capitals){
+opinion_deterministic(RecurNN *net, int hot, int learn_caps){
+  float *answer = one_hot_opinion(net, hot, learn_caps);
+  if (learn_caps){
     int len = net->output_size - 2;
     float *cap_answer = answer + len;
     int c = search_for_max(answer, len);
@@ -485,14 +487,14 @@ opinion_deterministic(RecurNN *net, int hot){
 }
 
 static inline int
-opinion_probabilistic(RecurNN *net, int hot, float bias){
+opinion_probabilistic(RecurNN *net, int hot, float bias, int learn_caps){
   int i;
   float r;
-  float *answer = one_hot_opinion(net, hot);
-  int n_chars = net->output_size - (opt_learn_capitals ? 2 : 0);
+  float *answer = one_hot_opinion(net, hot, learn_caps);
+  int n_chars = net->output_size - (learn_caps ? 2 : 0);
   int cap = 0;
   float error[net->output_size];
-  if (opt_learn_capitals){
+  if (learn_caps){
     r = rand_double(&net->rng);
     biased_softmax(error, answer + n_chars, 2, bias);
     if (r > error[0])
@@ -512,18 +514,18 @@ opinion_probabilistic(RecurNN *net, int hot, float bias){
 }
 
 static float
-validate(RecurNN *net, const u8 *text, int len){
+validate(RecurNN *net, const u8 *text, int len, int learn_caps){
   float error[net->output_size];
   float entropy = 0.0f;
   int i;
-  int n_chars = net->output_size - (opt_learn_capitals ? 2 : 0);
+  int n_chars = net->output_size - (learn_caps ? 2 : 0);
   /*skip the first few because state depends too much on previous experience */
   int skip = MIN(len / 10, 5);
   for (i = 0; i < skip; i++){
-    one_hot_opinion(net, text[i]);
+    one_hot_opinion(net, text[i], learn_caps);
   }
   for (; i < len - 1; i++){
-    float *answer = one_hot_opinion(net, text[i]);
+    float *answer = one_hot_opinion(net, text[i], learn_caps);
     softmax(error, answer, n_chars);
     float e = error[text[i + 1] & 0x7f];
     entropy += capped_log2f(e);
@@ -539,9 +541,9 @@ confabulate(RecurNN *net, char *text, int len,
   static int n = 0;
   for (i = 0; i < len; i++){
     if (deterministic)
-      n = opinion_deterministic(net, n);
+      n = opinion_deterministic(net, n, opt_learn_capitals);
     else
-      n = opinion_probabilistic(net, n, bias);
+      n = opinion_probabilistic(net, n, bias, opt_learn_capitals);
     int cap = n & 0x80;
     n &= 0x7f;
     int c = opt_alphabet[n];
@@ -614,7 +616,7 @@ calc_ventropy(Ventropy *v, int lap)
         v->counter = 0;
       }
       v->history[v->counter] = validate(v->net, v->text + v->lapsize * v->counter,
-          v->lapsize);
+          v->lapsize, opt_learn_capitals);
       float sum = 0.0f;
       float div = v->lap;
       for (int j = 0; j < v->lap; j++){
@@ -624,7 +626,7 @@ calc_ventropy(Ventropy *v, int lap)
       v->entropy = div ? sum / div : 0;
     }
     else {
-      v->entropy = validate(v->net, v->text, v->len);
+      v->entropy = validate(v->net, v->text, v->len, opt_learn_capitals);
       v->history[0] = v->entropy;
     }
   }
@@ -703,7 +705,7 @@ epoch(RecurNN **nets, int n_nets, RecurNN *confab_net, Ventropy *v,
         }
         rnn_bptt_advance(n);
         e = net_error_bptt(n, n->bptt->o_error,
-            text[offset], text[offset + 1], &c);
+            text[offset], text[offset + 1], &c, opt_learn_capitals);
         correct += c;
         error += e;
         entropy += capped_log2f(1.0f - e);
@@ -719,7 +721,7 @@ epoch(RecurNN **nets, int n_nets, RecurNN *confab_net, Ventropy *v,
       RecurNNBPTT *bptt = net->bptt;
       bptt->momentum = momentum;
       rnn_bptt_advance(net);
-      e = net_error_bptt(net, bptt->o_error, text[i], text[i + 1], &c);
+      e = net_error_bptt(net, bptt->o_error, text[i], text[i + 1], &c, opt_learn_capitals);
       rnn_bptt_calculate(net, opt_batch_size);
       correct += c;
       error += e;
@@ -943,9 +945,9 @@ main(int argc, char *argv[]){
   long len;
   u8* validate_text;
   u8* text = alloc_and_collapse_text(opt_textfile,
-      opt_alphabet, (u8 *)opt_collapse_chars, &len);
+      opt_alphabet, (u8 *)opt_collapse_chars, &len, opt_learn_capitals);
   if (opt_dump_collapsed_text){
-    dump_collapsed_text(text, len, opt_dump_collapsed_text);
+    dump_collapsed_text(text, len, opt_dump_collapsed_text, opt_alphabet);
   }
 
   if (opt_validate_chars > 2){
