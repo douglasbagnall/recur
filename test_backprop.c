@@ -532,12 +532,7 @@ main(int argc, char *argv[]){
     .alphabet = opt_alphabet
   };
 
-  if (model.n_training_nets > 1){
-    model.training_nets = rnn_new_training_set(net, model.n_training_nets);
-  }
-  else{
-    model.training_nets = &net;
-  }
+  model.training_nets = rnn_new_training_set(net, model.n_training_nets);
 
   RecurNN *confab_net = rnn_clone(net,
       net->flags & ~(RNN_NET_FLAG_OWN_BPTT | RNN_NET_FLAG_OWN_WEIGHTS),
@@ -621,12 +616,8 @@ main(int argc, char *argv[]){
   }
 
   free(text);
-  if (opt_multi_tap < 2){
-    rnn_delete_net(net);
-  }
-  else {
-    rnn_delete_training_set(model.training_nets, opt_multi_tap, 0);
-  }
+
+  rnn_delete_training_set(model.training_nets, model.n_training_nets, 0);
   rnn_delete_net(confab_net);
   rnn_delete_net(validate_net);
 
