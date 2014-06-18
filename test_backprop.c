@@ -65,7 +65,6 @@ Because of ccan/opt, --help will tell you something.
 #define DEFAULT_VALIDATE_CHARS 0
 #define DEFAULT_VALIDATION_OVERLAP 1
 #define DEFAULT_OVERRIDE 0
-#define DEFAULT_DETERMINISTIC_CONFAB 0
 #define DEFAULT_CONFAB_BIAS 0
 #define DEFAULT_SAVE_NET 1
 #define DEFAULT_LOG_FILE "bptt.log"
@@ -104,9 +103,6 @@ Because of ccan/opt, --help will tell you something.
                                   STDERR_DEBUG(__VA_ARGS__); \
                                 } while(0)
 
-
-static TemporalPPM *input_ppm;
-static TemporalPPM *error_ppm;
 
 static uint opt_hidden_size = DEFAULT_HIDDEN_SIZE;
 static uint opt_bptt_depth = DEFAULT_BPTT_DEPTH;
@@ -147,7 +143,6 @@ static float opt_init_weight_scale = DEFAULT_INIT_WEIGHT_SCALE;
 static float opt_perforate_weights = DEFAULT_PERFORATE_WEIGHTS;
 static bool opt_temporal_pgm_dump = DEFAULT_TEMPORAL_PGM_DUMP;
 static bool opt_periodic_pgm_dump = DEFAULT_PERIODIC_PGM_DUMP;
-static bool opt_deterministic_confab = DEFAULT_DETERMINISTIC_CONFAB;
 static float opt_confab_bias = DEFAULT_CONFAB_BIAS;
 static bool opt_save_net = DEFAULT_SAVE_NET;
 static bool opt_learn_capitals = DEFAULT_LEARN_CAPITALS;
@@ -284,10 +279,8 @@ static struct opt_table options[] = {
       &opt_periodic_pgm_dump, "Dump ppm images of weights, every reporting interval"),
   OPT_WITHOUT_ARG("--learn-capitals", opt_set_bool,
       &opt_learn_capitals, "learn to predict capitalisation"),
-  OPT_WITHOUT_ARG("--deterministic-confab", opt_set_bool,
-      &opt_deterministic_confab, "Use best guess in confab, not random sampling"),
   OPT_WITH_ARG("--confab-bias", opt_set_floatval, opt_show_floatval,
-      &opt_confab_bias, "extra bias toward probable characters in confab"),
+      &opt_confab_bias, "bias toward probable characters in confab (100 == deterministic)"),
   OPT_WITHOUT_ARG("--no-save-net", opt_set_invbool,
       &opt_save_net, "Don't save learnt changes"),
   OPT_WITH_ARG("--multi-tap=<n>", opt_set_uintval, opt_show_uintval,
@@ -317,32 +310,12 @@ static struct opt_table options[] = {
   OPT_ENDTABLE
 };
 
-static void
-confabulate(RecurNN *net, char *text, int len,
-    int deterministic, float bias){
-  int i;
-  static int n = 0;
-  for (i = 0; i < len; i++){
-    if (deterministic)
-      n = opinion_deterministic(net, n, opt_learn_capitals);
-    else
-      n = opinion_probabilistic(net, n, bias, opt_learn_capitals);
-    int cap = n & 0x80;
-    n &= 0x7f;
-    int c = opt_alphabet[n];
-    if (cap){
-      c = toupper(c);
-    }
-    text[i] = c;
-  }
-}
-
 static inline void
-long_confab(RecurNN *net, int len, int rows, float bias){
+long_confab(RecurNN *net, int len, int rows, char *alphabet, float bias, int learn_caps){
   int i, j;
   char confab[len * rows + 1];
   confab[len * rows] = 0;
-  confabulate(net, confab, len * rows, 0, bias);
+  confabulate(net, confab, len * rows, alphabet, bias, learn_caps);
   for (i = 1; i < rows; i++){
     int target = i * len;
     int linebreak = target;
@@ -364,188 +337,6 @@ long_confab(RecurNN *net, int len, int rows, float bias){
     }
   }
   Q_DEBUG(1, "%s", confab);
-}
-
-typedef struct _Ventropy {
-  RecurNN *net;
-  int counter;
-  float *history;
-  const u8 *text;
-  int len;
-  int lap;
-  int lapsize;
-  float entropy;
-} Ventropy;
-
-static inline void
-init_ventropy(Ventropy *v, RecurNN *net, const u8 *text, const int len, const int lap){
-  v->net = net;
-  v->text = text;
-  v->len = len;
-  v->lap = lap;
-  v->lapsize = len / lap;
-  v->history = calloc(lap, sizeof(float));
-  v->entropy = 0;
-  v->counter = 0;
-}
-
-static inline float
-calc_ventropy(Ventropy *v, int lap)
-{
-  if (v->len > 0){
-    if (v->lap > 1 && lap){
-      v->counter++;
-      if (v->counter == v->lap){
-        v->counter = 0;
-      }
-      v->history[v->counter] = validate(v->net, v->text + v->lapsize * v->counter,
-          v->lapsize, opt_learn_capitals);
-      float sum = 0.0f;
-      float div = v->lap;
-      for (int j = 0; j < v->lap; j++){
-        div -= v->history[j] == 0;
-        sum += v->history[j];
-      }
-      v->entropy = div ? sum / div : 0;
-    }
-    else {
-      v->entropy = validate(v->net, v->text, v->len, opt_learn_capitals);
-      v->history[0] = v->entropy;
-    }
-  }
-  return v->entropy;
-}
-
-static inline void
-finish(RecurNN *net, Ventropy *v){
-  if (opt_filename && opt_save_net){
-    rnn_save_net(net, opt_filename, 1);
-  }
-  BELOW_QUIET_LEVEL(3){
-    float ventropy = calc_ventropy(v, 0);
-    DEBUG("final entropy %.3f; learn rate %.2g; momentum %.2g",
-        ventropy, net->bptt->learn_rate, net->bptt->momentum);
-  }
-  exit(0);
-}
-
-static inline void
-report_on_progress(RecurNN *net, RecurNN *confab_net, float ventropy,
-    int *correct, float *error, float *entropy, double elapsed, float scale){
-  char confab[CONFAB_SIZE + 1];
-  confab[CONFAB_SIZE] = 0;
-  int k = net->generation >> 10;
-  *entropy *= -scale;
-  *error *= scale;
-  float accuracy = *correct * scale;
-  double per_sec = 1.0 / scale / elapsed;
-  BELOW_QUIET_LEVEL(1){
-    confabulate(confab_net, confab, CONFAB_SIZE, opt_deterministic_confab, opt_confab_bias);
-    Q_DEBUG(1, "%5dk e.%02d t%.2f v%.2f a.%02d %.0f/s |%s|", k, (int)(*error * 100 + 0.5),
-        *entropy, ventropy,
-        (int)(accuracy * 100 + 0.5), per_sec + 0.5, confab);
-  }
-  rnn_log_float(net, "t_error", *error);
-  rnn_log_float(net, "t_entropy", *entropy);
-  rnn_log_float(net, "v_entropy", ventropy);
-  rnn_log_float(net, "momentum", net->bptt->momentum);
-  rnn_log_float(net, "accuracy", accuracy);
-  rnn_log_float(net, "learn-rate", net->bptt->learn_rate);
-  rnn_log_float(net, "per_second", per_sec);
-  *correct = 0;
-  *error = 0.0f;
-  *entropy = 0.0f;
-}
-
-static void
-epoch(RecurNN **nets, int n_nets, RecurNN *confab_net, Ventropy *v,
-    Schedule *schedule,
-    const u8 *text, const int len,
-    const int start){
-  int i, j;
-  float error = 0.0f;
-  float entropy = 0.0f;
-  int correct = 0;
-  float e;
-  int c;
-  int spacing = (len - 1) / n_nets;
-  RecurNN *net = nets[0];
-  uint report_counter = net->generation % opt_report_interval;
-  struct timespec timers[2];
-  struct timespec *time_start = timers;
-  struct timespec *time_end = timers + 1;
-  clock_gettime(CLOCK_MONOTONIC, time_start);
-  for(i = start; i < len - 1; i++){
-    float momentum = rnn_calculate_momentum_soft_start(net->generation,
-        opt_momentum, opt_momentum_soft_start);
-    if (n_nets > 1 || opt_momentum_style != RNN_MOMENTUM_WEIGHTED ||
-        opt_use_multi_tap_path){
-      for (j = 0; j < n_nets; j++){
-        RecurNN *n = nets[j];
-        int offset = i + j * spacing;
-        if (offset >= len - 1){
-          offset -= len - 1;
-        }
-        rnn_bptt_advance(n);
-        e = net_error_bptt(n, n->bptt->o_error,
-            text[offset], text[offset + 1], &c, opt_learn_capitals);
-        correct += c;
-        error += e;
-        entropy += capped_log2f(1.0f - e);
-        /*Second argument to r_b_c_deltas toggles delta accumulation. Turning
-          it off on the first run avoids expicit zeroing outside of the loop
-          (via rnn_bptt_clear_deltas) and is thus slightly faster.
-         */
-        rnn_bptt_calc_deltas(n, j ? 1 : 0);
-      }
-      rnn_apply_learning(net, opt_momentum_style, momentum);
-    }
-    else {
-      RecurNNBPTT *bptt = net->bptt;
-      bptt->momentum = momentum;
-      rnn_bptt_advance(net);
-      e = net_error_bptt(net, bptt->o_error, text[i], text[i + 1], &c, opt_learn_capitals);
-      rnn_bptt_calculate(net, opt_batch_size);
-      correct += c;
-      error += e;
-      entropy += capped_log2f(1.0f - e);
-    }
-
-    if (opt_temporal_pgm_dump){
-      temporal_ppm_add_row(input_ppm, net->input_layer);
-      temporal_ppm_add_row(error_ppm, net->bptt->o_error);
-    }
-    report_counter++;
-    if (report_counter >= opt_report_interval){
-      report_counter = 0;
-      clock_gettime(CLOCK_MONOTONIC, time_end);
-      s64 secs = time_end->tv_sec - time_start->tv_sec;
-      s64 nano = time_end->tv_nsec - time_start->tv_nsec;
-      double elapsed = secs + 1e-9 * nano;
-      struct timespec *tmp = time_end;
-      time_end = time_start;
-      time_start = tmp;
-      float ventropy = calc_ventropy(v, 1);
-      report_on_progress(net, confab_net, ventropy, &correct, &error, &entropy,
-          elapsed, 1.0f / (opt_report_interval * n_nets));
-      if (opt_save_net && opt_filename){
-        rnn_save_net(net, opt_filename, 1);
-      }
-      if (opt_periodic_pgm_dump){
-        rnn_multi_pgm_dump(net, PGM_DUMP_STRING, opt_basename);
-      }
-      schedule->eval(schedule, net, ventropy, opt_quiet < 2);
-      if (opt_periodic_weight_noise){
-        rnn_weight_noise(net, opt_periodic_weight_noise);
-      }
-    }
-    if (opt_stop && (int)net->generation >= opt_stop){
-      finish(net, v);
-    }
-  }
-  BELOW_QUIET_LEVEL(1){
-    long_confab(confab_net, CONFAB_SIZE, 6, opt_confab_bias);
-  }
 }
 
 
@@ -682,6 +473,20 @@ load_or_create_net(void){
 }
 
 
+static inline void
+finish(RnnCharModel *model, Ventropy *v){
+  if (opt_filename && opt_save_net){
+    rnn_save_net(model->net, opt_filename, 1);
+  }
+  BELOW_QUIET_LEVEL(3){
+    RecurNNBPTT *bptt = model->net->bptt;
+    float ventropy = rnn_char_calc_ventropy(model, v, 0);
+    DEBUG("final entropy %.3f; learn rate %.2g; momentum %.2g",
+        ventropy, bptt->learn_rate, bptt->momentum);
+  }
+  exit(0);
+}
+
 int
 main(int argc, char *argv[]){
   //feclearexcept(FE_ALL_EXCEPT);
@@ -697,20 +502,40 @@ main(int argc, char *argv[]){
     }
     opt_usage(argv[0], NULL);
   }
-  opt_multi_tap = MAX(opt_multi_tap, 1);
   RecurNN *net = load_or_create_net();
   if (opt_confab_only){
-    long_confab(net, opt_confab_only, 1, opt_confab_bias);
+    long_confab(net, opt_confab_only, 1, opt_alphabet, opt_confab_bias, opt_learn_capitals);
     exit(0);
   }
 
-  RecurNN **nets;
+  RnnCharModel model = {
+    .net = net,
+    //RecurNN **training_nets;
+    .n_training_nets = MAX(opt_multi_tap, 1),
 
-  if (opt_multi_tap > 1){
-    nets = rnn_new_training_set(net, opt_multi_tap);
+    .pgm_name = opt_basename,
+    .batch_size = opt_batch_size,
+
+    //char *filename;
+    .momentum = opt_momentum,
+    .momentum_soft_start = opt_momentum_soft_start,
+    .momentum_style = opt_momentum_style,
+    .learn_caps = opt_learn_capitals,
+    .periodic_pgm_dump = opt_periodic_pgm_dump,
+    .temporal_pgm_dump = opt_temporal_pgm_dump,
+    .periodic_weight_noise = opt_periodic_weight_noise,
+    .quiet = opt_quiet,
+    .report_interval = opt_report_interval,
+    .save_net = opt_save_net,
+    .use_multi_tap_path = opt_use_multi_tap_path,
+    .alphabet = opt_alphabet
+  };
+
+  if (model.n_training_nets > 1){
+    model.training_nets = rnn_new_training_set(net, model.n_training_nets);
   }
   else{
-    nets = &net;
+    model.training_nets = &net;
   }
 
   RecurNN *confab_net = rnn_clone(net,
@@ -754,10 +579,10 @@ main(int argc, char *argv[]){
   }
 
   if (opt_temporal_pgm_dump){
-    input_ppm = temporal_ppm_alloc(net->i_size, 300, "input_layer", 0, PGM_DUMP_COLOUR,
-        NULL);
-    error_ppm = temporal_ppm_alloc(net->o_size, 300, "output_error", 0, PGM_DUMP_COLOUR,
-        NULL);
+    model.input_ppm = temporal_ppm_alloc(net->i_size, 300, "input_layer", 0,
+        PGM_DUMP_COLOUR, NULL);
+    model.error_ppm = temporal_ppm_alloc(net->o_size, 300, "output_error", 0,
+        PGM_DUMP_COLOUR, NULL);
   }
   Ventropy v;
 
@@ -770,25 +595,29 @@ main(int argc, char *argv[]){
 
   rnn_print_net_stats(net);
 
-
+  int finished = 0;
   BELOW_QUIET_LEVEL(2){
     START_TIMER(run);
-    for (int i = 0;;i++){
+    for (int i = 0; finished == 0; i++){
       DEBUG("Starting epoch %d. learn rate %g.", i, net->bptt->learn_rate);
       START_TIMER(epoch);
-      epoch(nets, opt_multi_tap, confab_net, &v, &schedule,
-          text, len, start_char);
+
+      finished = epoch(&model, confab_net, &v, &schedule,
+          text, len, start_char, opt_stop, opt_confab_bias, CONFAB_SIZE, opt_quiet);
       DEBUG_TIMER(epoch);
       DEBUG_TIMER(run);
       start_char = 0;
     }
   }
   else {/* quiet level 2+ */
-    for (;;){
-      epoch(nets, opt_multi_tap, confab_net, &v, &schedule,
-          text, len, start_char);
+    for (;finished == 0;){
+      finished = epoch(&model, NULL, &v, &schedule,
+          text, len, start_char, opt_stop, 0, 0, opt_quiet);
       start_char = 0;
     }
+  }
+  if (finished){
+    finish(&model, &v);
   }
 
   free(text);
@@ -796,11 +625,11 @@ main(int argc, char *argv[]){
     rnn_delete_net(net);
   }
   else {
-    rnn_delete_training_set(nets, opt_multi_tap, 0);
+    rnn_delete_training_set(model.training_nets, opt_multi_tap, 0);
   }
   rnn_delete_net(confab_net);
   rnn_delete_net(validate_net);
 
-  temporal_ppm_free(input_ppm);
-  temporal_ppm_free(error_ppm);
+  temporal_ppm_free(model.input_ppm);
+  temporal_ppm_free(model.error_ppm);
 }

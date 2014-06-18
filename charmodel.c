@@ -8,10 +8,7 @@ This uses the RNN to predict the next character in a text sequence.
 #include <math.h>
 #include "path.h"
 #include "badmaths.h"
-//#include <errno.h>
 #include <stdio.h>
-//#include <fenv.h>
-#include <ctype.h>
 
 #include "charmodel.h"
 
@@ -275,4 +272,191 @@ eval_simple(Schedule *s, RecurNN *net, float score, int verbose){
         net->generation, score, sample_size, s->margin,
         bptt->learn_rate, net->bptt->momentum);
   }
+}
+
+void
+confabulate(RecurNN *net, char *dest, int len, const char* alphabet,
+    float bias, int learn_caps){
+  int i;
+  static int n = 0;
+  for (i = 0; i < len; i++){
+    if (bias > 100)
+      n = opinion_deterministic(net, n, learn_caps);
+    else
+      n = opinion_probabilistic(net, n, bias, learn_caps);
+    int cap = n & 0x80;
+    n &= 0x7f;
+    int c = alphabet[n];
+    if (cap){
+      c = toupper(c);
+    }
+    dest[i] = c;
+  }
+}
+
+
+void
+init_ventropy(Ventropy *v, RecurNN *net, const u8 *text, const int len, const int lap){
+  v->net = net;
+  v->text = text;
+  v->len = len;
+  v->lap = lap;
+  v->lapsize = len / lap;
+  v->history = calloc(lap, sizeof(float));
+  v->entropy = 0;
+  v->counter = 0;
+}
+
+float
+rnn_char_calc_ventropy(RnnCharModel *model, Ventropy *v, int lap)
+{
+  if (v->len > 0){
+    if (v->lap > 1 && lap){
+      v->counter++;
+      if (v->counter == v->lap){
+        v->counter = 0;
+      }
+      v->history[v->counter] = validate(v->net, v->text + v->lapsize * v->counter,
+          v->lapsize, model->learn_caps);
+      float sum = 0.0f;
+      float div = v->lap;
+      for (int j = 0; j < v->lap; j++){
+        div -= v->history[j] == 0;
+        sum += v->history[j];
+      }
+      v->entropy = div ? sum / div : 0;
+    }
+    else {
+      v->entropy = validate(v->net, v->text, v->len, model->learn_caps);
+      v->history[0] = v->entropy;
+    }
+  }
+  return v->entropy;
+}
+
+
+int
+epoch(RnnCharModel *model, RecurNN *confab_net, Ventropy *v,
+    Schedule *schedule,
+    const u8 *text, const int len,
+    const int start, const int stop,
+    float confab_bias, int confab_size,
+    int quietness){
+  int i, j;
+  float error = 0.0f;
+  float entropy = 0.0f;
+  int correct = 0;
+  float e;
+  int c;
+  int n_nets = model->n_training_nets;
+  int spacing = (len - 1) / n_nets;
+  RecurNN *net = model->net;
+  RecurNN **nets = model->training_nets;
+  uint report_counter = net->generation % model->report_interval;
+  struct timespec timers[2];
+  struct timespec *time_start = timers;
+  struct timespec *time_end = timers + 1;
+  clock_gettime(CLOCK_MONOTONIC, time_start);
+  for(i = start; i < len - 1; i++){
+    float momentum = rnn_calculate_momentum_soft_start(net->generation,
+        model->momentum, model->momentum_soft_start);
+    if (n_nets > 1 || model->momentum_style != RNN_MOMENTUM_WEIGHTED ||
+        model->use_multi_tap_path){
+      for (j = 0; j < n_nets; j++){
+        RecurNN *n = nets[j];
+        int offset = i + j * spacing;
+        if (offset >= len - 1){
+          offset -= len - 1;
+        }
+        rnn_bptt_advance(n);
+        e = net_error_bptt(n, n->bptt->o_error,
+            text[offset], text[offset + 1], &c, model->learn_caps);
+        correct += c;
+        error += e;
+        entropy += capped_log2f(1.0f - e);
+        /*Second argument to r_b_c_deltas toggles delta accumulation. Turning
+          it off on the first run avoids expicit zeroing outside of the loop
+          (via rnn_bptt_clear_deltas) and is thus slightly faster.
+         */
+        rnn_bptt_calc_deltas(n, j ? 1 : 0);
+      }
+      rnn_apply_learning(net, model->momentum_style, momentum);
+    }
+    else {
+      RecurNNBPTT *bptt = net->bptt;
+      bptt->momentum = momentum;
+      rnn_bptt_advance(net);
+      e = net_error_bptt(net, bptt->o_error, text[i], text[i + 1], &c, model->learn_caps);
+      rnn_bptt_calculate(net, model->batch_size);
+      correct += c;
+      error += e;
+      entropy += capped_log2f(1.0f - e);
+    }
+
+    if (model->input_ppm){
+      temporal_ppm_add_row(model->input_ppm, net->input_layer);
+    }
+    if (model->error_ppm){
+      temporal_ppm_add_row(model->error_ppm, net->bptt->o_error);
+    }
+    report_counter++;
+    if (report_counter >= model->report_interval){
+      report_counter = 0;
+      clock_gettime(CLOCK_MONOTONIC, time_end);
+      s64 secs = time_end->tv_sec - time_start->tv_sec;
+      s64 nano = time_end->tv_nsec - time_start->tv_nsec;
+      double elapsed = secs + 1e-9 * nano;
+      struct timespec *tmp = time_end;
+      time_end = time_start;
+      time_start = tmp;
+      float ventropy = rnn_char_calc_ventropy(model, v, 1);
+
+      /*formerly in report_on_progress*/
+      {
+        float scale = 1.0f / (model->report_interval * n_nets);
+        int k = net->generation >> 10;
+        entropy *= -scale;
+        error *= scale;
+        float accuracy = correct * scale;
+        double per_sec = 1.0 / scale / elapsed;
+        if (confab_net && confab_size && quietness < 1){
+          char confab[confab_size + 1];
+          confab[confab_size] = 0;
+          confabulate(confab_net, confab, confab_size, model->alphabet,
+              confab_bias, model->learn_caps);
+          STDERR_DEBUG("%5dk e.%02d t%.2f v%.2f a.%02d %.0f/s |%s|", k,
+              (int)(error * 100 + 0.5),
+              entropy, ventropy,
+              (int)(accuracy * 100 + 0.5), per_sec + 0.5, confab);
+
+        }
+        rnn_log_float(net, "t_error", error);
+        rnn_log_float(net, "t_entropy", entropy);
+        rnn_log_float(net, "v_entropy", ventropy);
+        rnn_log_float(net, "momentum", net->bptt->momentum);
+        rnn_log_float(net, "accuracy", accuracy);
+        rnn_log_float(net, "learn-rate", net->bptt->learn_rate);
+        rnn_log_float(net, "per_second", per_sec);
+        correct = 0;
+        error = 0.0f;
+        entropy = 0.0f;
+      }
+
+      if (model->save_net && model->filename){
+        rnn_save_net(net, model->filename, 1);
+      }
+      if (model->periodic_pgm_dump_string){
+        rnn_multi_pgm_dump(net, model->periodic_pgm_dump_string,
+            model->pgm_name);
+      }
+      schedule->eval(schedule, net, ventropy, model->quiet < 2);
+      if (model->periodic_weight_noise){
+        rnn_weight_noise(net, model->periodic_weight_noise);
+      }
+    }
+    if (stop && (int)net->generation >= stop){
+      return 1;
+    }
+  }
+  return 0;
 }
