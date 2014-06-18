@@ -226,24 +226,7 @@ validate(RecurNN *net, const u8 *text, int len, int learn_caps){
   return entropy;
 }
 
-
-void
-init_schedule(Schedule *s, int recent_len, float margin,
-    float learn_rate_min, float learn_rate_mul){
-  s->recent = malloc_aligned_or_die(recent_len * sizeof(float));
-  s->recent_len = recent_len;
-  s->learn_rate_min = learn_rate_min;
-  s->learn_rate_mul = learn_rate_mul;
-  s->margin = margin;
-  for (int i = 0; i < s->recent_len; i++){
-    s->recent[i] = 1e10;
-  }
-  s->timeout = s->recent_len;
-  s->eval = eval_simple;
-}
-
-
-void
+static void
 eval_simple(Schedule *s, RecurNN *net, float score, int verbose){
   int i, j;
   RecurNNBPTT *bptt = net->bptt;
@@ -260,19 +243,35 @@ eval_simple(Schedule *s, RecurNN *net, float score, int verbose){
   for (++i, j = 0; j < sample_size; j++, i++){
     if (i >= s->recent_len)
       i = 0;
-    if (score + s->margin < s->recent[i]){
+    if (score < s->recent[i]){
       return;
     }
   }
   s->timeout = s->recent_len;
   bptt->learn_rate = MAX(s->learn_rate_min, bptt->learn_rate * s->learn_rate_mul);
   if (verbose){
-    DEBUG("generation %7d: entropy %.4g exceeds %d recent samples (margin %.2g)."
+    DEBUG("generation %7d: entropy %.4g exceeds %d recent samples."
         " setting learn_rate to %.3g. momentum %.3g",
-        net->generation, score, sample_size, s->margin,
+        net->generation, score, sample_size,
         bptt->learn_rate, net->bptt->momentum);
   }
 }
+
+void
+init_schedule(Schedule *s, int recent_len,
+    float learn_rate_min, float learn_rate_mul){
+  s->recent = malloc_aligned_or_die(recent_len * sizeof(float));
+  s->recent_len = recent_len;
+  s->learn_rate_min = learn_rate_min;
+  s->learn_rate_mul = learn_rate_mul;
+  for (int i = 0; i < s->recent_len; i++){
+    s->recent[i] = 1e10;
+  }
+  s->timeout = s->recent_len;
+  s->eval = eval_simple;
+}
+
+
 
 void
 confabulate(RecurNN *net, char *dest, int len, const char* alphabet,
@@ -337,7 +336,6 @@ rnn_char_calc_ventropy(RnnCharModel *model, Ventropy *v, int lap)
 
 int
 epoch(RnnCharModel *model, RecurNN *confab_net, Ventropy *v,
-    Schedule *schedule,
     const u8 *text, const int len,
     const int start, const int stop,
     float confab_bias, int confab_size,
@@ -449,7 +447,7 @@ epoch(RnnCharModel *model, RecurNN *confab_net, Ventropy *v,
         rnn_multi_pgm_dump(net, model->periodic_pgm_dump_string,
             model->pgm_name);
       }
-      schedule->eval(schedule, net, ventropy, model->quiet < 2);
+      model->schedule.eval(&model->schedule, net, ventropy, model->quiet < 2);
       if (model->periodic_weight_noise){
         rnn_weight_noise(net, model->periodic_weight_noise);
       }

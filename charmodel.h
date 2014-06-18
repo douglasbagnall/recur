@@ -10,7 +10,6 @@ typedef struct Schedule_ Schedule;
 struct Schedule_ {
   float *recent;
   int recent_len;
-  float margin;
   int timeout;
   float learn_rate_mul;
   float learn_rate_min;
@@ -53,9 +52,9 @@ struct _RnnCharModel {
 
   TemporalPPM *input_ppm;
   TemporalPPM *error_ppm;
-  //Ventropy ventropy;
   char *alphabet;
   char * periodic_pgm_dump_string;
+  Schedule schedule;
 };
 
 
@@ -79,11 +78,8 @@ capped_log2f(float x){
   return (x < 1e-30f) ? -100.0f : log2f(x);
 }
 
-void init_schedule(Schedule *s, int recent_len, float margin,
+void init_schedule(Schedule *s, int recent_len,
     float learn_rate_min, float learn_rate_mul);
-
-void eval_simple(Schedule *s, RecurNN *net, float score, int verbose);
-
 
 float rnn_char_calc_ventropy(RnnCharModel *model, Ventropy *v, int lap);
 
@@ -94,7 +90,6 @@ void init_ventropy(Ventropy *v, RecurNN *net, const u8 *text,
     const int len, const int lap);
 
 int epoch(RnnCharModel *model, RecurNN *confab_net, Ventropy *v,
-    Schedule *schedule,
     const u8 *text, const int len,
     const int start, const int stop,
     float confab_bias, int confab_size,

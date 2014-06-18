@@ -510,13 +510,11 @@ main(int argc, char *argv[]){
 
   RnnCharModel model = {
     .net = net,
-    //RecurNN **training_nets;
     .n_training_nets = MAX(opt_multi_tap, 1),
 
     .pgm_name = opt_basename,
     .batch_size = opt_batch_size,
 
-    //char *filename;
     .momentum = opt_momentum,
     .momentum_soft_start = opt_momentum_soft_start,
     .momentum_style = opt_momentum_style,
@@ -547,8 +545,7 @@ main(int argc, char *argv[]){
       RECUR_RNG_SUBSEED,
       NULL);
 
-  Schedule schedule;
-  init_schedule(&schedule, opt_learn_rate_inertia, 0, opt_learn_rate_min,
+  init_schedule(&model.schedule, opt_learn_rate_inertia, opt_learn_rate_min,
       opt_learn_rate_scale);
   long len;
   u8* validate_text;
@@ -602,7 +599,7 @@ main(int argc, char *argv[]){
       DEBUG("Starting epoch %d. learn rate %g.", i, net->bptt->learn_rate);
       START_TIMER(epoch);
 
-      finished = epoch(&model, confab_net, &v, &schedule,
+      finished = epoch(&model, confab_net, &v,
           text, len, start_char, opt_stop, opt_confab_bias, CONFAB_SIZE, opt_quiet);
       DEBUG_TIMER(epoch);
       DEBUG_TIMER(run);
@@ -611,7 +608,7 @@ main(int argc, char *argv[]){
   }
   else {/* quiet level 2+ */
     for (;finished == 0;){
-      finished = epoch(&model, NULL, &v, &schedule,
+      finished = epoch(&model, NULL, &v,
           text, len, start_char, opt_stop, 0, 0, opt_quiet);
       start_char = 0;
     }
