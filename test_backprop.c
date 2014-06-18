@@ -504,7 +504,10 @@ main(int argc, char *argv[]){
   }
   RecurNN *net = load_or_create_net();
   if (opt_confab_only){
-    long_confab(net, opt_confab_only, 1, opt_alphabet, opt_confab_bias, opt_learn_capitals);
+    char *t = malloc(opt_confab_only);
+    confabulate(net, t, opt_confab_only, opt_alphabet,
+        opt_confab_bias, opt_learn_capitals);
+    fputs(t, stdout);
     exit(0);
   }
 
