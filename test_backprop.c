@@ -418,12 +418,12 @@ initialise_net(RecurNN *net){
 }
 
 static RecurNN *
-load_or_create_net(void){
+load_or_create_net(int reload){
   RecurNN *net = NULL;
   if (opt_filename == NULL){
     opt_filename = construct_net_filename();
   }
-  if (opt_reload){
+  if (reload){
     net = rnn_load_net(opt_filename);
     if (net){
       rnn_set_log_file(net, opt_logfile, 1);
@@ -502,7 +502,7 @@ main(int argc, char *argv[]){
     }
     opt_usage(argv[0], NULL);
   }
-  RecurNN *net = load_or_create_net();
+  RecurNN *net = load_or_create_net(opt_reload || opt_confab_only);
   if (opt_confab_only){
     char *t = malloc(opt_confab_only);
     confabulate(net, t, opt_confab_only, opt_alphabet,
