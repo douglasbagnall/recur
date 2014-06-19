@@ -181,7 +181,7 @@ RecurNN *rnn_new_with_bottom_layer(int n_inputs, int r_input_size,
 {
   RecurNN *net;
   if (r_input_size == 0){
-    DEBUG("rnn_new_with_bottom_layer returning bottomless net, "
+    MAYBE_DEBUG("rnn_new_with_bottom_layer returning bottomless net, "
         "due to zero internal size");
     flags &= ~RNN_NET_FLAG_BOTTOM_LAYER;
     net = rnn_new(n_inputs, hidden_size, output_size,
