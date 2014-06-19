@@ -746,6 +746,7 @@ load_metadata(const char *metadata, struct ClassifyMetadata *m){
 
     XXX alternately, there might be something better than sscanf().
    */
+  const int expected_n = 11;
   const char *template = (
       "classes %ms "
       "min-frequency %f "
@@ -765,11 +766,10 @@ load_metadata(const char *metadata, struct ClassifyMetadata *m){
       &m->mfccs, &m->window_size, &m->basename, &m->delta_features,
       &m->focus_freq, &m->lag, &m->intensity_feature,
       &m->confirmation_lag);
-  if (n != 11){
-    GST_WARNING("Found only %d/%d metadata items", n, 11);
-    return 11 - n;
+  if (n != expected_n){
+    GST_WARNING("Found only %d/%d metadata items", n, expected_n);
   }
-  return 0;
+  return expected_n - n;
 }
 
 static void
