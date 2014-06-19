@@ -460,17 +460,18 @@ epoch(RnnCharModel *model, RecurNN *confab_net, Ventropy *v,
 }
 
 char *
-rnn_char_construct_metadata(const char *alphabet, const char *collapse_chars,
-    int learn_caps){
+rnn_char_construct_metadata(const struct CharMetadata *m){
   char *metadata;
   int ret = asprintf(&metadata,
-      "alphabet {{%s}}\n"
-      "collapse_chars {{%s}}\n"
-      "learn_caps %d\n"
+#define SEP "\x1F"
+      "alphabet"       SEP "%s" SEP
+      "collapse_chars" SEP "%s" SEP
+      "learn_caps"     SEP "%d"
+#undef SEP
       ,
-      alphabet,
-      collapse_chars,
-      learn_caps
+      m->alphabet,
+      m->collapse_chars,
+      m->learn_caps
   );
   if (ret == -1){
     FATAL_ERROR("can't alloc memory for metadata. or something.");
@@ -480,16 +481,35 @@ rnn_char_construct_metadata(const char *alphabet, const char *collapse_chars,
 
 int
 rnn_char_load_metadata(const char *metadata, struct CharMetadata *m){
-  const int expected_n = 2;
-  const char *template = (
-      "alphabet {{%s}}\n"
-      "collapse_chars {{%s}}\n"
-      "learn_caps %d\n"
-  );
-  int n = sscanf(metadata, template, &m->alphabet, &m->collapse_chars,
-      &m->learn_caps);
-  if (n != expected_n){
-    STDERR_DEBUG("Found %d/%d metadata items", n, expected_n);
-  }
-  return expected_n - n;
+
+  /*0x1f is the ascii field separator character.*/
+
+#define CHECK_KEY(str, wanted) do {                                     \
+    char * token = strtok(str, "\x1F");                                 \
+    if (strcmp(token, wanted)){                                         \
+      STDERR_DEBUG("looking for '%s', found '%s'", wanted, token);      \
+      goto error;                                                       \
+    }                                                                   \
+  }while(0)                                                             \
+
+  char *s = strdup(metadata);
+  CHECK_KEY(s, "alphabet");
+  m->alphabet = strdup(strtok(NULL, "\x1F"));
+  CHECK_KEY(s, "collapse_chars");
+  m->collapse_chars = strdup(strtok(NULL, "\x1F"));
+  CHECK_KEY(s, "learn_caps");
+  m->learn_caps = atoi(strtok(NULL, "\x1F"));
+
+#undef CHECK_KEY
+
+  free(s);
+  return 0;
+ error:
+  return 1;
+}
+
+void
+rnn_char_free_metadata_items(struct CharMetadata *m){
+  free(m->alphabet);
+  free(m->collapse_chars);
 }

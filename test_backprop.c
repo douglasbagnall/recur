@@ -83,7 +83,7 @@ Because of ccan/opt, --help will tell you something.
 #define DEFAULT_INIT_HIDDEN_RUN_DEVIATION -1.0f
 #define DEFAULT_PERFORATE_WEIGHTS 0.0f
 
-#define DEFAULT_FORCE_LOAD 0
+#define DEFAULT_FORCE_METADATA 0
 #define DEFAULT_LEARN_CAPITALS 0
 #define DEFAULT_DUMP_COLLAPSED_TEXT NULL
 #define DEFAULT_MULTI_TAP 0
@@ -129,7 +129,7 @@ static int opt_validate_chars = DEFAULT_VALIDATE_CHARS;
 static int opt_validation_overlap = DEFAULT_VALIDATION_OVERLAP;
 static int opt_start_char = DEFAULT_START_CHAR;
 static bool opt_override = DEFAULT_OVERRIDE;
-static bool opt_force_load = DEFAULT_FORCE_LOAD;
+static bool opt_force_metadata = DEFAULT_FORCE_METADATA;
 static bool opt_bptt_adaptive_min = DEFAULT_BPTT_ADAPTIVE_MIN;
 static uint opt_batch_size = DEFAULT_BATCH_SIZE;
 static int opt_init_method = DEFAULT_INIT_METHOD;
@@ -261,8 +261,8 @@ static struct opt_table options[] = {
       &opt_bptt_adaptive_min, "don't auto-adapt BPTT minimum error threshold"),
   OPT_WITHOUT_ARG("-o|--override-params", opt_set_bool,
       &opt_override, "override meta-parameters in loaded net (where possible)"),
-  OPT_WITHOUT_ARG("--force-load", opt_set_bool,
-      &opt_force_load, "force loading of net in face of metadata mismatch"),
+  OPT_WITHOUT_ARG("--force-metadata", opt_set_bool,
+      &opt_force_metadata, "force loading of net in face of metadata mismatch"),
   OPT_WITH_ARG("-f|--filename=<file>", opt_set_charp, opt_show_charp, &opt_filename,
       "load/save net here"),
   OPT_WITH_ARG("--log-file=<file>", opt_set_charp, opt_show_charp, &opt_logfile,
@@ -343,18 +343,14 @@ long_confab(RecurNN *net, int len, int rows, char *alphabet, float bias, int lea
   Q_DEBUG(1, "%s", confab);
 }
 
-
 static char*
-construct_net_filename(void){
+construct_net_filename(struct CharMetadata *m){
   char s[260];
-  int alpha_size = strlen(opt_alphabet);
-  int input_size = alpha_size + (opt_learn_capitals ? 1 : 0);
-  int output_size = alpha_size + (opt_learn_capitals ? 2 : 0);
-  snprintf(s, sizeof(s), "%s--%s", opt_alphabet, opt_collapse_chars);
-  char *metadata = rnn_char_construct_metadata(opt_alphabet, opt_collapse_chars,
-      opt_learn_capitals);
+  char *metadata = rnn_char_construct_metadata(m);
+  int alpha_size = strlen(m->alphabet);
+  int input_size = alpha_size + (m->learn_caps ? 1 : 0);
+  int output_size = alpha_size + (m->learn_caps ? 2 : 0);
   u32 sig = rnn_hash32(metadata);
-  free(metadata);
   if (opt_bottom_layer){
     snprintf(s, sizeof(s), "%s-s%0" PRIx32 "-i%d-b%d-h%d-o%d-c%d.net", opt_basename,
         sig, input_size, opt_bottom_layer, opt_hidden_size, output_size,
@@ -425,34 +421,48 @@ initialise_net(RecurNN *net){
 }
 
 static RecurNN *
-load_or_create_net(int reload){
-  RecurNN *net;
-  char *metadata = rnn_char_construct_metadata(opt_alphabet, opt_collapse_chars,
-      opt_learn_capitals);
-  if (opt_filename == NULL){
-    opt_filename = construct_net_filename();
-  }
-  net = (reload) ? rnn_load_net(opt_filename) : NULL;
+load_or_create_net(struct CharMetadata *m, int reload){
+  char *metadata = rnn_char_construct_metadata(m);
+  char *filename = opt_filename ? opt_filename : construct_net_filename(m);
+  RecurNN *net = (reload) ? rnn_load_net(filename) : NULL;
 
   if (net){
     rnn_set_log_file(net, opt_logfile, 1);
     if (net->metadata && strcmp(metadata, net->metadata)){
-      DEBUG("metadata doesn't match. Expected:\n%s\nGot:\n%s\n",
+      DEBUG("metadata doesn't match. Expected:\n%s\nLoaded from net:\n%s\n",
           metadata, net->metadata);
-      if (! opt_force_load){
-        DEBUG("Aborting. (use --force-load to ignore metadata issues)");
+      if (opt_filename && ! opt_force_metadata){
+        /*this filename was specifically requested, so its metadata is
+          presumably right. But first check if it even loads!*/
+        struct CharMetadata m2;
+        int err = rnn_char_load_metadata(net->metadata, &m2);
+        if (err){
+          DEBUG("The net's metadata doesn't load."
+              "Using otherwise determined metadata");
+        }
+        else {
+          DEBUG("Using the net's metadata. Use --force-metadata to override");
+          DEBUG("alphabet %s", m2.alphabet);
+          m->alphabet = strdup(m2.alphabet);
+          m->collapse_chars = strdup(m2.collapse_chars);
+          m->learn_caps = m2.learn_caps;
+          rnn_char_free_metadata_items(&m2);
+        }
+      }
+      else if (opt_force_metadata){
+        DEBUG("Updating the net's metadata to match that requested "
+            "(because --force-metadata)");
+        free(net->metadata);
+        net->metadata = strdup(metadata);
+      }
+      else {
+        DEBUG("Aborting. (use --force-metadata to ignore metadata issues)");
         exit(-1);
       }
     }
-    if (opt_override){
-      RecurNNBPTT *bptt = net->bptt;
-      bptt->learn_rate = opt_learn_rate;
-      bptt->momentum = opt_momentum;
-      bptt->momentum_weight = opt_momentum_weight;
-    }
   }
   else {
-    int input_size = strlen(opt_alphabet);
+    int input_size = strlen(m->alphabet);
     int output_size = input_size;
     if (opt_learn_capitals){
       input_size++;
@@ -462,18 +472,10 @@ load_or_create_net(int reload){
     if (opt_bptt_adaptive_min){/*on by default*/
       flags |= RNN_NET_FLAG_BPTT_ADAPTIVE_MIN_ERROR;
     }
-    if(opt_bottom_layer){
-      net = rnn_new_with_bottom_layer(input_size, opt_bottom_layer,
-          opt_hidden_size, output_size, flags, opt_rng_seed,
-          opt_logfile, opt_bptt_depth, opt_learn_rate,
-          opt_momentum, 0);
-    }
-    else{
-      net = rnn_new(input_size, opt_hidden_size,
-          output_size, flags, opt_rng_seed,
-          opt_logfile, opt_bptt_depth, opt_learn_rate,
-          opt_momentum);
-    }
+    net = rnn_new_with_bottom_layer(input_size, opt_bottom_layer,
+        opt_hidden_size, output_size, flags, opt_rng_seed,
+        opt_logfile, opt_bptt_depth, opt_learn_rate,
+        opt_momentum, 0);
     initialise_net(net);
     net->bptt->momentum_weight = opt_momentum_weight;
     if (opt_periodic_pgm_dump){
@@ -503,41 +505,15 @@ finish(RnnCharModel *model, Ventropy *v){
   }
 }
 
-int
-main(int argc, char *argv[]){
-  //feclearexcept(FE_ALL_EXCEPT);
-  feenableexcept(FE_DIVBYZERO | FE_INVALID | FE_OVERFLOW);
-  opt_register_table(options, NULL);
-  if (!opt_parse(&argc, argv, opt_log_stderr)){
-    exit(1);
-  }
-  if (argc > 1){
-    Q_DEBUG(1, "unused arguments:");
-    for (int i = 1; i < argc; i++){
-      Q_DEBUG(1, "   '%s'", argv[i]);
-    }
-    opt_usage(argv[0], NULL);
-  }
-  RecurNN *net = load_or_create_net(opt_reload || opt_confab_only);
-  if (opt_confab_only){
-    char *t = malloc(opt_confab_only);
-    confabulate(net, t, opt_confab_only, opt_alphabet,
-        opt_confab_bias, opt_learn_capitals);
-    fputs(t, stdout);
-    exit(0);
-  }
-
+static void
+load_and_train_model(struct CharMetadata *m){
   RnnCharModel model = {
-    .net = net,
     .n_training_nets = MAX(opt_multi_tap, 1),
-
     .pgm_name = opt_basename,
     .batch_size = opt_batch_size,
-
     .momentum = opt_momentum,
     .momentum_soft_start = opt_momentum_soft_start,
     .momentum_style = opt_momentum_style,
-    .learn_caps = opt_learn_capitals,
     .periodic_pgm_dump = opt_periodic_pgm_dump,
     .temporal_pgm_dump = opt_temporal_pgm_dump,
     .periodic_weight_noise = opt_periodic_weight_noise,
@@ -545,9 +521,19 @@ main(int argc, char *argv[]){
     .report_interval = opt_report_interval,
     .save_net = opt_save_net,
     .use_multi_tap_path = opt_use_multi_tap_path,
-    .alphabet = opt_alphabet
+    .learn_caps = m->learn_caps,
+    .alphabet = m->alphabet,
   };
 
+  RecurNN *net = load_or_create_net(m, opt_reload);
+  if (opt_override){
+    RecurNNBPTT *bptt = net->bptt;
+    bptt->learn_rate = opt_learn_rate;
+    bptt->momentum = opt_momentum;
+    bptt->momentum_weight = opt_momentum_weight;
+  }
+
+  model.net = net;
   model.training_nets = rnn_new_training_set(net, model.n_training_nets);
 
   if (opt_temporal_pgm_dump){
@@ -573,10 +559,10 @@ main(int argc, char *argv[]){
   long len;
   u8* validate_text;
   u8* text = alloc_and_collapse_text(opt_textfile,
-      opt_alphabet, (u8 *)opt_collapse_chars, &len, opt_learn_capitals,
+      m->alphabet, (u8 *)m->collapse_chars, &len, m->learn_caps,
       opt_quiet);
   if (opt_dump_collapsed_text){
-    dump_collapsed_text(text, len, opt_dump_collapsed_text, opt_alphabet);
+    dump_collapsed_text(text, len, opt_dump_collapsed_text, m->alphabet);
   }
 
   if (opt_validate_chars > 2 &&
@@ -650,5 +636,38 @@ main(int argc, char *argv[]){
   }
   if (model.error_ppm){
     temporal_ppm_free(model.error_ppm);
+  }
+}
+
+
+int
+main(int argc, char *argv[]){
+  //feclearexcept(FE_ALL_EXCEPT);
+  feenableexcept(FE_DIVBYZERO | FE_INVALID | FE_OVERFLOW);
+  opt_register_table(options, NULL);
+  if (!opt_parse(&argc, argv, opt_log_stderr)){
+    exit(1);
+  }
+  if (argc > 1){
+    Q_DEBUG(1, "unused arguments:");
+    for (int i = 1; i < argc; i++){
+      Q_DEBUG(1, "   '%s'", argv[i]);
+    }
+    opt_usage(argv[0], NULL);
+  }
+  struct CharMetadata m = {
+    .alphabet = opt_alphabet,
+    .collapse_chars = opt_collapse_chars,
+    .learn_caps = opt_learn_capitals
+  };
+  if (opt_confab_only){
+    RecurNN *net = load_or_create_net(&m, 1);
+    char *t = malloc(opt_confab_only);
+    confabulate(net, t, opt_confab_only, m.alphabet,
+        opt_confab_bias, m.learn_caps);
+    fputs(t, stdout);
+  }
+  else {
+    load_and_train_model(&m);
   }
 }

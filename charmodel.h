@@ -100,8 +100,10 @@ int epoch(RnnCharModel *model, RecurNN *confab_net, Ventropy *v,
     float confab_bias, int confab_size,
     int quietness);
 
-char *rnn_char_construct_metadata(const char *alphabet, const char* collaspe_chars,
-    int learn_caps);
+char *rnn_char_construct_metadata(const struct CharMetadata *m);
 int rnn_char_load_metadata(const char *metadata, struct CharMetadata *m);
+
+void rnn_char_free_metadata_items(struct CharMetadata *m);
+
 
 #endif
