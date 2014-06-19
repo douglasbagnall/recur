@@ -551,6 +551,13 @@ main(int argc, char *argv[]){
 
   model.training_nets = rnn_new_training_set(net, model.n_training_nets);
 
+  if (opt_temporal_pgm_dump){
+    model.input_ppm = temporal_ppm_alloc(net->i_size, 300, "input_layer", 0,
+        PGM_DUMP_COLOUR, NULL);
+    model.error_ppm = temporal_ppm_alloc(net->o_size, 300, "output_error", 0,
+        PGM_DUMP_COLOUR, NULL);
+  }
+
   RecurNN *confab_net = rnn_clone(net,
       net->flags & ~(RNN_NET_FLAG_OWN_BPTT | RNN_NET_FLAG_OWN_WEIGHTS),
       RECUR_RNG_SUBSEED,
@@ -590,12 +597,6 @@ main(int argc, char *argv[]){
     start_char = net->generation % len;
   }
 
-  if (opt_temporal_pgm_dump){
-    model.input_ppm = temporal_ppm_alloc(net->i_size, 300, "input_layer", 0,
-        PGM_DUMP_COLOUR, NULL);
-    model.error_ppm = temporal_ppm_alloc(net->o_size, 300, "output_error", 0,
-        PGM_DUMP_COLOUR, NULL);
-  }
   Ventropy v;
 
   init_ventropy(&v, validate_net, validate_text,
@@ -638,6 +639,10 @@ main(int argc, char *argv[]){
   rnn_delete_net(confab_net);
   rnn_delete_net(validate_net);
 
-  temporal_ppm_free(model.input_ppm);
-  temporal_ppm_free(model.error_ppm);
+  if (model.input_ppm){
+    temporal_ppm_free(model.input_ppm);
+  }
+  if (model.error_ppm){
+    temporal_ppm_free(model.error_ppm);
+  }
 }
