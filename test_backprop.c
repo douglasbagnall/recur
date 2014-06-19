@@ -501,7 +501,6 @@ finish(RnnCharModel *model, Ventropy *v){
     DEBUG("final entropy %.3f; learn rate %.2g; momentum %.2g",
         ventropy, bptt->learn_rate, bptt->momentum);
   }
-  exit(0);
 }
 
 int
@@ -569,6 +568,8 @@ main(int argc, char *argv[]){
 
   init_schedule(&model.schedule, opt_learn_rate_inertia, opt_learn_rate_min,
       opt_learn_rate_scale);
+
+  /* get text and validation text */
   long len;
   u8* validate_text;
   u8* text = alloc_and_collapse_text(opt_textfile,
@@ -578,29 +579,34 @@ main(int argc, char *argv[]){
     dump_collapsed_text(text, len, opt_dump_collapsed_text, opt_alphabet);
   }
 
-  if (opt_validate_chars > 2){
+  if (opt_validate_chars > 2 &&
+      len - opt_validate_chars > 2){
     len -= opt_validate_chars;
     validate_text = text + len;
   }
   else {
     if (opt_validate_chars){
-      DEBUG("--validate-chars needs to be bigger");
+      DEBUG("--validate-chars is too small or too big (%d)"
+          " and will be ignored", opt_validate_chars);
       opt_validate_chars = 0;
     }
     validate_text = NULL;
   }
+  Ventropy v;
+
+  init_ventropy(&v, validate_net, validate_text,
+      opt_validate_chars, opt_validation_overlap);
+
+
+  /*start_char can only go up to len - 1, because the i + 1th character is the
+    one being predicted, hence has to be accessed for feedback. */
   int start_char;
   if (opt_start_char >= 0 && opt_start_char < len - 1){
     start_char = opt_start_char;
   }
   else {
-    start_char = net->generation % len;
+    start_char = net->generation % (len - 1);
   }
-
-  Ventropy v;
-
-  init_ventropy(&v, validate_net, validate_text,
-      opt_validate_chars, opt_validation_overlap);
 
   if (opt_stop < 0){
     opt_stop = net->generation - opt_stop;
@@ -611,10 +617,9 @@ main(int argc, char *argv[]){
   int finished = 0;
   BELOW_QUIET_LEVEL(2){
     START_TIMER(run);
-    for (int i = 0; finished == 0; i++){
+    for (int i = 0; ! finished; i++){
       DEBUG("Starting epoch %d. learn rate %g.", i, net->bptt->learn_rate);
       START_TIMER(epoch);
-
       finished = epoch(&model, confab_net, &v,
           text, len, start_char, opt_stop, opt_confab_bias, CONFAB_SIZE, opt_quiet);
       DEBUG_TIMER(epoch);
@@ -623,11 +628,12 @@ main(int argc, char *argv[]){
     }
   }
   else {/* quiet level 2+ */
-    for (;finished == 0;){
+    do {
       finished = epoch(&model, NULL, &v,
           text, len, start_char, opt_stop, 0, 0, opt_quiet);
       start_char = 0;
     }
+    while (! finished);
   }
   if (finished){
     finish(&model, &v);
