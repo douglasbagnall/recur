@@ -23,6 +23,8 @@ def read_flags(n, key):
     i = read_int(n, key, True)
     bits = []
     for x in range(bitlen):
+        if x and not x & 7:
+            bits.append('|')
         bits.append('.X'[i & 1])
         i >>= 1
     return ''.join(bits[::-1])
@@ -70,7 +72,7 @@ KEYS = {'net.i_size': (read_int, True),
         'bptt.momentum_weight': (read_float, True),
         'bptt.learn_rate': (read_float, True),
         'bptt.min_error_factor': (read_float, True),
-        #'net.rng': (read_rng, False),
+        'net.rng': (read_rng, False),
 
         'save_format_version': (read_int, True),
         'net.metadata': (read_string, True),
