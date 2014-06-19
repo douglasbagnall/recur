@@ -773,6 +773,15 @@ load_metadata(const char *metadata, struct ClassifyMetadata *m){
 }
 
 static void
+free_metadata_items(struct ClassifyMetadata *m){
+  /*these are const char*, but free complains about the const */
+  free((char *)m->classes);
+  m->classes = NULL;
+  free((char *)m->basename);
+  m->basename = NULL;
+}
+
+static void
 setup_audio(GstClassify *self, int window_size, int mfccs, float min_freq,
     float max_freq, float knee_freq, float focus_freq, int delta_features,
     int intensity_feature, float lag, float confirmation_lag){
@@ -850,6 +859,13 @@ load_specified_net(GstClassify *self, const char *filename){
       m.max_freq, m.knee_freq, m.focus_freq, m.delta_features,
       m.intensity_feature, m.lag, m.confirmation_lag);
   self->net = net;
+  if (! unloaded_items){
+    /* in the unloaded_items case, it might be that some of the strings that
+       would need freeing were not actually allocated. It is best to just let
+       them leak (they are short and this should be rare).
+     */
+    free_metadata_items(&m);
+  }
   return net;
 }
 
@@ -971,12 +987,15 @@ load_or_create_net(GstClassify *self){
     net = create_net(self, bottom_layer_size, hidden_size, top_layer_size, metadata);
   }
   struct ClassifyMetadata m = {0};
-  load_metadata(net->metadata, &m);
+  int unloaded_items = load_metadata(net->metadata, &m);
   int n_outputs = parse_classes_string(self, m.classes);
   if (n_outputs != net->output_size ||
       strcmp(class_string, m.classes)){
     FATAL_ERROR("Metadata class string %s suggests %d outputs, net has %s and %d",
         m.classes, n_outputs, class_string, net->output_size);
+  }
+  if (! unloaded_items){
+    free_metadata_items(&m);
   }
   free(metadata);
   return net;
