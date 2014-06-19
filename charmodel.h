@@ -57,6 +57,11 @@ struct _RnnCharModel {
   Schedule schedule;
 };
 
+struct CharMetadata {
+  char *alphabet;
+  char *collapse_chars;
+  int learn_caps;
+};
 
 u8* alloc_and_collapse_text(char *filename, const char *alphabet,
     const u8 *collapse_chars, long *len, int learn_caps, int quietness);
@@ -95,5 +100,8 @@ int epoch(RnnCharModel *model, RecurNN *confab_net, Ventropy *v,
     float confab_bias, int confab_size,
     int quietness);
 
+char *rnn_char_construct_metadata(const char *alphabet, const char* collaspe_chars,
+    int learn_caps);
+int rnn_char_load_metadata(const char *metadata, struct CharMetadata *m);
 
 #endif

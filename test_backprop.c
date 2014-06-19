@@ -83,6 +83,7 @@ Because of ccan/opt, --help will tell you something.
 #define DEFAULT_INIT_HIDDEN_RUN_DEVIATION -1.0f
 #define DEFAULT_PERFORATE_WEIGHTS 0.0f
 
+#define DEFAULT_FORCE_LOAD 0
 #define DEFAULT_LEARN_CAPITALS 0
 #define DEFAULT_DUMP_COLLAPSED_TEXT NULL
 #define DEFAULT_MULTI_TAP 0
@@ -128,6 +129,7 @@ static int opt_validate_chars = DEFAULT_VALIDATE_CHARS;
 static int opt_validation_overlap = DEFAULT_VALIDATION_OVERLAP;
 static int opt_start_char = DEFAULT_START_CHAR;
 static bool opt_override = DEFAULT_OVERRIDE;
+static bool opt_force_load = DEFAULT_FORCE_LOAD;
 static bool opt_bptt_adaptive_min = DEFAULT_BPTT_ADAPTIVE_MIN;
 static uint opt_batch_size = DEFAULT_BATCH_SIZE;
 static int opt_init_method = DEFAULT_INIT_METHOD;
@@ -259,6 +261,8 @@ static struct opt_table options[] = {
       &opt_bptt_adaptive_min, "don't auto-adapt BPTT minimum error threshold"),
   OPT_WITHOUT_ARG("-o|--override-params", opt_set_bool,
       &opt_override, "override meta-parameters in loaded net (where possible)"),
+  OPT_WITHOUT_ARG("--force-load", opt_set_bool,
+      &opt_force_load, "force loading of net in face of metadata mismatch"),
   OPT_WITH_ARG("-f|--filename=<file>", opt_set_charp, opt_show_charp, &opt_filename,
       "load/save net here"),
   OPT_WITH_ARG("--log-file=<file>", opt_set_charp, opt_show_charp, &opt_logfile,
@@ -347,7 +351,10 @@ construct_net_filename(void){
   int input_size = alpha_size + (opt_learn_capitals ? 1 : 0);
   int output_size = alpha_size + (opt_learn_capitals ? 2 : 0);
   snprintf(s, sizeof(s), "%s--%s", opt_alphabet, opt_collapse_chars);
-  u32 sig = rnn_hash32(s);
+  char *metadata = rnn_char_construct_metadata(opt_alphabet, opt_collapse_chars,
+      opt_learn_capitals);
+  u32 sig = rnn_hash32(metadata);
+  free(metadata);
   if (opt_bottom_layer){
     snprintf(s, sizeof(s), "%s-s%0" PRIx32 "-i%d-b%d-h%d-o%d-c%d.net", opt_basename,
         sig, input_size, opt_bottom_layer, opt_hidden_size, output_size,
@@ -419,17 +426,32 @@ initialise_net(RecurNN *net){
 
 static RecurNN *
 load_or_create_net(int reload){
-  RecurNN *net = NULL;
+  RecurNN *net;
+  char *metadata = rnn_char_construct_metadata(opt_alphabet, opt_collapse_chars,
+      opt_learn_capitals);
   if (opt_filename == NULL){
     opt_filename = construct_net_filename();
   }
-  if (reload){
-    net = rnn_load_net(opt_filename);
-    if (net){
-      rnn_set_log_file(net, opt_logfile, 1);
+  net = (reload) ? rnn_load_net(opt_filename) : NULL;
+
+  if (net){
+    rnn_set_log_file(net, opt_logfile, 1);
+    if (net->metadata && strcmp(metadata, net->metadata)){
+      DEBUG("metadata doesn't match. Expected:\n%s\nGot:\n%s\n",
+          metadata, net->metadata);
+      if (! opt_force_load){
+        DEBUG("Aborting. (use --force-load to ignore metadata issues)");
+        exit(-1);
+      }
+    }
+    if (opt_override){
+      RecurNNBPTT *bptt = net->bptt;
+      bptt->learn_rate = opt_learn_rate;
+      bptt->momentum = opt_momentum;
+      bptt->momentum_weight = opt_momentum_weight;
     }
   }
-  if (net == NULL){
+  else {
     int input_size = strlen(opt_alphabet);
     int output_size = input_size;
     if (opt_learn_capitals){
@@ -457,18 +479,13 @@ load_or_create_net(int reload){
     if (opt_periodic_pgm_dump){
       rnn_multi_pgm_dump(net, PGM_DUMP_STRING, opt_basename);
     }
-  }
-  else if (opt_override){
-    RecurNNBPTT *bptt = net->bptt;
-    bptt->learn_rate = opt_learn_rate;
-    bptt->momentum = opt_momentum;
-    bptt->momentum_weight = opt_momentum_weight;
+    net->metadata = strdup(metadata);
   }
   net->bptt->ho_scale = opt_top_learn_rate_scale;
   if (net->bottom_layer){
     net->bottom_layer->learn_rate_scale = opt_bottom_learn_rate_scale;
   }
-
+  free(metadata);
   return net;
 }
 

@@ -458,3 +458,38 @@ epoch(RnnCharModel *model, RecurNN *confab_net, Ventropy *v,
   }
   return 0;
 }
+
+char *
+rnn_char_construct_metadata(const char *alphabet, const char *collapse_chars,
+    int learn_caps){
+  char *metadata;
+  int ret = asprintf(&metadata,
+      "alphabet {{%s}}\n"
+      "collapse_chars {{%s}}\n"
+      "learn_caps %d\n"
+      ,
+      alphabet,
+      collapse_chars,
+      learn_caps
+  );
+  if (ret == -1){
+    FATAL_ERROR("can't alloc memory for metadata. or something.");
+  }
+  return metadata;
+}
+
+int
+rnn_char_load_metadata(const char *metadata, struct CharMetadata *m){
+  const int expected_n = 2;
+  const char *template = (
+      "alphabet {{%s}}\n"
+      "collapse_chars {{%s}}\n"
+      "learn_caps %d\n"
+  );
+  int n = sscanf(metadata, template, &m->alphabet, &m->collapse_chars,
+      &m->learn_caps);
+  if (n != expected_n){
+    STDERR_DEBUG("Found %d/%d metadata items", n, expected_n);
+  }
+  return expected_n - n;
+}
