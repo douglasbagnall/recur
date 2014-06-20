@@ -1,4 +1,4 @@
-/* Licensed under GPLv3+ - see LICENSE file for details */
+/* Licensed under GPLv2+ - see LICENSE file for details */
 #ifndef CCAN_OPT_H
 #define CCAN_OPT_H
 #include <ccan/compiler/compiler.h>
@@ -350,11 +350,25 @@ char *opt_invalid_argument(const char *arg);
  * and a table of all the options with their descriptions.  If an option has
  * description opt_hidden, it is not shown here.
  *
+ * The table of options is formatted such that descriptions are
+ * wrapped on space boundaries.  If a description has a "\n" that is
+ * left intact, and the following characters indented appropriately.
+ * If the description begins with one or more space/tab (or has a
+ * space or tab following a "\n") that line is output without wrapping.
+ *
  * If "extra" is NULL, then the extra information is taken from any
  * registered option which calls opt_usage_and_exit().  This avoids duplicating
  * that string in the common case.
  *
  * The result should be passed to free().
+ *
+ * See Also:
+ *	opt_usage_and_exit()
+ *
+ * Example:
+ *	opt_register_arg("--explode|--boom", explode, NULL, NULL,
+ *			 "This line will be wrapped by opt_usage\n"
+ *			 "  But this won't because it's indented.");
  */
 char *opt_usage(const char *argv0, const char *extra);
 
@@ -394,6 +408,12 @@ char *opt_set_longval(const char *arg, long *l);
 void opt_show_longval(char buf[OPT_SHOW_LEN], const long *l);
 char *opt_set_ulongval(const char *arg, unsigned long *ul);
 void opt_show_ulongval(char buf[OPT_SHOW_LEN], const unsigned long *ul);
+
+/* Set an floating point value, various forms. */
+char *opt_set_floatval(const char *arg, float *f);
+void opt_show_floatval(char buf[OPT_SHOW_LEN], const float *f);
+char *opt_set_doubleval(const char *arg, double *d);
+void opt_show_doubleval(char buf[OPT_SHOW_LEN], const double *d);
 
 /* the following setting functions accept k, M, G, T, P, or E suffixes, which
    multiplies the numeric value by the corresponding power of 1000 or 1024

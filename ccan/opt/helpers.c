@@ -1,7 +1,9 @@
-/* Licensed under GPLv3+ - see LICENSE file for details */
+/* Licensed under GPLv2+ - see LICENSE file for details */
 #include <ccan/opt/opt.h>
 #include <ccan/cast/cast.h>
+#include <inttypes.h>
 #include <string.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <errno.h>
 #include <stdio.h>
@@ -114,6 +116,49 @@ char *opt_set_ulongval(const char *arg, unsigned long *ul)
 	return NULL;
 }
 
+char *opt_set_floatval(const char *arg, float *f)
+{
+	double d;
+	char *err;
+
+	err = opt_set_doubleval(arg, &d);
+	if (err)
+		return err;
+
+	*f = d;
+	if (*f != d)
+		return arg_bad("'%s' is out of range", arg);
+
+	return NULL;
+}
+
+void opt_show_floatval(char buf[OPT_SHOW_LEN], const float *f)
+{
+	double d = *f;
+	opt_show_doubleval(buf, &d);
+}
+
+char *opt_set_doubleval(const char *arg, double *d)
+{
+	char *endp;
+
+	/* This is how the manpage says to do it.  Yech. */
+	errno = 0;
+	/* Don't assume strtof */
+	*d = strtod(arg, &endp);
+	if (*endp || !arg[0])
+		return arg_bad("'%s' is not a number", arg);
+	if (errno)
+		return arg_bad("'%s' is out of range", arg);
+
+	return NULL;
+}
+
+void opt_show_doubleval(char buf[OPT_SHOW_LEN], const double *d)
+{
+	snprintf(buf, OPT_SHOW_LEN, "%f", *d);
+}
+
 char *opt_inc_intval(int *i)
 {
 	(*i)++;
@@ -157,20 +202,14 @@ void opt_show_invbool(char buf[OPT_SHOW_LEN], const bool *b)
 
 void opt_show_charp(char buf[OPT_SHOW_LEN], char *const *p)
 {
-	if (*p){
-		size_t len;
-		len = strlen(*p);
-		buf[0] = '"';
-		if (len > OPT_SHOW_LEN - 2)
-			len = OPT_SHOW_LEN - 2;
-		strncpy(buf+1, *p, len);
-		buf[1+len] = '"';
-		if (len < OPT_SHOW_LEN - 2)
-			buf[2+len] = '\0';
-	}
-	else {
-		strncpy(buf, "(nil)", OPT_SHOW_LEN);
-	}
+	size_t len = strlen(*p);
+	buf[0] = '"';
+	if (len > OPT_SHOW_LEN - 2)
+		len = OPT_SHOW_LEN - 2;
+	strncpy(buf+1, *p, len);
+	buf[1+len] = '"';
+	if (len < OPT_SHOW_LEN - 2)
+		buf[2+len] = '\0';
 }
 
 /* Show an integer value, various forms. */
@@ -407,16 +446,16 @@ static void show_llong_with_suffix(char buf[OPT_SHOW_LEN], long long ll,
 		snprintf(buf, OPT_SHOW_LEN, "0");
 		return;
 	}
-	for (i = 0; i < (int)strlen(suffixes); i++){
+	for (i = 0; i < strlen(suffixes); i++){
 		long long tmp = ll / base;
 		if (tmp * base != ll)
 			break;
 		ll = tmp;
 	}
 	if (i == 0)
-		snprintf(buf, OPT_SHOW_LEN, "%lld", ll);
+		snprintf(buf, OPT_SHOW_LEN, "%"PRId64, (int64_t)ll);
 	else
-		snprintf(buf, OPT_SHOW_LEN, "%lld%c", ll, suffixes[i - 1]);
+		snprintf(buf, OPT_SHOW_LEN, "%"PRId64"%c", (int64_t)ll, suffixes[i - 1]);
 }
 
 static void show_ullong_with_suffix(char buf[OPT_SHOW_LEN], unsigned long long ull,
@@ -429,16 +468,16 @@ static void show_ullong_with_suffix(char buf[OPT_SHOW_LEN], unsigned long long u
 		snprintf(buf, OPT_SHOW_LEN, "0");
 		return;
 	}
-	for (i = 0; i < (int)strlen(suffixes); i++){
+	for (i = 0; i < strlen(suffixes); i++){
 		unsigned long long tmp = ull / base;
 		if (tmp * base != ull)
 			break;
 		ull = tmp;
 	}
 	if (i == 0)
-		snprintf(buf, OPT_SHOW_LEN, "%llu", ull);
+		snprintf(buf, OPT_SHOW_LEN, "%"PRIu64, (uint64_t)ull);
 	else
-		snprintf(buf, OPT_SHOW_LEN, "%llu%c", ull, suffixes[i - 1]);
+		snprintf(buf, OPT_SHOW_LEN, "%"PRIu64"%c", (uint64_t)ull, suffixes[i - 1]);
 }
 
 /* _bi, signed */
@@ -504,3 +543,4 @@ void opt_show_ulonglongval_si(char buf[OPT_SHOW_LEN], const unsigned long long *
 {
 	show_ullong_with_suffix(buf, (unsigned long long) *x, 1000);
 }
+

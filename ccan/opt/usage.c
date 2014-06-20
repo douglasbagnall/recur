@@ -1,7 +1,9 @@
-/* Licensed under GPLv3+ - see LICENSE file for details */
+/* Licensed under GPLv2+ - see LICENSE file for details */
 #include <ccan/opt/opt.h>
+#if HAVE_SYS_TERMIOS_H
 #include <sys/ioctl.h>
 #include <sys/termios.h> /* Required on Solaris for struct winsize */
+#endif
 #include <sys/unistd.h> /* Required on Solaris for ioctl */
 #include <string.h>
 #include <stdlib.h>
@@ -17,42 +19,57 @@ const char opt_hidden[1];
 
 static unsigned int get_columns(void)
 {
-	struct winsize w;
+	int ws_col = 0;
 	const char *env = getenv("COLUMNS");
 
-	w.ws_col = 0;
 	if (env)
-		w.ws_col = atoi(env);
-	if (!w.ws_col)
-		if (ioctl(0, TIOCGWINSZ, &w) == -1)
-			w.ws_col = 0;
-	if (!w.ws_col)
-		w.ws_col = 80;
+		ws_col = atoi(env);
 
-	return w.ws_col;
+#ifdef TIOCGWINSZ
+	if (!ws_col)
+	{
+		struct winsize w;
+		if (ioctl(0, TIOCGWINSZ, &w) != -1)
+			ws_col = w.ws_col;
+	}
+#endif
+	if (!ws_col)
+		ws_col = 80;
+
+	return ws_col;
 }
 
 /* Return number of chars of words to put on this line.
  * Prefix is set to number to skip at start, maxlen is max width, returns
- * length (after prefix) to put on this line. */
-static size_t consume_words(const char *words, size_t maxlen, size_t *prefix)
+ * length (after prefix) to put on this line.
+ * start is set if we start a new line in the source description. */
+static size_t consume_words(const char *words, size_t maxlen, size_t *prefix,
+			    bool *start)
 {
 	size_t oldlen, len;
 
-	/* Swallow leading whitespace. */
-	*prefix = strspn(words, " ");
+	/* Always swollow leading whitespace. */
+	*prefix = strspn(words, " \n");
 	words += *prefix;
 
-	/* Use at least one word, even if it takes us over maxlen. */
-	oldlen = len = strcspn(words, " ");
-	while (len <= maxlen) {
-		oldlen = len;
-		len += strspn(words+len, " ");
-		len += strcspn(words+len, " ");
-		if (len == oldlen)
-			break;
+	/* Leading whitespace at start of line means literal. */
+	if (*start && *prefix) {
+		oldlen = strcspn(words, "\n");
+	} else {
+		/* Use at least one word, even if it takes us over maxlen. */
+		oldlen = len = strcspn(words, " ");
+		while (len <= maxlen) {
+			oldlen = len;
+			len += strspn(words+len, " ");
+			if (words[len] == '\n')
+				break;
+			len += strcspn(words+len, " \n");
+			if (len == oldlen)
+				break;
+		}
 	}
 
+	*start = (words[oldlen - 1] == '\n');
 	return oldlen;
 }
 
@@ -86,7 +103,7 @@ static char *add_desc(char *base, size_t *len, size_t *max,
 {
 	size_t off, prefix, l;
 	const char *p;
-	bool same_line = false;
+	bool same_line = false, start = true;
 
 	base = add_str(base, len, max, opt->names);
 	off = strlen(opt->names);
@@ -109,7 +126,7 @@ static char *add_desc(char *base, size_t *len, size_t *max,
 
 	/* Indent description. */
 	p = opt->desc;
-	while ((l = consume_words(p, width - indent, &prefix)) != 0) {
+	while ((l = consume_words(p, width - indent, &prefix, &start)) != 0) {
 		if (!same_line)
 			base = add_indent(base, len, max, indent);
 		p += prefix;

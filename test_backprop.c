@@ -158,21 +158,6 @@ static float opt_top_learn_rate_scale = DEFAULT_TOP_LEARN_RATE_SCALE;
 static float opt_bottom_learn_rate_scale = DEFAULT_BOTTOM_LEARN_RATE_SCALE;
 static float opt_periodic_weight_noise = DEFAULT_PERIODIC_WEIGHT_NOISE;
 
-/* Following ccan/opt/helpers.c opt_set_longval, etc */
-static char *
-opt_set_floatval(const char *arg, float *f)
-{
-  char *endp;
-  errno = 0;
-  *f = strtof(arg, &endp);
-  if (*endp || !arg[0] || errno){
-    char *s;
-    if (asprintf(&s, "'%s' doesn't seem like a number", arg) > 0){
-      return s;
-    }
-  }
-  return NULL;
-}
 
 /*restrict to 0-1 range (mostly for probabilities)*/
 static char *
@@ -185,12 +170,6 @@ opt_set_floatval01(const char *arg, float *f){
     }
   }
   return msg;
-}
-
-static
-void opt_show_floatval(char buf[OPT_SHOW_LEN], const float *f)
-{
-  snprintf(buf, OPT_SHOW_LEN, "%g", *f);
 }
 
 static struct opt_table options[] = {
