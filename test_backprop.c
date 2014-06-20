@@ -293,35 +293,6 @@ static struct opt_table options[] = {
   OPT_ENDTABLE
 };
 
-static inline void
-long_confab(RecurNN *net, int len, int rows, char *alphabet, float bias, int learn_caps){
-  int i, j;
-  char confab[len * rows + 1];
-  confab[len * rows] = 0;
-  confabulate(net, confab, len * rows, alphabet, bias, learn_caps);
-  for (i = 1; i < rows; i++){
-    int target = i * len;
-    int linebreak = target;
-    int best = 100;
-    for (j = MAX(target - 12, 1);
-         j < MIN(target + 12, len * rows - 1); j++){
-      if (confab[j] == ' '){
-        int d = abs(j - target);
-        if ( d < best){
-          best = d;
-          linebreak = j;
-        }
-      }
-    }
-    confab[linebreak] = '\n';
-    if (best == 100){
-      confab[linebreak - 1] = '}';
-      confab[linebreak + 1] = '{';
-    }
-  }
-  Q_DEBUG(1, "%s", confab);
-}
-
 static char*
 construct_net_filename(struct CharMetadata *m){
   char s[260];
