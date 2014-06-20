@@ -12,6 +12,11 @@ This uses the RNN to predict the next character in a text sequence.
 
 #include "charmodel.h"
 
+static inline float
+capped_log2f(float x){
+  return (x < 1e-30f) ? -100.0f : log2f(x);
+}
+
 static u8*
 new_char_lut(const char *alphabet, const u8 *collapse_chars, int learn_caps){
   int i;
@@ -47,8 +52,8 @@ new_char_lut(const char *alphabet, const u8 *collapse_chars, int learn_caps){
 }
 
 u8*
-alloc_and_collapse_text(char *filename, const char *alphabet, const u8 *collapse_chars,
-    long *len, int learn_caps, int quietness){
+rnn_char_alloc_collapsed_text(char *filename, const char *alphabet,
+    const u8 *collapse_chars, long *len, int learn_caps, int quietness){
   int i, j;
   u8 *char_to_net = new_char_lut(alphabet, collapse_chars, learn_caps);
   FILE *f = fopen_or_abort(filename, "r");
@@ -84,7 +89,7 @@ alloc_and_collapse_text(char *filename, const char *alphabet, const u8 *collapse
 }
 
 void
-dump_collapsed_text(const u8 *text, int len, const char *name,
+rnn_char_dump_collapsed_text(const u8 *text, int len, const char *name,
     const char *alphabet)
 {
   int i;
@@ -138,7 +143,7 @@ one_hot_opinion(RecurNN *net, int hot, int learn_caps){
   return rnn_opinion(net, NULL);
 }
 
-float
+static float
 net_error_bptt(RecurNN *net, float *restrict error, int c, int next, int *correct,
     int learn_caps){
   ASSUME_ALIGNED(error);
@@ -227,7 +232,7 @@ validate(RecurNN *net, const u8 *text, int len, int learn_caps){
 }
 
 static void
-eval_simple(Schedule *s, RecurNN *net, float score, int verbose){
+eval_simple(RnnCharSchedule *s, RecurNN *net, float score, int verbose){
   int i, j;
   RecurNNBPTT *bptt = net->bptt;
   if (bptt->learn_rate <= s->learn_rate_min){
@@ -258,7 +263,7 @@ eval_simple(Schedule *s, RecurNN *net, float score, int verbose){
 }
 
 void
-init_schedule(Schedule *s, int recent_len,
+rnn_char_init_schedule(RnnCharSchedule *s, int recent_len,
     float learn_rate_min, float learn_rate_mul){
   s->recent = malloc_aligned_or_die(recent_len * sizeof(float));
   s->recent_len = recent_len;
@@ -274,7 +279,7 @@ init_schedule(Schedule *s, int recent_len,
 
 
 void
-confabulate(RecurNN *net, char *dest, int len, const char* alphabet,
+rnn_char_confabulate(RecurNN *net, char *dest, int len, const char* alphabet,
     float bias, int learn_caps){
   int i;
   static int n = 0;
@@ -295,7 +300,8 @@ confabulate(RecurNN *net, char *dest, int len, const char* alphabet,
 
 
 void
-init_ventropy(Ventropy *v, RecurNN *net, const u8 *text, const int len, const int lap){
+rnn_char_init_ventropy(RnnCharVentropy *v, RecurNN *net, const u8 *text, const int len,
+    const int lap){
   v->net = net;
   v->text = text;
   v->len = len;
@@ -307,7 +313,7 @@ init_ventropy(Ventropy *v, RecurNN *net, const u8 *text, const int len, const in
 }
 
 float
-rnn_char_calc_ventropy(RnnCharModel *model, Ventropy *v, int lap)
+rnn_char_calc_ventropy(RnnCharModel *model, RnnCharVentropy *v, int lap)
 {
   if (v->len > 0){
     if (v->lap > 1 && lap){
@@ -335,7 +341,7 @@ rnn_char_calc_ventropy(RnnCharModel *model, Ventropy *v, int lap)
 
 
 int
-epoch(RnnCharModel *model, RecurNN *confab_net, Ventropy *v,
+rnn_char_epoch(RnnCharModel *model, RecurNN *confab_net, RnnCharVentropy *v,
     const u8 *text, const int len,
     const int start, const int stop,
     float confab_bias, int confab_size,
@@ -420,7 +426,7 @@ epoch(RnnCharModel *model, RecurNN *confab_net, Ventropy *v,
         if (confab_net && confab_size && quietness < 1){
           char confab[confab_size + 1];
           confab[confab_size] = 0;
-          confabulate(confab_net, confab, confab_size, model->alphabet,
+          rnn_char_confabulate(confab_net, confab, confab_size, model->alphabet,
               confab_bias, model->learn_caps);
           STDERR_DEBUG("%5dk e.%02d t%.2f v%.2f a.%02d %.0f/s |%s|", k,
               (int)(error * 100 + 0.5),
@@ -460,7 +466,7 @@ epoch(RnnCharModel *model, RecurNN *confab_net, Ventropy *v,
 }
 
 char *
-rnn_char_construct_metadata(const struct CharMetadata *m){
+rnn_char_construct_metadata(const struct RnnCharMetadata *m){
   char *metadata;
   int ret = asprintf(&metadata,
 #define SEP "\x1F"
@@ -480,7 +486,7 @@ rnn_char_construct_metadata(const struct CharMetadata *m){
 }
 
 int
-rnn_char_load_metadata(const char *metadata, struct CharMetadata *m){
+rnn_char_load_metadata(const char *metadata, struct RnnCharMetadata *m){
 
   /*0x1f is the ascii field separator character.*/
 
@@ -509,13 +515,13 @@ rnn_char_load_metadata(const char *metadata, struct CharMetadata *m){
 }
 
 void
-rnn_char_free_metadata_items(struct CharMetadata *m){
+rnn_char_free_metadata_items(struct RnnCharMetadata *m){
   free(m->alphabet);
   free(m->collapse_chars);
 }
 
 char*
-construct_net_filename(struct CharMetadata *m, const char *basename,
+rnn_char_construct_net_filename(struct RnnCharMetadata *m, const char *basename,
     int bottom_size, int hidden_size, int learn_caps){
   char s[260];
   char *metadata = rnn_char_construct_metadata(m);

@@ -4,8 +4,7 @@ This uses the RNN to predict the next character in a text sequence.
 
 Unlike most of the Recur repository, this file is licensed under the GNU
 General Public License, version 2 or greater. That is because it is linked to
-ccan/opt which is also GPL2+ (originally GPL3+, but relicensed, see
-http://git.ozlabs.org/?p=ccan;a=commit;h=79715b8).
+ccan/opt which is also GPL2+.
 
 Because of ccan/opt, --help will tell you something.
 */
@@ -348,11 +347,11 @@ initialise_net(RecurNN *net){
 }
 
 static RecurNN *
-load_or_create_net(struct CharMetadata *m, int reload){
+load_or_create_net(struct RnnCharMetadata *m, int reload){
   char *metadata = rnn_char_construct_metadata(m);
   char *filename = opt_filename;
   if (filename == NULL){
-    filename = construct_net_filename(m, opt_basename, opt_bottom_layer,
+    filename = rnn_char_construct_net_filename(m, opt_basename, opt_bottom_layer,
         opt_hidden_size, opt_learn_capitals);
   }
 
@@ -365,7 +364,7 @@ load_or_create_net(struct CharMetadata *m, int reload){
       if (opt_filename && ! opt_force_metadata){
         /*this filename was specifically requested, so its metadata is
           presumably right. But first check if it even loads!*/
-        struct CharMetadata m2;
+        struct RnnCharMetadata m2;
         int err = rnn_char_load_metadata(net->metadata, &m2);
         if (err){
           DEBUG("The net's metadata doesn't load."
@@ -424,7 +423,7 @@ load_or_create_net(struct CharMetadata *m, int reload){
 
 
 static inline void
-finish(RnnCharModel *model, Ventropy *v){
+finish(RnnCharModel *model, RnnCharVentropy *v){
   if (opt_filename && opt_save_net){
     rnn_save_net(model->net, opt_filename, 1);
   }
@@ -437,7 +436,7 @@ finish(RnnCharModel *model, Ventropy *v){
 }
 
 static void
-load_and_train_model(struct CharMetadata *m){
+load_and_train_model(struct RnnCharMetadata *m){
   RnnCharModel model = {
     .n_training_nets = MAX(opt_multi_tap, 1),
     .pgm_name = opt_basename,
@@ -483,17 +482,17 @@ load_and_train_model(struct CharMetadata *m){
       RECUR_RNG_SUBSEED,
       NULL);
 
-  init_schedule(&model.schedule, opt_learn_rate_inertia, opt_learn_rate_min,
+  rnn_char_init_schedule(&model.schedule, opt_learn_rate_inertia, opt_learn_rate_min,
       opt_learn_rate_scale);
 
   /* get text and validation text */
   long len;
   u8* validate_text;
-  u8* text = alloc_and_collapse_text(opt_textfile,
+  u8* text = rnn_char_alloc_collapsed_text(opt_textfile,
       m->alphabet, (u8 *)m->collapse_chars, &len, m->learn_caps,
       opt_quiet);
   if (opt_dump_collapsed_text){
-    dump_collapsed_text(text, len, opt_dump_collapsed_text, m->alphabet);
+    rnn_char_dump_collapsed_text(text, len, opt_dump_collapsed_text, m->alphabet);
   }
 
   if (opt_validate_chars > 2 &&
@@ -509,9 +508,9 @@ load_and_train_model(struct CharMetadata *m){
     }
     validate_text = NULL;
   }
-  Ventropy v;
+  RnnCharVentropy v;
 
-  init_ventropy(&v, validate_net, validate_text,
+  rnn_char_init_ventropy(&v, validate_net, validate_text,
       opt_validate_chars, opt_validation_overlap);
 
 
@@ -537,7 +536,7 @@ load_and_train_model(struct CharMetadata *m){
     for (int i = 0; ! finished; i++){
       DEBUG("Starting epoch %d. learn rate %g.", i, net->bptt->learn_rate);
       START_TIMER(epoch);
-      finished = epoch(&model, confab_net, &v,
+      finished = rnn_char_epoch(&model, confab_net, &v,
           text, len, start_char, opt_stop, opt_confab_bias, CONFAB_SIZE, opt_quiet);
       DEBUG_TIMER(epoch);
       DEBUG_TIMER(run);
@@ -546,7 +545,7 @@ load_and_train_model(struct CharMetadata *m){
   }
   else {/* quiet level 2+ */
     do {
-      finished = epoch(&model, NULL, &v,
+      finished = rnn_char_epoch(&model, NULL, &v,
           text, len, start_char, opt_stop, 0, 0, opt_quiet);
       start_char = 0;
     }
@@ -586,7 +585,7 @@ main(int argc, char *argv[]){
     }
     opt_usage(argv[0], NULL);
   }
-  struct CharMetadata m = {
+  struct RnnCharMetadata m = {
     .alphabet = opt_alphabet,
     .collapse_chars = opt_collapse_chars,
     .learn_caps = opt_learn_capitals
@@ -594,7 +593,7 @@ main(int argc, char *argv[]){
   if (opt_confab_only){
     RecurNN *net = load_or_create_net(&m, 1);
     char *t = malloc(opt_confab_only);
-    confabulate(net, t, opt_confab_only, m.alphabet,
+    rnn_char_confabulate(net, t, opt_confab_only, m.alphabet,
         opt_confab_bias, m.learn_caps);
     fputs(t, stdout);
   }
