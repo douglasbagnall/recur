@@ -191,7 +191,8 @@ rnn_hash32(const char *s){
   u32 sig = 0;
   uint len = strlen(s);
   for (uint i = 0; i < len; i++){
-    sig ^= ROTATE(sig - s[i], 13) + s[i];
+    u8 t = s[i];
+    sig ^= ROTATE(sig - t, 13) + t;
   }
   return sig;
 }
