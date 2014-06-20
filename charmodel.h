@@ -105,5 +105,7 @@ int rnn_char_load_metadata(const char *metadata, struct CharMetadata *m);
 
 void rnn_char_free_metadata_items(struct CharMetadata *m);
 
+char* construct_net_filename(struct CharMetadata *m,
+    const char *basename, int bottom_size, int hidden_size, int learn_caps);
 
 #endif

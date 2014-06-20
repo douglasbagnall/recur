@@ -513,3 +513,26 @@ rnn_char_free_metadata_items(struct CharMetadata *m){
   free(m->alphabet);
   free(m->collapse_chars);
 }
+
+char*
+construct_net_filename(struct CharMetadata *m, const char *basename,
+    int bottom_size, int hidden_size, int learn_caps){
+  char s[260];
+  char *metadata = rnn_char_construct_metadata(m);
+  int alpha_size = strlen(m->alphabet);
+  int input_size = alpha_size + (m->learn_caps ? 1 : 0);
+  int output_size = alpha_size + (m->learn_caps ? 2 : 0);
+  u32 sig = rnn_hash32(metadata);
+  if (bottom_size){
+    snprintf(s, sizeof(s), "%s-s%0" PRIx32 "-i%d-b%d-h%d-o%d-c%d.net", basename,
+        sig, input_size, bottom_size, hidden_size, output_size,
+        m->learn_caps);
+  }
+  else{
+    snprintf(s, sizeof(s), "%s-s%0" PRIx32 "-i%d-h%d-o%d-c%d.net", basename,
+        sig, input_size, hidden_size, output_size,
+        m->learn_caps);
+  }
+  DEBUG("filename: %s", s);
+  return strdup(s);
+}
