@@ -159,11 +159,13 @@ static float opt_bottom_learn_rate_scale = DEFAULT_BOTTOM_LEARN_RATE_SCALE;
 static float opt_periodic_weight_noise = DEFAULT_PERIODIC_WEIGHT_NOISE;
 
 
+#define IN_RANGE_01(x) ((x) >= 0.0f && (x) <= 1.0f)
+
 /*restrict to 0-1 range (mostly for probabilities)*/
 static char *
 opt_set_floatval01(const char *arg, float *f){
   char *msg = opt_set_floatval(arg, f);
-  if (msg == NULL && (*f < 0.0f || *f > 1.0f)){
+  if (msg == NULL && ! IN_RANGE_01(*f)){
     char *s;
     if (asprintf(&s, "We want a number between 0 and 1, not '%s'", arg) > 0){
       return s;
@@ -202,8 +204,6 @@ static struct opt_table options[] = {
       &opt_init_hidden_run_length, "average length of hidden weight runs"),
   OPT_WITH_ARG("--init-hidden-run-deviation=<float>", opt_set_floatval, opt_show_floatval,
       &opt_init_hidden_run_deviation, "deviation of hidden weight run length"),
-
-
   OPT_WITH_ARG("--perforate-weights=<0-1>", opt_set_floatval01, opt_show_floatval,
       &opt_perforate_weights, "Zero this portion of weights"),
   OPT_WITH_ARG("-V|--validate-chars=<n>", opt_set_intval_bi, opt_show_intval_bi,
@@ -263,7 +263,8 @@ static struct opt_table options[] = {
   OPT_WITHOUT_ARG("--learn-capitals", opt_set_bool,
       &opt_learn_capitals, "learn to predict capitalisation"),
   OPT_WITH_ARG("--confab-bias", opt_set_floatval, opt_show_floatval,
-      &opt_confab_bias, "bias toward probable characters in confab (100 == deterministic)"),
+      &opt_confab_bias, "bias toward probable characters in confab "
+      "(100 == deterministic)"),
   OPT_WITHOUT_ARG("--no-save-net", opt_set_invbool,
       &opt_save_net, "Don't save learnt changes"),
   OPT_WITH_ARG("--multi-tap=<n>", opt_set_uintval, opt_show_uintval,
@@ -301,8 +302,6 @@ bounded_init_method(int m){
   STDERR_DEBUG("ignoring bad init-method %d", m);
   return DEFAULT_INIT_METHOD;
 }
-
-#define IN_RANGE_01(x) ((x) >= 0.0f && (x) <= 1.0f)
 
 static void
 initialise_net(RecurNN *net){
