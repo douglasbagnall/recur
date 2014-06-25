@@ -417,7 +417,8 @@ class Classifier(BaseClassifier):
             ground_truth = [fn]
             classifications = [fn]
             for s, t, timestamp in scores[self.target_index]:
-                ground_truth.append('%d' % t)
+                if t is not None:
+                    ground_truth.append('%d' % t)
                 classifications.append('%.5g' % s)
 
             if self.ground_truth_file:
