@@ -164,6 +164,7 @@ class Classifier(BaseClassifier):
     score_file = None
     smooth_presence = None
     presence_file = None
+    presence_csv = None
     minute_results = None
     def classify(self, data,
                  ground_truth_file=None,
