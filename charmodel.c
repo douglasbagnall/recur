@@ -18,7 +18,7 @@ capped_log2f(float x){
 }
 
 static u8*
-new_char_lut(const char *alphabet, const u8 *collapse_chars, int learn_caps){
+new_char_lut(const char *alphabet, const u8 *collapse_chars){
   int i;
   int len = strlen(alphabet);
   int collapse_target = 0;
@@ -40,12 +40,7 @@ new_char_lut(const char *alphabet, const u8 *collapse_chars, int learn_caps){
     u8 c = alphabet[i];
     ctn[c] = i;
     if (islower(c)){
-      if (learn_caps){
-        ctn[c - 32] = i | 0x80;
-      }
-      else {
-        ctn[c - 32] = i;
-      }
+      ctn[c - 32] = i;
     }
   }
   return ctn;
@@ -53,9 +48,9 @@ new_char_lut(const char *alphabet, const u8 *collapse_chars, int learn_caps){
 
 u8*
 rnn_char_alloc_collapsed_text(char *filename, const char *alphabet,
-    const u8 *collapse_chars, long *len, int learn_caps, int quietness){
+    const u8 *collapse_chars, long *len, int quietness){
   int i, j;
-  u8 *char_to_net = new_char_lut(alphabet, collapse_chars, learn_caps);
+  u8 *char_to_net = new_char_lut(alphabet, collapse_chars);
   FILE *f = fopen_or_abort(filename, "r");
   int err = fseek(f, 0, SEEK_END);
   *len = ftell(f);
@@ -96,12 +91,7 @@ rnn_char_dump_collapsed_text(const u8 *text, int len, const char *name,
   FILE *f = fopen_or_abort(name, "w");
   for (i = 0; i < len; i++){
     u8 c = text[i];
-    if (c & 0x80){
-      fputc(toupper(alphabet[c & 0x7f]), f);
-    }
-    else{
-      fputc(alphabet[c], f);
-    }
+    fputc(alphabet[c], f);
   }
   fclose(f);
 }
@@ -122,7 +112,7 @@ search_for_max(float *answer, int len){
 }
 
 static inline float*
-one_hot_opinion(RecurNN *net, int hot, int learn_caps){
+one_hot_opinion(RecurNN *net, int hot){
   float *inputs;
   int len;
   if (net->bottom_layer){
@@ -136,32 +126,16 @@ one_hot_opinion(RecurNN *net, int hot, int learn_caps){
 
   //XXX could just set the previous one to zero (i.e. remember it)
   memset(inputs, 0, len * sizeof(float));
-  if (learn_caps && (hot & 0x80)){
-    inputs[len - 1] = 1.0f;
-  }
-  inputs[hot & 0x7f] = 1.0f;
+  inputs[hot] = 1.0f;
   return rnn_opinion(net, NULL);
 }
 
 static float
-net_error_bptt(RecurNN *net, float *restrict error, int c, int next, int *correct,
-    int learn_caps){
+net_error_bptt(RecurNN *net, float *restrict error, int c, int next, int *correct){
   ASSUME_ALIGNED(error);
-  float *answer = one_hot_opinion(net, c, learn_caps);
+  float *answer = one_hot_opinion(net, c);
   int winner;
-  if (learn_caps){
-    int len = net->output_size - 2;
-    float *cap_error = error + len;
-    float *cap_answer = answer + len;
-    winner = softmax_best_guess(error, answer, len);
-    int next_cap = (next & 0x80) ? 1 : 0;
-    softmax_best_guess(cap_error, cap_answer, 2);
-    cap_error[next_cap] += 1.0f;
-  }
-  else {
-    winner = softmax_best_guess(error, answer, net->output_size);
-  }
-  next &= 0x7f;
+  winner = softmax_best_guess(error, answer, net->output_size);
   *correct = (winner == next);
   error[next] += 1.0f;
   return error[next];
@@ -169,34 +143,18 @@ net_error_bptt(RecurNN *net, float *restrict error, int c, int next, int *correc
 
 
 int
-opinion_deterministic(RecurNN *net, int hot, int learn_caps){
-  float *answer = one_hot_opinion(net, hot, learn_caps);
-  if (learn_caps){
-    int len = net->output_size - 2;
-    float *cap_answer = answer + len;
-    int c = search_for_max(answer, len);
-    int cap = search_for_max(cap_answer, 2);
-    return c | (cap ? 0x80 : 0);
-  }
-  else {
-    return search_for_max(answer, net->output_size);
-  }
+opinion_deterministic(RecurNN *net, int hot){
+  float *answer = one_hot_opinion(net, hot);
+  return search_for_max(answer, net->output_size);
 }
 
 int
-opinion_probabilistic(RecurNN *net, int hot, float bias, int learn_caps){
+opinion_probabilistic(RecurNN *net, int hot, float bias){
   int i;
   float r;
-  float *answer = one_hot_opinion(net, hot, learn_caps);
-  int n_chars = net->output_size - (learn_caps ? 2 : 0);
-  int cap = 0;
+  float *answer = one_hot_opinion(net, hot);
+  int n_chars = net->output_size;
   float error[net->output_size];
-  if (learn_caps){
-    r = rand_double(&net->rng);
-    biased_softmax(error, answer + n_chars, 2, bias);
-    if (r > error[0])
-      cap = 0x80;
-  }
   biased_softmax(error, answer, n_chars, bias);
   /*outer loop in case error doesn't quite add to 1 */
   for(;;){
@@ -205,26 +163,26 @@ opinion_probabilistic(RecurNN *net, int hot, float bias, int learn_caps){
     for (i = 0; i < n_chars; i++){
       accum += error[i];
       if (r < accum)
-        return i | cap;
+        return i;
     }
   }
 }
 
 float
-validate(RecurNN *net, const u8 *text, int len, int learn_caps){
+validate(RecurNN *net, const u8 *text, int len){
   float error[net->output_size];
   float entropy = 0.0f;
   int i;
-  int n_chars = net->output_size - (learn_caps ? 2 : 0);
+  int n_chars = net->output_size;
   /*skip the first few because state depends too much on previous experience */
   int skip = MIN(len / 10, 5);
   for (i = 0; i < skip; i++){
-    one_hot_opinion(net, text[i], learn_caps);
+    one_hot_opinion(net, text[i]);
   }
   for (; i < len - 1; i++){
-    float *answer = one_hot_opinion(net, text[i], learn_caps);
+    float *answer = one_hot_opinion(net, text[i]);
     softmax(error, answer, n_chars);
-    float e = error[text[i + 1] & 0x7f];
+    float e = error[text[i + 1]];
     entropy += capped_log2f(e);
   }
   entropy /= -(len - skip - 1);
@@ -280,21 +238,15 @@ rnn_char_init_schedule(RnnCharSchedule *s, int recent_len,
 
 void
 rnn_char_confabulate(RecurNN *net, char *dest, int len, const char* alphabet,
-    float bias, int learn_caps){
+    float bias){
   int i;
   static int n = 0;
   for (i = 0; i < len; i++){
     if (bias > 100)
-      n = opinion_deterministic(net, n, learn_caps);
+      n = opinion_deterministic(net, n);
     else
-      n = opinion_probabilistic(net, n, bias, learn_caps);
-    int cap = n & 0x80;
-    n &= 0x7f;
-    int c = alphabet[n];
-    if (cap){
-      c = toupper(c);
-    }
-    dest[i] = c;
+      n = opinion_probabilistic(net, n, bias);
+    dest[i] = alphabet[n];
   }
 }
 
@@ -322,7 +274,7 @@ rnn_char_calc_ventropy(RnnCharModel *model, RnnCharVentropy *v, int lap)
         v->counter = 0;
       }
       v->history[v->counter] = validate(v->net, v->text + v->lapsize * v->counter,
-          v->lapsize, model->learn_caps);
+          v->lapsize);
       float sum = 0.0f;
       float div = v->lap;
       for (int j = 0; j < v->lap; j++){
@@ -332,7 +284,7 @@ rnn_char_calc_ventropy(RnnCharModel *model, RnnCharVentropy *v, int lap)
       v->entropy = div ? sum / div : 0;
     }
     else {
-      v->entropy = validate(v->net, v->text, v->len, model->learn_caps);
+      v->entropy = validate(v->net, v->text, v->len);
       v->history[0] = v->entropy;
     }
   }
@@ -374,7 +326,7 @@ rnn_char_epoch(RnnCharModel *model, RecurNN *confab_net, RnnCharVentropy *v,
         }
         rnn_bptt_advance(n);
         e = net_error_bptt(n, n->bptt->o_error,
-            text[offset], text[offset + 1], &c, model->learn_caps);
+            text[offset], text[offset + 1], &c);
         correct += c;
         error += e;
         entropy += capped_log2f(1.0f - e);
@@ -390,7 +342,7 @@ rnn_char_epoch(RnnCharModel *model, RecurNN *confab_net, RnnCharVentropy *v,
       RecurNNBPTT *bptt = net->bptt;
       bptt->momentum = momentum;
       rnn_bptt_advance(net);
-      e = net_error_bptt(net, bptt->o_error, text[i], text[i + 1], &c, model->learn_caps);
+      e = net_error_bptt(net, bptt->o_error, text[i], text[i + 1], &c);
       rnn_bptt_calculate(net, model->batch_size);
       correct += c;
       error += e;
@@ -427,7 +379,7 @@ rnn_char_epoch(RnnCharModel *model, RecurNN *confab_net, RnnCharVentropy *v,
           char confab[confab_size + 1];
           confab[confab_size] = 0;
           rnn_char_confabulate(confab_net, confab, confab_size, model->alphabet,
-              confab_bias, model->learn_caps);
+              confab_bias);
           STDERR_DEBUG("%5dk e.%02d t%.2f v%.2f a.%02d %.0f/s |%s|", k,
               (int)(error * 100 + 0.5),
               entropy, ventropy,
@@ -471,13 +423,11 @@ rnn_char_construct_metadata(const struct RnnCharMetadata *m){
   int ret = asprintf(&metadata,
 #define SEP "\x1F"
       "alphabet"       SEP "%s" SEP
-      "collapse_chars" SEP "%s" SEP
-      "learn_caps"     SEP "%d"
+      "collapse_chars" SEP "%s"
 #undef SEP
       ,
       m->alphabet,
-      m->collapse_chars,
-      m->learn_caps
+      m->collapse_chars
   );
   if (ret == -1){
     FATAL_ERROR("can't alloc memory for metadata. or something.");
@@ -503,8 +453,6 @@ rnn_char_load_metadata(const char *metadata, struct RnnCharMetadata *m){
   m->alphabet = strdup(strtok(NULL, "\x1F"));
   CHECK_KEY(s, "collapse_chars");
   m->collapse_chars = strdup(strtok(NULL, "\x1F"));
-  CHECK_KEY(s, "learn_caps");
-  m->learn_caps = atoi(strtok(NULL, "\x1F"));
 
 #undef CHECK_KEY
 
@@ -522,22 +470,20 @@ rnn_char_free_metadata_items(struct RnnCharMetadata *m){
 
 char*
 rnn_char_construct_net_filename(struct RnnCharMetadata *m, const char *basename,
-    int bottom_size, int hidden_size, int learn_caps){
+    int bottom_size, int hidden_size){
   char s[260];
   char *metadata = rnn_char_construct_metadata(m);
   int alpha_size = strlen(m->alphabet);
-  int input_size = alpha_size + (m->learn_caps ? 1 : 0);
-  int output_size = alpha_size + (m->learn_caps ? 2 : 0);
+  int input_size = alpha_size;
+  int output_size = alpha_size;
   u32 sig = rnn_hash32(metadata);
   if (bottom_size){
-    snprintf(s, sizeof(s), "%s-s%0" PRIx32 "-i%d-b%d-h%d-o%d-c%d.net", basename,
-        sig, input_size, bottom_size, hidden_size, output_size,
-        m->learn_caps);
+    snprintf(s, sizeof(s), "%s-s%0" PRIx32 "-i%d-b%d-h%d-o%d.net", basename,
+        sig, input_size, bottom_size, hidden_size, output_size);
   }
   else{
-    snprintf(s, sizeof(s), "%s-s%0" PRIx32 "-i%d-h%d-o%d-c%d.net", basename,
-        sig, input_size, hidden_size, output_size,
-        m->learn_caps);
+    snprintf(s, sizeof(s), "%s-s%0" PRIx32 "-i%d-h%d-o%d.net", basename,
+        sig, input_size, hidden_size, output_size);
   }
   DEBUG("filename: %s", s);
   return strdup(s);

@@ -83,7 +83,6 @@ Because of ccan/opt, --help will tell you something.
 #define DEFAULT_PERFORATE_WEIGHTS 0.0f
 
 #define DEFAULT_FORCE_METADATA 0
-#define DEFAULT_LEARN_CAPITALS 0
 #define DEFAULT_DUMP_COLLAPSED_TEXT NULL
 #define DEFAULT_MULTI_TAP 0
 #define DEFAULT_USE_MULTI_TAP_PATH 0
@@ -146,7 +145,6 @@ static bool opt_temporal_pgm_dump = DEFAULT_TEMPORAL_PGM_DUMP;
 static bool opt_periodic_pgm_dump = DEFAULT_PERIODIC_PGM_DUMP;
 static float opt_confab_bias = DEFAULT_CONFAB_BIAS;
 static bool opt_save_net = DEFAULT_SAVE_NET;
-static bool opt_learn_capitals = DEFAULT_LEARN_CAPITALS;
 static uint opt_multi_tap = DEFAULT_MULTI_TAP;
 static bool opt_use_multi_tap_path = DEFAULT_USE_MULTI_TAP_PATH;
 static int opt_momentum_style = DEFAULT_MOMENTUM_STYLE;
@@ -259,8 +257,6 @@ static struct opt_table options[] = {
       &opt_temporal_pgm_dump, "Dump ppm images showing inputs change over time"),
   OPT_WITHOUT_ARG("--periodic-pgm-dump", opt_set_bool,
       &opt_periodic_pgm_dump, "Dump ppm images of weights, every reporting interval"),
-  OPT_WITHOUT_ARG("--learn-capitals", opt_set_bool,
-      &opt_learn_capitals, "learn to predict capitalisation"),
   OPT_WITH_ARG("--confab-bias", opt_set_floatval, opt_show_floatval,
       &opt_confab_bias, "bias toward probable characters in confab "
       "(100 == deterministic)"),
@@ -352,7 +348,7 @@ load_or_create_net(struct RnnCharMetadata *m, int reload){
   char *filename = opt_filename;
   if (filename == NULL){
     filename = rnn_char_construct_net_filename(m, opt_basename, opt_bottom_layer,
-        opt_hidden_size, opt_learn_capitals);
+        opt_hidden_size);
   }
 
   RecurNN *net = (reload) ? rnn_load_net(filename) : NULL;
@@ -375,7 +371,6 @@ load_or_create_net(struct RnnCharMetadata *m, int reload){
           DEBUG("alphabet %s", m2.alphabet);
           m->alphabet = strdup(m2.alphabet);
           m->collapse_chars = strdup(m2.collapse_chars);
-          m->learn_caps = m2.learn_caps;
           rnn_char_free_metadata_items(&m2);
         }
       }
@@ -394,10 +389,6 @@ load_or_create_net(struct RnnCharMetadata *m, int reload){
   else {
     int input_size = strlen(m->alphabet);
     int output_size = input_size;
-    if (opt_learn_capitals){
-      input_size++;
-      output_size += 2;
-    }
     u32 flags = RNN_NET_FLAG_STANDARD;
     if (opt_bptt_adaptive_min){/*on by default*/
       flags |= RNN_NET_FLAG_BPTT_ADAPTIVE_MIN_ERROR;
@@ -451,7 +442,6 @@ load_and_train_model(struct RnnCharMetadata *m){
     .report_interval = opt_report_interval,
     .save_net = opt_save_net,
     .use_multi_tap_path = opt_use_multi_tap_path,
-    .learn_caps = m->learn_caps,
     .alphabet = m->alphabet,
   };
 
@@ -489,7 +479,7 @@ load_and_train_model(struct RnnCharMetadata *m){
   long len;
   u8* validate_text;
   u8* text = rnn_char_alloc_collapsed_text(opt_textfile,
-      m->alphabet, (u8 *)m->collapse_chars, &len, m->learn_caps,
+      m->alphabet, (u8 *)m->collapse_chars, &len,
       opt_quiet);
   if (opt_dump_collapsed_text){
     rnn_char_dump_collapsed_text(text, len, opt_dump_collapsed_text, m->alphabet);
@@ -588,13 +578,12 @@ main(int argc, char *argv[]){
   struct RnnCharMetadata m = {
     .alphabet = opt_alphabet,
     .collapse_chars = opt_collapse_chars,
-    .learn_caps = opt_learn_capitals
   };
   if (opt_confab_only){
     RecurNN *net = load_or_create_net(&m, 1);
     char *t = malloc(opt_confab_only);
     rnn_char_confabulate(net, t, opt_confab_only, m.alphabet,
-        opt_confab_bias, m.learn_caps);
+        opt_confab_bias);
     fputs(t, stdout);
   }
   else {

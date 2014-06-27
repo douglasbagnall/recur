@@ -41,7 +41,6 @@ struct _RnnCharModel {
   float momentum;
   float momentum_soft_start;
   int momentum_style;
-  bool learn_caps;
   bool periodic_pgm_dump;
   bool temporal_pgm_dump;
   float periodic_weight_noise;
@@ -60,12 +59,11 @@ struct _RnnCharModel {
 struct RnnCharMetadata {
   char *alphabet;
   char *collapse_chars;
-  int learn_caps;
 };
 
 
 u8* rnn_char_alloc_collapsed_text(char *filename, const char *alphabet,
-    const u8 *collapse_chars, long *len, int learn_caps, int quietness);
+    const u8 *collapse_chars, long *len, int quietness);
 
 void rnn_char_dump_collapsed_text(const u8 *text, int len, const char *name,
     const char *alphabet);
@@ -76,7 +74,7 @@ void rnn_char_init_schedule(RnnCharSchedule *s, int recent_len,
 float rnn_char_calc_ventropy(RnnCharModel *model, RnnCharVentropy *v, int lap);
 
 void rnn_char_confabulate(RecurNN *net, char *text, int len, const char* alphabet,
-    float bias, int learn_caps);
+    float bias);
 
 void rnn_char_init_ventropy(RnnCharVentropy *v, RecurNN *net, const u8 *text,
     const int len, const int lap);
@@ -93,6 +91,6 @@ int rnn_char_load_metadata(const char *metadata, struct RnnCharMetadata *m);
 void rnn_char_free_metadata_items(struct RnnCharMetadata *m);
 
 char* rnn_char_construct_net_filename(struct RnnCharMetadata *m,
-    const char *basename, int bottom_size, int hidden_size, int learn_caps);
+    const char *basename, int bottom_size, int hidden_size);
 
 #endif
