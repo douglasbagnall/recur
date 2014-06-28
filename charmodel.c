@@ -39,6 +39,9 @@ rnn_char_find_alphabet(const char *filename, int *alphabet, int *a_len,
     else if (c == 0){
       break;
     }
+    if (c == 31){/* 31 is metadata separator XXX gah */
+      c = 32;
+    }
     if (collapse_space){
       if (isspace(c)){
         c = 32;
