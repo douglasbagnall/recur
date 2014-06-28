@@ -51,19 +51,26 @@ struct _RnnCharModel {
 
   TemporalPPM *input_ppm;
   TemporalPPM *error_ppm;
-  char *alphabet;
+  int *alphabet; /*unicode points */
+  int *collapse_chars;
   char * periodic_pgm_dump_string;
   RnnCharSchedule schedule;
+  bool utf8;
 };
 
 struct RnnCharMetadata {
-  char *alphabet;
+  char *alphabet; /*utf-8 or byte string */
   char *collapse_chars;
+  bool utf8;
 };
 
+int rnn_char_find_alphabet(const char *filename, int *alphabet, int *a_len,
+    int *collapse_chars, int *c_len, double threshold, int ignore_case,
+    int collapse_space, int utf8);
 
-u8* rnn_char_alloc_collapsed_text(char *filename, const char *alphabet,
-    const u8 *collapse_chars, long *len, int quietness);
+u8* rnn_char_alloc_collapsed_text(char *filename, int *alphabet, int a_len,
+    int *collapse_chars, int c_len, long *text_len,
+    int case_insensitive, int collapse_space, int utf8, int quietness);
 
 void rnn_char_dump_collapsed_text(const u8 *text, int len, const char *name,
     const char *alphabet);
@@ -73,8 +80,8 @@ void rnn_char_init_schedule(RnnCharSchedule *s, int recent_len,
 
 float rnn_char_calc_ventropy(RnnCharModel *model, RnnCharVentropy *v, int lap);
 
-void rnn_char_confabulate(RecurNN *net, char *text, int len, const char* alphabet,
-    float bias);
+int rnn_char_confabulate(RecurNN *net, char *dest, int char_len,
+    int byte_len, const int* alphabet, int utf8, float bias);
 
 void rnn_char_init_ventropy(RnnCharVentropy *v, RecurNN *net, const u8 *text,
     const int len, const int lap);
@@ -91,6 +98,7 @@ int rnn_char_load_metadata(const char *metadata, struct RnnCharMetadata *m);
 void rnn_char_free_metadata_items(struct RnnCharMetadata *m);
 
 char* rnn_char_construct_net_filename(struct RnnCharMetadata *m,
-    const char *basename, int bottom_size, int hidden_size);
+    const char *basename, int alpha_size, int bottom_size, int hidden_size);
+
 
 #endif

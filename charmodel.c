@@ -11,69 +11,200 @@ This uses the RNN to predict the next character in a text sequence.
 #include <stdio.h>
 
 #include "charmodel.h"
+#include "utf8.h"
 
 static inline float
 capped_log2f(float x){
   return (x < 1e-30f) ? -100.0f : log2f(x);
 }
 
-static u8*
-new_char_lut(const char *alphabet, const u8 *collapse_chars){
+/* rnn_char_find_alphabet returns the length of the found alphabet (not
+   the same as strlen if utf8 is parsed), or -1 on failure. */
+int
+rnn_char_find_alphabet(const char *filename, int *alphabet, int *a_len,
+    int *collapse_chars, int *c_len, double threshold, int ignore_case,
+    int collapse_space, int utf8){
+  int n_chars = utf8 ? 0x200000 : 256;
+  int *counts = calloc(n_chars + 1, sizeof(int));
+  int c, prev = 0;
+  int n = 0;
+  FILE *f = fopen_or_abort(filename, "r");
+  /*alloc enough for all characters to be 4 bytes long */
+  for(;;){
+    c = fread_utf8_char(f);
+    if (c < 0){
+      STDERR_DEBUG("Unicode Error!");
+      break;
+    }
+    else if (c == 0){
+      break;
+    }
+    if (collapse_space){
+      if (isspace(c)){
+        c = 32;
+        if (c == prev){
+          continue;
+        }
+      }
+    }
+    if (ignore_case && c < 0x80){
+      /*FIXME ascii only */
+      if(isupper(c)){
+        c = tolower(c);
+      }
+    }
+    n++;
+    counts[c]++;
+    prev = c;
+  }
+  if (n == 0){
+    goto error;
+  }
+  int a_count = 0;
+  int c_count = 0;
+
+  /*find the representative for the collapsed_chars, if any, which is put at
+    the beginning of the alphabet.*/
+  int max_collapsed_count = 0;
+  int max_collapsed_point = 0;
+  int min_count = MAX(threshold * n + 0.5, 1);
+  DEBUG("min count %i threshold %f n %d", min_count, threshold, n);
+  for (int i = 0; i < n_chars; i++){
+    int count = counts[i];
+    if (count && count < min_count){
+      max_collapsed_count = count;
+      max_collapsed_point = i;
+    }
+  }
+  if (max_collapsed_count){
+    alphabet[0] = max_collapsed_point;
+    counts[max_collapsed_point] = 0; /*so as to ignore it hereafter*/
+    a_count = 1;
+  }
+  /*map the rest of the collapsed chars to alphabet[0]*/
+  for (int i = 0; i < n_chars; i++){
+    int count = counts[i];
+    if (count >= min_count){
+      if (a_count == 256){
+        goto error;
+      }
+      alphabet[a_count] = i;
+      a_count++;
+    }
+    else if (count){
+      if (c_count == 256){
+        goto error;
+      }
+      collapse_chars[c_count] = i;
+      c_count++;
+    }
+  }
+  if (a_count == 0){
+    goto error;
+  }
+
+  free(counts);
+  *a_len = a_count;
+  *c_len = c_count;
+  DEBUG("a_len %i c_len %i", a_count, c_count);
+  return 0;
+ error:
+  STDERR_DEBUG("threshold of %f over %d chars led to %d in alphabet, "
+      "%d collapsed characters",
+      threshold, n, a_count, c_count);
+  free(counts);
+  *a_len = *c_len = 0;
+  return -1;
+}
+
+static int*
+new_char_lut(const int *alphabet, int a_len, const int *collapse, int c_len,
+    int *_space, int case_insensitive, int utf8){
   int i;
-  int len = strlen(alphabet);
   int collapse_target = 0;
-  int space;
-  char *space_p = strchr(alphabet, ' ');
-  if (space_p){
-    space = space_p - alphabet;
+  int space = -1;
+  for (i = 0; i < a_len; i++){
+    if (alphabet[i] == ' '){
+      space = i;
+      break;
+    }
   }
-  else {
-    space = 0;
-    DEBUG("space is not in alphabet: %s", alphabet);
+  if (space == -1){
+    space = collapse_target;
+    DEBUG("space is not in alphabet; using collapse_target");
   }
-  u8 *ctn = malloc_aligned_or_die(257);
-  memset(ctn, space, 257);
-  for (i = 0; collapse_chars[i]; i++){
-    ctn[collapse_chars[i]] = collapse_target;
-  }
+  *_space = space;
+  int len = utf8 ? 0x200001 : 257;
+  int *ctn = malloc(len *sizeof(int));
+  /*anything unspecified goes to space */
   for (i = 0; i < len; i++){
-    u8 c = alphabet[i];
+    ctn[i] = space;
+  }
+  /*collapse chars map to alphabet[0] */
+  for (i = 0; i < c_len; i++){
+    int c = collapse[i];
+    ctn[c] = collapse_target;
+  }
+
+  for (i = 0; i < a_len; i++){
+    int c = alphabet[i];
     ctn[c] = i;
-    if (islower(c)){
-      ctn[c - 32] = i;
+    /*FIXME: ascii only */
+    if (islower(c) && case_insensitive){
+      ctn[toupper(c)] = i;
     }
   }
   return ctn;
 }
 
 u8*
-rnn_char_alloc_collapsed_text(char *filename, const char *alphabet,
-    const u8 *collapse_chars, long *len, int quietness){
+rnn_char_alloc_collapsed_text(char *filename, int *alphabet, int a_len,
+    int *collapse_chars, int c_len, long *text_len,
+    int case_insensitive, int collapse_space, int utf8, int quietness){
   int i, j;
-  u8 *char_to_net = new_char_lut(alphabet, collapse_chars);
+  int space;
+  int *char_to_net = new_char_lut(alphabet, a_len,
+      collapse_chars, c_len, &space,
+      case_insensitive, utf8);
   FILE *f = fopen_or_abort(filename, "r");
   int err = fseek(f, 0, SEEK_END);
-  *len = ftell(f);
+  long len = ftell(f);
   err |= fseek(f, 0, SEEK_SET);
-  u8 *text = malloc(*len + 1);
+  u8 *text = malloc(len + 1);
   u8 prev = 0;
   u8 c;
   int chr = 0;
-  int space = char_to_net[' '];
   j = 0;
-  for(i = 0; i < *len && chr != EOF; i++){
-    chr = getc(f);
+  for(i = 0; i < len; i++){
+    if (utf8){
+      chr = fread_utf8_char(f);
+      if (chr < 0){
+        break;
+      }
+    }
+    else {
+      chr = fgetc(f);
+      if (chr == EOF)
+        break;
+    }
+
     c = char_to_net[chr];
-    if (c != space || prev != space){
+    if (collapse_space && (c != space || prev != space)){
       prev = c;
       text[j] = c;
       j++;
     }
+    else {
+      text[j] = c;
+      j = i;
+    }
   }
   text[j] = 0;
-  *len = j;
+  *text_len = j;
+  free(char_to_net);
   if (quietness < 1){
-    STDERR_DEBUG("original text was %d chars, collapsed is %d", i, j);
+    STDERR_DEBUG("original text was %d chars (%d bytes), collapsed is %d",
+        i, (int)len, j);
   }
   err |= fclose(f);
   if (err && quietness < 2){
@@ -236,18 +367,27 @@ rnn_char_init_schedule(RnnCharSchedule *s, int recent_len,
 
 
 
-void
-rnn_char_confabulate(RecurNN *net, char *dest, int len, const char* alphabet,
-    float bias){
-  int i;
+int
+rnn_char_confabulate(RecurNN *net, char *dest, int char_len,
+    int byte_len, const int* alphabet, int utf8, float bias){
+  int i, j;
   static int n = 0;
-  for (i = 0; i < len; i++){
+  int safe_end = byte_len - (utf8 ? 5 : 1);
+  for (i = 0, j = 0; i < char_len && j < safe_end; i++){
     if (bias > 100)
       n = opinion_deterministic(net, n);
     else
       n = opinion_probabilistic(net, n, bias);
-    dest[i] = alphabet[n];
+    if (utf8){
+      j += write_utf8_char(alphabet[n], dest + j);
+    }
+    else {
+      j = i;
+      dest[j] = alphabet[n];
+    }
   }
+  dest[j] = 0;
+  return j;
 }
 
 
@@ -376,10 +516,10 @@ rnn_char_epoch(RnnCharModel *model, RecurNN *confab_net, RnnCharVentropy *v,
         float accuracy = correct * scale;
         double per_sec = 1.0 / scale / elapsed;
         if (confab_net && confab_size && quietness < 1){
-          char confab[confab_size + 1];
-          confab[confab_size] = 0;
-          rnn_char_confabulate(confab_net, confab, confab_size, model->alphabet,
-              confab_bias);
+          int alloc_size = confab_size * 4;
+          char confab[alloc_size + 1];
+          rnn_char_confabulate(confab_net, confab, confab_size, alloc_size,
+              model->alphabet, model->utf8, confab_bias);
           STDERR_DEBUG("%5dk e.%02d t%.2f v%.2f a.%02d %.0f/s |%s|", k,
               (int)(error * 100 + 0.5),
               entropy, ventropy,
@@ -470,10 +610,9 @@ rnn_char_free_metadata_items(struct RnnCharMetadata *m){
 
 char*
 rnn_char_construct_net_filename(struct RnnCharMetadata *m, const char *basename,
-    int bottom_size, int hidden_size){
+    int alpha_size, int bottom_size, int hidden_size){
   char s[260];
   char *metadata = rnn_char_construct_metadata(m);
-  int alpha_size = strlen(m->alphabet);
   int input_size = alpha_size;
   int output_size = alpha_size;
   u32 sig = rnn_hash32(metadata);

@@ -20,7 +20,7 @@ Because of ccan/opt, --help will tell you something.
 #include <fenv.h>
 #include <ctype.h>
 #include "charmodel.h"
-
+#include "utf8.h"
 #define PGM_DUMP_STRING "ihw how"
 
 #define DICKENS_SHUFFLED_TEXT TEST_DATA_DIR "/dickens-shuffled.txt"
@@ -94,6 +94,10 @@ Because of ccan/opt, --help will tell you something.
 #define DEFAULT_TOP_LEARN_RATE_SCALE 1.0f
 #define DEFAULT_BOTTOM_LEARN_RATE_SCALE 1.0f
 #define DEFAULT_PERIODIC_WEIGHT_NOISE 0
+#define DEFAULT_CASE_INSENSITIVE 1
+#define DEFAULT_UTF8 0
+#define DEFAULT_COLLAPSE_SPACE 1
+#define DEFAULT_FIND_ALPHABET_THRESHOLD 0
 
 #define BELOW_QUIET_LEVEL(quiet) if (opt_quiet < quiet)
 
@@ -154,7 +158,10 @@ static uint opt_bottom_layer = DEFAULT_BOTTOM_LAYER;
 static float opt_top_learn_rate_scale = DEFAULT_TOP_LEARN_RATE_SCALE;
 static float opt_bottom_learn_rate_scale = DEFAULT_BOTTOM_LEARN_RATE_SCALE;
 static float opt_periodic_weight_noise = DEFAULT_PERIODIC_WEIGHT_NOISE;
-
+static bool opt_case_insensitive = DEFAULT_CASE_INSENSITIVE;
+static bool opt_utf8 = DEFAULT_UTF8;
+static bool opt_collapse_space = DEFAULT_COLLAPSE_SPACE;
+static double opt_find_alphabet_threshold = DEFAULT_FIND_ALPHABET_THRESHOLD;
 
 #define IN_RANGE_01(x) ((x) >= 0.0f && (x) <= 1.0f)
 
@@ -282,6 +289,20 @@ static struct opt_table options[] = {
       &opt_bottom_learn_rate_scale, "bottom layer learn rate (relative)"),
   OPT_WITH_ARG("--periodic-weight-noise=<stddev>", opt_set_floatval, opt_show_floatval,
       &opt_periodic_weight_noise, "periodically add this much gaussian noise to weights"),
+  OPT_WITHOUT_ARG("--case-sensitive", opt_set_invbool,
+      &opt_case_insensitive, "Treat capitals as their separate symbols"),
+  OPT_WITHOUT_ARG("--case-insensitive", opt_set_bool,
+      &opt_case_insensitive, "Treat capitals as lower case characters (ASCII only)"),
+  OPT_WITHOUT_ARG("--utf8", opt_set_bool,
+      &opt_utf8, "Parse text as UTF8"),
+  OPT_WITHOUT_ARG("--no-utf8", opt_set_invbool,
+      &opt_utf8, "Parse text as 8 bit symbols"),
+  OPT_WITHOUT_ARG("--no-collapse-space", opt_set_invbool,
+      &opt_collapse_space, "Predict whitespace characters individually"),
+  OPT_WITHOUT_ARG("--collapse-space", opt_set_bool,
+      &opt_collapse_space, "Runs of whitespace collapse to single space"),
+  OPT_WITH_ARG("--find-alphabet-threshold", opt_set_doubleval, opt_show_doubleval,
+      &opt_find_alphabet_threshold, "minimum frequency for character to be included"),
 
   OPT_WITHOUT_ARG("-h|--help", opt_usage_and_exit,
       ": Rnn modelling of text at the character level",
@@ -343,12 +364,13 @@ initialise_net(RecurNN *net){
 }
 
 static RecurNN *
-load_or_create_net(struct RnnCharMetadata *m, int reload){
+load_or_create_net(struct RnnCharMetadata *m, int alpha_len, int reload){
   char *metadata = rnn_char_construct_metadata(m);
   char *filename = opt_filename;
+
   if (filename == NULL){
-    filename = rnn_char_construct_net_filename(m, opt_basename, opt_bottom_layer,
-        opt_hidden_size);
+    filename = rnn_char_construct_net_filename(m, opt_basename, alpha_len,
+        opt_bottom_layer, opt_hidden_size);
   }
 
   RecurNN *net = (reload) ? rnn_load_net(filename) : NULL;
@@ -367,6 +389,7 @@ load_or_create_net(struct RnnCharMetadata *m, int reload){
               "Using otherwise determined metadata");
         }
         else {
+          /*NB. the alphabet length could be different, isn't checked*/
           DEBUG("Using the net's metadata. Use --force-metadata to override");
           DEBUG("alphabet %s", m2.alphabet);
           m->alphabet = strdup(m2.alphabet);
@@ -387,8 +410,8 @@ load_or_create_net(struct RnnCharMetadata *m, int reload){
     }
   }
   else {
-    int input_size = strlen(m->alphabet);
-    int output_size = input_size;
+    int input_size = alpha_len;
+    int output_size = alpha_len;
     u32 flags = RNN_NET_FLAG_STANDARD;
     if (opt_bptt_adaptive_min){/*on by default*/
       flags |= RNN_NET_FLAG_BPTT_ADAPTIVE_MIN_ERROR;
@@ -427,7 +450,8 @@ finish(RnnCharModel *model, RnnCharVentropy *v){
 }
 
 static void
-load_and_train_model(struct RnnCharMetadata *m){
+load_and_train_model(struct RnnCharMetadata *m, int *alphabet, int a_len,
+    int *collapse_chars, int c_len){
   RnnCharModel model = {
     .n_training_nets = MAX(opt_multi_tap, 1),
     .pgm_name = opt_basename,
@@ -442,10 +466,12 @@ load_and_train_model(struct RnnCharMetadata *m){
     .report_interval = opt_report_interval,
     .save_net = opt_save_net,
     .use_multi_tap_path = opt_use_multi_tap_path,
-    .alphabet = m->alphabet,
+    .utf8 = opt_utf8,
+    .alphabet = alphabet,
+    .collapse_chars = collapse_chars
   };
 
-  RecurNN *net = load_or_create_net(m, opt_reload);
+  RecurNN *net = load_or_create_net(m, a_len, opt_reload);
   if (opt_override){
     RecurNNBPTT *bptt = net->bptt;
     bptt->learn_rate = opt_learn_rate;
@@ -476,19 +502,20 @@ load_and_train_model(struct RnnCharMetadata *m){
       opt_learn_rate_scale);
 
   /* get text and validation text */
-  long len;
+  long text_len;
   u8* validate_text;
-  u8* text = rnn_char_alloc_collapsed_text(opt_textfile,
-      m->alphabet, (u8 *)m->collapse_chars, &len,
-      opt_quiet);
+
+  u8* text = rnn_char_alloc_collapsed_text(opt_textfile, alphabet, a_len,
+      collapse_chars, c_len, &text_len, opt_case_insensitive, opt_collapse_space,
+      opt_utf8, opt_quiet);
   if (opt_dump_collapsed_text){
-    rnn_char_dump_collapsed_text(text, len, opt_dump_collapsed_text, m->alphabet);
+    rnn_char_dump_collapsed_text(text, text_len, opt_dump_collapsed_text, m->alphabet);
   }
 
   if (opt_validate_chars > 2 &&
-      len - opt_validate_chars > 2){
-    len -= opt_validate_chars;
-    validate_text = text + len;
+      text_len - opt_validate_chars > 2){
+    text_len -= opt_validate_chars;
+    validate_text = text + text_len;
   }
   else {
     if (opt_validate_chars){
@@ -504,14 +531,14 @@ load_and_train_model(struct RnnCharMetadata *m){
       opt_validate_chars, opt_validation_overlap);
 
 
-  /*start_char can only go up to len - 1, because the i + 1th character is the
+  /*start_char can only go up to text_len - 1, because the i + 1th character is the
     one being predicted, hence has to be accessed for feedback. */
   int start_char;
-  if (opt_start_char >= 0 && opt_start_char < len - 1){
+  if (opt_start_char >= 0 && opt_start_char < text_len - 1){
     start_char = opt_start_char;
   }
   else {
-    start_char = net->generation % (len - 1);
+    start_char = net->generation % (text_len - 1);
   }
 
   if (opt_stop < 0){
@@ -527,7 +554,7 @@ load_and_train_model(struct RnnCharMetadata *m){
       DEBUG("Starting epoch %d. learn rate %g.", i, net->bptt->learn_rate);
       START_TIMER(epoch);
       finished = rnn_char_epoch(&model, confab_net, &v,
-          text, len, start_char, opt_stop, opt_confab_bias, CONFAB_SIZE, opt_quiet);
+          text, text_len, start_char, opt_stop, opt_confab_bias, CONFAB_SIZE, opt_quiet);
       DEBUG_TIMER(epoch);
       DEBUG_TIMER(run);
       start_char = 0;
@@ -536,7 +563,7 @@ load_and_train_model(struct RnnCharMetadata *m){
   else {/* quiet level 2+ */
     do {
       finished = rnn_char_epoch(&model, NULL, &v,
-          text, len, start_char, opt_stop, 0, 0, opt_quiet);
+          text, text_len, start_char, opt_stop, 0, 0, opt_quiet);
       start_char = 0;
     }
     while (! finished);
@@ -559,7 +586,6 @@ load_and_train_model(struct RnnCharMetadata *m){
   }
 }
 
-
 int
 main(int argc, char *argv[]){
   //feclearexcept(FE_ALL_EXCEPT);
@@ -575,18 +601,59 @@ main(int argc, char *argv[]){
     }
     opt_usage(argv[0], NULL);
   }
+
+  int *alphabet = calloc(257, sizeof(int));
+  int *collapse_chars = calloc(257, sizeof(int));
+  int a_len, c_len;
+
+  if (opt_find_alphabet_threshold){
+    rnn_char_find_alphabet(opt_textfile,
+        alphabet, &a_len, collapse_chars, &c_len,
+        opt_find_alphabet_threshold,
+        opt_case_insensitive, opt_collapse_space, opt_utf8);
+    if (a_len < 1){
+      DEBUG("Trouble finding an alphabet");
+      exit(1);
+    }
+    if (opt_utf8){
+      opt_alphabet = new_string_from_codepoints(alphabet, a_len);
+      opt_collapse_chars = new_string_from_codepoints(collapse_chars, c_len);
+    }
+    else {
+      opt_alphabet = new_8bit_string_from_ints(alphabet, a_len);
+      opt_collapse_chars = new_8bit_string_from_ints(collapse_chars, c_len);
+    }
+  }
+  else { /*use given or default alphabet */
+    if (opt_utf8){
+      a_len = fill_codepoints_from_string(alphabet, 256, opt_alphabet);
+      c_len = fill_codepoints_from_string(collapse_chars, 256, opt_collapse_chars);
+    }
+    else {
+      a_len = fill_codepoints_from_8bit_string(alphabet, 256, opt_alphabet);
+      c_len = fill_codepoints_from_8bit_string(collapse_chars, 256, opt_collapse_chars);
+    }
+  }
+  STDERR_DEBUG("Using alphabet of length %d: '%s'", a_len, opt_alphabet);
+  STDERR_DEBUG("collapsing these %d characters into first alphabet character: '%s'",
+      c_len, opt_collapse_chars);
+
   struct RnnCharMetadata m = {
     .alphabet = opt_alphabet,
     .collapse_chars = opt_collapse_chars,
+    .utf8 = opt_utf8
   };
   if (opt_confab_only){
-    RecurNN *net = load_or_create_net(&m, 1);
-    char *t = malloc(opt_confab_only);
-    rnn_char_confabulate(net, t, opt_confab_only, m.alphabet,
-        opt_confab_bias);
+    RecurNN *net = load_or_create_net(&m, a_len, 1);
+    /*XXX this could be done in small chunks */
+    int byte_len = opt_confab_only * 4 + 5;
+    char *t = malloc(byte_len);
+    rnn_char_confabulate(net, t, opt_confab_only, byte_len,
+        alphabet, opt_utf8, opt_confab_bias);
     fputs(t, stdout);
+    free(t);
   }
   else {
-    load_and_train_model(&m);
+    load_and_train_model(&m, alphabet, a_len, collapse_chars, c_len);
   }
 }
