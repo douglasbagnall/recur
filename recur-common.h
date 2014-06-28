@@ -21,6 +21,18 @@
 #warning INVISIBLE is set
 #endif
 
+#ifndef ALWAYS_INLINE
+#define ALWAYS_INLINE __attribute__ ((__always_inline__))
+#else
+#warning ALWAYS_INLINE is set
+#endif
+
+#ifndef MALLOC
+#define MALLOC __attribute__ ((__malloc__))
+#else
+#warning MALLOC is set
+#endif
+
 #define VERBOSE_DEBUG 0
 
 #define ROTATE(x, k) (((x) << (k)) | ((x) >> (sizeof(x) * 8 - (k))))
