@@ -1,21 +1,35 @@
 #!/usr/bin/python3
+
 from collections import Counter
 import sys
+import argparse
 
-def main(files, short=False):
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-q', '--short', action="store_true",
+                        help="one-line view")
+    parser.add_argument('-c', '--case-sensitive', action="store_true",
+                        help="treat upper and lower case separately")
+    parser.add_argument('-t', '--threshold', type=float, default=1e-4,
+                        help='threshold of alphabet inclusion')
+    parser.add_argument('files', help='process these files', nargs='+')
+    args = parser.parse_args()
+
     chars = Counter()
-    for fn in files:
+    for fn in args.files:
         f = open(fn)
-        s = ' '.join(f.read().split()).lower()
+        s = ' '.join(f.read().split())
+        if not args.case_sensitive:
+            s = s.lower()
         f.close()
         chars.update(s)
-    if short:
-        threshold = len(s) // 10000
-        print('%-30s: {%s}    {%s}' % (' '.join(files),
-                                       '' .join(c for c, n in chars.most_common()
-                                                if n >= threshold),
-                                       '' .join(c for c, n in chars.most_common()
-                                                if n < threshold)))
+    if args.short:
+        threshold = int(args.threshold * len(s) + 0.5)
+        print('%-30s: {{%s}} {{%s}}' % (' '.join(args.files),
+                                        '' .join(c for c, n in chars.most_common()
+                                                 if n >= threshold),
+                                        '' .join(c for c, n in chars.most_common()
+                                                 if n < threshold)))
     else:
         i = 1
         for c, n in chars.most_common():
@@ -24,8 +38,5 @@ def main(files, short=False):
         print(''.join(c for c, n in chars.most_common()))
 
 
-if '-q' in sys.argv:
-    sys.argv.remove('-q')
-    main(sys.argv[1:], short=True)
-else:
-    main(sys.argv[1:])
+
+main()
