@@ -137,8 +137,11 @@ test/test_mfcc_table: %:  mfcc.o rescale.o %.o
 test/test_mfcc_bins: %: mfcc.o %.o
 	$(CC) -Wl,-O1 $^ $(INCLUDES) $(DEFINES) $(LINKS)  -o $@
 
+test/test_charmodel: test/test_charmodel.o $(RNN_OBJECTS) charmodel.o
+	$(CC) -Wl,-O1 $^  -I. $(DEFINES)  $(COMMON_LINKS)   -o $@
+
 #actually there are more path.h dependers.
-test_backprop.o test/test_fb_backprop.o test/test_rescale.o :path.h
+test_backprop.o test/test_fb_backprop.o test/test_rescale.o test/test_charmodel.o :path.h
 
 test/test_%: test/test_%.o
 	$(CC) -Wl,-O1 $^  -I. $(DEFINES)  $(COMMON_LINKS)   -o $@

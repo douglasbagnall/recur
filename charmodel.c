@@ -18,8 +18,7 @@ capped_log2f(float x){
   return (x < 1e-30f) ? -100.0f : log2f(x);
 }
 
-/* rnn_char_find_alphabet returns the length of the found alphabet (not
-   the same as strlen if utf8 is parsed), or -1 on failure. */
+/* rnn_char_find_alphabet returns 0 for success, -1 on failure. */
 int
 rnn_char_find_alphabet(const char *filename, int *alphabet, int *a_len,
     int *collapse_chars, int *c_len, double threshold, int ignore_case,
@@ -74,7 +73,7 @@ rnn_char_find_alphabet(const char *filename, int *alphabet, int *a_len,
   DEBUG("min count %i threshold %f n %d", min_count, threshold, n);
   for (int i = 0; i < n_chars; i++){
     int count = counts[i];
-    if (count && count < min_count){
+    if (count && count < min_count && count > max_collapsed_count){
       max_collapsed_count = count;
       max_collapsed_point = i;
     }

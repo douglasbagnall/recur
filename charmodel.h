@@ -1,6 +1,7 @@
 #ifndef HAVE_CHAR_MODEL_H
 #define HAVE_CHAR_MODEL_H
 #include "recur-nn.h"
+#include "pgm_dump.h"
 
 #include <ctype.h>
 #include <stdbool.h>
