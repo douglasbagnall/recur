@@ -1,3 +1,10 @@
+/* Copyright (C) 2014 Douglas Bagnall <douglas@halo.gen.nz> LGPL
+-*- coding: utf-8 -*-
+
+Tests SOME of the functions in ../utf8.h
+
+This file contains string literals encoded in utf-8.
+*/
 #include "../utf8.h"
 
 #define C_NORMAL  "\033[00m"
