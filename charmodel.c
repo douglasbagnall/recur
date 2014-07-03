@@ -30,14 +30,27 @@ rnn_char_find_alphabet(const char *filename, int *alphabet, int *a_len,
   FILE *f = fopen_or_abort(filename, "r");
   /*alloc enough for all characters to be 4 bytes long */
   for(;;){
-    c = fread_utf8_char(f);
-    if (c < 0){
-      STDERR_DEBUG("Unicode Error!");
-      break;
+    if (utf8){
+      c = fread_utf8_char(f);
+      if (c < 0){
+        STDERR_DEBUG("Unicode Error!");
+        break;
+      }
+      else if (c == 0){
+        break;
+      }
     }
-    else if (c == 0){
-      break;
+    else {
+      c = getc(f);
+      if (c == EOF){
+        break;
+      }
     }
+    if (c >= n_chars){
+      DEBUG("got char %d, but there are only %d slots", c, n_chars);
+      goto error;
+    }
+
     if (c == 31){/* 31 is metadata separator XXX gah */
       c = 32;
     }
