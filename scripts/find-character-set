@@ -3,6 +3,7 @@
 from collections import Counter
 import sys
 import argparse
+import math
 
 def main():
     parser = argparse.ArgumentParser()
@@ -24,7 +25,8 @@ def main():
         f.close()
         chars.update(s)
     if args.short:
-        threshold = int(args.threshold * len(s) + 0.5)
+        threshold = math.ceil(args.threshold * len(s))
+
         print('%-30s: {{%s}} {{%s}}' % (' '.join(args.files),
                                         '' .join(c for c, n in chars.most_common()
                                                  if n >= threshold),

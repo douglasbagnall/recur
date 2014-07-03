@@ -82,7 +82,7 @@ rnn_char_find_alphabet(const char *filename, int *alphabet, int *a_len,
     the beginning of the alphabet.*/
   int max_collapsed_count = 0;
   int max_collapsed_point = 0;
-  int min_count = MAX(threshold * n + 0.5, 1);
+  int min_count = MAX(ceil(threshold * n), 1);
   DEBUG("min count %i threshold %f n %d", min_count, threshold, n);
   for (int i = 0; i < n_chars; i++){
     int count = counts[i];
