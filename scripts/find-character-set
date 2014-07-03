@@ -13,17 +13,27 @@ def main():
                         help="treat upper and lower case separately")
     parser.add_argument('-t', '--threshold', type=float, default=1e-4,
                         help='threshold of alphabet inclusion')
+    parser.add_argument('-u', '--utf8', action="store_true",
+                        help='parse as UTF-8')
     parser.add_argument('files', help='process these files', nargs='+')
     args = parser.parse_args()
 
     chars = Counter()
     for fn in args.files:
-        f = open(fn)
-        s = ' '.join(f.read().split())
+        if args.utf8:
+            f = open(fn, "r")
+            s = ' '.join(f.read().split())
+        else:
+            f = open(fn, "rb")
+            #stupid Python 3. mac_roman seems to be defined for all bytes,
+            #unlike latin_1 and cp1252.
+            s = ' '.join(f.read().decode('mac_roman').split())
         if not args.case_sensitive:
             s = s.lower()
         f.close()
         chars.update(s)
+
+
     if args.short:
         threshold = math.ceil(args.threshold * len(s))
 
