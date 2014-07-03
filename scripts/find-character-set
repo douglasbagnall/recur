@@ -4,6 +4,7 @@ from collections import Counter
 import sys
 import argparse
 import math
+import re
 
 def main():
     parser = argparse.ArgumentParser()
@@ -15,6 +16,8 @@ def main():
                         help='threshold of alphabet inclusion')
     parser.add_argument('-u', '--utf8', action="store_true",
                         help='parse as UTF-8')
+    parser.add_argument('-p', '--preserve-whitespace', action="store_true",
+                        help="don't collapse whitespace to single space")
     parser.add_argument('files', help='process these files', nargs='+')
     args = parser.parse_args()
 
@@ -22,33 +25,52 @@ def main():
     for fn in args.files:
         if args.utf8:
             f = open(fn, "r")
-            s = ' '.join(f.read().split())
+            s = f.read()
         else:
             f = open(fn, "rb")
             #stupid Python 3. mac_roman seems to be defined for all bytes,
             #unlike latin_1 and cp1252.
-            s = ' '.join(f.read().decode('mac_roman').split())
+            s = f.read().decode('mac_roman')
+
+        if not args.preserve_whitespace:
+            s = ' '.join(s.split())
         if not args.case_sensitive:
             s = s.lower()
         f.close()
         chars.update(s)
 
-
+    threshold = math.ceil(args.threshold * len(s))
     if args.short:
-        threshold = math.ceil(args.threshold * len(s))
-
-        print('%-30s: {{%s}} {{%s}}' % (' '.join(args.files),
-                                        '' .join(c for c, n in chars.most_common()
-                                                 if n >= threshold),
-                                        '' .join(c for c, n in chars.most_common()
-                                                 if n < threshold)))
+        s = ('%-30s: {{%s}} {{%s}}' % (' '.join(args.files),
+                                       '' .join(c for c, n in chars.most_common()
+                                                if n >= threshold),
+                                       '' .join(c for c, n in chars.most_common()
+                                                if n < threshold)))
+        print(str(s.encode('mac_roman'))[2: -1])
     else:
         i = 1
+        print(len(s), len(chars))
         for c, n in chars.most_common():
-            print("%2d '%s' %10d %10.3g" % (i, c, n, float(n) / len(s)))
+            print("%2d '%s'  \\x%02x %10d %10.3g" % (i, c, ord(c.encode('mac_roman')),
+                                                 n, float(n) / len(s)))
             i += 1
-        print(''.join(c for c, n in chars.most_common()))
 
+        s = (''.join(c for c, n in chars.most_common()))
+        print(c_formatted_string(s))
+        s = '' .join(c for c, n in chars.most_common()
+                     if n >= threshold)
+        print('.alphabet = "%s",' % c_formatted_string(s))
+        s = '' .join(c for c, n in chars.most_common()
+                     if n < threshold)
+        print('.collapse = "%s",' % c_formatted_string(s))
+
+
+
+def c_formatted_string(s):
+    s = str(s.encode('mac_roman'))[2: -1]
+    s = s.replace('"', '\\"')
+    return re.sub(r'(\\x[0-9a-f][0-9a-f])([0-9a-f])',
+                  r'\1""\2', s, flags=re.IGNORECASE)
 
 
 main()
