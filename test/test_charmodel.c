@@ -26,7 +26,10 @@ Tests some of the functions in ../charmodel.[ch]
 #define C_REV_RED "\033[01;41m"
 
 #define EREWHON_TEXT TEST_DATA_DIR "/erewhon.txt"
-#define LGPL_TEXT "../licenses/LGPL-2.1"
+#define LGPL_TEXT TEST_DATA_DIR "/../licenses/LGPL-2.1"
+#define WAI1874_TEXT TEST_DATA_DIR "/Wai1874NgaM.txt"
+
+#define PUT(format, ...) fprintf(stderr, (format),## __VA_ARGS__)
 
 typedef struct {
   double threshold;
@@ -125,6 +128,55 @@ static const ab_test ab_test_cases[] = {
     .collapse_space = 0
   },
 
+  /*utf-8 treatment of pure ASCII text -- should just work the same */
+  {
+    .threshold = 1e-4,
+    .alphabet = "1etaonihsrdlucmwfygpb,v.k-;x\"qj'?:z)(_ ",
+    .collapse = "!0*872&{}695/34[]@",
+    .first_char = '1',
+    .whitespace = " ",
+    .filename = EREWHON_TEXT,
+    .ignore_case = 1,
+    .utf8 = 1,
+    .collapse_space = 1
+  },
+
+  {/*LGPL text, also ascii only */
+    .threshold = 1e-4,
+    .alphabet = "4 etiorasnhlcduyfbpmwg,v.k)\"x1(q;2j-/'0:96><35",
+    .collapse = "87![]z`",
+    .first_char = '4',
+    .whitespace = " ",
+    .filename = LGPL_TEXT,
+    .ignore_case = 1,
+    .utf8 = 0,
+    .collapse_space = 1
+  },
+
+  {/*Wai1874 text, UTF-8 */
+    .threshold = 1e-4,
+    .alphabet = "' aiteokhrnu.mgpw<>,1-0£sd42₤367859:)(;ā—v\"c&bjē*/l",
+    .collapse = "…yxīōü",
+    .first_char = '\'',
+    .whitespace = " ",
+    .filename = WAI1874_TEXT,
+    .ignore_case = 1,
+    .utf8 = 1,
+    .collapse_space = 1
+  },
+
+  {/*Wai1874 text, UTF-8 */
+    .threshold = 1e-4,
+    .alphabet = "' aietoknrh.ugmp<>Kw,1MTH-W0RPN£sd42A₤36I785OE9:)(;ā—\"vUVcB&JlS*/ē",
+    .collapse = "yD…xüXōCGī",
+    .first_char = '\'',
+    .whitespace = " ",
+    .filename = WAI1874_TEXT,
+    .ignore_case = 0,
+    .utf8 = 1,
+    .collapse_space = 1
+  },
+
 
   {
     .filename = NULL
@@ -137,7 +189,7 @@ print_char_list_diff(const char *a, const char *b)
   int i, j;
   char *b2 = strdupa(b);
   int diff = 0;
-  fprintf(stderr, C_NORMAL "-->");
+  PUT(C_NORMAL "-->");
   for (i = 0; a[i]; i++){
     char x = a[i];
     int found = 0;
@@ -149,32 +201,89 @@ print_char_list_diff(const char *a, const char *b)
       }
     }
     if (found){
-      fprintf(stderr, C_GREEN "%c", x);
+      PUT(C_GREEN "%c", x);
     }
     else {
-      fprintf(stderr, C_RED "%c", x);
+      PUT(C_RED "%c", x);
       diff++;
     }
   }
-  fprintf(stderr, C_MAGENTA);
+  PUT(C_MAGENTA);
   for (j = 0; b[j]; j++){
     if (b2[j]){
-      fprintf(stderr, "%c", b2[j]);
+      PUT("%c", b2[j]);
       diff++;
     }
   }
-  fprintf(stderr, C_NORMAL "<--diff is %d\n", diff);
+  PUT(C_NORMAL "<--diff is %d\n", diff);
   return diff;
 }
 
+static inline int
+print_code_list_diff(const int *a, int a_len, const int *b, int b_len)
+{
+  int i, j;
+  int b2[b_len];
+  char s[5];
+  memcpy(b2, b, b_len * sizeof(int));
+  int diff = 0;
+  PUT(C_NORMAL "-->");
+  for (i = 0; i < a_len; i++){
+    int x = a[i];
+    int found = 0;
+    for (j = 0; j < b_len; j++){
+      if (b2[j] == x){
+        b2[j] = 0;
+        found = 1;
+        break;
+      }
+    }
+    int end = write_utf8_char(x, s);
+    s[end] = 0;
+    if (found){
+      PUT(C_GREEN "%s", s);
+    }
+    else {
+      PUT(C_RED "%s", s);
+      diff++;
+    }
+  }
+  PUT(C_MAGENTA);
+  for (j = 0; j < b_len; j++){
+    if (b2[j]){
+      int end = write_utf8_char(b2[j], s);
+      s[end] = 0;
+      PUT("%s", s);
+      diff++;
+    }
+  }
+  PUT(C_NORMAL "<--diff is %d\n", diff);
+  return diff;
+}
+
+
+
+static inline void
+dump_alphabet(int *alphabet, int len){
+  char *s = new_string_from_codepoints(alphabet, len);
+  DEBUG(C_DARK_YELLOW "»»" C_NORMAL "%s" C_DARK_YELLOW "««" C_NORMAL, s);
+  free(s);
+  for (int i = 0; i < len; i++){
+    PUT("%d, ", alphabet[i]);
+  }
+  PUT("\n");
+}
 
 static int
 test_alphabet_finding(void){
   int i;
   int errors = 0;
-  int *alphabet = malloc(257 * sizeof(int));
-  int *collapse_chars = malloc(257 * sizeof(int));
+  int alphabet[257];
+  int collapse_chars[257];
+  int target_alphabet[257];
+  int target_collapse_chars[257];
   int a_len, c_len;
+  int ta_len, tc_len;
   for (i = 0; ; i++){
     const ab_test *a = &ab_test_cases[i];
     if (! a->filename){
@@ -192,36 +301,41 @@ test_alphabet_finding(void){
         a->ignore_case ? "insensitive" : "sensitive",
         a->utf8 ? "utf8" : "bytes",
         a->collapse_space ? "collapsed" : "preserved");
-    char *a_string;
-    char *c_string;
     if (a->utf8){
-      a_string = new_string_from_codepoints(alphabet, a_len);
-      c_string = new_string_from_codepoints(collapse_chars, c_len);
+      ta_len = fill_codepoints_from_string(target_alphabet, 256, a->alphabet);
+      tc_len = fill_codepoints_from_string(target_collapse_chars, 256, a->collapse);
     }
     else {
-      a_string = new_8bit_string_from_ints(alphabet, a_len);
-      c_string = new_8bit_string_from_ints(collapse_chars, c_len);
+      ta_len = fill_codepoints_from_8bit_string(target_alphabet, 256, a->alphabet);
+      tc_len  = fill_codepoints_from_8bit_string(target_collapse_chars, 256, a->collapse);
     }
     int e = 0;
-    fprintf(stderr, C_YELLOW "alphabet ");
-    e += print_char_list_diff(a_string, a->alphabet);
-    fprintf(stderr, C_YELLOW "collapsed");
-    e += print_char_list_diff(c_string, a->collapse);
-    if (a->first_char && a->first_char != *a_string){
+    PUT(C_YELLOW "alphabet ");
+    e += print_code_list_diff(alphabet, a_len, target_alphabet, ta_len);
+    PUT(C_YELLOW "collapsed");
+    e += print_code_list_diff(collapse_chars, c_len, target_collapse_chars,
+        tc_len);
+
+    //XXX
+    if ( 0 && a->first_char && a->first_char != 0){
       DEBUG(C_RED "collapse representative character should be %c, is %c" C_NORMAL,
-          a->first_char, *a_string);
+          a->first_char, 0);
       e++;
     }
     if (e){
       errors++;
       DEBUG(C_REV_RED "Errors found!" C_NORMAL);
-      DEBUG("alphabet: %s", a_string);
-      DEBUG("target  : %s", a->alphabet);
-      DEBUG("collapse: %s", c_string);
-      DEBUG("target  : %s", a->collapse);
+      PUT(C_BLUE "alphabet : " C_NORMAL);
+      dump_alphabet(alphabet, a_len);
+      PUT(C_DARK_CYAN "target   : " C_NORMAL);
+      dump_alphabet(target_alphabet, ta_len);
+      DEBUG("literal: %s", a->alphabet);
+      PUT(C_BLUE "collapsed: " C_NORMAL);
+      dump_alphabet(collapse_chars, c_len);
+      PUT(C_DARK_CYAN "target   : " C_NORMAL);
+      dump_alphabet(target_collapse_chars, ta_len);
+      DEBUG("literal : %s", a->collapse);
     }
-    free(a_string);
-    free(c_string);
     DEBUG("--\n");
   }
   return errors;
