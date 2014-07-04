@@ -98,6 +98,8 @@ Because of ccan/opt, --help will tell you something.
 #define DEFAULT_UTF8 0
 #define DEFAULT_COLLAPSE_SPACE 1
 #define DEFAULT_FIND_ALPHABET_THRESHOLD 0
+#define DEFAULT_FIND_ALPHABET_DIGIT_ADJUST 1.0
+#define DEFAULT_FIND_ALPHABET_ALPHA_ADJUST 1.0
 
 #define BELOW_QUIET_LEVEL(quiet) if (opt_quiet < quiet)
 
@@ -162,6 +164,8 @@ static bool opt_case_insensitive = DEFAULT_CASE_INSENSITIVE;
 static bool opt_utf8 = DEFAULT_UTF8;
 static bool opt_collapse_space = DEFAULT_COLLAPSE_SPACE;
 static double opt_find_alphabet_threshold = DEFAULT_FIND_ALPHABET_THRESHOLD;
+static double opt_find_alphabet_digit_adjust = DEFAULT_FIND_ALPHABET_DIGIT_ADJUST;
+static double opt_find_alphabet_alpha_adjust = DEFAULT_FIND_ALPHABET_ALPHA_ADJUST;
 
 #define IN_RANGE_01(x) ((x) >= 0.0f && (x) <= 1.0f)
 
@@ -303,6 +307,10 @@ static struct opt_table options[] = {
       &opt_collapse_space, "Runs of whitespace collapse to single space"),
   OPT_WITH_ARG("--find-alphabet-threshold", opt_set_doubleval, opt_show_doubleval,
       &opt_find_alphabet_threshold, "minimum frequency for character to be included"),
+  OPT_WITH_ARG("--find-alphabet-digit-adjust", opt_set_doubleval, opt_show_doubleval,
+      &opt_find_alphabet_digit_adjust, "adjust digit frequency for alphabet calculations"),
+  OPT_WITH_ARG("--find-alphabet-alpha-adjust", opt_set_doubleval, opt_show_doubleval,
+      &opt_find_alphabet_alpha_adjust, "adjust letter frequency for alphabet calculation"),
 
   OPT_WITHOUT_ARG("-h|--help", opt_usage_and_exit,
       ": Rnn modelling of text at the character level",
@@ -610,7 +618,9 @@ main(int argc, char *argv[]){
     rnn_char_find_alphabet(opt_textfile,
         alphabet, &a_len, collapse_chars, &c_len,
         opt_find_alphabet_threshold,
-        opt_case_insensitive, opt_collapse_space, opt_utf8, 1.0, 1.0);
+        opt_case_insensitive, opt_collapse_space, opt_utf8,
+        opt_find_alphabet_digit_adjust,
+        opt_find_alphabet_alpha_adjust);
     if (a_len < 1){
       DEBUG("Trouble finding an alphabet");
       exit(1);
