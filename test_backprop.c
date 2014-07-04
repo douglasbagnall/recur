@@ -616,22 +616,22 @@ main(int argc, char *argv[]){
       exit(1);
     }
     if (opt_utf8){
-      opt_alphabet = new_string_from_codepoints(alphabet, a_len);
-      opt_collapse_chars = new_string_from_codepoints(collapse_chars, c_len);
+      opt_alphabet = new_utf8_from_codepoints(alphabet, a_len);
+      opt_collapse_chars = new_utf8_from_codepoints(collapse_chars, c_len);
     }
     else {
-      opt_alphabet = new_8bit_string_from_ints(alphabet, a_len);
-      opt_collapse_chars = new_8bit_string_from_ints(collapse_chars, c_len);
+      opt_alphabet = new_bytes_from_codepoints(alphabet, a_len);
+      opt_collapse_chars = new_bytes_from_codepoints(collapse_chars, c_len);
     }
   }
   else { /*use given or default alphabet */
     if (opt_utf8){
-      a_len = fill_codepoints_from_string(alphabet, 256, opt_alphabet);
-      c_len = fill_codepoints_from_string(collapse_chars, 256, opt_collapse_chars);
+      a_len = fill_codepoints_from_utf8(alphabet, 256, opt_alphabet);
+      c_len = fill_codepoints_from_utf8(collapse_chars, 256, opt_collapse_chars);
     }
     else {
-      a_len = fill_codepoints_from_8bit_string(alphabet, 256, opt_alphabet);
-      c_len = fill_codepoints_from_8bit_string(collapse_chars, 256, opt_collapse_chars);
+      a_len = fill_codepoints_from_bytes(alphabet, 256, opt_alphabet);
+      c_len = fill_codepoints_from_bytes(collapse_chars, 256, opt_collapse_chars);
     }
   }
   STDERR_DEBUG("Using alphabet of length %d: '%s'", a_len, opt_alphabet);

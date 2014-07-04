@@ -143,7 +143,7 @@ approx_isspace(int c){
 }
 
 static inline char *
-new_string_from_codepoints(const int *points, int maxlen){
+new_utf8_from_codepoints(const int *points, int maxlen){
   int i;
   char *str = malloc(maxlen * 4 + 1);
   char *s = str;
@@ -162,7 +162,7 @@ new_string_from_codepoints(const int *points, int maxlen){
 }
 
 static inline char *
-new_8bit_string_from_ints(const int *points, int maxlen){
+new_bytes_from_codepoints(const int *points, int maxlen){
   int i;
   char *str = malloc(maxlen + 1);
   for (i = 0; i < maxlen; i++){
@@ -177,7 +177,7 @@ new_8bit_string_from_ints(const int *points, int maxlen){
 }
 
 static inline int
-fill_codepoints_from_8bit_string(int *points, int len, const char *string){
+fill_codepoints_from_bytes(int *points, int len, const char *string){
   int i;
   const u8* s = (u8*)string;
   for (i = 0; i < len; i++){
@@ -191,7 +191,7 @@ fill_codepoints_from_8bit_string(int *points, int len, const char *string){
 }
 
 static inline int
-fill_codepoints_from_string(int *points, int len, const char *string){
+fill_codepoints_from_utf8(int *points, int len, const char *string){
   int i;
   const char **s = &string;
   for (i = 0; i < len; i++){

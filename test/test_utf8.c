@@ -70,9 +70,9 @@ test_utf8_should_fail()
       break;
     }
     DEBUG("\nlooking at    \"%s\"", s);
-    int n_points = fill_codepoints_from_string(codepoints, MAXLEN, s);
+    int n_points = fill_codepoints_from_utf8(codepoints, MAXLEN, s);
     dump_int_array(codepoints, n_points + 1);
-    const char *s2 = new_string_from_codepoints(codepoints, n_points);
+    const char *s2 = new_utf8_from_codepoints(codepoints, n_points);
     int diff = strcmp(s, s2);
     if (! diff){
       errors++;
@@ -133,12 +133,12 @@ main(void){
   int r = 0;
 
   DEBUG("\n" C_YELLOW "utf-8 reconstruction cycle" C_NORMAL);
-  r += test_codepoint_round_trip(fill_codepoints_from_string,
-      new_string_from_codepoints);
+  r += test_codepoint_round_trip(fill_codepoints_from_utf8,
+      new_utf8_from_codepoints);
 
   DEBUG("\n" C_YELLOW "8 bit reconstruction" C_NORMAL);
-  r += test_codepoint_round_trip(fill_codepoints_from_8bit_string,
-      new_8bit_string_from_ints);
+  r += test_codepoint_round_trip(fill_codepoints_from_bytes,
+      new_bytes_from_codepoints);
 
   DEBUG("\n" C_YELLOW "known bad strings where reconstruction should fail" C_NORMAL);
   r += test_utf8_should_fail();

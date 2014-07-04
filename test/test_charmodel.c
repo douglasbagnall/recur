@@ -274,10 +274,10 @@ static inline void
 dump_alphabet(int *alphabet, int len, int utf8){
   char *s;
   if (utf8){
-    s = new_string_from_codepoints(alphabet, len);
+    s = new_utf8_from_codepoints(alphabet, len);
   }
   else{
-    s = new_8bit_string_from_ints(alphabet, len);
+    s = new_bytes_from_codepoints(alphabet, len);
   }
   DEBUG(C_DARK_YELLOW "»»" C_NORMAL "%s" C_DARK_YELLOW "««" C_NORMAL, s);
   free(s);
@@ -315,12 +315,12 @@ test_alphabet_finding(void){
         a->utf8 ? "utf8" : "bytes",
         a->collapse_space ? "collapsed" : "preserved");
     if (a->utf8){
-      ta_len = fill_codepoints_from_string(target_alphabet, 256, a->alphabet);
-      tc_len = fill_codepoints_from_string(target_collapse_chars, 256, a->collapse);
+      ta_len = fill_codepoints_from_utf8(target_alphabet, 256, a->alphabet);
+      tc_len = fill_codepoints_from_utf8(target_collapse_chars, 256, a->collapse);
     }
     else {
-      ta_len = fill_codepoints_from_8bit_string(target_alphabet, 256, a->alphabet);
-      tc_len  = fill_codepoints_from_8bit_string(target_collapse_chars, 256,
+      ta_len = fill_codepoints_from_bytes(target_alphabet, 256, a->alphabet);
+      tc_len  = fill_codepoints_from_bytes(target_collapse_chars, 256,
           a->collapse);
     }
     int e = 0;
