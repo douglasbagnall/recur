@@ -6,17 +6,7 @@ Tests SOME of the functions in ../utf8.h
 This file contains string literals encoded in utf-8.
 */
 #include "../utf8.h"
-
-#define C_NORMAL  "\033[00m"
-#define C_DARK_GREEN  "\033[00;32m"
-#define C_GREEN  "\033[01;32m"
-#define C_DARK_RED  "\033[00;31m"
-#define C_RED "\033[01;31m"
-#define C_MAGENTA  "\033[01;35m"
-#define C_PURPLE  "\033[00;35m"
-#define C_CYAN  "\033[01;36m"
-#define C_YELLOW  "\033[01;33m"
-#define C_WHITE  "\033[01;37m"
+#include "../colour.h"
 
 static inline void
 dump_int_array(const int* a, int len){
