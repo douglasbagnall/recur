@@ -147,8 +147,6 @@ rnn_char_init_schedule(RnnCharSchedule *s, int recent_len,
   s->eval = eval_simple;
 }
 
-
-
 int
 rnn_char_confabulate(RecurNN *net, char *dest, int char_len,
     int byte_len, const int* alphabet, int utf8, float bias){
@@ -168,7 +166,6 @@ rnn_char_confabulate(RecurNN *net, char *dest, int char_len,
   dest[j] = 0;
   return j;
 }
-
 
 void
 rnn_char_init_ventropy(RnnCharVentropy *v, RecurNN *net, const u8 *text, const int len,
@@ -334,75 +331,4 @@ rnn_char_epoch(RnnCharModel *model, RecurNN *confab_net, RnnCharVentropy *v,
     }
   }
   return 0;
-}
-
-char *
-rnn_char_construct_metadata(const struct RnnCharMetadata *m){
-  char *metadata;
-  int ret = asprintf(&metadata,
-#define SEP "\x1F"
-      "alphabet"       SEP "%s" SEP
-      "collapse_chars" SEP "%s"
-#undef SEP
-      ,
-      m->alphabet,
-      m->collapse_chars
-  );
-  if (ret == -1){
-    FATAL_ERROR("can't alloc memory for metadata. or something.");
-  }
-  return metadata;
-}
-
-int
-rnn_char_load_metadata(const char *metadata, struct RnnCharMetadata *m){
-
-  /*0x1f is the ascii field separator character.*/
-
-#define CHECK_KEY(str, wanted) do {                                     \
-    char * token = strtok(str, "\x1F");                                 \
-    if (strcmp(token, wanted)){                                         \
-      STDERR_DEBUG("looking for '%s', found '%s'", wanted, token);      \
-      goto error;                                                       \
-    }                                                                   \
-  }while(0)                                                             \
-
-  char *s = strdup(metadata);
-  CHECK_KEY(s, "alphabet");
-  m->alphabet = strdup(strtok(NULL, "\x1F"));
-  CHECK_KEY(s, "collapse_chars");
-  m->collapse_chars = strdup(strtok(NULL, "\x1F"));
-
-#undef CHECK_KEY
-
-  free(s);
-  return 0;
- error:
-  return 1;
-}
-
-void
-rnn_char_free_metadata_items(struct RnnCharMetadata *m){
-  free(m->alphabet);
-  free(m->collapse_chars);
-}
-
-char*
-rnn_char_construct_net_filename(struct RnnCharMetadata *m, const char *basename,
-    int alpha_size, int bottom_size, int hidden_size){
-  char s[260];
-  char *metadata = rnn_char_construct_metadata(m);
-  int input_size = alpha_size;
-  int output_size = alpha_size;
-  u32 sig = rnn_hash32(metadata);
-  if (bottom_size){
-    snprintf(s, sizeof(s), "%s-s%0" PRIx32 "-i%d-b%d-h%d-o%d.net", basename,
-        sig, input_size, bottom_size, hidden_size, output_size);
-  }
-  else{
-    snprintf(s, sizeof(s), "%s-s%0" PRIx32 "-i%d-h%d-o%d.net", basename,
-        sig, input_size, hidden_size, output_size);
-  }
-  DEBUG("filename: %s", s);
-  return strdup(s);
 }
