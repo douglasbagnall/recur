@@ -33,9 +33,9 @@ Tests some of the functions in ../charmodel.[ch]
 
 typedef struct {
   double threshold;
-  char *alphabet;
-  char *collapse;
-  char first_char;
+  const char *alphabet;
+  const char *collapse;
+  const char first_char;
   char *whitespace;
   char *filename;
   int ignore_case;
@@ -165,7 +165,7 @@ static const ab_test ab_test_cases[] = {
     .collapse_space = 1
   },
 
-  {/*Wai1874 text, UTF-8 */
+  {/*Wai1874 text, ignore case */
     .threshold = 1e-4,
     .alphabet = "' aietoknrh.ugmp<>Kw,1MTH-W0RPN£sd42A₤36I785OE9:)(;ā—\"vUVcB&JlS*/ē",
     .collapse = "yD…xüXōCGī",
@@ -177,6 +177,42 @@ static const ab_test ab_test_cases[] = {
     .collapse_space = 1
   },
 
+  {/*Wai1874 utf-8 text,  preserve whitespace */
+    .threshold = 1e-4,
+    .alphabet = "'\n\r \"&()*,-./0123456789:;<>abcdeghijklmnoprstuvw£āē—₤",
+    .collapse = "xyüīō…",
+    .first_char = '\'',
+    .whitespace = " ",
+    .filename = WAI1874_TEXT,
+    .ignore_case = 1,
+    .utf8 = 1,
+    .collapse_space = 0
+  },
+
+  {/*utf-8 parsed as bytes */
+    .threshold = 1e-4,
+    .alphabet = ("' aiteokhrnu.mgpw><,1-0\xa3\xc2s\xe2""d42\xa4"
+        "36785:9\xc4();\x80\x81\x82v\x94\"c&bj*/\x93l"),
+    .collapse = "\xa6\x8dxy\xc3\xbc\xc5\xab",
+    .first_char = '\'',
+    .whitespace = " ",
+    .filename = WAI1874_TEXT,
+    .ignore_case = 1,
+    .utf8 = 0,
+    .collapse_space = 1
+  },
+  {/*utf-8 parsed as bytes, preserving whitespace (testing \n\r) */
+    .threshold = 1e-4,
+    .alphabet = ("' aieto\n\rknrh.ugmp><Kw,1MTH-W0RPN\xc2\xa3\xe2sd42A\x82\xa4"
+        "36I785OE:9\xc4();\x80\x81\x94\"vVUc&BJ*/\x93lS"),
+    .collapse = "\xa6yD\xc5\x8d\xc3x\xbcXC\xabG",
+    .first_char = '\'',
+    .whitespace = " ",
+    .filename = WAI1874_TEXT,
+    .ignore_case = 0,
+    .utf8 = 0,
+    .collapse_space = 0
+  },
 
   {
     .filename = NULL
@@ -184,47 +220,11 @@ static const ab_test ab_test_cases[] = {
 };
 
 static inline int
-print_char_list_diff(const char *a, const char *b)
-{
-  int i, j;
-  char *b2 = strdupa(b);
-  int diff = 0;
-  PUT(C_NORMAL "-->");
-  for (i = 0; a[i]; i++){
-    char x = a[i];
-    int found = 0;
-    for (j = 0; b[j]; j++){
-      if (b[j] == x){
-        b2[j] = 0;
-        found = 1;
-        break;
-      }
-    }
-    if (found){
-      PUT(C_GREEN "%c", x);
-    }
-    else {
-      PUT(C_RED "%c", x);
-      diff++;
-    }
-  }
-  PUT(C_MAGENTA);
-  for (j = 0; b[j]; j++){
-    if (b2[j]){
-      PUT("%c", b2[j]);
-      diff++;
-    }
-  }
-  PUT(C_NORMAL "<--diff is %d\n", diff);
-  return diff;
-}
-
-static inline int
-print_code_list_diff(const int *a, int a_len, const int *b, int b_len)
+print_code_list_diff(const int *a, int a_len, const int *b, int b_len, int utf8)
 {
   int i, j;
   int b2[b_len];
-  char s[5];
+  char s[8];
   memcpy(b2, b, b_len * sizeof(int));
   int diff = 0;
   PUT(C_NORMAL "-->");
@@ -238,7 +238,13 @@ print_code_list_diff(const int *a, int a_len, const int *b, int b_len)
         break;
       }
     }
-    int end = write_utf8_char(x, s);
+    int end;
+    if (utf8){
+      end = write_utf8_char(x, s);
+    }
+    else {
+      end = write_escaped_char(x, s);
+    }
     s[end] = 0;
     if (found){
       PUT(C_GREEN "%s", s);
@@ -250,8 +256,9 @@ print_code_list_diff(const int *a, int a_len, const int *b, int b_len)
   }
   PUT(C_MAGENTA);
   for (j = 0; j < b_len; j++){
-    if (b2[j]){
-      int end = write_utf8_char(b2[j], s);
+    int x = b2[j];
+    if (x){
+      int end = utf8 ? write_utf8_char(x, s) : write_escaped_char(x, s);
       s[end] = 0;
       PUT("%s", s);
       diff++;
@@ -264,8 +271,14 @@ print_code_list_diff(const int *a, int a_len, const int *b, int b_len)
 
 
 static inline void
-dump_alphabet(int *alphabet, int len){
-  char *s = new_string_from_codepoints(alphabet, len);
+dump_alphabet(int *alphabet, int len, int utf8){
+  char *s;
+  if (utf8){
+    s = new_string_from_codepoints(alphabet, len);
+  }
+  else{
+    s = new_8bit_string_from_ints(alphabet, len);
+  }
   DEBUG(C_DARK_YELLOW "»»" C_NORMAL "%s" C_DARK_YELLOW "««" C_NORMAL, s);
   free(s);
   for (int i = 0; i < len; i++){
@@ -307,14 +320,19 @@ test_alphabet_finding(void){
     }
     else {
       ta_len = fill_codepoints_from_8bit_string(target_alphabet, 256, a->alphabet);
-      tc_len  = fill_codepoints_from_8bit_string(target_collapse_chars, 256, a->collapse);
+      tc_len  = fill_codepoints_from_8bit_string(target_collapse_chars, 256,
+          a->collapse);
     }
     int e = 0;
+    DEBUG(C_GREEN "green" C_NORMAL ": in alphabet and target. "
+        C_RED "red" C_NORMAL ": in found alphabet only. "
+        C_MAGENTA "magenta" C_NORMAL ": in target only.");
+
     PUT(C_YELLOW "alphabet ");
-    e += print_code_list_diff(alphabet, a_len, target_alphabet, ta_len);
+    e += print_code_list_diff(alphabet, a_len, target_alphabet, ta_len, a->utf8);
     PUT(C_YELLOW "collapsed");
     e += print_code_list_diff(collapse_chars, c_len, target_collapse_chars,
-        tc_len);
+        tc_len, a->utf8);
 
     //XXX
     if ( 0 && a->first_char && a->first_char != 0){
@@ -326,14 +344,14 @@ test_alphabet_finding(void){
       errors++;
       DEBUG(C_REV_RED "Errors found!" C_NORMAL);
       PUT(C_BLUE "alphabet : " C_NORMAL);
-      dump_alphabet(alphabet, a_len);
+      dump_alphabet(alphabet, a_len, a->utf8);
       PUT(C_DARK_CYAN "target   : " C_NORMAL);
-      dump_alphabet(target_alphabet, ta_len);
+      dump_alphabet(target_alphabet, ta_len, a->utf8);
       DEBUG("literal: %s", a->alphabet);
       PUT(C_BLUE "collapsed: " C_NORMAL);
-      dump_alphabet(collapse_chars, c_len);
+      dump_alphabet(collapse_chars, c_len, a->utf8);
       PUT(C_DARK_CYAN "target   : " C_NORMAL);
-      dump_alphabet(target_collapse_chars, ta_len);
+      dump_alphabet(target_collapse_chars, tc_len, a->utf8);
       DEBUG("literal : %s", a->collapse);
     }
     DEBUG("--\n");

@@ -8,6 +8,18 @@ how it would work.
 */
 #include "recur-common.h"
 
+/*write_escaped_char*/
+static inline int
+write_escaped_char(uint code, char *s){
+  u8 x = code & 0xff;
+  if (code > 127 || code < 32 || code == '\\' || code == '"'){
+    snprintf(s, 5, "\\x%02x", x);
+    return 4;
+  }
+  s[0] = code;
+  return 1;
+}
+
 /*write_utf8_char(uint code, char *s) writes between 0 and 4 bytes at *s,
   returning the number of bytes written. 0 corresponds to a unicode
   codepoint that can't be represented in 4 bytes or fewer.
@@ -167,8 +179,10 @@ new_8bit_string_from_ints(const int *points, int maxlen){
 static inline int
 fill_codepoints_from_8bit_string(int *points, int len, const char *string){
   int i;
+  const u8* s = (u8*)string;
   for (i = 0; i < len; i++){
-    points[i] = string[i];
+    uint x = s[i];
+    points[i] = x;
     if (! points[i]){
       break;
     }
