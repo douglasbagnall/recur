@@ -18,11 +18,27 @@ capped_log2f(float x){
   return (x < 1e-30f) ? -100.0f : log2f(x);
 }
 
+
+static inline ALWAYS_INLINE int
+adjust_count(int i, int count, double digit_adjust, double alpha_adjust){
+  if (count){
+    if (i < 256){
+      if (isdigit(i)){
+        count = count * digit_adjust + 0.5;
+      }
+      else if (isalpha(i)){
+        count = count * alpha_adjust + 0.5;
+      }
+    }
+  }
+  return count;
+}
+
 /* rnn_char_find_alphabet returns 0 for success, -1 on failure. */
 int
 rnn_char_find_alphabet(const char *filename, int *alphabet, int *a_len,
     int *collapse_chars, int *c_len, double threshold, int ignore_case,
-    int collapse_space, int utf8){
+    int collapse_space, int utf8, double digit_adjust, double alpha_adjust){
   int n_chars = utf8 ? 0x200000 : 256;
   int *counts = calloc(n_chars + 1, sizeof(int));
   int c, prev = 0;
@@ -86,9 +102,13 @@ rnn_char_find_alphabet(const char *filename, int *alphabet, int *a_len,
   DEBUG("min count %i threshold %f n %d", min_count, threshold, n);
   for (int i = 0; i < n_chars; i++){
     int count = counts[i];
-    if (count && count < min_count && count > max_collapsed_count){
-      max_collapsed_count = count;
-      max_collapsed_point = i;
+    if (count){
+      int adj_count = adjust_count(i, count, digit_adjust, alpha_adjust);
+      /*select the representative on raw count, not adjusted count */
+      if (adj_count < min_count && count > max_collapsed_count){
+        max_collapsed_count = count;
+        max_collapsed_point = i;
+      }
     }
   }
   if (max_collapsed_count){
@@ -99,19 +119,22 @@ rnn_char_find_alphabet(const char *filename, int *alphabet, int *a_len,
   /*map the rest of the collapsed chars to alphabet[0]*/
   for (int i = 0; i < n_chars; i++){
     int count = counts[i];
-    if (count >= min_count){
-      if (a_count == 256){
-        goto error;
+    if (count){
+      int adj_count = adjust_count(i, count, digit_adjust, alpha_adjust);
+      if (adj_count >= min_count){
+        if (a_count == 256){
+          goto error;
+        }
+        alphabet[a_count] = i;
+        a_count++;
       }
-      alphabet[a_count] = i;
-      a_count++;
-    }
-    else if (count){
-      if (c_count == 256){
-        goto error;
+      else {
+        if (c_count == 256){
+          goto error;
+        }
+        collapse_chars[c_count] = i;
+        c_count++;
       }
-      collapse_chars[c_count] = i;
-      c_count++;
     }
   }
   if (a_count == 0){

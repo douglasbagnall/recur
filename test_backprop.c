@@ -610,7 +610,7 @@ main(int argc, char *argv[]){
     rnn_char_find_alphabet(opt_textfile,
         alphabet, &a_len, collapse_chars, &c_len,
         opt_find_alphabet_threshold,
-        opt_case_insensitive, opt_collapse_space, opt_utf8);
+        opt_case_insensitive, opt_collapse_space, opt_utf8, 1.0, 1.0);
     if (a_len < 1){
       DEBUG("Trouble finding an alphabet");
       exit(1);
