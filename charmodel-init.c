@@ -1,0 +1,259 @@
+/* Copyright (C) 2014 Douglas Bagnall <douglas@halo.gen.nz> LGPL
+
+Initialisation functions for character-based models.
+*/
+#include "recur-nn.h"
+#include "recur-nn-helpers.h"
+#include <math.h>
+#include "path.h"
+#include "badmaths.h"
+#include <stdio.h>
+
+#include "charmodel.h"
+#include "utf8.h"
+
+static inline ALWAYS_INLINE int
+adjust_count(int i, int count, double digit_adjust, double alpha_adjust){
+  if (count){
+    if (i < 256){
+      if (isdigit(i)){
+        count = count * digit_adjust + 0.5;
+      }
+      else if (isalpha(i)){
+        count = count * alpha_adjust + 0.5;
+      }
+    }
+  }
+  return count;
+}
+
+/* rnn_char_find_alphabet returns 0 for success, -1 on failure. */
+int
+rnn_char_find_alphabet(const char *filename, int *alphabet, int *a_len,
+    int *collapse_chars, int *c_len, double threshold, int ignore_case,
+    int collapse_space, int utf8, double digit_adjust, double alpha_adjust){
+  int n_chars = utf8 ? 0x200000 : 256;
+  int *counts = calloc(n_chars + 1, sizeof(int));
+  int c, prev = 0;
+  int n = 0;
+  FILE *f = fopen_or_abort(filename, "r");
+  /*alloc enough for all characters to be 4 bytes long */
+  for(;;){
+    if (utf8){
+      c = fread_utf8_char(f);
+      if (c < 0){
+        STDERR_DEBUG("Unicode Error!");
+        break;
+      }
+      else if (c == 0){
+        break;
+      }
+    }
+    else {
+      c = getc(f);
+      if (c == EOF){
+        break;
+      }
+    }
+    if (c >= n_chars){
+      DEBUG("got char %d, but there are only %d slots", c, n_chars);
+      goto error;
+    }
+
+    if (c == 31){/* 31 is metadata separator XXX gah */
+      c = 32;
+    }
+    if (collapse_space){
+      if (isspace(c)){
+        c = 32;
+        if (c == prev){
+          continue;
+        }
+      }
+    }
+    if (ignore_case && c < 0x80){
+      /*FIXME ascii only */
+      if(isupper(c)){
+        c = tolower(c);
+      }
+    }
+    n++;
+    counts[c]++;
+    prev = c;
+  }
+  if (n == 0){
+    goto error;
+  }
+  int a_count = 0;
+  int c_count = 0;
+
+  /*find the representative for the collapsed_chars, if any, which is put at
+    the beginning of the alphabet.*/
+  int max_collapsed_count = 0;
+  int max_collapsed_point = 0;
+  int min_count = MAX(ceil(threshold * n), 1);
+  DEBUG("min count %i threshold %f n %d", min_count, threshold, n);
+  for (int i = 0; i < n_chars; i++){
+    int count = counts[i];
+    if (count){
+      int adj_count = adjust_count(i, count, digit_adjust, alpha_adjust);
+      /*select the representative on raw count, not adjusted count */
+      if (adj_count < min_count && count > max_collapsed_count){
+        max_collapsed_count = count;
+        max_collapsed_point = i;
+      }
+    }
+  }
+  if (max_collapsed_count){
+    alphabet[0] = max_collapsed_point;
+    counts[max_collapsed_point] = 0; /*so as to ignore it hereafter*/
+    a_count = 1;
+  }
+  /*map the rest of the collapsed chars to alphabet[0]*/
+  for (int i = 0; i < n_chars; i++){
+    int count = counts[i];
+    if (count){
+      int adj_count = adjust_count(i, count, digit_adjust, alpha_adjust);
+      if (adj_count >= min_count){
+        if (a_count == 256){
+          goto error;
+        }
+        alphabet[a_count] = i;
+        a_count++;
+      }
+      else {
+        if (c_count == 256){
+          goto error;
+        }
+        collapse_chars[c_count] = i;
+        c_count++;
+      }
+    }
+  }
+  if (a_count == 0){
+    goto error;
+  }
+
+  free(counts);
+  *a_len = a_count;
+  *c_len = c_count;
+  DEBUG("a_len %i c_len %i", a_count, c_count);
+  return 0;
+ error:
+  STDERR_DEBUG("threshold of %f over %d chars led to %d in alphabet, "
+      "%d collapsed characters",
+      threshold, n, a_count, c_count);
+  free(counts);
+  *a_len = *c_len = 0;
+  return -1;
+}
+
+static int*
+new_char_lut(const int *alphabet, int a_len, const int *collapse, int c_len,
+    int *_space, int case_insensitive, int utf8){
+  int i;
+  int collapse_target = 0;
+  int space = -1;
+  for (i = 0; i < a_len; i++){
+    if (alphabet[i] == ' '){
+      space = i;
+      break;
+    }
+  }
+  if (space == -1){
+    space = collapse_target;
+    DEBUG("space is not in alphabet; using collapse_target");
+  }
+  *_space = space;
+  int len = utf8 ? 0x200001 : 257;
+  int *ctn = malloc(len *sizeof(int));
+  /*anything unspecified goes to space */
+  for (i = 0; i < len; i++){
+    ctn[i] = space;
+  }
+  /*collapse chars map to alphabet[0] */
+  for (i = 0; i < c_len; i++){
+    int c = collapse[i];
+    ctn[c] = collapse_target;
+  }
+
+  for (i = 0; i < a_len; i++){
+    int c = alphabet[i];
+    ctn[c] = i;
+    /*FIXME: ascii only */
+    if (islower(c) && case_insensitive){
+      ctn[toupper(c)] = i;
+    }
+  }
+  return ctn;
+}
+
+u8*
+rnn_char_alloc_collapsed_text(char *filename, int *alphabet, int a_len,
+    int *collapse_chars, int c_len, long *text_len,
+    int case_insensitive, int collapse_space, int utf8, int quietness){
+  int i, j;
+  int space;
+  int *char_to_net = new_char_lut(alphabet, a_len,
+      collapse_chars, c_len, &space,
+      case_insensitive, utf8);
+  FILE *f = fopen_or_abort(filename, "r");
+  int err = fseek(f, 0, SEEK_END);
+  long len = ftell(f);
+  err |= fseek(f, 0, SEEK_SET);
+  u8 *text = malloc(len + 1);
+  u8 prev = 0;
+  u8 c;
+  int chr = 0;
+  j = 0;
+  for(i = 0; i < len; i++){
+    if (utf8){
+      chr = fread_utf8_char(f);
+      if (chr < 0){
+        break;
+      }
+    }
+    else {
+      chr = fgetc(f);
+      if (chr == EOF)
+        break;
+    }
+
+    c = char_to_net[chr];
+    if (collapse_space && (c != space || prev != space)){
+      prev = c;
+      text[j] = c;
+      j++;
+    }
+    else {
+      text[j] = c;
+      j = i;
+    }
+  }
+  text[j] = 0;
+  *text_len = j;
+  free(char_to_net);
+  if (quietness < 1){
+    STDERR_DEBUG("original text was %d chars (%d bytes), collapsed is %d",
+        i, (int)len, j);
+  }
+  err |= fclose(f);
+  if (err && quietness < 2){
+    STDERR_DEBUG("something went wrong with the file %p (%s). error %d",
+        f, filename, err);
+  }
+  return text;
+}
+
+void
+rnn_char_dump_collapsed_text(const u8 *text, int len, const char *name,
+    const char *alphabet)
+{
+  int i;
+  FILE *f = fopen_or_abort(name, "w");
+  for (i = 0; i < len; i++){
+    u8 c = text[i];
+    fputc(alphabet[c], f);
+  }
+  fclose(f);
+}
