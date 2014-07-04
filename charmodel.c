@@ -265,21 +265,6 @@ rnn_char_dump_collapsed_text(const u8 *text, int len, const char *name,
   fclose(f);
 }
 
-static inline int
-search_for_max(float *answer, int len){
-  ASSUME_ALIGNED(answer);
-  int j;
-  int best_offset = 0;
-  float best_score = *answer;
-  for (j = 1; j < len; j++){
-    if (answer[j] >= best_score){
-      best_score = answer[j];
-      best_offset = j;
-    }
-  }
-  return best_offset;
-}
-
 static inline float*
 one_hot_opinion(RecurNN *net, int hot){
   float *inputs;
@@ -310,26 +295,32 @@ net_error_bptt(RecurNN *net, float *restrict error, int c, int next, int *correc
   return error[next];
 }
 
-
-int
-opinion_deterministic(RecurNN *net, int hot){
-  float *answer = one_hot_opinion(net, hot);
-  return search_for_max(answer, net->output_size);
-}
-
-int
-opinion_probabilistic(RecurNN *net, int hot, float bias){
+static inline int
+guess_next_character(RecurNN *net, int hot, float bias){
   int i;
   float r;
   float *answer = one_hot_opinion(net, hot);
-  int n_chars = net->output_size;
+  ASSUME_ALIGNED(answer);
+  int len = net->output_size;
+  if (bias >= 100){
+    /*bias is so high as to be deterministic search for most probable */
+    int best_offset = 0;
+    float best_score = *answer;
+    for (i = 1; i < len; i++){
+      if (answer[i] >= best_score){
+        best_score = answer[i];
+        best_offset = i;
+      }
+    }
+    return best_offset;
+  }
   float error[net->output_size];
-  biased_softmax(error, answer, n_chars, bias);
+  biased_softmax(error, answer, len, bias);
   /*outer loop in case error doesn't quite add to 1 */
   for(;;){
     r = rand_double(&net->rng);
     float accum = 0.0;
-    for (i = 0; i < n_chars; i++){
+    for (i = 0; i < len; i++){
       accum += error[i];
       if (r < accum)
         return i;
@@ -412,10 +403,7 @@ rnn_char_confabulate(RecurNN *net, char *dest, int char_len,
   static int n = 0;
   int safe_end = byte_len - (utf8 ? 5 : 1);
   for (i = 0, j = 0; i < char_len && j < safe_end; i++){
-    if (bias > 100)
-      n = opinion_deterministic(net, n);
-    else
-      n = opinion_probabilistic(net, n, bias);
+    n = guess_next_character(net, n, bias);
     if (utf8){
       j += write_utf8_char(alphabet[n], dest + j);
     }
