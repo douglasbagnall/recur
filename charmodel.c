@@ -328,7 +328,7 @@ guess_next_character(RecurNN *net, int hot, float bias){
   }
 }
 
-float
+static float
 validate(RecurNN *net, const u8 *text, int len){
   float error[net->output_size];
   float entropy = 0.0f;
