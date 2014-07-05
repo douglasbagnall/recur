@@ -1,7 +1,7 @@
 /* Copyright (C) 2014 Douglas Bagnall <douglas@halo.gen.nz> LGPL
 -*- coding: utf-8 -*-
 
-Tests some of the functions in ../charmodel.[ch]
+Tests alphabet finding in ../charmodel-init.c
 */
 #include "path.h"
 #include "../charmodel.h"

@@ -137,7 +137,7 @@ test/test_mfcc_table: %:  mfcc.o rescale.o %.o
 test/test_mfcc_bins: %: mfcc.o %.o
 	$(CC) -Wl,-O1 $^ $(INCLUDES) $(DEFINES) $(LINKS)  -o $@
 
-test/test_charmodel%: test/test_charmodel%.o $(RNN_OBJECTS) charmodel.o charmodel-init.o
+test/test_charmodel%: test/test_charmodel%.o $(RNN_OBJECTS) charmodel-predict.o charmodel-init.o
 	$(CC) -Wl,-O1 $^  -I. $(DEFINES)  $(COMMON_LINKS)   -o $@
 
 #actually there are more path.h dependers.
@@ -155,7 +155,7 @@ test/test_simple_rescale test/test_rescale: %: rescale.o %.o
 test/test_fb_backprop: %: $(RNN_OBJECTS) %.o $(OPT_OBJECTS)  | nets images
 	$(CC) -Iccan/opt/ -Wl,-O1 $(filter %.o,$^)   -I. $(DEFINES)  $(COMMON_LINKS)  -o $@
 
-test_backprop: %: $(RNN_OBJECTS) %.o charmodel.o charmodel-init.o $(OPT_OBJECTS)  \
+test_backprop: %: $(RNN_OBJECTS) %.o charmodel-predict.o charmodel-init.o $(OPT_OBJECTS)  \
 	config.h  | nets images
 	$(CC) -Iccan/opt/ -Wl,-O1 $(filter %.o,$^)   -I. $(DEFINES)  $(COMMON_LINKS)  -o $@
 
