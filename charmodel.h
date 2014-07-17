@@ -74,7 +74,7 @@ int rnn_char_find_alphabet_f(const char *filename, int *alphabet, int *a_len,
     int collapse_space, int utf8, double digit_adjust, double alpha_adjust);
 
 u8* rnn_char_alloc_collapsed_text(char *filename, int *alphabet, int a_len,
-    int *collapse_chars, int c_len, long *text_len,
+    int *collapse_chars, int c_len, int *text_len,
     int case_insensitive, int collapse_space, int utf8, int quietness);
 
 void rnn_char_dump_collapsed_text(const u8 *text, int len, const char *name,

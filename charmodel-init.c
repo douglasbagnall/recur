@@ -256,41 +256,43 @@ new_char_lut(const int *alphabet, int a_len, const int *collapse, int c_len,
   return ctn;
 }
 
+
+
 u8*
 rnn_char_alloc_collapsed_text(char *filename, int *alphabet, int a_len,
-    int *collapse_chars, int c_len, long *text_len,
+    int *collapse_chars, int c_len, int *text_len,
     int case_insensitive, int collapse_space, int utf8, int quietness){
   int i, j;
   int space;
   int *char_to_net = new_char_lut(alphabet, a_len,
       collapse_chars, c_len, &space,
       case_insensitive, utf8);
-  FILE *f = fopen_or_abort(filename, "r");
-  int err;
-  long len = get_file_length(f, &err);
-  u8 *text = malloc(len + 1);
+  u8 *text;
+  int raw_len;
+  rnn_char_alloc_file_contents(filename, (char**)&text, &raw_len);
   u8 prev = 0;
   u8 c;
   int chr = 0;
-  j = 0;
-  for(i = 0; i < len; i++){
+  const char *s = (char*)text;
+  for(i = 0, j = 0; i < raw_len; i++){
     if (utf8){
-      chr = fread_utf8_char(f);
-      if (chr < 0){
+      chr = read_utf8_char(&s);
+      if (chr <= 0){
         break;
       }
     }
     else {
-      chr = fgetc(f);
-      if (chr == EOF)
+      chr = text[i];
+      if (chr == 0)
         break;
     }
-
     c = char_to_net[chr];
-    if (collapse_space && (c != space || prev != space)){
-      prev = c;
-      text[j] = c;
-      j++;
+    if (collapse_space){
+      if (c != space || prev != space){
+        prev = c;
+        text[j] = c;
+        j++;
+      }
     }
     else {
       text[j] = c;
@@ -302,12 +304,7 @@ rnn_char_alloc_collapsed_text(char *filename, int *alphabet, int a_len,
   free(char_to_net);
   if (quietness < 1){
     STDERR_DEBUG("original text was %d chars (%d bytes), collapsed is %d",
-        i, (int)len, j);
-  }
-  err |= fclose(f);
-  if (err && quietness < 2){
-    STDERR_DEBUG("something went wrong with the file %p (%s). error %d",
-        f, filename, err);
+        i, raw_len, *text_len);
   }
   return text;
 }
