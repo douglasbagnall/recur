@@ -44,7 +44,6 @@ struct _RnnCharModel {
   int momentum_style;
   bool temporal_pgm_dump;
   float periodic_weight_noise;
-  int quiet;
   uint report_interval;
   bool save_net;
   bool use_multi_tap_path;

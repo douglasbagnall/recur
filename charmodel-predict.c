@@ -298,7 +298,7 @@ rnn_char_epoch(RnnCharModel *model, RecurNN *confab_net, RnnCharVentropy *v,
         rnn_multi_pgm_dump(net, model->periodic_pgm_dump_string,
             model->pgm_name);
       }
-      model->schedule.eval(&model->schedule, net, ventropy, model->quiet < 2);
+      model->schedule.eval(&model->schedule, net, ventropy, quietness < 2);
       if (model->periodic_weight_noise){
         rnn_weight_noise(net, model->periodic_weight_noise);
       }
