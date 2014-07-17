@@ -33,3 +33,4 @@ local.mak
 /bird-data/
 *.dot
 /data/
+.juliahistory
