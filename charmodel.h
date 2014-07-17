@@ -6,6 +6,12 @@
 #include <ctype.h>
 #include <stdbool.h>
 
+enum {
+  RNN_CHAR_FLAG_CASE_INSENSITIVE = 1,
+  RNN_CHAR_FLAG_UTF8 = 2,
+  RNN_CHAR_FLAG_COLLAPSE_SPACE = 4
+};
+
 typedef struct _RnnCharSchedule RnnCharSchedule;
 
 struct _RnnCharSchedule {
@@ -47,14 +53,13 @@ struct _RnnCharModel {
   uint report_interval;
   bool save_net;
   bool use_multi_tap_path;
-
+  u32 flags;
   TemporalPPM *input_ppm;
   TemporalPPM *error_ppm;
   int *alphabet; /*unicode points */
   int *collapse_chars;
   char * periodic_pgm_dump_string;
   RnnCharSchedule schedule;
-  bool utf8;
 };
 
 struct RnnCharMetadata {
@@ -66,16 +71,15 @@ struct RnnCharMetadata {
 int rnn_char_alloc_file_contents(const char *filename, char **contents, int *len);
 
 int rnn_char_find_alphabet_s(const char *text, int len, int *alphabet, int *a_len,
-    int *collapse_chars, int *c_len, double threshold, int ignore_case,
-    int collapse_space, int utf8, double digit_adjust, double alpha_adjust);
+    int *collapse_chars, int *c_len, double threshold, double digit_adjust,
+    double alpha_adjust, u32 flags);
 
 int rnn_char_find_alphabet_f(const char *filename, int *alphabet, int *a_len,
-    int *collapse_chars, int *c_len, double threshold, int ignore_case,
-    int collapse_space, int utf8, double digit_adjust, double alpha_adjust);
+    int *collapse_chars, int *c_len, double threshold, double digit_adjust,
+    double alpha_adjust, u32 flags);
 
 u8* rnn_char_alloc_collapsed_text(char *filename, int *alphabet, int a_len,
-    int *collapse_chars, int c_len, int *text_len,
-    int case_insensitive, int collapse_space, int utf8, int quietness);
+    int *collapse_chars, int c_len, int *text_len, u32 flags, int quietness);
 
 void rnn_char_dump_collapsed_text(const u8 *text, int len, const char *name,
     const char *alphabet);

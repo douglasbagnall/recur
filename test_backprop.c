@@ -460,7 +460,7 @@ finish(RnnCharModel *model, RnnCharVentropy *v){
 
 static void
 load_and_train_model(struct RnnCharMetadata *m, int *alphabet, int a_len,
-    int *collapse_chars, int c_len){
+    int *collapse_chars, int c_len, u32 char_flags){
   RnnCharModel model = {
     .n_training_nets = MAX(opt_multi_tap, 1),
     .pgm_name = opt_basename,
@@ -473,8 +473,8 @@ load_and_train_model(struct RnnCharMetadata *m, int *alphabet, int a_len,
     .report_interval = opt_report_interval,
     .save_net = opt_save_net,
     .use_multi_tap_path = opt_use_multi_tap_path,
-    .utf8 = opt_utf8,
     .alphabet = alphabet,
+    .flags = char_flags,
     .collapse_chars = collapse_chars
   };
   /*If the char point is not the default, the string has been set on the
@@ -518,12 +518,11 @@ load_and_train_model(struct RnnCharMetadata *m, int *alphabet, int a_len,
       opt_learn_rate_scale);
 
   /* get text and validation text */
-  long text_len;
+  int text_len;
   u8* validate_text;
 
   u8* text = rnn_char_alloc_collapsed_text(opt_textfile, alphabet, a_len,
-      collapse_chars, c_len, &text_len, opt_case_insensitive, opt_collapse_space,
-      opt_utf8, opt_quiet);
+      collapse_chars, c_len, &text_len, char_flags, opt_quiet);
   if (opt_dump_collapsed_text){
     rnn_char_dump_collapsed_text(text, text_len, opt_dump_collapsed_text, m->alphabet);
   }
@@ -622,6 +621,10 @@ main(int argc, char *argv[]){
   int *collapse_chars = calloc(257, sizeof(int));
   int a_len, c_len;
 
+  u32 char_flags = (
+      (opt_case_insensitive ? RNN_CHAR_FLAG_CASE_INSENSITIVE : 0) |
+      (opt_collapse_space   ? RNN_CHAR_FLAG_COLLAPSE_SPACE : 0) |
+      (opt_utf8             ? RNN_CHAR_FLAG_UTF8 : 0));
 
   if (opt_find_alphabet_threshold){
     int raw_text_len;
@@ -634,9 +637,10 @@ main(int argc, char *argv[]){
     rnn_char_find_alphabet_s(text, raw_text_len,
         alphabet, &a_len, collapse_chars, &c_len,
         opt_find_alphabet_threshold,
-        opt_case_insensitive, opt_collapse_space, opt_utf8,
         opt_find_alphabet_digit_adjust,
-        opt_find_alphabet_alpha_adjust);
+        opt_find_alphabet_alpha_adjust,
+        char_flags);
+
     free(text);
     if (a_len < 1){
       DEBUG("Trouble finding an alphabet");
@@ -681,6 +685,6 @@ main(int argc, char *argv[]){
     free(t);
   }
   else {
-    load_and_train_model(&m, alphabet, a_len, collapse_chars, c_len);
+    load_and_train_model(&m, alphabet, a_len, collapse_chars, c_len, char_flags);
   }
 }

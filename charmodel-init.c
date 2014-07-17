@@ -30,14 +30,16 @@ adjust_count(int i, int count, double digit_adjust, double alpha_adjust){
 /* rnn_char_find_alphabet_s returns 0 for success, -1 on failure. */
 int
 rnn_char_find_alphabet_s(const char *text, int len, int *alphabet, int *a_len,
-    int *collapse_chars, int *c_len, double threshold, int ignore_case,
-    int collapse_space, int utf8, double digit_adjust, double alpha_adjust){
+    int *collapse_chars, int *c_len, double threshold, double digit_adjust,
+    double alpha_adjust, u32 flags){
+  int ignore_case = flags & RNN_CHAR_FLAG_CASE_INSENSITIVE;
+  int collapse_space = flags & RNN_CHAR_FLAG_COLLAPSE_SPACE;
+  int utf8 = flags & RNN_CHAR_FLAG_UTF8;
   int n_chars = utf8 ? 0x200000 : 256;
   int *counts = calloc(n_chars + 1, sizeof(int));
   int c, prev = 0;
   int n = 0;
   const char *s = text;
-  /*alloc enough for all characters to be 4 bytes long */
   for(int i = 0; i < len; i++){
     if (s >= text + len){
       break;
@@ -194,19 +196,17 @@ rnn_char_alloc_file_contents(const char *filename, char **contents, int *len)
   return -1;
 }
 
-
 /* rnn_char_find_alphabet_f returns 0 for success, -1 on failure. */
 int
 rnn_char_find_alphabet_f(const char *filename, int *alphabet, int *a_len,
-    int *collapse_chars, int *c_len, double threshold, int ignore_case,
-    int collapse_space, int utf8, double digit_adjust, double alpha_adjust){
+    int *collapse_chars, int *c_len, double threshold, double digit_adjust,
+    double alpha_adjust, u32 flags){
   int len;
   char *contents;
   int err = rnn_char_alloc_file_contents(filename, &contents, &len);
   if (! err){
     err = rnn_char_find_alphabet_s(contents, len, alphabet, a_len,
-        collapse_chars, c_len, threshold, ignore_case,
-        collapse_space, utf8, digit_adjust, alpha_adjust);
+        collapse_chars, c_len, threshold, digit_adjust, alpha_adjust, flags);
     free(contents);
   }
   else {
@@ -218,7 +218,8 @@ rnn_char_find_alphabet_f(const char *filename, int *alphabet, int *a_len,
 
 static int*
 new_char_lut(const int *alphabet, int a_len, const int *collapse, int c_len,
-    int *_space, int case_insensitive, int utf8){
+    int *_space, u32 flags){
+  int case_insensitive = flags & RNN_CHAR_FLAG_CASE_INSENSITIVE;
   int i;
   int collapse_target = 0;
   int space = -1;
@@ -233,7 +234,7 @@ new_char_lut(const int *alphabet, int a_len, const int *collapse, int c_len,
     DEBUG("space is not in alphabet; using collapse_target");
   }
   *_space = space;
-  int len = utf8 ? 0x200001 : 257;
+  int len = (flags & RNN_CHAR_FLAG_UTF8) ? 0x200001 : 257;
   int *ctn = malloc(len *sizeof(int));
   /*anything unspecified goes to space */
   for (i = 0; i < len; i++){
@@ -248,7 +249,7 @@ new_char_lut(const int *alphabet, int a_len, const int *collapse, int c_len,
   for (i = 0; i < a_len; i++){
     int c = alphabet[i];
     ctn[c] = i;
-    /*FIXME: ascii only */
+    /*FIXME: case insensitivity works for ascii only */
     if (islower(c) && case_insensitive){
       ctn[toupper(c)] = i;
     }
@@ -256,17 +257,15 @@ new_char_lut(const int *alphabet, int a_len, const int *collapse, int c_len,
   return ctn;
 }
 
-
-
 u8*
 rnn_char_alloc_collapsed_text(char *filename, int *alphabet, int a_len,
-    int *collapse_chars, int c_len, int *text_len,
-    int case_insensitive, int collapse_space, int utf8, int quietness){
+    int *collapse_chars, int c_len, int *text_len, u32 flags, int quietness){
+  int collapse_space = flags & RNN_CHAR_FLAG_COLLAPSE_SPACE;
+  int utf8 = flags & RNN_CHAR_FLAG_UTF8;
   int i, j;
   int space;
   int *char_to_net = new_char_lut(alphabet, a_len,
-      collapse_chars, c_len, &space,
-      case_insensitive, utf8);
+      collapse_chars, c_len, &space, flags);
   u8 *text;
   int raw_len;
   rnn_char_alloc_file_contents(filename, (char**)&text, &raw_len);
