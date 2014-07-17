@@ -623,7 +623,7 @@ main(int argc, char *argv[]){
   int a_len, c_len;
 
   if (opt_find_alphabet_threshold){
-    rnn_char_find_alphabet(opt_textfile,
+    rnn_char_find_alphabet_f(opt_textfile,
         alphabet, &a_len, collapse_chars, &c_len,
         opt_find_alphabet_threshold,
         opt_case_insensitive, opt_collapse_space, opt_utf8,

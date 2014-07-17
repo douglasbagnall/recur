@@ -27,20 +27,23 @@ adjust_count(int i, int count, double digit_adjust, double alpha_adjust){
   return count;
 }
 
-/* rnn_char_find_alphabet returns 0 for success, -1 on failure. */
+/* rnn_char_find_alphabet_s returns 0 for success, -1 on failure. */
 int
-rnn_char_find_alphabet(const char *filename, int *alphabet, int *a_len,
+rnn_char_find_alphabet_s(const char *text, int len, int *alphabet, int *a_len,
     int *collapse_chars, int *c_len, double threshold, int ignore_case,
     int collapse_space, int utf8, double digit_adjust, double alpha_adjust){
   int n_chars = utf8 ? 0x200000 : 256;
   int *counts = calloc(n_chars + 1, sizeof(int));
   int c, prev = 0;
   int n = 0;
-  FILE *f = fopen_or_abort(filename, "r");
+  const char *s = text;
   /*alloc enough for all characters to be 4 bytes long */
-  for(;;){
+  for(int i = 0; i < len; i++){
+    if (s >= text + len){
+      break;
+    }
     if (utf8){
-      c = fread_utf8_char(f);
+      c = read_utf8_char(&s);
       if (c < 0){
         STDERR_DEBUG("Unicode Error!");
         break;
@@ -50,10 +53,7 @@ rnn_char_find_alphabet(const char *filename, int *alphabet, int *a_len,
       }
     }
     else {
-      c = getc(f);
-      if (c == EOF){
-        break;
-      }
+      c = s[i];
     }
     if (c >= n_chars){
       DEBUG("got char %d, but there are only %d slots", c, n_chars);
@@ -148,6 +148,52 @@ rnn_char_find_alphabet(const char *filename, int *alphabet, int *a_len,
   return -1;
 }
 
+static inline long
+get_file_length(FILE *f, int *err){
+  long len = 0;
+  *err = fseek(f, 0, SEEK_END);
+  if (! *err){
+    len = ftell(f);
+    *err = fseek(f, 0, SEEK_SET);
+  }
+  return len;
+}
+
+/* rnn_char_find_alphabet_f returns 0 for success, -1 on failure. */
+int
+rnn_char_find_alphabet_f(const char *filename, int *alphabet, int *a_len,
+    int *collapse_chars, int *c_len, double threshold, int ignore_case,
+    int collapse_space, int utf8, double digit_adjust, double alpha_adjust){
+  FILE *f = fopen_or_abort(filename, "r");
+  int err;
+  int len = get_file_length(f, &err);
+  if (err){
+    goto error;
+  }
+  char *contents = malloc(len + 4);
+  int rlen = fread(contents, 1, len, f);
+  if (rlen != len){
+    goto late_error;
+  }
+  fclose(f);
+  contents[len] = 0;
+
+  err = rnn_char_find_alphabet_s(contents, len, alphabet, a_len,
+      collapse_chars, c_len, threshold, ignore_case,
+      collapse_space, utf8, digit_adjust, alpha_adjust);
+
+  free(contents);
+  return err;
+
+ late_error:
+  free(contents);
+ error:
+  STDERR_DEBUG("could not process %s", filename);
+  *a_len = *c_len = 0;
+  return -1;
+}
+
+
 static int*
 new_char_lut(const int *alphabet, int a_len, const int *collapse, int c_len,
     int *_space, int case_insensitive, int utf8){
@@ -198,9 +244,8 @@ rnn_char_alloc_collapsed_text(char *filename, int *alphabet, int a_len,
       collapse_chars, c_len, &space,
       case_insensitive, utf8);
   FILE *f = fopen_or_abort(filename, "r");
-  int err = fseek(f, 0, SEEK_END);
-  long len = ftell(f);
-  err |= fseek(f, 0, SEEK_SET);
+  int err;
+  long len = get_file_length(f, &err);
   u8 *text = malloc(len + 1);
   u8 prev = 0;
   u8 c;

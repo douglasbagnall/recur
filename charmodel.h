@@ -64,7 +64,11 @@ struct RnnCharMetadata {
   bool utf8;
 };
 
-int rnn_char_find_alphabet(const char *filename, int *alphabet, int *a_len,
+int rnn_char_find_alphabet_s(const char *text, int len, int *alphabet, int *a_len,
+    int *collapse_chars, int *c_len, double threshold, int ignore_case,
+    int collapse_space, int utf8, double digit_adjust, double alpha_adjust);
+
+int rnn_char_find_alphabet_f(const char *filename, int *alphabet, int *a_len,
     int *collapse_chars, int *c_len, double threshold, int ignore_case,
     int collapse_space, int utf8, double digit_adjust, double alpha_adjust);
 

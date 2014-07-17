@@ -380,7 +380,7 @@ test_alphabet_finding(void){
     if (! a->filename){
       break;
     }
-    int err = rnn_char_find_alphabet(a->filename, alphabet, &a_len,
+    int err = rnn_char_find_alphabet_f(a->filename, alphabet, &a_len,
         collapse_chars, &c_len, a->threshold, a->ignore_case,
         a->collapse_space, a->utf8, a->digit_adjust, a->alpha_adjust);
     if (err){
