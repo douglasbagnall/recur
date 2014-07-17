@@ -159,38 +159,58 @@ get_file_length(FILE *f, int *err){
   return len;
 }
 
+int
+rnn_char_alloc_file_contents(const char *filename, char **contents, int *len)
+{
+  FILE *f = fopen(filename, "r");
+  int err;
+  if (!f){
+    goto error;
+  }
+  *len = get_file_length(f, &err);
+  if (err){
+    goto error;
+  }
+  char *c = malloc(*len + 4);
+  if (! c){
+    goto error;
+  }
+  int rlen = fread(c, 1, *len, f);
+  if (rlen != *len){
+    goto late_error;
+  }
+  fclose(f);
+  c[*len] = 0; /*in case it gets used as string*/
+  *contents = c;
+  return 0;
+ late_error:
+  free(c);
+ error:
+  STDERR_DEBUG("could not read %s", filename);
+  *contents = NULL;
+  *len = 0;
+  return -1;
+}
+
+
 /* rnn_char_find_alphabet_f returns 0 for success, -1 on failure. */
 int
 rnn_char_find_alphabet_f(const char *filename, int *alphabet, int *a_len,
     int *collapse_chars, int *c_len, double threshold, int ignore_case,
     int collapse_space, int utf8, double digit_adjust, double alpha_adjust){
-  FILE *f = fopen_or_abort(filename, "r");
-  int err;
-  int len = get_file_length(f, &err);
-  if (err){
-    goto error;
+  int len;
+  char *contents;
+  int err = rnn_char_alloc_file_contents(filename, &contents, &len);
+  if (! err){
+    err = rnn_char_find_alphabet_s(contents, len, alphabet, a_len,
+        collapse_chars, c_len, threshold, ignore_case,
+        collapse_space, utf8, digit_adjust, alpha_adjust);
+    free(contents);
   }
-  char *contents = malloc(len + 4);
-  int rlen = fread(contents, 1, len, f);
-  if (rlen != len){
-    goto late_error;
+  else {
+    *a_len = *c_len = 0;
   }
-  fclose(f);
-  contents[len] = 0;
-
-  err = rnn_char_find_alphabet_s(contents, len, alphabet, a_len,
-      collapse_chars, c_len, threshold, ignore_case,
-      collapse_space, utf8, digit_adjust, alpha_adjust);
-
-  free(contents);
   return err;
-
- late_error:
-  free(contents);
- error:
-  STDERR_DEBUG("could not process %s", filename);
-  *a_len = *c_len = 0;
-  return -1;
 }
 
 

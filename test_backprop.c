@@ -622,13 +622,22 @@ main(int argc, char *argv[]){
   int *collapse_chars = calloc(257, sizeof(int));
   int a_len, c_len;
 
+
   if (opt_find_alphabet_threshold){
-    rnn_char_find_alphabet_f(opt_textfile,
+    int raw_text_len;
+    char* text;
+    int err = rnn_char_alloc_file_contents(opt_textfile, &text, &raw_text_len);
+    if (err){
+      DEBUG("Couldn't read text file '%s'. Goodbye", opt_textfile);
+      exit(1);
+    }
+    rnn_char_find_alphabet_s(text, raw_text_len,
         alphabet, &a_len, collapse_chars, &c_len,
         opt_find_alphabet_threshold,
         opt_case_insensitive, opt_collapse_space, opt_utf8,
         opt_find_alphabet_digit_adjust,
         opt_find_alphabet_alpha_adjust);
+    free(text);
     if (a_len < 1){
       DEBUG("Trouble finding an alphabet");
       exit(1);
