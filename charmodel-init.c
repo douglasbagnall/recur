@@ -165,7 +165,7 @@ rnn_char_alloc_file_contents(const char *filename, char **contents, int *len)
   FILE *f = fopen(filename, "r");
   int err;
   if (!f){
-    goto error;
+    goto early_error;
   }
   *len = get_file_length(f, &err);
   if (err){
@@ -186,6 +186,8 @@ rnn_char_alloc_file_contents(const char *filename, char **contents, int *len)
  late_error:
   free(c);
  error:
+  fclose(f);
+ early_error:
   STDERR_DEBUG("could not read %s", filename);
   *contents = NULL;
   *len = 0;
