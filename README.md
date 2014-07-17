@@ -45,10 +45,10 @@ The core library needs [libcdb](http://www.corpit.ru/mjt/tinycdb.html),
 which will be packaged as `libcdb-dev` on Debian or `tinycdb-devel` on
 Fedora.
 
-The Gstreamer plugins require Gstreamer 1.x, Gstreamer 1.x base
-plugins, and Glib 2.x development files. These are packaged with most
-Linux distributions, with names like `libgstreamer1.0-dev` and
-`libglib2.0-dev`.
+The [Gstreamer](http://gstreamer.freedesktop.org/) plugins require
+Gstreamer 1.x, Gstreamer 1.x base plugins, and Glib 2.x development
+files. These are packaged with most Linux distributions, with names
+like `libgstreamer1.0-dev` and `libglib2.0-dev`.
 
 ## Gstreamer plugins
 
