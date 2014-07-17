@@ -21,7 +21,6 @@ Because of ccan/opt, --help will tell you something.
 #include <ctype.h>
 #include "charmodel.h"
 #include "utf8.h"
-#define PGM_DUMP_STRING "ihw how"
 
 #define DICKENS_SHUFFLED_TEXT TEST_DATA_DIR "/dickens-shuffled.txt"
 #define DICKENS_TEXT TEST_DATA_DIR "/dickens.txt"
@@ -46,6 +45,7 @@ Because of ccan/opt, --help will tell you something.
 
 #define CONFAB_SIZE 80
 
+#define DEFAULT_PGM_DUMP_IMAGES "ihw how"
 #define DEFAULT_PERIODIC_PGM_DUMP 0
 #define DEFAULT_TEMPORAL_PGM_DUMP 0
 #define DEFAULT_RELOAD 0
@@ -147,8 +147,10 @@ static float opt_init_hidden_run_length = DEFAULT_INIT_HIDDEN_RUN_LENGTH;
 static float opt_init_hidden_run_deviation = DEFAULT_INIT_HIDDEN_RUN_DEVIATION;
 static float opt_init_weight_scale = DEFAULT_INIT_WEIGHT_SCALE;
 static float opt_perforate_weights = DEFAULT_PERFORATE_WEIGHTS;
-static bool opt_temporal_pgm_dump = DEFAULT_TEMPORAL_PGM_DUMP;
 static bool opt_periodic_pgm_dump = DEFAULT_PERIODIC_PGM_DUMP;
+static bool opt_temporal_pgm_dump = DEFAULT_TEMPORAL_PGM_DUMP;
+static char *opt_pgm_dump_images = DEFAULT_PGM_DUMP_IMAGES;
+static char **orig_pgm_dump_images = &opt_pgm_dump_images;
 static float opt_confab_bias = DEFAULT_CONFAB_BIAS;
 static bool opt_save_net = DEFAULT_SAVE_NET;
 static uint opt_multi_tap = DEFAULT_MULTI_TAP;
@@ -268,6 +270,8 @@ static struct opt_table options[] = {
       &opt_temporal_pgm_dump, "Dump ppm images showing inputs change over time"),
   OPT_WITHOUT_ARG("--periodic-pgm-dump", opt_set_bool,
       &opt_periodic_pgm_dump, "Dump ppm images of weights, every reporting interval"),
+  OPT_WITH_ARG("--periodic-pgm-dump-images", opt_set_charp, opt_show_charp,
+      &opt_pgm_dump_images, "which images to dump ({ih,ho,bi}[wmdt])*"),
   OPT_WITH_ARG("--confab-bias", opt_set_floatval, opt_show_floatval,
       &opt_confab_bias, "bias toward probable characters in confab "
       "(100 == deterministic)"),
@@ -430,9 +434,6 @@ load_or_create_net(struct RnnCharMetadata *m, int alpha_len, int reload){
         opt_momentum, 0);
     initialise_net(net);
     net->bptt->momentum_weight = opt_momentum_weight;
-    if (opt_periodic_pgm_dump){
-      rnn_multi_pgm_dump(net, PGM_DUMP_STRING, opt_basename);
-    }
     net->metadata = strdup(metadata);
   }
   net->bptt->ho_scale = opt_top_learn_rate_scale;
@@ -467,10 +468,8 @@ load_and_train_model(struct RnnCharMetadata *m, int *alphabet, int a_len,
     .momentum = opt_momentum,
     .momentum_soft_start = opt_momentum_soft_start,
     .momentum_style = opt_momentum_style,
-    .periodic_pgm_dump = opt_periodic_pgm_dump,
     .temporal_pgm_dump = opt_temporal_pgm_dump,
     .periodic_weight_noise = opt_periodic_weight_noise,
-    .quiet = opt_quiet,
     .report_interval = opt_report_interval,
     .save_net = opt_save_net,
     .use_multi_tap_path = opt_use_multi_tap_path,
@@ -478,6 +477,11 @@ load_and_train_model(struct RnnCharMetadata *m, int *alphabet, int a_len,
     .alphabet = alphabet,
     .collapse_chars = collapse_chars
   };
+  /*If the char point is not the default, the string has been set on the
+    command line.*/
+  if (opt_periodic_pgm_dump || opt_pgm_dump_images != *orig_pgm_dump_images){
+    model.periodic_pgm_dump_string = opt_pgm_dump_images;
+  }
 
   RecurNN *net = load_or_create_net(m, a_len, opt_reload);
   if (opt_override){
@@ -485,6 +489,10 @@ load_and_train_model(struct RnnCharMetadata *m, int *alphabet, int a_len,
     bptt->learn_rate = opt_learn_rate;
     bptt->momentum = opt_momentum;
     bptt->momentum_weight = opt_momentum_weight;
+  }
+
+  if (model.periodic_pgm_dump_string){
+    rnn_multi_pgm_dump(net, model.periodic_pgm_dump_string, opt_basename);
   }
 
   model.net = net;

@@ -42,7 +42,6 @@ struct _RnnCharModel {
   float momentum;
   float momentum_soft_start;
   int momentum_style;
-  bool periodic_pgm_dump;
   bool temporal_pgm_dump;
   float periodic_weight_noise;
   int quiet;
