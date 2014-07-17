@@ -169,7 +169,7 @@ static double opt_find_alphabet_threshold = DEFAULT_FIND_ALPHABET_THRESHOLD;
 static double opt_find_alphabet_digit_adjust = DEFAULT_FIND_ALPHABET_DIGIT_ADJUST;
 static double opt_find_alphabet_alpha_adjust = DEFAULT_FIND_ALPHABET_ALPHA_ADJUST;
 
-#define IN_RANGE_01(x) ((x) >= 0.0f && (x) <= 1.0f)
+#define IN_RANGE_01(x) (((x) >= 0.0f) && ((x) <= 1.0f))
 
 /*restrict to 0-1 range (mostly for probabilities)*/
 static char *
