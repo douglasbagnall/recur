@@ -69,7 +69,8 @@ def main():
     args = parser.parse_args()
     #print >>sys.stderr, args
     #start from git root
-    os.chdir(os.path.relpath('..', os.path.dirname(__file__)))
+    gitroot = os.path.abspath(os.path.dirname((os.path.dirname(__file__))))
+    os.chdir(gitroot)
     excluded_files = load_filelist(args.exclude_file)
     files = load_filelist(args.include_file, strip=False, exclude=excluded_files)
     if args.net_directory:
