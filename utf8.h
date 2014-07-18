@@ -82,6 +82,25 @@ _parse_utf8_byte(int c, int *extra_bytes)
   return c;
 }
 
+static inline ALWAYS_INLINE int
+check_utf8_bounds(int c, int extra){
+  /* For stricter compliance check for codepoints sneakily encoded with
+     too many extra characters. Ranges are:
+
+     1 -> 0x000080 - 0x0007ff    8 - 11 bits
+     2 -> 0x000800 - 0x00ffff   12 - 16 bits
+     3 -> 0x010000 - 0x1fffff   17 - 21 bits
+
+     so the required function maps 1, 2, 3 to 1 << 7, 1 << 11, 1 << 16
+  */
+  int min = 1 << (1 + extra * 5 + (extra == 1));
+  if (c < min){
+    return -1;
+  }
+  return c;
+}
+
+
 /*read_utf8_char returns the unicode code point indicated by the UTF-8
   sequence starting at *s, and advances *s to beyond the character.
 
@@ -96,15 +115,18 @@ read_utf8_char(const char **s){
   int extra_bytes;
   (*s)++;
   c = _parse_utf8_byte(c, &extra_bytes);
-  for (int i = 0; i < extra_bytes; i++){
-    int x = **s;
-    (*s)++;
-    if ((x & 0xC0) != 0x80){
-      //bad codepoint (perhaps end of string)
-      return -1;
+  if (extra_bytes){
+    for (int i = 0; i < extra_bytes; i++){
+      int x = **s;
+      (*s)++;
+      if ((x & 0xC0) != 0x80){
+        //bad codepoint (perhaps end of string)
+        return -1;
+      }
+      c <<= 6;
+      c += x & 63;
     }
-    c <<= 6;
-    c += x & 63;
+    c = check_utf8_bounds(c, extra_bytes);
   }
   return c;
 }
@@ -123,14 +145,17 @@ fread_utf8_char(FILE *f){
     return 0;
   }
   c = _parse_utf8_byte(c, &extra_bytes);
-  for (int i = 0; i < extra_bytes; i++){
-    int x = fgetc(f);
-    if (x == EOF || (x & 0xC0) != 0x80){
-      MAYBE_DEBUG("UTF-8 stream seems to stop mid-character");
-      return -1;
+  if (extra_bytes){
+    for (int i = 0; i < extra_bytes; i++){
+      int x = fgetc(f);
+      if (x == EOF || (x & 0xC0) != 0x80){
+        MAYBE_DEBUG("UTF-8 stream seems to stop mid-character");
+        return -1;
+      }
+      c <<= 6;
+      c += x & 63;
     }
-    c <<= 6;
-    c += x & 63;
+    c = check_utf8_bounds(c, extra_bytes);
   }
   return c;
 }
