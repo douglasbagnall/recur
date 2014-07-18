@@ -21,6 +21,10 @@ def main():
                        help="write call locations to this file")
     group.add_argument('--score-file',
                        help="write best scores to this file")
+    group.add_argument('--score-file-period', type=int, default=0,
+                       help="if non-zero, write scores every this many seconds")
+    group.add_argument('--score-file-n', type=int, default=0,
+                       help="offset/number of samples in score files")
     group.add_argument('--call-edge-threshold', default=0.5, type=float,
                        help="use this edge threshold for call-json-file")
     group.add_argument('--call-peak-threshold', default=0.9, type=float,
@@ -88,7 +92,9 @@ def main():
                call_duration_threshold=args.call_duration_threshold,
                show_presence_roc=args.presence_roc, target_index=args.target_class,
                summarise=args.summary, presence_index=args.presence_index,
-               score_file=args.score_file, smooth_presence=args.smooth_presence,
+               score_file=args.score_file, score_file_period=args.score_file_period,
+               score_file_n=args.score_file_n,
+               smooth_presence=args.smooth_presence,
                roc_arrows=args.roc_arrows,
                presence_subsample=args.presence_subsample,
                presence_run_length=args.presence_run_length,

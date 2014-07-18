@@ -179,6 +179,8 @@ class Classifier(BaseClassifier):
                  summarise=False,
                  presence_index=None,
                  score_file=None,
+                 score_file_period=None,
+                 score_file_n=None,
                  smooth_presence=None,
                  presence_subsample=None,
                  presence_run_length=None,
@@ -205,6 +207,8 @@ class Classifier(BaseClassifier):
             self.call_json_file = open(call_json_file, 'w')
         if score_file:
             self.score_file = open(score_file, 'w')
+        self.score_file_period = score_file_period
+        self.score_file_n = score_file_n
         self.call_edge_threshold = call_edge_threshold
         self.call_peak_threshold = call_peak_threshold
         self.call_duration_threshold = call_duration_threshold
@@ -452,11 +456,30 @@ class Classifier(BaseClassifier):
             print >>self.call_json_file, json.dumps(row)
 
         if self.target_index and self.score_file:
-            top_scores = peak_smoothed_scores(scores[self.target_index],
-                                              smooth=self.smooth_presence)
-            line = [fn]
-            line.extend(top_scores)
-            print >>self.score_file, json.dumps(line)
+            # self.score_file does completely different things,
+            # depending on whether self.score_file_period is non-zero.
+            # If it is zero (or None), the top self.score_file_n
+            # scores are printed. If it is non-zero, the
+            # `self.score_file_n`th top score for each period of
+            # self.score_file_period seconds is printed. If
+            # self.score_file_n is zero or None, a default value is
+            # used.
+            if not self.score_file_period:
+                n = self.score_file_n or 200
+                top_scores = peak_smoothed_scores(scores[self.target_index],
+                                                  top_n=n,
+                                                  smooth=self.smooth_presence)
+                line = [fn]
+                line.extend(top_scores)
+                print >>self.score_file, json.dumps(line)
+            else:
+                n = self.score_file_n or 60
+                periods = peak_periodic_scores(scores[self.target_index],
+                                               self.score_file_period, n,
+                                               smooth=self.smooth_presence)
+                #print periods[0]
+                line = [fn] + [x[2] for x in periods]
+                print >>self.score_file, json.dumps(line)
 
         if self.show_presence_roc or self.summarise or self.presence_file:
             indices = self.calc_presence(scores)
@@ -511,6 +534,40 @@ def peak_smoothed_scores(scores, top_n=200, smooth=0, ignore_first=10, kaiser=7)
         s = sorted([x[0] for x in scores[ignore_first:]], reverse=True)
         top_scores = s[:top_n]
     return top_scores
+
+def peak_periodic_scores(scores, period, nth, smooth=0, kaiser=7):
+    if smooth:
+        window = np.kaiser(smooth, kaiser)
+        s = np.array([x[0] for x in scores])
+        s = np.convolve(s, window, mode='same')
+        scores = [(x, None, y[2]) for x, y in zip(s, scores)]
+
+    endtime = 0
+    starttime = 0
+    chunks = []
+    start = 0
+    for i, x in enumerate(scores):
+        if x[2] >= endtime:
+            c = [x[0] for x in scores[start:i]]
+            if endtime > 0 and len(c) > nth:
+                chunks.append([starttime, endtime, c])
+                #sys.exit()
+            start = i
+            starttime = endtime
+            endtime += period
+
+    #last one could be a sample or two short, so add it if its long enough.
+    if i > start + nth:
+        c = [x[0] for x in scores[start:i]]
+        chunks.append([starttime, endtime, c])
+
+    for c in chunks:
+        #print c
+        #print len(c[2])
+        c[2] = sorted(c[2])[-nth]
+        #print c
+    return chunks
+
 
 def eternal_alternator(iters, max_iterations=-1):
     cycles = [itertools.cycle(x) for x in iters]
