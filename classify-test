@@ -55,6 +55,8 @@ def main():
                        help="write presence data here is CSV form")
     group.add_argument('--presence-file',
                        help="write presence data here")
+    group.add_argument('--sort-files', action='store_true',
+                       help="process files in alphabetical order")
 
     args = parser.parse_args()
     timed = not args.no_timings
@@ -66,6 +68,9 @@ def main():
 
     c = Classifier(channels=1)
     timed_files = process_common_args(c, args, timed=timed)
+    if args.sort_files:
+        timed_files.sort(key=lambda x: x.fullname)
+
     if args.min_changes:
         timed_files = [x for x in timed_files
                        if len(x.timings) >= args.min_changes]
