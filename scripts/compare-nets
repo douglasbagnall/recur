@@ -87,6 +87,7 @@ def main():
     cmd = ["./classify-test", "--summary", "-v0"]
     for arg, val in (("-C", args.first_n),
                      ("--ignore-start", args.ignore_start),
+                     ("--presence-index", args.presence_index),
                      ("--min-call-intensity", args.min_call_intensity)):
         if val is not None:
             cmd.append(arg)
