@@ -131,6 +131,10 @@ libgstclassify.so: $(RNN_OBJECTS) gstclassify.o mfcc.o | nets images
 	$(CC) -shared -Wl,-O1 $+ $(INCLUDES) $(DEFINES) $(LINKS) -Wl,-soname -Wl,$@ \
 	  -o $@
 
+libcharmodel.so: charmodel-classify.o charmodel-predict.o charmodel-init.o $(RNN_OBJECTS)
+	$(CC) -shared -Wl,-O1 $+ $(INCLUDES) $(DEFINES) $(LINKS) -Wl,-soname -Wl,$@ \
+	  -o $@
+
 test/test_mfcc_table: %:  mfcc.o rescale.o %.o
 	$(CC) -Wl,-O1 $^ $(INCLUDES) $(DEFINES) $(LINKS)   -o $@
 

@@ -307,6 +307,60 @@ rnn_char_alloc_collapsed_text(char *filename, int *alphabet, int a_len,
   return text;
 }
 
+RnnCharClassifiedChar *
+rnn_char_alloc_classified_text(RnnCharClassifiedString *snippets,
+    int *alphabet, int a_len, int *collapse_chars, int c_len,
+    int *text_len, u32 flags){
+  int i;
+  int space;
+  int collapse_space = flags & RNN_CHAR_FLAG_COLLAPSE_SPACE;
+
+  if (! (flags & RNN_CHAR_FLAG_UTF8)){
+    DEBUG("WARNING: rnn_char_alloc_classified_text() only does utf-8 for now");
+    flags |= RNN_CHAR_FLAG_UTF8;
+  }
+  int *char_to_net = new_char_lut(alphabet, a_len,
+      collapse_chars, c_len, &space, flags);
+
+  int size = 1000 * 1000;
+  RnnCharClassifiedChar *text = malloc(size * sizeof(RnnCharClassifiedChar));
+  u8 prev;
+  u8 c = 0;
+  int chr = 0;
+  const char *s = snippets->string;
+  u8 class = snippets->class;
+  for(i = 0;;){
+    if (i == size){
+      size *= 2;
+      text = realloc(text, size * sizeof(RnnCharClassifiedChar));
+    }
+    chr = read_utf8_char(&s);
+    if (chr == 0){
+      /*end of string, move on to next snippet*/
+      snippets++;
+      s = snippets->string;
+      if (s == NULL){
+        break;
+      }
+      class = snippets->class;
+    }
+    else if (chr < 0){
+      break;
+    }
+    prev = c;
+    c = char_to_net[chr];
+    if (!(collapse_space && c == space && prev == space)){
+      text[i].class = class;
+      text[i].symbol = c;
+      i++;
+    }
+  }
+  text = realloc(text, (i + 1) * sizeof(RnnCharClassifiedChar));
+  *text_len = i;
+  free(char_to_net);
+  return text;
+}
+
 void
 rnn_char_dump_collapsed_text(const u8 *text, int len, const char *name,
     const char *alphabet)
