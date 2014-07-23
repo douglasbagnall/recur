@@ -222,15 +222,14 @@ new_char_lut(const int *alphabet, int a_len, const int *collapse, int c_len,
   int case_insensitive = flags & RNN_CHAR_FLAG_CASE_INSENSITIVE;
   int i;
   int collapse_target = 0;
-  int space = -1;
+  int space = 0;
   for (i = 0; i < a_len; i++){
     if (alphabet[i] == ' '){
       space = i;
       break;
     }
   }
-  if (space == -1){
-    space = collapse_target;
+  if (space == 0){
     DEBUG("space is not in alphabet; using collapse_target");
   }
   *_space = space;
