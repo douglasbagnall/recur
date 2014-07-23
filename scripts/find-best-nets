@@ -18,12 +18,15 @@ SCORE_ADJUST = {
     'p.mcc': 0.5,
 }
 
+PRESENCE_WEIGHT = 1.0
+
 def calc_score(k, v, best):
     v = v or 1e-10
     best = best or 1e-10
     score = best / v if k in SMALLER_IS_BETTER else v / best
-    #score = 1
     score *= SCORE_ADJUST.get(k, 1.0)
+    if k.startswith('p.'):
+        score *= PRESENCE_WEIGHT
     return score
 
 def print_summary(nets, n, cutoff):
@@ -109,9 +112,16 @@ def main():
     parser.add_argument('-l', '--list-only', action="store_true",
                         help="only list the top filenames")
     parser.add_argument('-c', '--cutoff', type=float, default=1e-20,
-                        help='how many top-n listings a net needs to be in summary')
+                        help='how many top-n listings a net needs'
+                        ' to be in summary')
+    parser.add_argument('-p', '--presence-adjust', type=float, default=1.0,
+                        help="the relative importance of presence parameters")
+
     parser.add_argument('file', help='JSON file to use')
     args = parser.parse_args()
+
+    global PRESENCE_WEIGHT
+    PRESENCE_WEIGHT = args.presence_adjust
 
     summarise_nets(args.file, n=args.top_n, list_only=args.list_only,
                              cutoff=args.cutoff)
