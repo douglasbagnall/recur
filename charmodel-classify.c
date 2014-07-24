@@ -26,22 +26,26 @@ next_all_ones(int x){
 
 #define NO_CLASS 0xFF
 
-/*Adjust the lag of the text predictions in-place. Anything hat gets adjusted
+/*Adjust the lag of the text predictions in-place. Anything that gets adjusted
   out of range gets its target set to 0xff, which indicates no training */
 
 void
 rnn_char_adjust_text_lag(RnnCharClassifiedChar *text, int len, int lag){
   int i;
+  /*lag could be positive or negative*/
+  DEBUG("text %d %d, %d %d... len %d, lag %d",
+      text[0].class, text[0].symbol, text[1].class, text[1].symbol,
+      len, lag);
   if (lag > 0){
-    for (i = 0; i < lag; i++){
-      text[i].class = NO_CLASS;
-    }
-    for (i = lag; i < len; i++){
+    for (i = len - 1; i >= lag; i--){
       text[i].class = text[i - lag].class;
     }
+    for (; i >= 0; i--){
+      text[i].class = NO_CLASS;
+    }
   }
-  else if(lag < 0){
-    for (i = 0; i < len - lag; i++){
+  else if (lag < 0){
+    for (i = 0; i < lag + len; i++){
       text[i].class = text[i - lag].class;
     }
     for (; i < len; i++){

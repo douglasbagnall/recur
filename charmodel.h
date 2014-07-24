@@ -10,7 +10,7 @@ enum {
   RNN_CHAR_FLAG_CASE_INSENSITIVE = 1,
   RNN_CHAR_FLAG_UTF8 = 2,
   RNN_CHAR_FLAG_COLLAPSE_SPACE = 4
-};
+} rnn_char_flags;
 
 typedef struct _RnnCharSchedule RnnCharSchedule;
 
@@ -105,6 +105,8 @@ typedef struct _RnnCharClassifiedString{
 } RnnCharClassifiedString;
 
 int rnn_char_alloc_file_contents(const char *filename, char **contents, int *len);
+
+void rnn_char_adjust_text_lag(RnnCharClassifiedChar *text, int len, int lag);
 
 int rnn_char_find_alphabet_s(const char *text, int len, int *alphabet, int *a_len,
     int *collapse_chars, int *c_len, double threshold, double digit_adjust,
