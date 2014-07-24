@@ -99,12 +99,35 @@ typedef struct _RnnCharClassifiedChar{
   u8 symbol;
 } RnnCharClassifiedChar;
 
-typedef struct _RnnCharClassifiedString{
-  char *string;
-  int class;
-} RnnCharClassifiedString;
+typedef struct _RnnCharClassifiedText{
+  RnnCharClassifiedChar *text;
+  int len;
+  int *alphabet;
+  int *collapse_chars;
+  u32 flags;
+} RnnCharClassifiedText;
+
+
+
+
+typedef struct _RnnCharClassBlock RnnCharClassBlock;
+struct _RnnCharClassBlock
+{
+  char *class_name;
+  char *text;
+  RnnCharClassBlock *next;
+  int len;
+  u8 class_code;
+};
+
+#define NO_CLASS 0xFF
 
 int rnn_char_alloc_file_contents(const char *filename, char **contents, int *len);
+
+RnnCharClassifiedChar *
+rnn_char_alloc_classified_text(RnnCharClassBlock *b,
+    int *alphabet, int a_len, int *collapse_chars, int c_len,
+    int *text_len, u32 flags);
 
 void rnn_char_adjust_text_lag(RnnCharClassifiedChar *text, int len, int lag);
 

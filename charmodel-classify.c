@@ -24,8 +24,6 @@ next_all_ones(int x){
   return x;
 }
 
-#define NO_CLASS 0xFF
-
 /*Adjust the lag of the text predictions in-place. Anything that gets adjusted
   out of range gets its target set to 0xff, which indicates no training */
 

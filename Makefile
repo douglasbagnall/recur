@@ -61,8 +61,9 @@ LINKS = $(COMMON_LINKS) $(GST_LINKS)
 GTK_LINKS =  -lgtk-3 -lgdk-3
 
 OPT_OBJECTS = ccan/opt/opt.o ccan/opt/parse.o ccan/opt/helpers.o ccan/opt/usage.o
+TTXML_OBJECTS = ccan/ttxml/ttxml.o
 
-$(OPT_OBJECTS):%.o: %.c config.h
+$(OPT_OBJECTS) $(TTXML_OBJECTS):%.o: %.c config.h
 	$(CC) -c -MMD $(ALL_CFLAGS) -Wno-sign-compare $(CPPFLAGS) -o $@ $<
 
 subdirs = images nets test-video
@@ -72,7 +73,7 @@ $(subdirs):
 all:: libgstclassify.so $(subdirs)
 
 
-ELF_EXECUTABLES = test_backprop convert-saved-net rnnca-player gtk-recur
+ELF_EXECUTABLES = test_backprop convert-saved-net rnnca-player gtk-recur text-classify
 
 clean:
 	rm -f *.so *.o *.a *.d *.s *.pyc
@@ -161,6 +162,10 @@ test/test_fb_backprop: %: $(RNN_OBJECTS) %.o $(OPT_OBJECTS)  | nets images
 
 test_backprop: %: $(RNN_OBJECTS) %.o charmodel-predict.o charmodel-init.o $(OPT_OBJECTS)  \
 	config.h  | nets images
+	$(CC) -Iccan/opt/ -Wl,-O1 $(filter %.o,$^)   -I. $(DEFINES)  $(COMMON_LINKS)  -o $@
+
+text-classify: %: $(RNN_OBJECTS) %.o charmodel-classify.o charmodel-init.o \
+	$(OPT_OBJECTS) $(TTXML_OBJECTS) config.h  | nets images
 	$(CC) -Iccan/opt/ -Wl,-O1 $(filter %.o,$^)   -I. $(DEFINES)  $(COMMON_LINKS)  -o $@
 
 convert-saved-net: %: $(RNN_OBJECTS) %.o

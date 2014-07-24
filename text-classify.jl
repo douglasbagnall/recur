@@ -1,5 +1,6 @@
 using LightXML
 using ArgParse
+using StrPack
 
 #these need to match the rnn_char_flags enum in charmodel.h
 const CASE_INSENSITIVE = uint32(1)
@@ -67,15 +68,24 @@ function xml_getlangstrings(xmlname::String)
     flags::Uint32 = CASE_INSENSITIVE | UTF8 | COLLAPSE_SPACE
     xdoc = parse_file(xmlname)
     xroot = root(xdoc)
-    lang_blocks = LangBlock[]
-    getlangstrings(xroot, lang_blocks, NO_LANG, flags)
+    lang_blocks_raw = LangBlock[]
+    getlangstrings(xroot, lang_blocks_raw, NO_LANG, flags)
 
     langs = Set()
     full_text = ""
-    for e in lang_blocks
+    prev_was_space = false
+    lang_blocks = LangBlock[]
+    for e in lang_blocks_raw
+        text_is_space = e.text == " "
+        if prev_was_space && text_is_space && (flags & COLLAPSE_SPACE) != 0
+            continue
+        end
+        prev_was_space = text_is_space
         if e.lang != NO_LANG
             push!(langs, e.lang)
         end
+        
+        push!(lang_blocks, e)
         full_text = string(full_text, e.text)
     end
     langs2 = [NO_LANG => NO_CLASS]
@@ -163,6 +173,8 @@ function main()
     labelled_text, langs2 = xml_getlangstrings(args["file"])
     @printf("%d %d, %d, %d\n", labelled_text[1], labelled_text[2],
             labelled_text[3], labelled_text[4])
+
+
 
     if args["lag"] != 0
         ccall((:rnn_char_adjust_text_lag, "./libcharmodel.so"), Void,

@@ -308,12 +308,13 @@ rnn_char_alloc_collapsed_text(char *filename, int *alphabet, int a_len,
 }
 
 RnnCharClassifiedChar *
-rnn_char_alloc_classified_text(RnnCharClassifiedString *snippets,
+rnn_char_alloc_classified_text(RnnCharClassBlock *b,
     int *alphabet, int a_len, int *collapse_chars, int c_len,
     int *text_len, u32 flags){
   int i;
   int space;
   int collapse_space = flags & RNN_CHAR_FLAG_COLLAPSE_SPACE;
+  int utf8 = flags & RNN_CHAR_FLAG_UTF8;
 
   if (! (flags & RNN_CHAR_FLAG_UTF8)){
     DEBUG("WARNING: rnn_char_alloc_classified_text() only does utf-8 for now");
@@ -324,39 +325,45 @@ rnn_char_alloc_classified_text(RnnCharClassifiedString *snippets,
 
   int size = 1000 * 1000;
   RnnCharClassifiedChar *text = malloc(size * sizeof(RnnCharClassifiedChar));
+
+  int len = 0;
   u8 prev;
-  u8 c = 0;
-  int chr = 0;
-  const char *s = snippets->string;
-  u8 class = snippets->class;
-  for(i = 0;;){
-    if (i == size){
+
+  for (; b; b = b->next){
+    u8 class = b->class_code;
+    const char *s = b->text;
+    u8 c = 0;
+    int chr = 0;
+    int end = len + b->len;
+    while (end > size){
       size *= 2;
       text = realloc(text, size * sizeof(RnnCharClassifiedChar));
     }
-    chr = read_utf8_char(&s);
-    if (chr == 0){
-      /*end of string, move on to next snippet*/
-      snippets++;
-      s = snippets->string;
-      if (s == NULL){
+    for(; len < end; len++){
+      if (utf8){
+        chr = read_utf8_char(&s);
+      }
+      else {
+        chr = (u8)*s;
+        s++;
+      }
+      if (chr <= 0){
         break;
       }
-      class = snippets->class;
+      prev = c;
+      c = char_to_net[chr];
+      if (!(collapse_space && c == space && prev == space)){
+        text[len].class = class;
+        text[len].symbol = c;
+        i++;
+      }
     }
-    else if (chr < 0){
-      break;
-    }
-    prev = c;
-    c = char_to_net[chr];
-    if (!(collapse_space && c == space && prev == space)){
-      text[i].class = class;
-      text[i].symbol = c;
-      i++;
+    if (chr < 0){
+      DEBUG("seems like unicode trouble!");
     }
   }
-  text = realloc(text, (i + 1) * sizeof(RnnCharClassifiedChar));
-  *text_len = i;
+  text = realloc(text, (len + 1) * sizeof(RnnCharClassifiedChar));
+  *text_len = len;
   free(char_to_net);
   return text;
 }

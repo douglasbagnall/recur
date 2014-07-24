@@ -1,0 +1,44 @@
+#include "config.h"
+#include <stdio.h>
+#include <string.h>
+
+/**
+ * ttxml - tiny XML library for parsing (trusted!) XML documents.
+ *
+ * This parses an XML file into a convenient data structure.
+ *
+ * Example:
+ * #include <ccan/ttxml/ttxml.h>
+ * #include <stdio.h>
+ *
+ * int main(int argc, char *argv[])
+ * {
+ *	XmlNode *xml, *tmp;
+ *
+ *	xml = xml_load("./test/test.xml2");
+ *	if(!xml)return 1;
+ *
+ *	tmp = xml_find(xml, "childnode");
+ *
+ *	printf("%s: %s\n", xml->name, xml_attr(tmp, "attribute"));
+ *
+ *	xml_free(xml);
+ *
+ *	return 0;
+ * }
+ *
+ * License: GPL
+ * Author: Daniel Burke <dan.p.burke@gmail.com>
+ */
+int main(int argc, char *argv[])
+{
+	/* Expect exactly one argument */
+	if (argc != 2)
+		return 1;
+
+	if (strcmp(argv[1], "depends") == 0) {
+		return 0;
+	}
+
+	return 1;
+}
