@@ -330,7 +330,6 @@ RnnCharClassifiedChar *
 rnn_char_alloc_classified_text(RnnCharClassBlock *b,
     int *alphabet, int a_len, int *collapse_chars, int c_len,
     int *text_len, u32 flags){
-  int i;
   int space;
   int collapse_space = flags & RNN_CHAR_FLAG_COLLAPSE_SPACE;
   int utf8 = flags & RNN_CHAR_FLAG_UTF8;
@@ -346,19 +345,18 @@ rnn_char_alloc_classified_text(RnnCharClassBlock *b,
   RnnCharClassifiedChar *text = malloc(size * sizeof(RnnCharClassifiedChar));
 
   int len = 0;
-  u8 prev;
-
+  u8 prev = 0;
   for (; b; b = b->next){
     u8 class = b->class_code;
     const char *s = b->text;
-    u8 c = 0;
+    u8 c = prev;
     int chr = 0;
     int end = len + b->len;
     while (end > size){
       size *= 2;
       text = realloc(text, size * sizeof(RnnCharClassifiedChar));
     }
-    for(; len < end; len++){
+    while(len < end){
       if (utf8){
         chr = read_utf8_char(&s);
       }
@@ -374,7 +372,7 @@ rnn_char_alloc_classified_text(RnnCharClassBlock *b,
       if (!(collapse_space && c == space && prev == space)){
         text[len].class = class;
         text[len].symbol = c;
-        i++;
+        len++;
       }
     }
     if (chr < 0){

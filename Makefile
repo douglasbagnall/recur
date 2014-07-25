@@ -166,7 +166,7 @@ test_backprop: %: $(RNN_OBJECTS) %.o charmodel-predict.o charmodel-init.o $(OPT_
 
 text-classify: %: $(RNN_OBJECTS) %.o charmodel-classify.o charmodel-init.o \
 	$(OPT_OBJECTS) $(TTXML_OBJECTS) config.h  | nets images
-	$(CC) -Iccan/opt/ -Wl,-O1 $(filter %.o,$^)   -I. $(DEFINES)  $(COMMON_LINKS)  -o $@
+	$(CC) -Iccan/opt/ -Wl,-O1 $(filter %.o,$^) -l xml2  -I. $(DEFINES)  $(COMMON_LINKS)  -o $@
 
 convert-saved-net: %: $(RNN_OBJECTS) %.o
 	$(CC) -Iccan/opt/ -Wl,-O1 $(filter %.o,$^)   -I. $(DEFINES)  $(COMMON_LINKS)  -o $@

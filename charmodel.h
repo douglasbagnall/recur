@@ -103,7 +103,9 @@ typedef struct _RnnCharClassifiedText{
   RnnCharClassifiedChar *text;
   int len;
   int *alphabet;
+  int a_len;
   int *collapse_chars;
+  int c_len;
   u32 flags;
 } RnnCharClassifiedText;
 
@@ -113,8 +115,8 @@ typedef struct _RnnCharClassifiedText{
 typedef struct _RnnCharClassBlock RnnCharClassBlock;
 struct _RnnCharClassBlock
 {
-  char *class_name;
-  char *text;
+  const char *class_name;
+  const char *text;
   RnnCharClassBlock *next;
   int len;
   u8 class_code;

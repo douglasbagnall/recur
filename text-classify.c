@@ -21,78 +21,65 @@ Because of ccan/opt, --help will tell you something.
 #include <ctype.h>
 #include "charmodel.h"
 #include "utf8.h"
-#include "ccan/ttxml/ttxml.h"
 #include "colour.h"
+#include <libxml/parser.h>
+#include <libxml/tree.h>
+#include <libxml/debugXML.h>
 
 #define NO_LANG "xx"
-
-#define IS_TEXTNODE(x) (!(x)->name && (x)->attrib && (x)->attrib[0])
 
 #define MAXLEN 20 * 1000 * 1000
 
 static inline void
-dump_xmlnode(XmlNode *x){
-  DEBUG("node    %p", x);
-  DEBUG("name    %p", x->name);
-  if (x->name)  DEBUG("   %s", x->name);
-  DEBUG("attrib  %p", x->attrib);
-  DEBUG("nattrib %d", x->nattrib);
-  if (x->attrib){
-    for (int i = 0; i < x->nattrib * 2; i += 2){
-      DEBUG(" %d  %p", i, x->attrib[i]);
-      if (x->attrib[i])
-        DEBUG("      %s", x->attrib[i]);
-      DEBUG(" %d    %p", i, x->attrib[i + 1]);
-      if (x->attrib[i + 1])
-        DEBUG("      %s", x->attrib[i + 1]);
-    }
-  }
-  DEBUG("child   %p", x->child);
-  DEBUG("next    %p", x->next);
-  DEBUG(IS_TEXTNODE(x) ? "IS text!" : "is NOT text");
-  DEBUG("----------------");
+dump_xmlnode(xmlNode *x){
+  xmlDebugDumpOneNode(stderr, x, 1);
 }
 
+static inline ALWAYS_INLINE int
+lookup_class(char** class_lut, const char *class, int set_if_not_found){
+  if (strcmp(class, NO_LANG)){
+    int i;
+    for (i = 0; class_lut[i] && i < 256; i++){
+      if (strcmp(class, class_lut[i]) == 0){
+        return i;
+      }
+    }
+    if (set_if_not_found && i < 256){
+      class_lut[i] = strndup(class, 1000);
+      return i;
+    }
+  }
+  return NO_CLASS;
+}
 
 static RnnCharClassBlock *
-alloc_langblock_from_xml(XmlNode *el, RnnCharClassBlock *b, char *lang,
-    char **class_lut){
-  if (el->name && streq(el->name, "foreign")){
+alloc_langblock_from_xml(xmlNode *el, RnnCharClassBlock *b, const char *lang,
+    char **class_lut)
+{
+  dump_xmlnode(el);
+  if (el->type == XML_ELEMENT_NODE && streq((char *)el->name, "foreign")){
     lang = NO_LANG;
   }
   else{
-    char *lang_attr = xml_attr(el, "lang");
-    if (! lang_attr){
-      lang_attr = xml_attr(el, "xml:lang");
-    }
+    const char *lang_attr = (char *)xmlGetProp(el, (const xmlChar *)"lang");
     if (lang_attr){
       lang = lang_attr;
     }
   }
-  int class_code = NO_CLASS;
-  if (strcmp(lang, NO_LANG)){
-    int i;
-    for (i = 0; class_lut[i]; i++){
-      if (strcmp(lang, class_lut[i]) == 0){
-        class_code = i;
-        lang = class_lut[i]; /*use the strduped copy, not the xml one*/
-        break;
-      }
-    }
-    if (class_lut[i] == NULL){
-      class_lut[i] = strndup(lang, 1000);
-      class_code = i;
-    }
+  int class_code = lookup_class(class_lut, lang, 1);
+  if (class_code != NO_CLASS){
+    lang = class_lut[class_code]; /*use the strduped copy, not the xml one*/
   }
 
-  for(XmlNode *c = el->child; c; c = c->next){
-    if (IS_TEXTNODE(c)){
+  for(xmlNode *c = el->xmlChildrenNode; c; c = c->next){
+    if (c->type == XML_TEXT_NODE){
+      char *text = (char *)xmlNodeGetContent(c);
       b->class_name = lang;
       b->class_code = class_code;
-      b->text = strndup(c->attrib[0], MAXLEN);
+      b->text = text;
       b->len = strlen(b->text);
       b->next = malloc(sizeof(RnnCharClassBlock));
-      //DEBUG("found text. lang %s len %d b %p next %p", lang, b->len, b, b->next);
+      //DEBUG("found text. %s lang %s len %d b %p next %p", text, lang, b->len, b, b->next);
       b = b->next;
     }
     else {
@@ -104,16 +91,17 @@ alloc_langblock_from_xml(XmlNode *el, RnnCharClassBlock *b, char *lang,
 
 static RnnCharClassBlock *
 new_langblocks_from_xml(char *filename){
-  XmlNode *xml;
-  xml = xml_load(filename);
-  if(!xml)
-    return NULL;
+
+  xmlDoc *doc = xmlReadFile(filename, NULL, 0);
+  xmlNode *xml = xmlDocGetRootElement(doc);
+
   RnnCharClassBlock *b = calloc(1, sizeof(RnnCharClassBlock));
   char *class_lut[257] = {0};
   class_lut[NO_CLASS] = NO_LANG;
   RnnCharClassBlock *end = alloc_langblock_from_xml(xml, b, NO_LANG, class_lut);
   end->next = NULL;
-  xml_free(xml);
+  xmlFreeDoc(doc);
+  xmlCleanupParser();
   return b;
 }
 
@@ -122,7 +110,7 @@ free_langblocks(RnnCharClassBlock *b){
   RnnCharClassBlock *next;
   for (; b; b = next){
     next = b->next;
-    free(b->text);
+    free((char *)b->text);
     free(b);
     b = next;
   }
@@ -147,6 +135,7 @@ new_full_text_from_blocks(RnnCharClassBlock *b, int *len){
   text = realloc(text, cumlen + 1);
   text[cumlen] = 0;
   *len = cumlen;
+  printf("%s", text);
   return text;
 }
 
@@ -183,7 +172,9 @@ new_charmodel_from_xml(char *filename, double alpha_threshold,
   t->text = classified_text;
   t->len = textlen;
   t->alphabet = alphabet;
-  t->collapse_chars = alphabet;
+  t->a_len = a_len;
+  t->collapse_chars = collapse_chars;
+  t->c_len = c_len;
   t->flags = flags;
   free_langblocks(first_block);
   return t;
@@ -233,7 +224,10 @@ main(int argc, char *argv[]){
       RNN_CHAR_FLAG_COLLAPSE_SPACE);
 
   char *filename = XMLNAME;
-  RnnCharClassifiedText *classified_text = new_charmodel_from_xml(filename, 1e-4,
+  RnnCharClassifiedText *t = new_charmodel_from_xml(filename, 1e-4,
       0.5, 3.0, flags);
-  dump_colourised_text(classified_text);
+  dump_colourised_text(t);
+
+  rnn_char_dump_alphabet(t->alphabet, t->a_len, flags & RNN_CHAR_FLAG_UTF8);
+  rnn_char_dump_alphabet(t->collapse_chars, t->c_len, flags & RNN_CHAR_FLAG_UTF8);
 }
