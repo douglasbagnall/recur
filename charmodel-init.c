@@ -8,7 +8,7 @@ Initialisation functions for character-based models.
 #include "path.h"
 #include "badmaths.h"
 #include <stdio.h>
-
+#include "colour.h"
 #include "charmodel.h"
 #include "utf8.h"
 
@@ -306,6 +306,25 @@ rnn_char_alloc_collapsed_text(char *filename, int *alphabet, int a_len,
   }
   return text;
 }
+
+void
+rnn_char_dump_alphabet(int *alphabet, int len, int utf8){
+  char *s;
+  if (utf8){
+    s = new_utf8_from_codepoints(alphabet, len);
+  }
+  else{
+    s = new_bytes_from_codepoints(alphabet, len);
+  }
+  DEBUG(C_DARK_YELLOW "»»" C_NORMAL "%s" C_DARK_YELLOW "««" C_NORMAL, s);
+  free(s);
+
+  for (int i = 0; i < len; i++){
+    fprintf(stderr, "%d, ", alphabet[i]);
+  }
+  putc('\n', stderr);
+}
+
 
 RnnCharClassifiedChar *
 rnn_char_alloc_classified_text(RnnCharClassBlock *b,

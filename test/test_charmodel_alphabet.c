@@ -346,25 +346,6 @@ print_code_list_diff(const int *a, int a_len, const int *b, int b_len, int utf8)
   return diff;
 }
 
-
-
-static inline void
-dump_alphabet(int *alphabet, int len, int utf8){
-  char *s;
-  if (utf8){
-    s = new_utf8_from_codepoints(alphabet, len);
-  }
-  else{
-    s = new_bytes_from_codepoints(alphabet, len);
-  }
-  DEBUG(C_DARK_YELLOW "»»" C_NORMAL "%s" C_DARK_YELLOW "««" C_NORMAL, s);
-  free(s);
-  for (int i = 0; i < len; i++){
-    PUT("%d, ", alphabet[i]);
-  }
-  PUT("\n");
-}
-
 static int
 test_alphabet_finding(void){
   int i;
@@ -428,14 +409,14 @@ test_alphabet_finding(void){
       errors++;
       DEBUG(C_REV_RED "Errors found!" C_NORMAL);
       PUT(C_BLUE "alphabet : " C_NORMAL);
-      dump_alphabet(alphabet, a_len, a->utf8);
+      rnn_char_dump_alphabet(alphabet, a_len, a->utf8);
       PUT(C_DARK_CYAN "target   : " C_NORMAL);
-      dump_alphabet(target_alphabet, ta_len, a->utf8);
+      rnn_char_dump_alphabet(target_alphabet, ta_len, a->utf8);
       DEBUG("literal: %s", a->alphabet);
       PUT(C_BLUE "collapsed: " C_NORMAL);
-      dump_alphabet(collapse_chars, c_len, a->utf8);
+      rnn_char_dump_alphabet(collapse_chars, c_len, a->utf8);
       PUT(C_DARK_CYAN "target   : " C_NORMAL);
-      dump_alphabet(target_collapse_chars, tc_len, a->utf8);
+      rnn_char_dump_alphabet(target_collapse_chars, tc_len, a->utf8);
       DEBUG("literal : %s", a->collapse);
       if (BREAK_ON_ERROR)
         exit(1);

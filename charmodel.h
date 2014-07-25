@@ -170,5 +170,7 @@ void rnn_char_free_metadata_items(struct RnnCharMetadata *m);
 char* rnn_char_construct_net_filename(struct RnnCharMetadata *m,
     const char *basename, int alpha_size, int bottom_size, int hidden_size);
 
+void
+rnn_char_dump_alphabet(int *alphabet, int len, int utf8);
 
 #endif
