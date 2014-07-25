@@ -55,7 +55,7 @@ rnn_char_find_alphabet_s(const char *text, int len, int *alphabet, int *a_len,
       }
     }
     else {
-      c = s[i];
+      c = ((u8*)s)[i];
     }
     if (c >= n_chars){
       DEBUG("got char %d, but there are only %d slots", c, n_chars);
