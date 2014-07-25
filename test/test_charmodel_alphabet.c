@@ -361,9 +361,13 @@ test_alphabet_finding(void){
     if (! a->filename){
       break;
     }
+    u32 flags = ((a->ignore_case ? RNN_CHAR_FLAG_CASE_INSENSITIVE : 0) |
+        (a->utf8 ? RNN_CHAR_FLAG_UTF8 : 0) |
+        (a->collapse_space ? RNN_CHAR_FLAG_COLLAPSE_SPACE : 0));
+
     int err = rnn_char_find_alphabet_f(a->filename, alphabet, &a_len,
-        collapse_chars, &c_len, a->threshold, a->ignore_case,
-        a->collapse_space, a->utf8, a->digit_adjust, a->alpha_adjust);
+        collapse_chars, &c_len, a->threshold, a->digit_adjust,
+        a->alpha_adjust, flags);
     if (err){
       errors++;
       continue;
