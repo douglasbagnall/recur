@@ -56,14 +56,21 @@ static RnnCharClassBlock *
 alloc_langblock_from_xml(xmlNode *el, RnnCharClassBlock *b, const char *lang,
     char **class_lut)
 {
-  dump_xmlnode(el);
-  if (el->type == XML_ELEMENT_NODE && streq((char *)el->name, "foreign")){
-    lang = NO_LANG;
-  }
-  else{
-    const char *lang_attr = (char *)xmlGetProp(el, (const xmlChar *)"lang");
-    if (lang_attr){
-      lang = lang_attr;
+  if (el->type != XML_TEXT_NODE){
+    char *name = (char *)el->name;
+    if (streq(name, "teiHeader")){
+      /*teiHeader is full of nonsense; ignore it */
+      return b;
+    }
+    if(streq(name, "foreign")){
+      /*foreign designations are unreliable*/
+      lang = NO_LANG;
+    }
+    else{
+      const char *lang_attr = (char *)xmlGetProp(el, (const xmlChar *)"lang");
+      if (lang_attr){
+        lang = lang_attr;
+      }
     }
   }
   int class_code = lookup_class(class_lut, lang, 1);
@@ -79,7 +86,6 @@ alloc_langblock_from_xml(xmlNode *el, RnnCharClassBlock *b, const char *lang,
       b->text = text;
       b->len = strlen(b->text);
       b->next = malloc(sizeof(RnnCharClassBlock));
-      //DEBUG("found text. %s lang %s len %d b %p next %p", text, lang, b->len, b, b->next);
       b = b->next;
     }
     else {
@@ -122,9 +128,6 @@ new_full_text_from_blocks(RnnCharClassBlock *b, int *len){
   int size = 1000 * 1000;
   char *text = malloc(size);
   for(; b; b = b->next){
-    /*DEBUG("cumlen %d b->len %d size %d b %p b->next %p",
-        cumlen, b->len, size, b, b->next);
-        DEBUG("text %s", b->text);*/
     if (cumlen + b->len > size){
       size *= 2;
       text = realloc(text, size);
@@ -135,7 +138,6 @@ new_full_text_from_blocks(RnnCharClassBlock *b, int *len){
   text = realloc(text, cumlen + 1);
   text[cumlen] = 0;
   *len = cumlen;
-  printf("%s", text);
   return text;
 }
 
@@ -151,9 +153,6 @@ new_charmodel_from_xml(char *filename, double alpha_threshold,
   int c_len;
   int textlen;
   char *fulltext = new_full_text_from_blocks(first_block, &textlen);
-  DEBUG("fulltext is %d characters. first block is %p, %d long", textlen,
-      first_block, first_block->len);
-
   int r = rnn_char_find_alphabet_s(fulltext, textlen, alphabet, &a_len,
       collapse_chars, &c_len, alpha_threshold, digit_adjust,
       alpha_adjust, flags);

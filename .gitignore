@@ -34,3 +34,4 @@ local.mak
 *.dot
 /data/
 .juliahistory
+/text-classify

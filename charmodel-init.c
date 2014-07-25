@@ -333,11 +333,6 @@ rnn_char_alloc_classified_text(RnnCharClassBlock *b,
   int space;
   int collapse_space = flags & RNN_CHAR_FLAG_COLLAPSE_SPACE;
   int utf8 = flags & RNN_CHAR_FLAG_UTF8;
-
-  if (! (flags & RNN_CHAR_FLAG_UTF8)){
-    DEBUG("WARNING: rnn_char_alloc_classified_text() only does utf-8 for now");
-    flags |= RNN_CHAR_FLAG_UTF8;
-  }
   int *char_to_net = new_char_lut(alphabet, a_len,
       collapse_chars, c_len, &space, flags);
 
