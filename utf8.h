@@ -12,7 +12,7 @@ how it would work.
 static inline int
 write_escaped_char(uint code, char *s){
   u8 x = code & 0xff;
-  if (code > 127 || code < 32 || code == '\\' || code == '"'){
+  if (code > 126 || code < 32 || code == '\\' || code == '"'){
     snprintf(s, 5, "\\x%02x", x);
     return 4;
   }
