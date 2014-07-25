@@ -186,6 +186,7 @@ dump_colourised_text(RnnCharClassifiedText *t){
   const char *colour_lut[] = {C_RED, C_GREEN, C_YELLOW, C_BLUE};
   const char *no_class_colour = C_CYAN;
   u8 prev = NO_CLASS;
+  printf("%s", no_class_colour);
   u8 n_colours = sizeof(colour_lut) / sizeof(colour_lut[0]);
   RnnCharClassifiedChar *text = t->text;
   char s[5] = {0};
@@ -228,6 +229,7 @@ static double opt_alpha_threshold = 1e-4;
 static double opt_alpha_adjust = 3.0;
 static double opt_digit_adjust = 1.0;
 static int opt_lag = 0;
+static bool opt_dump_colour = false;
 
 static struct opt_table options[] = {
   OPT_WITHOUT_ARG("-h|--help", opt_usage_and_exit,
@@ -256,6 +258,8 @@ static struct opt_table options[] = {
       &opt_alpha_adjust, "adjust letter frequency for alphabet calculation"),
   OPT_WITH_ARG("-l|--lag", opt_set_intval, opt_show_intval,
       &opt_lag, "classify character this far back"),
+  OPT_WITHOUT_ARG("--dump-colour", opt_set_bool,
+      &opt_dump_colour, "Print text in colour showing training classes"),
   OPT_ENDTABLE
 };
 
@@ -288,6 +292,9 @@ main(int argc, char *argv[]){
 
   if (opt_lag){
     rnn_char_adjust_text_lag(t, opt_lag);
+  }
+  if (opt_dump_colour){
+    dump_colourised_text(t);
   }
   rnn_char_dump_alphabet(t->alphabet, t->a_len, flags & RNN_CHAR_FLAG_UTF8);
   rnn_char_dump_alphabet(t->collapse_chars, t->c_len, flags & RNN_CHAR_FLAG_UTF8);
