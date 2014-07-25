@@ -213,18 +213,75 @@ dump_colourised_text(RnnCharClassifiedText *t){
   puts(C_NORMAL);
 }
 
-//#define XMLNAME "/home/douglas/corpora/maori-legal-papers/GorLaws.xml"
-#define XMLNAME "/home/douglas/corpora/maori-legal-papers/Gov1909Acts.xml"
+//#define DEFAULT_XML "/home/douglas/corpora/maori-legal-papers/GorLaws.xml"
+#define DEFAULT_XML "/home/douglas/corpora/maori-legal-papers/Gov1909Acts.xml"
+#define DEFAULT_UTF8 1
+#define DEFAULT_COLLAPSE_SPACE 1
+#define DEFAULT_CASE_INSENSITIVE 1
+
+static char *opt_xmlfile = DEFAULT_XML;
+static bool opt_utf8 = DEFAULT_UTF8;
+static bool opt_collapse_space = DEFAULT_COLLAPSE_SPACE;
+static bool opt_case_insensitive = DEFAULT_CASE_INSENSITIVE;
+static double opt_alpha_threshold = 1e-4;
+static double opt_alpha_adjust = 3.0;
+static double opt_digit_adjust = 1.0;
+
+static struct opt_table options[] = {
+  OPT_WITHOUT_ARG("-h|--help", opt_usage_and_exit,
+      ": Rnn classification of text at the character level",
+      "Print this message."),
+
+  OPT_WITH_ARG("-x|--xmlfile=<file>", opt_set_charp, opt_show_charp, &opt_xmlfile,
+      "operate on this XML file"),
+  OPT_WITHOUT_ARG("--case-sensitive", opt_set_invbool,
+      &opt_case_insensitive, "Treat capitals as their separate symbols"),
+  OPT_WITHOUT_ARG("--case-insensitive", opt_set_bool,
+      &opt_case_insensitive, "Treat capitals as lower case characters (ASCII only)"),
+  OPT_WITHOUT_ARG("--utf8", opt_set_bool,
+      &opt_utf8, "Parse text as UTF8"),
+  OPT_WITHOUT_ARG("--no-utf8", opt_set_invbool,
+      &opt_utf8, "Parse text as 8 bit symbols"),
+  OPT_WITHOUT_ARG("--no-collapse-space", opt_set_invbool,
+      &opt_collapse_space, "Predict whitespace characters individually"),
+  OPT_WITHOUT_ARG("--collapse-space", opt_set_bool,
+      &opt_collapse_space, "Runs of whitespace collapse to single space"),
+  OPT_WITH_ARG("--find-alphabet-threshold", opt_set_doubleval, opt_show_doubleval,
+      &opt_alpha_threshold, "minimum frequency for character to be included"),
+  OPT_WITH_ARG("--find-alphabet-digit-adjust", opt_set_doubleval, opt_show_doubleval,
+      &opt_digit_adjust, "adjust digit frequency for alphabet calculations"),
+  OPT_WITH_ARG("--find-alphabet-alpha-adjust", opt_set_doubleval, opt_show_doubleval,
+      &opt_alpha_adjust, "adjust letter frequency for alphabet calculation"),
+  OPT_ENDTABLE
+};
+
+static void
+parse_opts(int argc, char *argv[]){
+  opt_register_table(options, NULL);
+  if (!opt_parse(&argc, argv, opt_log_stderr)){
+    exit(1);
+  }
+  if (argc > 1){
+    DEBUG("unused arguments:");
+    for (int i = 1; i < argc; i++){
+      DEBUG("   '%s'", argv[i]);
+    }
+    opt_usage_and_exit(NULL);
+  }
+}
 
 int
 main(int argc, char *argv[]){
-  u32 flags = (RNN_CHAR_FLAG_CASE_INSENSITIVE |
-      RNN_CHAR_FLAG_UTF8 |
-      RNN_CHAR_FLAG_COLLAPSE_SPACE);
+  parse_opts(argc, argv);
 
-  char *filename = XMLNAME;
-  RnnCharClassifiedText *t = new_charmodel_from_xml(filename, 1e-4,
-      0.5, 3.0, flags);
+  u32 flags = (
+      (opt_case_insensitive ? RNN_CHAR_FLAG_CASE_INSENSITIVE : 0) |
+      (opt_utf8 ? RNN_CHAR_FLAG_UTF8 : 0) |
+      (opt_collapse_space ? RNN_CHAR_FLAG_COLLAPSE_SPACE : 0));
+
+  RnnCharClassifiedText *t = new_charmodel_from_xml(opt_xmlfile,
+      opt_alpha_threshold, opt_digit_adjust, opt_alpha_adjust, flags);
+
   dump_colourised_text(t);
 
   rnn_char_dump_alphabet(t->alphabet, t->a_len, flags & RNN_CHAR_FLAG_UTF8);
