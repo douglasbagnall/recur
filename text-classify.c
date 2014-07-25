@@ -230,6 +230,7 @@ static double opt_alpha_adjust = 3.0;
 static double opt_digit_adjust = 1.0;
 static int opt_lag = 0;
 static bool opt_dump_colour = false;
+static int opt_verbose = 0;
 
 static struct opt_table options[] = {
   OPT_WITHOUT_ARG("-h|--help", opt_usage_and_exit,
@@ -260,6 +261,10 @@ static struct opt_table options[] = {
       &opt_lag, "classify character this far back"),
   OPT_WITHOUT_ARG("--dump-colour", opt_set_bool,
       &opt_dump_colour, "Print text in colour showing training classes"),
+  OPT_WITHOUT_ARG("-v|--verbose", opt_inc_intval,
+      &opt_verbose, "More debugging noise, if possible"),
+  OPT_WITHOUT_ARG("-q|--quiet", opt_inc_intval,
+      &opt_verbose, "Less debugging noise."),
   OPT_ENDTABLE
 };
 
@@ -296,6 +301,8 @@ main(int argc, char *argv[]){
   if (opt_dump_colour){
     dump_colourised_text(t);
   }
-  rnn_char_dump_alphabet(t->alphabet, t->a_len, flags & RNN_CHAR_FLAG_UTF8);
-  rnn_char_dump_alphabet(t->collapse_chars, t->c_len, flags & RNN_CHAR_FLAG_UTF8);
+  if (opt_verbose >= 1){
+    rnn_char_dump_alphabet(t->alphabet, t->a_len, flags & RNN_CHAR_FLAG_UTF8);
+    rnn_char_dump_alphabet(t->collapse_chars, t->c_len, flags & RNN_CHAR_FLAG_UTF8);
+  }
 }
