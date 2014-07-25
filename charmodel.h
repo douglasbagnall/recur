@@ -107,6 +107,7 @@ typedef struct _RnnCharClassifiedText{
   int *collapse_chars;
   int c_len;
   u32 flags;
+  int lag;
 } RnnCharClassifiedText;
 
 
@@ -131,7 +132,7 @@ rnn_char_alloc_classified_text(RnnCharClassBlock *b,
     int *alphabet, int a_len, int *collapse_chars, int c_len,
     int *text_len, u32 flags);
 
-void rnn_char_adjust_text_lag(RnnCharClassifiedChar *text, int len, int lag);
+void rnn_char_adjust_text_lag(RnnCharClassifiedText *t, int lag);
 
 int rnn_char_find_alphabet_s(const char *text, int len, int *alphabet, int *a_len,
     int *collapse_chars, int *c_len, double threshold, double digit_adjust,

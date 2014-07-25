@@ -28,8 +28,10 @@ next_all_ones(int x){
   out of range gets its target set to 0xff, which indicates no training */
 
 void
-rnn_char_adjust_text_lag(RnnCharClassifiedChar *text, int len, int lag){
+rnn_char_adjust_text_lag(RnnCharClassifiedText *t, int lag){
   int i;
+  RnnCharClassifiedChar *text = t->text;
+  int len = t->len;
   /*lag could be positive or negative*/
   DEBUG("text %d %d, %d %d... len %d, lag %d",
       text[0].class, text[0].symbol, text[1].class, text[1].symbol,
@@ -50,6 +52,7 @@ rnn_char_adjust_text_lag(RnnCharClassifiedChar *text, int len, int lag){
       text[i].class = NO_CLASS;
     }
   }
+  t->lag += lag;
 }
 
 

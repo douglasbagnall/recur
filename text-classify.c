@@ -175,6 +175,7 @@ new_charmodel_from_xml(char *filename, double alpha_threshold,
   t->collapse_chars = collapse_chars;
   t->c_len = c_len;
   t->flags = flags;
+  t->lag = 0;
   free_langblocks(first_block);
   return t;
 }
@@ -226,6 +227,7 @@ static bool opt_case_insensitive = DEFAULT_CASE_INSENSITIVE;
 static double opt_alpha_threshold = 1e-4;
 static double opt_alpha_adjust = 3.0;
 static double opt_digit_adjust = 1.0;
+static int opt_lag = 0;
 
 static struct opt_table options[] = {
   OPT_WITHOUT_ARG("-h|--help", opt_usage_and_exit,
@@ -252,6 +254,8 @@ static struct opt_table options[] = {
       &opt_digit_adjust, "adjust digit frequency for alphabet calculations"),
   OPT_WITH_ARG("--find-alphabet-alpha-adjust", opt_set_doubleval, opt_show_doubleval,
       &opt_alpha_adjust, "adjust letter frequency for alphabet calculation"),
+  OPT_WITH_ARG("-l|--lag", opt_set_intval, opt_show_intval,
+      &opt_lag, "classify character this far back"),
   OPT_ENDTABLE
 };
 
@@ -282,8 +286,9 @@ main(int argc, char *argv[]){
   RnnCharClassifiedText *t = new_charmodel_from_xml(opt_xmlfile,
       opt_alpha_threshold, opt_digit_adjust, opt_alpha_adjust, flags);
 
-  dump_colourised_text(t);
-
+  if (opt_lag){
+    rnn_char_adjust_text_lag(t, opt_lag);
+  }
   rnn_char_dump_alphabet(t->alphabet, t->a_len, flags & RNN_CHAR_FLAG_UTF8);
   rnn_char_dump_alphabet(t->collapse_chars, t->c_len, flags & RNN_CHAR_FLAG_UTF8);
 }
