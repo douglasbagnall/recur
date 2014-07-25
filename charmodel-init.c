@@ -341,10 +341,10 @@ rnn_char_alloc_classified_text(RnnCharClassBlock *b,
 
   int len = 0;
   u8 prev = 0;
+  u8 c = 0;
   for (; b; b = b->next){
     u8 class = b->class_code;
     const char *s = b->text;
-    u8 c = prev;
     int chr = 0;
     int end = len + b->len;
     while (end > size){
