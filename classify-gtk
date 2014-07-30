@@ -23,12 +23,11 @@ def main():
     parser.add_argument('-M', '--microphone', action="store_true",
                         help="Use the microphone instead of files")
 
-
     args = parser.parse_args()
 
     if args.microphone:
         load_files = False
-        c = GTKClassifier(sinkname='autoaudiosink', srcname='autoaudiosrc')
+        c = GTKClassifier(sinkname='fakesink', srcname='autoaudiosrc')
         process_common_args(c, args, timed=False, load_files=False)
         run(c, [], args.reverse)
     else:
