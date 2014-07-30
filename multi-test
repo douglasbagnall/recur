@@ -27,13 +27,13 @@ class MultiClassifier(BaseClassifier):
             self.classifiers.append(c)
         self.capsfilter = self.make_add_link('capsfilter', c)
         self.interleave = self.make_add_link('interleave', self.capsfilter)
-        self.filesrcs = []
+        self.sources = []
         for i in range(channels):
             ac = self.make_add_link('audioconvert', self.interleave)
             ar = self.make_add_link('audioresample', ac)
             wp = self.make_add_link('wavparse', ar)
             fs = self.make_add_link('filesrc', wp)
-            self.filesrcs.append(fs)
+            self.sources.append(fs)
 
         self.channels = channels
         caps =  Gst.caps_from_string("audio/x-raw, "
@@ -91,7 +91,7 @@ class MultiClassifier(BaseClassifier):
         f = self.data.pop()
         targets = ' '.join(x % 0 for x in f.targets)
         self.current_file = f
-        self.filesrcs[0].set_property('location', f.fullname)
+        self.sources[0].set_property('location', f.fullname)
         self.setp_all('target', targets)
         self.file_results = [[] for x in self.classes]
         self.file_scores = self.get_results_counter(0)
@@ -326,7 +326,7 @@ def main():
     c = MultiClassifier(n_classifiers=len(args.nets))
     #c.verbosity = 2
     c.set_filenames(*args.nets)
-    timed_files = process_common_args(c, args, timed=timed, load=False)
+    timed_files = process_common_args(c, args, timed=timed, load_net=False)
     if args.min_changes:
         timed_files = [x for x in timed_files
                        if len(x.timings) >= args.min_changes]

@@ -20,20 +20,29 @@ def main():
                         help='files to process before --audio-directory')
     parser.add_argument('--min-changes', type=int, default=0,
                         help="only test files with at least this many class switches")
+    parser.add_argument('-M', '--microphone', action="store_true",
+                        help="Use the microphone instead of files")
 
 
     args = parser.parse_args()
-    c = GTKClassifier(sinkname='autoaudiosink')
 
-    if args.min_changes:
-        files = process_common_args(c, args, timed=True)
-        files = [x for x in files
-                 if len(x.timings) >= args.min_changes]
+    if args.microphone:
+        load_files = False
+        c = GTKClassifier(sinkname='autoaudiosink', srcname='autoaudiosrc')
+        process_common_args(c, args, timed=False, load_files=False)
+        run(c, [], args.reverse)
     else:
-        #by default ignore timings
-        files = process_common_args(c, args, timed=False)
+        load_files = True
+        c = GTKClassifier(sinkname='autoaudiosink', srcname='filesrc')
+        if args.min_changes:
+            files = process_common_args(c, args, timed=True)
+            files = [x for x in files
+                     if len(x.timings) >= args.min_changes]
+        else:
+            #by default ignore timings
+            files = process_common_args(c, args, timed=False)
 
-    files = args.files[:] + [x.fullname for x in files]
-    run(c, files, args.reverse)
+        files = args.files[:] + [x.fullname for x in files]
+        run(c, files, args.reverse)
 
 main()

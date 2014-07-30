@@ -59,19 +59,29 @@ class BaseClassifier(object):
             x.link(link)
         return x
 
-    def build_pipeline(self, channels, sinkname, samplerate):
+    def build_pipeline(self, channels, sinkname, samplerate, srcname):
         self.channels = channels
+        self.srcname = srcname
         self.sink = self.make_add_link(sinkname, None)
         self.classifier = self.make_add_link('classify', self.sink)
         self.capsfilter = self.make_add_link('capsfilter', self.classifier)
         self.interleave = self.make_add_link('interleave', self.capsfilter)
-        self.filesrcs = []
+        self.sources = []
         for i in range(channels):
             ac = self.make_add_link('audioconvert', self.interleave)
             ar = self.make_add_link('audioresample', ac)
-            wp = self.make_add_link('wavparse', ar)
-            fs = self.make_add_link('filesrc', wp)
-            self.filesrcs.append(fs)
+            if srcname == 'filesrc':
+                wp = self.make_add_link('wavparse', ar)
+                fs = self.make_add_link(srcname, wp)
+            else:
+                cf = self.make_add_link('capsfilter', ar)
+                cf.set_property("caps", Gst.caps_from_string("audio/x-raw, "
+                                                             "layout=(string)interleaved, "
+                                                             "channel-mask=(bitmask)0x0, "
+                                                             "rate=%d, channels=1"
+                                                             % (samplerate,)))
+                fs = self.make_add_link(srcname, cf)
+            self.sources.append(fs)
 
         self.channels = channels
         caps =  Gst.caps_from_string("audio/x-raw, "
@@ -80,13 +90,15 @@ class BaseClassifier(object):
                                      "rate=%d, channels=%d"
                                      % (samplerate, channels))
         self.capsfilter.set_property("caps", caps)
-        #Gst.debug_bin_to_dot_file(self.pipeline, 0, "pipeline.dot")
+        #Gst.debug_bin_to_dot_file(self.pipeline, Gst.DebugGraphDetails.ALL,
+        #                          "pipeline.dot")
 
-    def __init__(self, channels=1, mainloop=None, sinkname='fakesink', samplerate=8000):
+    def __init__(self, channels=1, mainloop=None, sinkname='fakesink',
+                 samplerate=8000, srcname='filesrc'):
         if mainloop is None:
             mainloop = GObject.MainLoop()
         self.mainloop = mainloop
-        self.build_pipeline(channels, sinkname, samplerate)
+        self.build_pipeline(channels, sinkname, samplerate, srcname)
         self.setp = self.classifier.set_property
         self.getp = self.classifier.get_property
 
@@ -242,7 +254,7 @@ class Classifier(BaseClassifier):
         f = self.data.pop()
         targets = ' '.join(x % 0 for x in f.targets)
         self.current_file = f
-        self.filesrcs[0].set_property('location', f.fullname)
+        self.sources[0].set_property('location', f.fullname)
         self.setp('target', targets)
         self.file_results = [[] for x in self.class_groups]
         self.file_scores = {x[0]:[] for x in self.collected_classes}
@@ -653,7 +665,7 @@ class Trainer(BaseClassifier):
     def next_set(self, src):
         targets = []
         self.timestamp = time.time()
-        for channel, fs in enumerate(self.filesrcs):
+        for channel, fs in enumerate(self.sources):
             f = src.next()
             targets.extend(x % channel for x in f.targets)
             fs.set_property('location', f.fullname)
@@ -921,9 +933,10 @@ class GTKClassifier(BaseClassifier):
 
     def load_next_file(self):
         self.pipeline.set_state(Gst.State.READY)
-        fn = self.pending_files.pop()
-        self.filesrcs[0].set_property('location', fn)
-        print fn
+        if self.srcname == 'filesrc':
+            fn = self.pending_files.pop()
+            self.sources[0].set_property('location', fn)
+            print fn
         self.pipeline.set_state(Gst.State.PLAYING)
 
     def on_element(self, bus, msg):
@@ -1144,9 +1157,10 @@ def add_common_args(parser):
     group.add_argument('--max-call-duration', type=float, default=0,
                        help="ignore calls longer than this")
 
-def process_common_args(c, args, random_seed=1, timed=True, load=True):
+def process_common_args(c, args, random_seed=1, timed=True,
+                        load_net=True, load_files=True):
     c.verbosity = args.verbosity
-    if load:
+    if load_net:
         c.setp('force-load', args.force_load)
         if args.net_filename:
             c.setup_from_file(args.net_filename,
@@ -1170,6 +1184,8 @@ def process_common_args(c, args, random_seed=1, timed=True, load=True):
     if random_seed is not None:
         random.seed(random_seed)
 
+    if not load_files:
+        return None
     if not timed:
         if args.audio_directory:
             files = load_untimed_files(args.audio_directory)
