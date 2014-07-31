@@ -54,12 +54,16 @@ lookup_class(char** class_lut, const char *class, int set_if_not_found){
 
 static RnnCharClassBlock *
 alloc_langblock_from_xml(xmlNode *el, RnnCharClassBlock *b, const char *lang,
-    char **class_lut)
+    char **class_lut, const char *parent)
 {
   if (el->type != XML_TEXT_NODE){
     char *name = (char *)el->name;
     if (streq(name, "teiHeader")){
       /*teiHeader is full of nonsense; ignore it */
+      return b;
+    }
+    if (streq(parent, "choice") && ! streq(name, "orig")){
+      /*<choice> contains alternate versions <orig> and <reg>.*/
       return b;
     }
     if(streq(name, "foreign")){
@@ -89,7 +93,7 @@ alloc_langblock_from_xml(xmlNode *el, RnnCharClassBlock *b, const char *lang,
       b = b->next;
     }
     else {
-      b = alloc_langblock_from_xml(c, b, lang, class_lut);
+      b = alloc_langblock_from_xml(c, b, lang, class_lut, (char *)el->name);
     }
   }
   return b;
@@ -104,7 +108,7 @@ new_langblocks_from_xml(char *filename){
   RnnCharClassBlock *b = calloc(1, sizeof(RnnCharClassBlock));
   char *class_lut[257] = {0};
   class_lut[NO_CLASS] = NO_LANG;
-  RnnCharClassBlock *end = alloc_langblock_from_xml(xml, b, NO_LANG, class_lut);
+  RnnCharClassBlock *end = alloc_langblock_from_xml(xml, b, NO_LANG, class_lut, "");
   end->next = NULL;
   xmlFreeDoc(doc);
   xmlCleanupParser();
