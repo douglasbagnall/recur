@@ -229,7 +229,7 @@ new_char_lut(const int *alphabet, int a_len, const int *collapse, int c_len,
       break;
     }
   }
-  if (space == 0){
+  if (space == 0 && alphabet[0] != ' '){
     DEBUG("space is not in alphabet; using collapse_target");
   }
   *_space = space;
