@@ -66,7 +66,7 @@ Because of ccan/opt, --help will tell you something.
 #define DEFAULT_OVERRIDE 0
 #define DEFAULT_CONFAB_BIAS 0
 #define DEFAULT_SAVE_NET 1
-#define DEFAULT_LOG_FILE "bptt.log"
+#define DEFAULT_LOG_FILE "text.log"
 #define DEFAULT_BASENAME "text"
 #define DEFAULT_START_CHAR -1
 #define DEFAULT_HIDDEN_SIZE 199
@@ -118,7 +118,7 @@ static float opt_learn_rate_scale = DEFAULT_LEARN_RATE_SCALE;
 static float opt_momentum = DEFAULT_MOMENTUM;
 static int opt_quiet = 0;
 static char * opt_filename = NULL;
-static char * opt_logfile = DEFAULT_LOG_FILE;
+static char * opt_logfile = NULL;
 static char * opt_basename = DEFAULT_BASENAME;
 static char * opt_alphabet = DEFAULT_CHARSET;
 static char * opt_collapse_chars = DEFAULT_COLLAPSE_CHARS;
@@ -615,6 +615,18 @@ main(int argc, char *argv[]){
       Q_DEBUG(1, "   '%s'", argv[i]);
     }
     opt_usage(argv[0], NULL);
+  }
+
+  if (! opt_logfile){
+    if (opt_basename){
+      int n = asprintf(&opt_logfile, "%s.log", opt_basename);
+      if (n < 5){
+        FATAL_ERROR("error setting log filename from basename");
+      }
+    }
+    else {
+      opt_logfile = DEFAULT_LOG_FILE;
+    }
   }
 
   int *alphabet = calloc(257, sizeof(int));
