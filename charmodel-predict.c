@@ -17,7 +17,7 @@ This uses the RNN to predict the next character in a text sequence.
 static inline float
 net_error_bptt(RecurNN *net, float *restrict error, int c, int next, int *correct){
   ASSUME_ALIGNED(error);
-  float *answer = one_hot_opinion(net, c);
+  float *answer = one_hot_opinion(net, c, net->presynaptic_noise);
   int winner;
   winner = softmax_best_guess(error, answer, net->output_size);
   *correct = (winner == next);
@@ -29,7 +29,7 @@ static inline int
 guess_next_character(RecurNN *net, int hot, float bias){
   int i;
   float r;
-  float *answer = one_hot_opinion(net, hot);
+  float *answer = one_hot_opinion(net, hot, 0);
   ASSUME_ALIGNED(answer);
   int len = net->output_size;
   if (bias >= 100){
@@ -67,10 +67,10 @@ validate(RecurNN *net, const u8 *text, int len){
   /*skip the first few because state depends too much on previous experience */
   int skip = MIN(len / 10, 5);
   for (i = 0; i < skip; i++){
-    one_hot_opinion(net, text[i]);
+    one_hot_opinion(net, text[i], 0);
   }
   for (; i < len - 1; i++){
-    float *answer = one_hot_opinion(net, text[i]);
+    float *answer = one_hot_opinion(net, text[i], 0);
     softmax(error, answer, n_chars);
     float e = error[text[i + 1]];
     entropy += capped_log2f(e);

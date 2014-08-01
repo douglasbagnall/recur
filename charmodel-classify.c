@@ -93,7 +93,7 @@ rnn_char_classify_epoch(RnnCharClassifier *model, const RnnCharClassifiedChar *t
       RnnCharClassifiedChar t = text[offset];
       RecurNN *n = nets[j];
       rnn_bptt_advance(n);
-      float *answer = one_hot_opinion(net, t.symbol);
+      float *answer = one_hot_opinion(net, t.symbol, net->presynaptic_noise);
       if (t.class != NO_CLASS){
         float *error = n->bptt->o_error;
         ASSUME_ALIGNED(error);

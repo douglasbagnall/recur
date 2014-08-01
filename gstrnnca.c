@@ -36,7 +36,6 @@ enum
   PROP_MOMENTUM,
 };
 
-
 #define DEFAULT_PROP_PGM_DUMP ""
 #define DEFAULT_PROP_LOG_FILE ""
 #define DEFAULT_PROP_OFFSETS RNNCA_DEFAULT_PATTERN
@@ -327,7 +326,8 @@ load_or_create_net(GstRnnca *self){
     int input_size = self->len_Y  + self->len_C * 2 + self->len_pos;
     net = rnn_new(input_size, self->hidden_size, 3,
         RNNCA_RNN_FLAGS, RNNCA_RNG_SEED,
-        NULL, RNNCA_BPTT_DEPTH, DEFAULT_LEARN_RATE, self->momentum);
+        NULL, RNNCA_BPTT_DEPTH, DEFAULT_LEARN_RATE,
+        RNNCA_PRESYNAPTIC_NOISE, self->momentum);
     rnn_randomise_weights_auto(net);
     //net->bptt->ho_scale = 0.25;
   }
@@ -697,7 +697,7 @@ train_net(GstRnnca *self, RnncaTrainer *t, RnncaFrame *prev,  RnncaFrame *now){
   /*trainers are not on edges, so edge condition doesn't much matter */
   fill_net_inputs(self, net, prev, t->x, t->y, 1);
   float *answer;
-  answer = rnn_opinion(net, NULL);
+  answer = rnn_opinion(net, NULL, net->presynaptic_noise);
   fast_sigmoid_array(answer, answer, 3);
   offset = t->y * RNNCA_WIDTH + t->x;
   GST_DEBUG("x %d, y %d, offset %d", t->x, t->y, offset);
@@ -812,7 +812,7 @@ fill_frame(GstRnnca *self, GstVideoFrame *frame){
     for (x = 0; x < RNNCA_WIDTH; x++){
       RecurNN *net = self->constructors[y * RNNCA_WIDTH + x];
       fill_net_inputs(self, net, self->play_frame, x, y, self->edges);
-      float *answer = rnn_opinion(net, NULL);
+      float *answer = rnn_opinion(net, NULL, 0);
       fast_sigmoid_array(answer, answer, 3);
       GST_LOG("answer gen %d, x %d y %d, %.2g %.2g %.2g",
           net->generation, x, y, answer[0], answer[1], answer[2]);

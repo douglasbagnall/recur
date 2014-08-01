@@ -166,4 +166,18 @@ zero_aligned_array(float *array, int size){
 #endif
 }
 
+static inline void
+add_array_noise(rand_ctx *rng, float *array, int len, float deviation){
+  for (int i = 0; i < len; i++){
+    float noise = cheap_gaussian_noise(rng) * deviation;
+    array[i] += noise;
+  }
+}
+
+#define MAYBE_ADD_ARRAY_NOISE(rng, array, len, dev) do {        \
+    if (dev)                                                    \
+      add_array_noise(rng, array, len, dev);                    \
+  } while(0)
+
+
 #endif

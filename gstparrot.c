@@ -260,7 +260,8 @@ load_or_create_net(GstParrot *self){
   if (net == NULL){
     net = rnn_new(PARROT_N_FEATURES, self->hidden_size,
         PARROT_N_FEATURES, PARROT_RNN_FLAGS, PARROT_RNG_SEED,
-        NULL, PARROT_BPTT_DEPTH, self->learn_rate, MOMENTUM);
+        NULL, PARROT_BPTT_DEPTH, self->learn_rate, PARROT_PRESYNAPTIC_NOISE,
+        MOMENTUM);
     rnn_randomise_weights_auto(net);
   }
   else {
@@ -453,7 +454,7 @@ possibly_save_net(RecurNN *net, char *filename)
 
 static inline float *
 tanh_opinion(RecurNN *net, float *in){
-  float *answer = rnn_opinion(net, in);
+  float *answer = rnn_opinion(net, in, 0);
   for (int i = 0; i < net->output_size; i++){
     answer[i] = fast_tanhf(answer[i]);
   }

@@ -80,7 +80,7 @@ maybe_scale_inputs(RecurNN *net){
 }
 
 float *
-rnn_opinion(RecurNN *net, const float *restrict inputs){
+rnn_opinion(RecurNN *net, const float *restrict inputs, float presynaptic_noise){
   /*If inputs is NULL, assume the inputs have already been set.*/
   float *restrict hiddens = net->hidden_layer;
   ASSUME_ALIGNED(hiddens);
@@ -93,6 +93,8 @@ rnn_opinion(RecurNN *net, const float *restrict inputs){
     }
     calculate_interlayer(layer->inputs, layer->i_size, layer->outputs,
          layer->o_size, layer->weights);
+    MAYBE_ADD_ARRAY_NOISE(&net->rng, layer->outputs + 1, net->input_size - 1,
+        presynaptic_noise);
     memcpy(net->real_inputs, layer->outputs, net->input_size * sizeof(float));
   }
   else if (inputs){
@@ -102,7 +104,7 @@ rnn_opinion(RecurNN *net, const float *restrict inputs){
   /*copy in hiddens */
   memcpy(net->input_layer, hiddens, INPUT_OFFSET(net) * sizeof(float));
 
-  /*bias, possibly unnecessary because it may not get overwritten */
+  /*bias, possibly unnecessary because it probably doesn't get overwritten */
   net->input_layer[0] = 1.0f;
 
   /* in emergencies, clamp the scale of the input vector */
@@ -110,6 +112,10 @@ rnn_opinion(RecurNN *net, const float *restrict inputs){
 
   calculate_interlayer(net->input_layer, net->i_size,
       hiddens, net->h_size, net->ih_weights);
+
+  MAYBE_ADD_ARRAY_NOISE(&net->rng, net->hidden_layer + 1, net->h_size - 1,
+      presynaptic_noise);
+
   for (int i = 1; i < net->h_size; i++){
     float h = hiddens[i] - RNN_HIDDEN_PENALTY;
     hiddens[i] = (h > 0.0f) ? h : 0.0f;
@@ -620,10 +626,7 @@ weight_noise(rand_ctx *rng, float *weights, int width, int stride, int height,
     float deviation){
   for (int y = 0; y < height; y++){
     float *row = weights + y * stride;
-    for (int x = 0; x < width; x++){
-      float noise = cheap_gaussian_noise(rng) * deviation;
-      row[x] += noise;
-    }
+    add_array_noise(rng, row, width, deviation);
   }
 }
 

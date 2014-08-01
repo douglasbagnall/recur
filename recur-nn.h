@@ -162,6 +162,7 @@ struct _RecurNN {
   RecurExtraLayer *bottom_layer;
   char *metadata;
   u32 generation;
+  float presynaptic_noise;
 };
 
 struct _RecurNNBPTT {
@@ -237,10 +238,9 @@ struct RecurInitialisationParameters {
 
 RecurNN * rnn_new(uint input_size, uint hidden_size, uint output_size,
     u32 flags, u64 rng_seed, const char *log_file, int depth, float learn_rate,
-    float momentum);
+    float momentum, float presynaptic_noise);
 
-RecurNN * rnn_clone(RecurNN *parent, u32 flags,
-    u64 rng_seed, const char *log_file);
+RecurNN * rnn_clone(RecurNN *parent, u32 flags, u64 rng_seed, const char *log_file);
 
 RecurExtraLayer *rnn_new_extra_layer(int input_size, int output_size, int overlap,
     u32 flags);
@@ -248,7 +248,7 @@ RecurExtraLayer *rnn_new_extra_layer(int input_size, int output_size, int overla
 RecurNN *rnn_new_with_bottom_layer(int n_inputs, int r_input_size,
     int hidden_size, int output_size, u32 flags, u64 rng_seed,
     const char *log_file, int bptt_depth, float learn_rate,
-    float momentum, int convolutional_overlap);
+    float momentum, float presynaptic_noise, int convolutional_overlap);
 
 
 void rnn_set_log_file(RecurNN *net, const char * log_file, int append_dont_truncate);
@@ -268,7 +268,7 @@ void rnn_delete_net(RecurNN *net);
 RecurNN ** rnn_new_training_set(RecurNN *prototype, int n_nets);
 void rnn_delete_training_set(RecurNN **nets, int n_nets, int leave_prototype);
 
-float *rnn_opinion(RecurNN *net, const float *inputs);
+float *rnn_opinion(RecurNN *net, const float *inputs, float presynaptic_noise);
 
 void rnn_multi_pgm_dump(RecurNN *net, const char *dumpees, const char *basename);
 

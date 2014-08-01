@@ -11,7 +11,7 @@ capped_log2f(float x){
 }
 
 static inline float*
-one_hot_opinion(RecurNN *net, int hot){
+one_hot_opinion(RecurNN *net, int hot, float presynaptic_noise){
   float *inputs;
   int len;
   if (net->bottom_layer){
@@ -26,6 +26,6 @@ one_hot_opinion(RecurNN *net, int hot){
   //XXX could just set the previous one to zero (i.e. remember it)
   memset(inputs, 0, len * sizeof(float));
   inputs[hot] = 1.0f;
-  return rnn_opinion(net, NULL);
+  return rnn_opinion(net, NULL, presynaptic_noise);
 }
 

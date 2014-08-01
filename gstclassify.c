@@ -62,6 +62,7 @@ enum
   PROP_CONFIRMATION_LAG,
   PROP_LOAD_NET_NOW,
   PROP_WINDOWS_PER_SECOND,
+  PROP_PRESYNAPTIC_NOISE,
 
   PROP_LAST
 };
@@ -90,6 +91,7 @@ enum
 #define DEFAULT_PROP_WEIGHT_INIT_SCALE 0.0f
 #define DEFAULT_PROP_GENERATION 0
 #define DEFAULT_PROP_WINDOWS_PER_SECOND 0
+#define DEFAULT_PROP_PRESYNAPTIC_NOISE 0
 
 #define DEFAULT_PROP_CLASSES "01"
 #define DEFAULT_PROP_BPTT_DEPTH 30
@@ -562,6 +564,13 @@ gst_classify_class_init (GstClassifyClass * klass)
           DEFAULT_PROP_WEIGHT_INIT_SCALE,
           G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
+  g_object_class_install_property (gobject_class, PROP_PRESYNAPTIC_NOISE,
+      g_param_spec_float("presynaptic-noise", "presynaptic-noise",
+          "Add this much noise before nonlinear tranform",
+          0, G_MAXFLOAT,
+          DEFAULT_PROP_PRESYNAPTIC_NOISE,
+          G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
+
   g_object_class_install_property (gobject_class, PROP_GENERATION,
       g_param_spec_uint("generation", "generation",
           "Read the net's training generation",
@@ -913,6 +922,8 @@ create_net(GstClassify *self, int bottom_layer_size,
   GST_DEBUG("rng seed %lu", rng_seed);
   float weight_init_scale = PP_GET_FLOAT(self, PROP_WEIGHT_INIT_SCALE,
     DEFAULT_PROP_WEIGHT_INIT_SCALE);
+  float presynaptic_noise = PP_GET_FLOAT(self, PROP_PRESYNAPTIC_NOISE,
+    DEFAULT_PROP_PRESYNAPTIC_NOISE);
 
   int lawnmower = PP_GET_BOOLEAN(self, PROP_LAWN_MOWER, DEFAULT_PROP_LAWN_MOWER);
   if (lawnmower){
@@ -923,7 +934,7 @@ create_net(GstClassify *self, int bottom_layer_size,
   }
   net = rnn_new_with_bottom_layer(n_features, bottom_layer_size, hidden_size,
       top_layer_size, flags, rng_seed,
-      NULL, bptt_depth, learn_rate, momentum, 0);
+      NULL, bptt_depth, learn_rate, momentum, presynaptic_noise, 0);
 
   initialise_net(self, net);
 
@@ -1417,6 +1428,9 @@ maybe_set_net_scalar(GstClassify *self, guint prop_id, const GValue *value)
     case PROP_MOMENTUM:
       SET_FLOAT(net->bptt->momentum);
       break;
+    case PROP_PRESYNAPTIC_NOISE:
+      SET_FLOAT(net->presynaptic_noise);
+      break;
     case PROP_BOTTOM_LEARN_RATE_SCALE:
       if (net->bottom_layer){
         SET_FLOAT(net->bottom_layer->learn_rate_scale);
@@ -1515,6 +1529,7 @@ gst_classify_set_property (GObject * object, guint prop_id, const GValue * value
     case PROP_TOP_LEARN_RATE_SCALE:
     case PROP_BOTTOM_LEARN_RATE_SCALE:
     case PROP_LEARN_RATE:
+    case PROP_PRESYNAPTIC_NOISE:
     case PROP_MOMENTUM:
       maybe_set_net_scalar(self, prop_id, value);
       break;
@@ -1789,7 +1804,7 @@ prepare_channel_features(GstClassify *self, s16 *buffer_i, int j){
 static inline float
 train_channel(GstClassify *self, ClassifyChannel *c, int *win_count){
   RecurNN *net = c->net;
-  float *answer = rnn_opinion(net, c->features);
+  float *answer = rnn_opinion(net, c->features, net->presynaptic_noise);
   float *error = net->bptt->o_error;
   float wrongness = 0;
   for (int i = 0; i < self->n_groups; i++){
@@ -1923,7 +1938,7 @@ emit_opinions(GstClassify *self, GstClockTime pts){
       ClassifyChannel *c = prepare_channel_features(self, buffer, j);
       RecurNN *net = c->net;
       float *error = net->bptt->o_error;
-      float *answer = rnn_opinion(net, c->features);
+      float *answer = rnn_opinion(net, c->features, 0);
       for (i = 0; i < self->n_groups; i++){
         ClassifyClassGroup *g = &self->class_groups[i];
         int o = g->offset;

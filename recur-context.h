@@ -53,6 +53,7 @@ typedef s16 audio_sample;
 #define RECUR_OUTPUT_SIZE (RECUR_OUTPUT_HEIGHT * RECUR_OUTPUT_WIDTH * 3)
 
 #define LEARN_RATE 1e-5
+#define PRESYNAPTIC_NOISE 0
 #define MOMENTUM 0.95
 
 #define RECUR_FQ_LENGTH 16

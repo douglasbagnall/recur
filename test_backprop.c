@@ -100,6 +100,7 @@ Because of ccan/opt, --help will tell you something.
 #define DEFAULT_FIND_ALPHABET_THRESHOLD 0
 #define DEFAULT_FIND_ALPHABET_DIGIT_ADJUST 1.0
 #define DEFAULT_FIND_ALPHABET_ALPHA_ADJUST 1.0
+#define DEFAULT_PRESYNAPTIC_NOISE 0.0f
 
 #define BELOW_QUIET_LEVEL(quiet) if (opt_quiet < quiet)
 
@@ -168,6 +169,7 @@ static bool opt_collapse_space = DEFAULT_COLLAPSE_SPACE;
 static double opt_find_alphabet_threshold = DEFAULT_FIND_ALPHABET_THRESHOLD;
 static double opt_find_alphabet_digit_adjust = DEFAULT_FIND_ALPHABET_DIGIT_ADJUST;
 static double opt_find_alphabet_alpha_adjust = DEFAULT_FIND_ALPHABET_ALPHA_ADJUST;
+static float opt_presynaptic_noise = DEFAULT_PRESYNAPTIC_NOISE;
 
 #define IN_RANGE_01(x) (((x) >= 0.0f) && ((x) <= 1.0f))
 
@@ -315,6 +317,9 @@ static struct opt_table options[] = {
       &opt_find_alphabet_digit_adjust, "adjust digit frequency for alphabet calculations"),
   OPT_WITH_ARG("--find-alphabet-alpha-adjust", opt_set_doubleval, opt_show_doubleval,
       &opt_find_alphabet_alpha_adjust, "adjust letter frequency for alphabet calculation"),
+  OPT_WITH_ARG("--presynaptic-noise", opt_set_floatval, opt_show_floatval,
+      &opt_presynaptic_noise, "deviation of noise to add before non-linear transform"),
+
 
   OPT_WITHOUT_ARG("-h|--help", opt_usage_and_exit,
       ": Rnn modelling of text at the character level",
@@ -431,7 +436,7 @@ load_or_create_net(struct RnnCharMetadata *m, int alpha_len, int reload){
     net = rnn_new_with_bottom_layer(input_size, opt_bottom_layer,
         opt_hidden_size, output_size, flags, opt_rng_seed,
         opt_logfile, opt_bptt_depth, opt_learn_rate,
-        opt_momentum, 0);
+        opt_momentum, opt_presynaptic_noise, 0);
     initialise_net(net);
     net->bptt->momentum_weight = opt_momentum_weight;
     net->metadata = strdup(metadata);
