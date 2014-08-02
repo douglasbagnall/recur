@@ -21,6 +21,7 @@ Because of ccan/opt, --help will tell you something.
 #include <ctype.h>
 #include "charmodel.h"
 #include "utf8.h"
+#include "opt-helpers.h"
 
 #define DICKENS_SHUFFLED_TEXT TEST_DATA_DIR "/dickens-shuffled.txt"
 #define DICKENS_TEXT TEST_DATA_DIR "/dickens.txt"
@@ -172,21 +173,6 @@ static double opt_find_alphabet_digit_adjust = DEFAULT_FIND_ALPHABET_DIGIT_ADJUS
 static double opt_find_alphabet_alpha_adjust = DEFAULT_FIND_ALPHABET_ALPHA_ADJUST;
 static float opt_presynaptic_noise = DEFAULT_PRESYNAPTIC_NOISE;
 static bool opt_adjust_noise = DEFAULT_ADJUST_NOISE;
-
-#define IN_RANGE_01(x) (((x) >= 0.0f) && ((x) <= 1.0f))
-
-/*restrict to 0-1 range (mostly for probabilities)*/
-static char *
-opt_set_floatval01(const char *arg, float *f){
-  char *msg = opt_set_floatval(arg, f);
-  if (msg == NULL && ! IN_RANGE_01(*f)){
-    char *s;
-    if (asprintf(&s, "We want a number between 0 and 1, not '%s'", arg) > 0){
-      return s;
-    }
-  }
-  return msg;
-}
 
 static struct opt_table options[] = {
   OPT_WITH_ARG("-H|--hidden-size=<n>", opt_set_uintval, opt_show_uintval,

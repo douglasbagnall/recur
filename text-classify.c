@@ -25,6 +25,8 @@ Because of ccan/opt, --help will tell you something.
 #include <libxml/parser.h>
 #include <libxml/tree.h>
 #include <libxml/debugXML.h>
+#include "opt-helpers.h"
+
 
 #define NO_LANG "xx"
 
