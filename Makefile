@@ -17,6 +17,7 @@ INC_DIR = /usr/include
 PLUGIN_DIR = $(CURDIR)/plugins
 
 ### Alternative compilers
+#CC = gcc-4.9
 #CC = nccgen -ncgcc -ncld -ncfabs
 #CC = /usr/bin/clang
 #CC = /usr/bin/clang -Weverything -Wno-variadic-macros -Wno-gnu -Wno-vla
