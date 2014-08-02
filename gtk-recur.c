@@ -134,7 +134,7 @@ gint main (int argc, char *argv[])
   /*Tell gstreamer to look locally for the plugin*/
   GstRegistry *registry;
   registry = gst_registry_get();
-  gst_registry_scan_path(registry, ".");
+  gst_registry_scan_path(registry, "plugins");
 
   GError *parse_error = NULL;
   GstElement *pipeline = make_pipeline(&parse_error, loop);

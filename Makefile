@@ -14,6 +14,7 @@ WARNINGS = -Wall -Wextra -Wno-unused-parameter -Wno-missing-field-initializers
 LIB_ARCH_DIR = /usr/lib/$(ARCH)-linux-gnu
 INC_ARCH_DIR = /usr/include/$(ARCH)-linux-gnu
 INC_DIR = /usr/include
+PLUGIN_DIR = $(CURDIR)/plugins
 
 ### Alternative compilers
 #CC = nccgen -ncgcc -ncld -ncfabs
@@ -66,17 +67,17 @@ TTXML_OBJECTS = ccan/ttxml/ttxml.o
 $(OPT_OBJECTS) $(TTXML_OBJECTS):%.o: %.c config.h
 	$(CC) -c -MMD $(ALL_CFLAGS) -Wno-sign-compare $(CPPFLAGS) -o $@ $<
 
-subdirs = images nets test-video
+subdirs = images nets test-video plugins
 $(subdirs):
 	mkdir -p $@
 
-all:: libgstclassify.so $(subdirs)
+all:: plugins/libgstclassify.so $(subdirs)
 
 
 ELF_EXECUTABLES = test_backprop convert-saved-net rnnca-player gtk-recur text-classify
 
 clean:
-	rm -f *.so *.o *.a *.d *.s *.pyc
+	rm -f plugins/*.so *.o *.a *.d *.s *.pyc
 	rm -f path.h config.h
 	rm -f ccan/*/*.[oad]
 	rm -f $(ELF_EXECUTABLES)
@@ -116,19 +117,19 @@ RNN_OBJECTS =  recur-nn.o recur-nn-io.o recur-nn-init.o
 RECUR_OBJECTS = gstrecur_manager.o gstrecur_audio.o gstrecur_video.o \
 	recur-context.o context-recurse.o
 
-libgstrecur.so: $(RECUR_OBJECTS) $(RNN_OBJECTS) rescale.o mfcc.o | nets images
+plugins/libgstrecur.so: $(RECUR_OBJECTS) $(RNN_OBJECTS) rescale.o mfcc.o | nets images plugins
 	$(CC) -shared -Wl,-O1 $+ $(INCLUDES) $(DEFINES) $(LINKS) -Wl,-soname -Wl,$@ \
 	  -o $@
 
-libgstrnnca.so: $(RNN_OBJECTS) gstrnnca.o rescale.o | nets images
+plugins/libgstrnnca.so: $(RNN_OBJECTS) gstrnnca.o rescale.o | nets images plugins
 	$(CC) -shared -Wl,-O1 $+ $(INCLUDES) $(DEFINES) $(LINKS) -Wl,-soname -Wl,$@ \
 	  -o $@
 
-libgstparrot.so: $(RNN_OBJECTS)  mdct.o gstparrot.o mfcc.o | nets images
+plugins/libgstparrot.so: $(RNN_OBJECTS)  mdct.o gstparrot.o mfcc.o | nets images plugins
 	$(CC) -shared -Wl,-O1 $+ $(INCLUDES) $(DEFINES) $(LINKS) -Wl,-soname -Wl,$@ \
 	  -o $@
 
-libgstclassify.so: $(RNN_OBJECTS) gstclassify.o mfcc.o | nets images
+plugins/libgstclassify.so: $(RNN_OBJECTS) gstclassify.o mfcc.o | nets images plugins
 	$(CC) -shared -Wl,-O1 $+ $(INCLUDES) $(DEFINES) $(LINKS) -Wl,-soname -Wl,$@ \
 	  -o $@
 
@@ -258,16 +259,16 @@ VID_FILE_SRC_DEFAULT = uridecodebin name=src uri=file://$(CURDIR)/$(DEFAULT_VIDE
 
 #RNNCA_DEBUG=GST_DEBUG=rnnca*:5,recur*:5
 
-test-rnnca: libgstrnnca.so $(subdirs) $(DEFAULT_VIDEO)
+test-rnnca: plugins/libgstrnnca.so $(subdirs) $(DEFAULT_VIDEO)
 	$(RNNCA_DEBUG)	$(GDB) 	gst-launch-1.0  \
-	  --gst-plugin-path=$(CURDIR) \
+	  --gst-plugin-path=$(PLUGIN_DIR) \
 	$(VID_FILE_SRC_DEFAULT) \
 	! rnnca log-file=rnnca.log training=1 playing=1 edges=0  \
 	! videoconvert ! xvimagesink force-aspect-ratio=0
 
-train-rnnca: libgstrnnca.so $(subdirs) $(DEFAULT_VIDEO)
+train-rnnca: plugins/libgstrnnca.so $(subdirs) $(DEFAULT_VIDEO)
 	$(RNNCA_DEBUG) $(GDB) 	gst-launch-1.0  \
-		  --gst-plugin-path=$(CURDIR) \
+		  --gst-plugin-path=$(PLUGIN_DIR) \
 		$(VID_FILE_SRC_DEFAULT) \
 		! rnnca log-file=rnnca.log training=1 playing=0 \
 		! fakesink ;\
@@ -275,25 +276,25 @@ train-rnnca: libgstrnnca.so $(subdirs) $(DEFAULT_VIDEO)
 PROPER_RNNCA_PROPERTIES = momentum-soft-start=3000 momentum=0.95 learn-rate=3e-6 \
 	hidden-size=79 log-file=rnnca.log offsets=Y000111C000111
 
-train-rnnca-properly: libgstrnnca.so $(subdirs) $(DEFAULT_VIDEO)
+train-rnnca-properly: plugins/libgstrnnca.so $(subdirs) $(DEFAULT_VIDEO)
 	$(RNNCA_DEBUG) $(GDB) 	gst-launch-1.0  \
-		  --gst-plugin-path=$(CURDIR) \
+		  --gst-plugin-path=$(PLUGIN_DIR) \
 		$(VID_FILE_SRC_DEFAULT) \
 		! rnnca $(PROPER_RNNCA_PROPERTIES) \
 		training=1 playing=0 \
 		! fakesink ;\
 
-test-rnnca-properly: libgstrnnca.so $(subdirs) $(DEFAULT_VIDEO)
+test-rnnca-properly: plugins/libgstrnnca.so $(subdirs) $(DEFAULT_VIDEO)
 	$(RNNCA_DEBUG) $(GDB) 	gst-launch-1.0  \
-		  --gst-plugin-path=$(CURDIR) \
+		  --gst-plugin-path=$(PLUGIN_DIR) \
 		$(VID_FILE_SRC_DEFAULT) \
 		! rnnca $(PROPER_RNNCA_PROPERTIES) \
 		training=1 playing=1 \
 		!  xvimagesink force-aspect-ratio=0
 
-play-rnnca-properly: libgstrnnca.so $(subdirs)
+play-rnnca-properly: plugins/libgstrnnca.so $(subdirs)
 	$(RNNCA_DEBUG)	$(GDB) 	gst-launch-1.0  \
-	  --gst-plugin-path=$(CURDIR) \
+	  --gst-plugin-path=$(PLUGIN_DIR) \
 	videotestsrc pattern=black  ! $(VID_SPECS)  \
 	! rnnca $(PROPER_RNNCA_PROPERTIES) \
 	training=0 playing=1 edges=0 \
@@ -301,8 +302,8 @@ play-rnnca-properly: libgstrnnca.so $(subdirs)
 
 #RNNCA_DEBUG=GST_DEBUG=5
 
-record-rnnca-properly: libgstrnnca.so
-	$(RNNCA_DEBUG)	$(GDB) 	gst-launch-1.0 	--gst-plugin-path=$(CURDIR) \
+record-rnnca-properly: plugins/libgstrnnca.so
+	$(RNNCA_DEBUG)	$(GDB) 	gst-launch-1.0 	--gst-plugin-path=$(PLUGIN_DIR) \
 	avimux name=mux ! filesink location=rnnca2.avi \
 	videotestsrc pattern=black  ! $(VID_SPECS) \
 	! rnnca $(PROPER_RNNCA_PROPERTIES) \
@@ -310,23 +311,23 @@ record-rnnca-properly: libgstrnnca.so
 	! videoconvert ! x264enc bitrate=512 ! mux.
 
 
-play-rnnca: libgstrnnca.so $(subdirs)
+play-rnnca: plugins/libgstrnnca.so $(subdirs)
 	$(RNNCA_DEBUG)	$(GDB) 	gst-launch-1.0  \
-	  --gst-plugin-path=$(CURDIR) \
+	  --gst-plugin-path=$(PLUGIN_DIR) \
 	videotestsrc pattern=black  ! $(VID_SPECS) ! \
 	rnnca training=0 playing=1 edges=0 \
 	! videoconvert ! xvimagesink force-aspect-ratio=0
 
-record-rnnca: libgstrnnca.so
+record-rnnca: plugins/libgstrnnca.so
 	$(RNNCA_DEBUG)	$(GDB) 	gst-launch-1.0  \
-	  --gst-plugin-path=$(CURDIR) \
+	  --gst-plugin-path=$(PLUGIN_DIR) \
 	videotestsrc pattern=black  ! $(VID_SPECS), framerate=20/1 ! \
 	 rnnca training=0 playing=1 edges=0 \
 	! videoconvert ! vp8enc ! webmmux ! filesink location=rnnca.webm
 
 
 TEST_PIPELINE_CORE = gst-launch-1.0  \
-	  --gst-plugin-path=$(CURDIR) \
+	  --gst-plugin-path=$(PLUGIN_DIR) \
 	$(VID_FILE_SRC_DEFAULT) ! recur_manager name=recur osdebug=0 ! videoconvert \
 	! xvimagesink force-aspect-ratio=false \
 	recur. ! autoaudiosink \
@@ -334,31 +335,31 @@ TEST_PIPELINE_CORE = gst-launch-1.0  \
 
 
 
-test-pipeline: libgstrecur.so  $(DEFAULT_VIDEO)
+test-pipeline: plugins/libgstrecur.so  $(DEFAULT_VIDEO)
 	GST_DEBUG=$(GST_DEBUG) $(TIMER) $(GDB) $(TEST_PIPELINE_CORE)
 
-%-recur.ogv: libgstrecur.so  $(DEFAULT_VIDEO)
+%-recur.ogv: plugins/libgstrecur.so  $(DEFAULT_VIDEO)
 	timeout 30 gst-launch-1.0  \
-	  --gst-plugin-path=$(CURDIR) \
+	  --gst-plugin-path=$(PLUGIN_DIR) \
 	$(VID_FILE_SRC_DEFAULT) ! recur_manager name=recur ! videoconvert ! queue ! theoraenc ! oggmux ! filesink location="$@" \
 	recur. ! fakesink \
 	src. ! $(AUD_LINE) ! recur.
 
-test-pipeline-valgrind: libgstrecur.so
+test-pipeline-valgrind: plugins/libgstrecur.so
 	$(VALGRIND) $(TEST_PIPELINE_CORE)
 
-test-pipeline-kcachegrind: libgstrecur.so
+test-pipeline-kcachegrind: plugins/libgstrecur.so
 	kcachegrind &
 	valgrind --tool=callgrind $(TEST_PIPELINE_CORE) 2>callgrind.log
 
 train-pipeline:  $(DEFAULT_VIDEO)
 	gst-launch-1.0  \
-	  --gst-plugin-path=$(CURDIR) \
+	  --gst-plugin-path=$(PLUGIN_DIR) \
 	$(VID_FILE_SRC_DEFAULT) ! recur_manager name=recur ! videoconvert ! fakesink \
 	recur. ! fakesink \
 	src. ! $(AUD_LINE) ! recur.
 	gst-launch-1.0  \
-	  --gst-plugin-path=$(CURDIR) \
+	  --gst-plugin-path=$(PLUGIN_DIR) \
 	$(VID_FILE_SRC_DEFAULT) ! recur_manager name=recur ! videoconvert ! fakesink \
 	recur. ! fakesink \
 	src. ! $(AUD_LINE) ! recur.
@@ -372,7 +373,7 @@ AUD_URI_REED_CAT = file://$(CURDIR)/test-audio/Lou\ Reed-10\ Sad\ Song.mp3
 PARROT_CAPS = "audio/x-raw,channels=1,format=S16LE"
 
 TEST_PARROT_CORE = gst-launch-1.0  \
-	  --gst-plugin-path=$(CURDIR) \
+	  --gst-plugin-path=$(PLUGIN_DIR) \
 	uridecodebin name=src uri=$(AUD_URI_REED) ! audioconvert ! audioresample \
 	! parrot name=parrot
 
@@ -381,42 +382,42 @@ PARROT_DEBUG=parrot*:5
 PARROT_SIZE=399
 #PARROT_GDB=gdb --args
 #PARROT_GDB=valgrind --tool=memcheck  --track-origins=yes
-test-parrot: libgstparrot.so
+test-parrot: plugins/libgstparrot.so
 	GST_DEBUG=$(PARROT_DEBUG)  $(TIMER) $(PARROT_GDB) $(TEST_PARROT_CORE) \
 	training=1 playing=1 log-file=parrot.log hidden-size=$(PARROT_SIZE) ! autoaudiosink  #2> gst.log
 
-play-parrot: libgstparrot.so
+play-parrot: plugins/libgstparrot.so
 	GST_DEBUG=$(PARROT_DEBUG)  $(TIMER) $(PARROT_GDB) $(TEST_PARROT_CORE) \
 	training=0 playing=1 hidden-size=$(PARROT_SIZE) ! autoaudiosink  #2> gst.log
 
-train-parrot: libgstparrot.so
+train-parrot: plugins/libgstparrot.so
 	GST_DEBUG=$(PARROT_DEBUG)  $(TIMER) $(PARROT_GDB) $(TEST_PARROT_CORE) \
 	training=1 playing=0 log-file=parrot.log hidden-size=$(PARROT_SIZE) ! fakesink
 
-train-parrot-torben: libgstparrot.so
-	gst-launch-1.0 --gst-plugin-path=$(CURDIR) \
+train-parrot-torben: plugins/libgstparrot.so
+	gst-launch-1.0 --gst-plugin-path=$(PLUGIN_DIR) \
 		uridecodebin uri=$(AUD_URI_REED)  ! $(AUD_LINE) ! parrot ! fakesink
-	gst-launch-1.0 --gst-plugin-path=$(CURDIR) \
+	gst-launch-1.0 --gst-plugin-path=$(PLUGIN_DIR) \
 		uridecodebin uri=$(AUD_URI_CALE)  ! $(AUD_LINE) ! parrot ! fakesink
 
-test-parrot-torben: libgstparrot.so
-	GST_DEBUG=recur:3 gst-launch-1.0 --gst-plugin-path=$(CURDIR) \
+test-parrot-torben: plugins/libgstparrot.so
+	GST_DEBUG=recur:3 gst-launch-1.0 --gst-plugin-path=$(PLUGIN_DIR) \
 		uridecodebin uri=$(AUD_URI_REED)  ! $(AUD_LINE) ! parrot ! autoaudiosink
-	GST_DEBUG=recur:3 gst-launch-1.0 --gst-plugin-path=$(CURDIR) \
+	GST_DEBUG=recur:3 gst-launch-1.0 --gst-plugin-path=$(PLUGIN_DIR) \
 		uridecodebin uri=$(AUD_URI_CALE)  ! $(AUD_LINE) ! parrot ! autoaudiosink
 
 PARROT_CAPS = "audio/x-raw,channels=1,rate=16000,format=S16LE"
 
-test-parrot-duo: libgstparrot.so
-	GST_DEBUG=2 gst-launch-1.0 --gst-plugin-path=$(CURDIR) \
+test-parrot-duo: plugins/libgstparrot.so
+	GST_DEBUG=2 gst-launch-1.0 --gst-plugin-path=$(PLUGIN_DIR) \
 		uridecodebin uri=$(AUD_URI_REED)  ! audioconvert ! audioresample \
 		! $(PARROT_CAPS) ! interleave name=il \
 		! parrot ! autoaudiosink \
 		uridecodebin uri=$(AUD_URI_CALE) ! audioconvert ! audioresample \
 		! $(PARROT_CAPS) ! il.
 
-train-parrot-duo: libgstparrot.so
-	GST_DEBUG=parrot:5 gst-launch-1.0 --gst-plugin-path=$(CURDIR) \
+train-parrot-duo: plugins/libgstparrot.so
+	GST_DEBUG=parrot:5 gst-launch-1.0 --gst-plugin-path=$(PLUGIN_DIR) \
 		uridecodebin uri=$(AUD_URI_REED_CAT)  ! audioconvert ! audioresample \
 		! $(PARROT_CAPS) ! interleave name=il \
 		! parrot ! fakesink \
@@ -425,7 +426,7 @@ train-parrot-duo: libgstparrot.so
 
 .PHONY: classify
 
-classify: libgstclassify.so
+classify: plugins/libgstclassify.so
 	mv classify*.net nets || echo no net to move
 	rm classify.log || echo no log to nuke
 	time ./classify-train -q

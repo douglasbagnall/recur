@@ -26,7 +26,7 @@ for i in {1..20}; do
     fi
     for j in {1..5}; do
         echo training $i.$j LR $LR
-        time gst-launch-1.0 --gst-plugin-path=. \
+        time gst-launch-1.0 --gst-plugin-path=plugins \
 	    uridecodebin name=src uri=$URI \
             ! videoscale method=nearest-neighbour ! videoconvert \
             ! video/x-raw, format=I420, width=288, height=192, framerate=20/1 \
@@ -36,7 +36,7 @@ for i in {1..20}; do
     done
 
     echo video $i
-    time gst-launch-1.0 --gst-plugin-path=. \
+    time gst-launch-1.0 --gst-plugin-path=plugins \
         avimux name=mux ! \
         filesink location=examples/rnnca-$BASENAME-$PATTERN-$HS-$i.avi \
 	uridecodebin name=src uri=$RECORD_URI \

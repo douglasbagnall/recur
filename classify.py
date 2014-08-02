@@ -10,7 +10,7 @@ from classify_stats import draw_roc_curve, calc_stats, draw_presence_roc
 from classify_stats import actually_show_roc
 
 _dirname = os.path.dirname(os.path.abspath(__file__))
-os.environ['GST_PLUGIN_PATH'] = _dirname
+os.environ['GST_PLUGIN_PATH'] = os.path.join(_dirname, 'plugins')
 
 import gi
 gi.require_version('Gst', '1.0')
