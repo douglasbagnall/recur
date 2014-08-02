@@ -101,6 +101,7 @@ Because of ccan/opt, --help will tell you something.
 #define DEFAULT_FIND_ALPHABET_DIGIT_ADJUST 1.0
 #define DEFAULT_FIND_ALPHABET_ALPHA_ADJUST 1.0
 #define DEFAULT_PRESYNAPTIC_NOISE 0.0f
+#define DEFAULT_ADJUST_NOISE false
 
 #define BELOW_QUIET_LEVEL(quiet) if (opt_quiet < quiet)
 
@@ -170,6 +171,7 @@ static double opt_find_alphabet_threshold = DEFAULT_FIND_ALPHABET_THRESHOLD;
 static double opt_find_alphabet_digit_adjust = DEFAULT_FIND_ALPHABET_DIGIT_ADJUST;
 static double opt_find_alphabet_alpha_adjust = DEFAULT_FIND_ALPHABET_ALPHA_ADJUST;
 static float opt_presynaptic_noise = DEFAULT_PRESYNAPTIC_NOISE;
+static bool opt_adjust_noise = DEFAULT_ADJUST_NOISE;
 
 #define IN_RANGE_01(x) (((x) >= 0.0f) && ((x) <= 1.0f))
 
@@ -309,6 +311,8 @@ static struct opt_table options[] = {
       &opt_utf8, "Parse text as 8 bit symbols"),
   OPT_WITHOUT_ARG("--no-collapse-space", opt_set_invbool,
       &opt_collapse_space, "Predict whitespace characters individually"),
+  OPT_WITHOUT_ARG("--adjust-noise", opt_set_bool,
+      &opt_adjust_noise, "Decay presynaptic and weight noise with learn-rate"),
   OPT_WITHOUT_ARG("--collapse-space", opt_set_bool,
       &opt_collapse_space, "Runs of whitespace collapse to single space"),
   OPT_WITH_ARG("--find-alphabet-threshold", opt_set_doubleval, opt_show_doubleval,
@@ -520,7 +524,7 @@ load_and_train_model(struct RnnCharMetadata *m, int *alphabet, int a_len,
       NULL);
 
   rnn_char_init_schedule(&model.schedule, opt_learn_rate_inertia, opt_learn_rate_min,
-      opt_learn_rate_scale);
+      opt_learn_rate_scale, opt_adjust_noise);
 
   /* get text and validation text */
   int text_len;

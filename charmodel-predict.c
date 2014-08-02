@@ -80,8 +80,10 @@ validate(RecurNN *net, const u8 *text, int len){
 }
 
 static void
-eval_simple(RnnCharSchedule *s, RecurNN *net, float score, int verbose){
+eval_simple(RnnCharModel *model, float score, int verbose){
   int i, j;
+  RecurNN *net = model->net;
+  RnnCharSchedule *s = &model->schedule;
   RecurNNBPTT *bptt = net->bptt;
   if (bptt->learn_rate <= s->learn_rate_min){
     return;
@@ -102,6 +104,10 @@ eval_simple(RnnCharSchedule *s, RecurNN *net, float score, int verbose){
   }
   s->timeout = s->recent_len;
   bptt->learn_rate = MAX(s->learn_rate_min, bptt->learn_rate * s->learn_rate_mul);
+  if (s->adjust_noise){
+    net->presynaptic_noise *= s->learn_rate_mul;
+    model->periodic_weight_noise *= s->learn_rate_mul;
+  }
   if (verbose){
     DEBUG("generation %7d: entropy %.4g exceeds %d recent samples."
         " setting learn_rate to %.3g. momentum %.3g",
@@ -112,7 +118,7 @@ eval_simple(RnnCharSchedule *s, RecurNN *net, float score, int verbose){
 
 void
 rnn_char_init_schedule(RnnCharSchedule *s, int recent_len,
-    float learn_rate_min, float learn_rate_mul){
+    float learn_rate_min, float learn_rate_mul, int adjust_noise){
   s->recent = malloc_aligned_or_die(recent_len * sizeof(float));
   s->recent_len = recent_len;
   s->learn_rate_min = learn_rate_min;
@@ -122,6 +128,7 @@ rnn_char_init_schedule(RnnCharSchedule *s, int recent_len,
   }
   s->timeout = s->recent_len;
   s->eval = eval_simple;
+  s->adjust_noise = adjust_noise;
 }
 
 int
@@ -298,7 +305,7 @@ rnn_char_epoch(RnnCharModel *model, RecurNN *confab_net, RnnCharVentropy *v,
         rnn_multi_pgm_dump(net, model->periodic_pgm_dump_string,
             model->pgm_name);
       }
-      model->schedule.eval(&model->schedule, net, ventropy, quietness < 2);
+      model->schedule.eval(model, ventropy, quietness < 2);
       if (model->periodic_weight_noise){
         rnn_weight_noise(net, model->periodic_weight_noise);
       }

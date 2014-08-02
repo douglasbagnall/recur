@@ -13,6 +13,7 @@ enum {
 } rnn_char_flags;
 
 typedef struct _RnnCharSchedule RnnCharSchedule;
+typedef struct _RnnCharModel RnnCharModel;
 
 struct _RnnCharSchedule {
   float *recent;
@@ -20,7 +21,8 @@ struct _RnnCharSchedule {
   int timeout;
   float learn_rate_mul;
   float learn_rate_min;
-  void (*eval)(RnnCharSchedule *s, RecurNN *net, float score, int verbose);
+  int adjust_noise;
+  void (*eval)(RnnCharModel *m, float score, int verbose);
 };
 
 typedef struct _RnnCharVentropy {
@@ -34,7 +36,6 @@ typedef struct _RnnCharVentropy {
   float entropy;
 } RnnCharVentropy;
 
-typedef struct _RnnCharModel RnnCharModel;
 
 struct _RnnCharModel {
   RecurNN *net;
@@ -149,7 +150,7 @@ void rnn_char_dump_collapsed_text(const u8 *text, int len, const char *name,
     const char *alphabet);
 
 void rnn_char_init_schedule(RnnCharSchedule *s, int recent_len,
-    float learn_rate_min, float learn_rate_mul);
+    float learn_rate_min, float learn_rate_mul, int adjust_noise);
 
 float rnn_char_calc_ventropy(RnnCharModel *model, RnnCharVentropy *v, int lap);
 
