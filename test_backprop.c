@@ -340,6 +340,8 @@ bounded_init_method(int m){
   return DEFAULT_INIT_METHOD;
 }
 
+#define SET_IF_POSITIVE(a, b) (a) = ((b) > 0 ? (b) : (a))
+
 static void
 initialise_net(RecurNN *net){
   /*start off with a default set of parameters */
@@ -365,18 +367,11 @@ initialise_net(RecurNN *net){
   if (IN_RANGE_01(opt_init_input_probability)){
     p.run_input_probability = opt_init_input_probability;
   }
-  if (opt_init_input_magnitude > 0){
-    p.run_input_magnitude = opt_init_input_magnitude;
-  }
-  if (opt_init_hidden_gain > 0){
-    p.run_gain = opt_init_hidden_gain;
-  }
-  if (opt_init_hidden_run_length > 0){
-    p.run_len_mean = opt_init_hidden_run_length;
-  }
-  if (opt_init_hidden_run_deviation > 0){
-    p.run_len_stddev = opt_init_hidden_run_deviation;
-  }
+  SET_IF_POSITIVE(p.run_input_magnitude, opt_init_input_magnitude);
+  SET_IF_POSITIVE(p.run_gain, opt_init_hidden_gain);
+  SET_IF_POSITIVE(p.run_len_mean, opt_init_hidden_run_length);
+  SET_IF_POSITIVE(p.run_len_stddev, opt_init_hidden_run_deviation);
+
   rnn_randomise_weights_clever(net, &p);
 
   if (opt_init_weight_scale > 0){
