@@ -386,7 +386,7 @@ load_or_create_net(struct RnnCharMetadata *m, int alpha_len, int reload){
 
   if (filename == NULL){
     filename = rnn_char_construct_net_filename(m, opt_basename, alpha_len,
-        opt_bottom_layer, opt_hidden_size);
+        opt_bottom_layer, opt_hidden_size, alpha_len);
   }
 
   RecurNN *net = (reload) ? rnn_load_net(filename) : NULL;

@@ -446,11 +446,9 @@ rnn_char_free_metadata_items(struct RnnCharMetadata *m){
 
 char*
 rnn_char_construct_net_filename(struct RnnCharMetadata *m, const char *basename,
-    int alpha_size, int bottom_size, int hidden_size){
+    int input_size, int bottom_size, int hidden_size, int output_size){
   char s[260];
   char *metadata = rnn_char_construct_metadata(m);
-  int input_size = alpha_size;
-  int output_size = alpha_size;
   u32 sig = rnn_hash32(metadata);
   if (bottom_size){
     snprintf(s, sizeof(s), "%s-s%0" PRIx32 "-i%d-b%d-h%d-o%d.net", basename,
