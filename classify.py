@@ -11,6 +11,7 @@ from classify_stats import actually_show_roc
 
 _dirname = os.path.dirname(os.path.abspath(__file__))
 os.environ['GST_PLUGIN_PATH'] = os.path.join(_dirname, 'plugins')
+os.environ['GST_DEBUG_DUMP_DOT_DIR'] = '/tmp'
 
 import gi
 gi.require_version('Gst', '1.0')
@@ -90,8 +91,9 @@ class BaseClassifier(object):
                                      "rate=%d, channels=%d"
                                      % (samplerate, channels))
         self.capsfilter.set_property("caps", caps)
-        #Gst.debug_bin_to_dot_file(self.pipeline, Gst.DebugGraphDetails.ALL,
-        #                          "pipeline.dot")
+        if 0:
+            Gst.debug_bin_to_dot_file(self.pipeline, Gst.DebugGraphDetails.ALL,
+                                      "pipeline.dot")
 
     def __init__(self, channels=1, mainloop=None, sinkname='fakesink',
                  samplerate=8000, srcname='filesrc'):
