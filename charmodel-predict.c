@@ -249,11 +249,11 @@ rnn_char_epoch(RnnCharModel *model, RecurNN *confab_net, RnnCharVentropy *v,
       entropy += capped_log2f(1.0f - e);
     }
 
-    if (model->input_ppm){
-      temporal_ppm_add_row(model->input_ppm, net->input_layer);
+    if (model->images.input_ppm){
+      temporal_ppm_add_row(model->images.input_ppm, net->input_layer);
     }
-    if (model->error_ppm){
-      temporal_ppm_add_row(model->error_ppm, net->bptt->o_error);
+    if (model->images.error_ppm){
+      temporal_ppm_add_row(model->images.error_ppm, net->bptt->o_error);
     }
     report_counter++;
     if (report_counter >= model->report_interval){
@@ -301,9 +301,9 @@ rnn_char_epoch(RnnCharModel *model, RecurNN *confab_net, RnnCharVentropy *v,
       if (model->save_net && model->filename){
         rnn_save_net(net, model->filename, 1);
       }
-      if (model->periodic_pgm_dump_string){
-        rnn_multi_pgm_dump(net, model->periodic_pgm_dump_string,
-            model->pgm_name);
+      if (model->images.periodic_pgm_dump_string){
+        rnn_multi_pgm_dump(net, model->images.periodic_pgm_dump_string,
+            model->images.basename);
       }
       model->schedule.eval(model, ventropy, quietness < 2);
       if (model->periodic_weight_noise){

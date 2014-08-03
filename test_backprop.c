@@ -467,24 +467,24 @@ load_and_train_model(struct RnnCharMetadata *m, int *alphabet, int a_len,
     int *collapse_chars, int c_len, u32 char_flags){
   RnnCharModel model = {
     .n_training_nets = MAX(opt_multi_tap, 1),
-    .pgm_name = opt_basename,
     .batch_size = opt_batch_size,
     .momentum = opt_momentum,
     .momentum_soft_start = opt_momentum_soft_start,
     .momentum_style = opt_momentum_style,
-    .temporal_pgm_dump = opt_temporal_pgm_dump,
     .periodic_weight_noise = opt_periodic_weight_noise,
     .report_interval = opt_report_interval,
     .save_net = opt_save_net,
     .use_multi_tap_path = opt_use_multi_tap_path,
     .alphabet = alphabet,
     .flags = char_flags,
-    .collapse_chars = collapse_chars
+    .collapse_chars = collapse_chars,
+    .images = {
+      .basename = opt_basename,
+      .temporal_pgm_dump = opt_temporal_pgm_dump
+    }
   };
-  /*If the char point is not the default, the string has been set on the
-    command line.*/
   if (opt_periodic_pgm_dump || opt_pgm_dump_images != *orig_pgm_dump_images){
-    model.periodic_pgm_dump_string = opt_pgm_dump_images;
+    model.images.periodic_pgm_dump_string = opt_pgm_dump_images;
   }
 
   RecurNN *net = load_or_create_net(m, a_len, opt_reload);
@@ -495,17 +495,18 @@ load_and_train_model(struct RnnCharMetadata *m, int *alphabet, int a_len,
     bptt->momentum_weight = opt_momentum_weight;
   }
 
-  if (model.periodic_pgm_dump_string){
-    rnn_multi_pgm_dump(net, model.periodic_pgm_dump_string, opt_basename);
+  if (model.images.periodic_pgm_dump_string){
+    rnn_multi_pgm_dump(net, model.images.periodic_pgm_dump_string,
+        model.images.basename);
   }
 
   model.net = net;
   model.training_nets = rnn_new_training_set(net, model.n_training_nets);
 
-  if (opt_temporal_pgm_dump){
-    model.input_ppm = temporal_ppm_alloc(net->i_size, 300, "input_layer", 0,
+  if (model.images.temporal_pgm_dump){
+    model.images.input_ppm = temporal_ppm_alloc(net->i_size, 300, "input_layer", 0,
         PGM_DUMP_COLOUR, NULL);
-    model.error_ppm = temporal_ppm_alloc(net->o_size, 300, "output_error", 0,
+    model.images.error_ppm = temporal_ppm_alloc(net->o_size, 300, "output_error", 0,
         PGM_DUMP_COLOUR, NULL);
   }
 
@@ -597,11 +598,11 @@ load_and_train_model(struct RnnCharMetadata *m, int *alphabet, int a_len,
   rnn_delete_net(confab_net);
   rnn_delete_net(validate_net);
 
-  if (model.input_ppm){
-    temporal_ppm_free(model.input_ppm);
+  if (model.images.input_ppm){
+    temporal_ppm_free(model.images.input_ppm);
   }
-  if (model.error_ppm){
-    temporal_ppm_free(model.error_ppm);
+  if (model.images.error_ppm){
+    temporal_ppm_free(model.images.error_ppm);
   }
 }
 

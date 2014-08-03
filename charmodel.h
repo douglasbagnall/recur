@@ -15,6 +15,15 @@ enum {
 typedef struct _RnnCharSchedule RnnCharSchedule;
 typedef struct _RnnCharModel RnnCharModel;
 
+typedef struct _RnnCharImageSettings{
+  char *basename;
+  bool periodic_pgm_dump;
+  bool temporal_pgm_dump;
+  TemporalPPM *input_ppm;
+  TemporalPPM *error_ppm;
+  char * periodic_pgm_dump_string;
+} RnnCharImageSettings;
+
 struct _RnnCharSchedule {
   float *recent;
   int recent_len;
@@ -41,26 +50,20 @@ struct _RnnCharModel {
   RecurNN *net;
   RecurNN **training_nets;
   int n_training_nets;
-
-  char *pgm_name;
   uint batch_size;
-
   char *filename;
   float momentum;
   float momentum_soft_start;
   int momentum_style;
-  bool temporal_pgm_dump;
   float periodic_weight_noise;
   uint report_interval;
   bool save_net;
   bool use_multi_tap_path;
   u32 flags;
-  TemporalPPM *input_ppm;
-  TemporalPPM *error_ppm;
   int *alphabet; /*unicode points */
   int *collapse_chars;
-  char * periodic_pgm_dump_string;
   RnnCharSchedule schedule;
+  RnnCharImageSettings images;
 };
 
 struct RnnCharMetadata {
