@@ -55,6 +55,8 @@ def main():
                        help="Test after this many training cycles")
     group.add_argument('--weight-noise', type=float, default=0.0,
                        help="std dev of noise added to weights before each cycle")
+    group.add_argument('--presynaptic-noise', type=float, default=0.0,
+                       help="std dev of noise added before non-linearity")
     group.add_argument('--weight-init-scale', type=float, default=0.0,
                        help="scale weights to approximately this gain")
     group.add_argument('--log-file', default="auto",
@@ -117,6 +119,7 @@ def main():
                         #('weight-fan-in-sum', 4),
                         #('weight-fan-in-kurtosis', 0.15),
                         ('weight-init-method', 3),
+                        ('presynaptic-noise', args.presynaptic_noise),
                     ))
 
 main()
