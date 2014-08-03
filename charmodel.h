@@ -66,37 +66,11 @@ struct _RnnCharModel {
   RnnCharImageSettings images;
 };
 
-struct RnnCharMetadata {
+typedef struct RnnCharMetadata {
   char *alphabet; /*utf-8 or byte string */
   char *collapse_chars;
   bool utf8;
-};
-
-typedef struct _RnnCharClassifier{
-  RecurNN *net;
-  RecurNN **training_nets;
-  int n_training_nets;
-  int lag;
-  char *pgm_name;
-  uint batch_size;
-  char *filename;
-  float momentum;
-  float momentum_soft_start;
-  int momentum_style;
-  bool periodic_pgm_dump;
-  bool temporal_pgm_dump;
-  float periodic_weight_noise;
-  uint report_interval;
-  bool save_net;
-  bool use_multi_tap_path;
-  TemporalPPM *input_ppm;
-  TemporalPPM *error_ppm;
-  int *alphabet; /*unicode points */
-  int *collapse_chars;
-  char * periodic_pgm_dump_string;
-  RnnCharSchedule schedule;
-  bool utf8;
-} RnnCharClassifier;
+} RnnCharMetadata;
 
 typedef struct _RnnCharClassifiedChar{
   u8 class;
@@ -112,7 +86,28 @@ typedef struct _RnnCharClassifiedText{
   int c_len;
   u32 flags;
   int lag;
+  int n_classes;
+  char **classes;
+  bool utf8;
 } RnnCharClassifiedText;
+
+typedef struct _RnnCharClassifier{
+  RnnCharClassifiedText *text;
+  RecurNN *net;
+  RecurNN **training_nets;
+  int n_training_nets;
+  char *pgm_name;
+  uint batch_size;
+  char *filename;
+  float momentum;
+  float momentum_soft_start;
+  int momentum_style;
+  float periodic_weight_noise;
+  uint report_interval;
+  bool save_net;
+  RnnCharSchedule schedule;
+  RnnCharImageSettings images;
+} RnnCharClassifier;
 
 
 
@@ -128,6 +123,8 @@ struct _RnnCharClassBlock
 };
 
 #define NO_CLASS 0xFF
+
+int rnn_char_classify_epoch(RnnCharClassifier *model);
 
 int rnn_char_alloc_file_contents(const char *filename, char **contents, int *len);
 

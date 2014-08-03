@@ -102,18 +102,25 @@ alloc_langblock_from_xml(xmlNode *el, RnnCharClassBlock *b, const char *lang,
 }
 
 static RnnCharClassBlock *
-new_langblocks_from_xml(char *filename){
+new_langblocks_from_xml(char *filename, char ***classes, int *n_classes){
 
   xmlDoc *doc = xmlReadFile(filename, NULL, 0);
   xmlNode *xml = xmlDocGetRootElement(doc);
 
   RnnCharClassBlock *b = calloc(1, sizeof(RnnCharClassBlock));
-  char *class_lut[257] = {0};
-  class_lut[NO_CLASS] = NO_LANG;
-  RnnCharClassBlock *end = alloc_langblock_from_xml(xml, b, NO_LANG, class_lut, "");
+  *classes = calloc(256, sizeof(char*));
+  (*classes)[NO_CLASS] = NO_LANG;
+  RnnCharClassBlock *end = alloc_langblock_from_xml(xml, b, NO_LANG, *classes, "");
   end->next = NULL;
   xmlFreeDoc(doc);
   xmlCleanupParser();
+
+  for (int i = 0; i < 256; i++){
+    if (! (*classes)[i]){
+      *n_classes = i;
+      break;
+    }
+  }
   return b;
 }
 
@@ -151,7 +158,9 @@ static RnnCharClassifiedText *
 new_charmodel_from_xml(char *filename, double alpha_threshold,
     double digit_adjust, double alpha_adjust, u32 flags)
 {
-  RnnCharClassBlock *first_block = new_langblocks_from_xml(filename);
+  int n_classes;
+  char **classes;
+  RnnCharClassBlock *first_block = new_langblocks_from_xml(filename, &classes, &n_classes);
   RnnCharClassifiedChar *classified_text;
   int *alphabet = calloc(257, sizeof(int));
   int *collapse_chars = calloc(257, sizeof(int));
@@ -182,6 +191,8 @@ new_charmodel_from_xml(char *filename, double alpha_threshold,
   t->c_len = c_len;
   t->flags = flags;
   t->lag = 0;
+  t->n_classes = n_classes;
+  t->classes = classes;
   free_langblocks(first_block);
   return t;
 }
@@ -237,12 +248,23 @@ static double opt_digit_adjust = 1.0;
 static int opt_lag = 0;
 static bool opt_dump_colour = false;
 static int opt_verbose = 0;
+static uint opt_multi_tap = 20;
+static uint opt_hidden_size = 199;
+static u64 opt_rng_seed = 11;
+static char * opt_logfile = NULL;
+static uint opt_bptt_depth = 40;
+static float opt_learn_rate = 0.001;
+static float opt_momentum = 0.93;
 
 static struct opt_table options[] = {
   OPT_WITHOUT_ARG("-h|--help", opt_usage_and_exit,
       ": Rnn classification of text at the character level",
       "Print this message."),
 
+  OPT_WITH_ARG("-H|--hidden-size=<n>", opt_set_uintval, opt_show_uintval,
+      &opt_hidden_size, "number of hidden nodes"),
+  OPT_WITH_ARG("-r|--rng-seed=<seed>", opt_set_ulongval_bi, opt_show_ulongval_bi,
+      &opt_rng_seed, "RNG seed (-1 for auto)"),
   OPT_WITH_ARG("-x|--xmlfile=<file>", opt_set_charp, opt_show_charp, &opt_xmlfile,
       "operate on this XML file"),
   OPT_WITHOUT_ARG("--case-sensitive", opt_set_invbool,
@@ -271,6 +293,16 @@ static struct opt_table options[] = {
       &opt_verbose, "More debugging noise, if possible"),
   OPT_WITHOUT_ARG("-q|--quiet", opt_inc_intval,
       &opt_verbose, "Less debugging noise."),
+  OPT_WITH_ARG("--multi-tap=<n>", opt_set_uintval, opt_show_uintval,
+      &opt_multi_tap, "read at n evenly spaced points in parallel"),
+  OPT_WITH_ARG("--log-file=<file>", opt_set_charp, opt_show_charp, &opt_logfile,
+      "log to this filename"),
+  OPT_WITH_ARG("-d|--depth=<n>", opt_set_uintval, opt_show_uintval,
+      &opt_bptt_depth, "max depth of BPTT recursion"),
+  OPT_WITH_ARG("-m|--momentum=<0-1>", opt_set_floatval01, opt_show_floatval,
+      &opt_momentum, "momentum"),
+
+
   OPT_ENDTABLE
 };
 
@@ -288,6 +320,7 @@ parse_opts(int argc, char *argv[]){
     opt_usage_and_exit(NULL);
   }
 }
+
 
 int
 main(int argc, char *argv[]){
@@ -308,7 +341,48 @@ main(int argc, char *argv[]){
     dump_colourised_text(t);
   }
   if (opt_verbose >= 1){
-    rnn_char_dump_alphabet(t->alphabet, t->a_len, flags & RNN_CHAR_FLAG_UTF8);
-    rnn_char_dump_alphabet(t->collapse_chars, t->c_len, flags & RNN_CHAR_FLAG_UTF8);
+    rnn_char_dump_alphabet(t->alphabet, t->a_len, opt_utf8);
+    rnn_char_dump_alphabet(t->collapse_chars, t->c_len, opt_utf8);
   }
+
+  RnnCharClassifier *model = malloc(sizeof(RnnCharModel));
+  model->text = t;
+  model->n_training_nets = MAX(opt_multi_tap, 1);
+  model->pgm_name = "text-classify";
+  model->momentum = opt_momentum;
+  model->momentum_soft_start = 2000;
+  model->momentum_style = 0;
+  model->images.temporal_pgm_dump = 0;
+  model->periodic_weight_noise = 0;
+  model->report_interval = 1024;
+  model->save_net = 0;
+
+  struct RnnCharMetadata m;
+  if (opt_utf8){
+    m.alphabet = new_utf8_from_codepoints(t->alphabet, t->a_len);
+    m.collapse_chars = new_utf8_from_codepoints(t->collapse_chars, t->c_len);
+    m.utf8 = 1;
+  }
+  else {
+    m.alphabet = new_bytes_from_codepoints(t->alphabet, t->a_len);
+    m.collapse_chars = new_bytes_from_codepoints(t->collapse_chars, t->c_len);
+    m.utf8 = 0;
+  }
+
+  model->filename = rnn_char_construct_net_filename(&m, "char-classify", t->a_len,
+      0, opt_hidden_size, t->n_classes);
+
+  u32 net_flags = RNN_NET_FLAG_STANDARD | RNN_NET_FLAG_BPTT_ADAPTIVE_MIN_ERROR;
+  RecurNN *net = rnn_new(t->a_len, opt_hidden_size, t->n_classes, net_flags,
+      opt_rng_seed, opt_logfile, opt_bptt_depth, opt_learn_rate,
+      opt_momentum, 0);
+  rnn_randomise_weights_auto(net);
+
+  net->bptt->momentum_weight = 0.5;
+  net->metadata = rnn_char_construct_metadata(&m);
+  model->net = net;
+  model->training_nets = rnn_new_training_set(net, model->n_training_nets);
+
+
+  rnn_char_classify_epoch(model);
 }

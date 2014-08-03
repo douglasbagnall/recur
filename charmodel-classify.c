@@ -70,9 +70,11 @@ get_elapsed_interval(struct timespec **start, struct timespec **end){
 
 /* lag needs to be preadjusted */
 int
-rnn_char_classify_epoch(RnnCharClassifier *model, const RnnCharClassifiedChar *text,
-    int len, int start, int stop, int ignore_start){
+rnn_char_classify_epoch(RnnCharClassifier *model){
   int n_nets = model->n_training_nets;
+  RnnCharClassifiedText *t = model->text;
+  int len = t->len;
+  RnnCharClassifiedChar *text = t->text;
   int spacing = (len - 1) / n_nets;
   int correct = 0;
   float mean_error = 0;
@@ -80,14 +82,12 @@ rnn_char_classify_epoch(RnnCharClassifier *model, const RnnCharClassifiedChar *t
   RecurNN *net = model->net;
   RecurNN **nets = model->training_nets;
   uint report_counter = net->generation % model->report_interval;
-  int end = (stop < len) ? stop : len;
   struct timespec timers[2];
   struct timespec *time_start = timers;
   struct timespec *time_end = timers + 1;
-  for (int i = MAX(0, start); i < end; i++){
+  for (int i = 0; i < len; i++){
     float momentum = rnn_calculate_momentum_soft_start(net->generation,
         model->momentum, model->momentum_soft_start);
-
     int offset = i;
     for (int j = 0; j < n_nets; j++){
       RnnCharClassifiedChar t = text[offset];
@@ -111,12 +111,8 @@ rnn_char_classify_epoch(RnnCharClassifier *model, const RnnCharClassifiedChar *t
         offset -= len - 1;
       }
     }
-    if (ignore_start){
-      ignore_start--;
-    }
-    else {
-      rnn_apply_learning(net, model->momentum_style, momentum);
-    }
+    rnn_apply_learning(net, model->momentum_style, momentum);
+
     report_counter++;
     if (report_counter == model->report_interval){
       report_counter = 0;
@@ -136,9 +132,6 @@ rnn_char_classify_epoch(RnnCharClassifier *model, const RnnCharClassifiedChar *t
       mean_error = 0.0f;
       entropy = 0.0f;
     }
-  }
-  if (stop && (int)net->generation >= stop){
-    return 1;
   }
   return 0;
 }
