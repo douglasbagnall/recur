@@ -18,6 +18,7 @@ PLUGIN_DIR = $(CURDIR)/plugins
 
 ### Alternative compilers
 #CC = gcc-4.9
+#CC = gcc-4.7 -fplugin=dragonegg
 #CC = nccgen -ncgcc -ncld -ncfabs
 #CC = /usr/bin/clang
 #CC = /usr/bin/clang -Weverything -Wno-variadic-macros -Wno-gnu -Wno-vla
@@ -32,7 +33,7 @@ BLAS_FLAGS = -DUSE_CBLAS
 endif
 
 
-ALL_CFLAGS = -march=native -pthread $(WARNINGS) -pipe  -D_GNU_SOURCE $(INCLUDES) $(ARCH_CFLAGS) $(CFLAGS) $(DEV_CFLAGS) -ffast-math -funsafe-loop-optimizations $(CLANG_FLAGS) -std=gnu11 $(CFLAGS) $(BLAS_CFLAGS) $(LOCAL_FLAGS)
+ALL_CFLAGS = -march=native -pthread $(WARNINGS) -pipe  -D_GNU_SOURCE $(INCLUDES) $(ARCH_CFLAGS) $(CFLAGS) $(DEV_CFLAGS) -ffast-math $(CLANG_FLAGS) -std=gnu11 $(CFLAGS) $(BLAS_CFLAGS) $(LOCAL_FLAGS)
 ALL_LDFLAGS = $(LDFLAGS)
 
 GST_INCLUDES =  -isystem $(INC_DIR)/gstreamer-1.0\
