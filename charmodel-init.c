@@ -39,6 +39,9 @@ rnn_char_find_alphabet_s(const char *text, int len, int *alphabet, int *a_len,
   int *counts = calloc(n_chars + 1, sizeof(int));
   int c, prev = 0;
   int n = 0;
+  int a_count = 0;
+  int c_count = 0;
+
   const char *s = text;
   for(int i = 0; i < len; i++){
     if (s >= text + len){
@@ -86,8 +89,6 @@ rnn_char_find_alphabet_s(const char *text, int len, int *alphabet, int *a_len,
   if (n == 0){
     goto error;
   }
-  int a_count = 0;
-  int c_count = 0;
 
   /*find the representative for the collapsed_chars, if any, which is put at
     the beginning of the alphabet.*/
