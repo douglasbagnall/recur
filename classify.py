@@ -1128,7 +1128,7 @@ def add_common_args(parser):
                        help="number of hidden neurons")
     group.add_argument('-B', '--bottom-layer', type=int,
                        help="number of bottom layer output nodes")
-    group.add_argument('-c', '--classes', default='tf',
+    group.add_argument('-c', '--classes', default='01',
                        help="classes (letter per class, groups separated by commas)")
     group.add_argument('-w', '--window-size', default=WINDOW_SIZE, type=int,
                        help="size of the FFT window")
