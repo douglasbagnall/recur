@@ -255,6 +255,9 @@ static char * opt_logfile = NULL;
 static uint opt_bptt_depth = 40;
 static float opt_learn_rate = 0.001;
 static float opt_momentum = 0.93;
+static char * opt_basename = "text-classify";
+static float opt_presynaptic_noise = 0;
+
 
 static struct opt_table options[] = {
   OPT_WITHOUT_ARG("-h|--help", opt_usage_and_exit,
@@ -285,7 +288,7 @@ static struct opt_table options[] = {
       &opt_digit_adjust, "adjust digit frequency for alphabet calculations"),
   OPT_WITH_ARG("--find-alphabet-alpha-adjust", opt_set_doubleval, opt_show_doubleval,
       &opt_alpha_adjust, "adjust letter frequency for alphabet calculation"),
-  OPT_WITH_ARG("-l|--lag", opt_set_intval, opt_show_intval,
+  OPT_WITH_ARG("-L|--lag", opt_set_intval, opt_show_intval,
       &opt_lag, "classify character this far back"),
   OPT_WITHOUT_ARG("--dump-colour", opt_set_bool,
       &opt_dump_colour, "Print text in colour showing training classes"),
@@ -301,7 +304,12 @@ static struct opt_table options[] = {
       &opt_bptt_depth, "max depth of BPTT recursion"),
   OPT_WITH_ARG("-m|--momentum=<0-1>", opt_set_floatval01, opt_show_floatval,
       &opt_momentum, "momentum"),
-
+  OPT_WITH_ARG("-l|--learn-rate=<0-1>", opt_set_floatval01, opt_show_floatval,
+      &opt_learn_rate, "initial learning rate"),
+  OPT_WITH_ARG("-n|--basename=<tag>", opt_set_charp, opt_show_charp, &opt_basename,
+      "construct log, image, net filenames from this root"),
+  OPT_WITH_ARG("--presynaptic-noise", opt_set_floatval, opt_show_floatval,
+      &opt_presynaptic_noise, "deviation of noise to add before non-linear transform"),
 
   OPT_ENDTABLE
 };
@@ -369,13 +377,13 @@ main(int argc, char *argv[]){
     m.utf8 = 0;
   }
 
-  model->filename = rnn_char_construct_net_filename(&m, "char-classify", t->a_len,
+  model->filename = rnn_char_construct_net_filename(&m, opt_basename, t->a_len,
       0, opt_hidden_size, t->n_classes);
 
   u32 net_flags = RNN_NET_FLAG_STANDARD | RNN_NET_FLAG_BPTT_ADAPTIVE_MIN_ERROR;
   RecurNN *net = rnn_new(t->a_len, opt_hidden_size, t->n_classes, net_flags,
       opt_rng_seed, opt_logfile, opt_bptt_depth, opt_learn_rate,
-      opt_momentum, 0);
+      opt_momentum, opt_presynaptic_noise);
   rnn_randomise_weights_auto(net);
 
   net->bptt->momentum_weight = 0.5;
@@ -383,6 +391,7 @@ main(int argc, char *argv[]){
   model->net = net;
   model->training_nets = rnn_new_training_set(net, model->n_training_nets);
 
-
-  rnn_char_classify_epoch(model);
+  for (;;){
+    rnn_char_classify_epoch(model);
+  }
 }
