@@ -89,22 +89,28 @@ rnn_char_classify_epoch(RnnCharClassifier *model){
     float momentum = rnn_calculate_momentum_soft_start(net->generation,
         model->momentum, model->momentum_soft_start);
     int offset = i;
+    //DEBUG("n_nets %i offset %i spacing %i", n_nets, offset, spacing);
     for (int j = 0; j < n_nets; j++){
       RnnCharClassifiedChar t = text[offset];
       RecurNN *n = nets[j];
       rnn_bptt_advance(n);
-      float *answer = one_hot_opinion(net, t.symbol, net->presynaptic_noise);
+      int class = t.class;
+      MAYBE_DEBUG("j %i offset %i symbol %i class %i output_size %i len %i",
+          j, offset, t.symbol, class, n->output_size, len);
+      float *answer = one_hot_opinion(n, t.symbol, net->presynaptic_noise);
       if (t.class != NO_CLASS){
         float *error = n->bptt->o_error;
         ASSUME_ALIGNED(error);
         int winner = softmax_best_guess(error, answer, net->output_size);
-        correct += (winner == t.class);
-        float e = error[t.class] + 1.0f;
-        error[t.class] = e;
+        correct += (winner == class);
+        float e = error[class] + 1.0f;
+        error[class] = e;
         mean_error += e;
         entropy += capped_log2f(1.0f - e);
+        //DEBUG("winner %i correct %i error %.2f", winner, winner == class, e);
+        rnn_bptt_calc_deltas(n, j);
       }
-      rnn_bptt_calc_deltas(n, j ? 1 : 0);
+
 
       offset += spacing;
       if (offset >= len - 1){
@@ -128,6 +134,9 @@ rnn_char_classify_epoch(RnnCharClassifier *model){
       rnn_log_float(net, "accuracy", accuracy);
       rnn_log_float(net, "learn-rate", net->bptt->learn_rate);
       rnn_log_float(net, "per_second", per_sec);
+      DEBUG("entropy %.2f accuracy %.2f error %.2f speed %.1f",
+          entropy, accuracy, mean_error, per_sec);
+
       correct = 0;
       mean_error = 0.0f;
       entropy = 0.0f;
