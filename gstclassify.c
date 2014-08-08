@@ -1918,7 +1918,7 @@ maybe_learn(GstClassify *self){
     if (self->error_image){
       temporal_ppm_row_from_source(self->error_image);
     }
-
+    rnn_log_float(net, "momentum", momentum);
     rnn_log_float(net, "error", err_sum / self->n_channels);
     rnn_log_float(net, "correct", winners * 1.0f / self->n_channels);
   }

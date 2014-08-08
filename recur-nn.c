@@ -447,7 +447,6 @@ rnn_apply_learning(RecurNN *net, int momentum_style,
           momentum, momentum_weight);
     }
   }
-  rnn_log_float(net, "momentum", momentum);
 }
 
 
