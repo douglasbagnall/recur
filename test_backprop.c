@@ -123,7 +123,7 @@ static int opt_quiet = 0;
 static char * opt_filename = NULL;
 static char * opt_logfile = NULL;
 static char * opt_basename = DEFAULT_BASENAME;
-static char * opt_alphabet = DEFAULT_CHARSET;
+static char * opt_alphabet = NULL;
 static char * opt_collapse_chars = DEFAULT_COLLAPSE_CHARS;
 static char * opt_textfile = DEFAULT_TEXT;
 static char * opt_dump_collapsed_text = DEFAULT_DUMP_COLLAPSED_TEXT;
@@ -629,7 +629,8 @@ main(int argc, char *argv[]){
       (opt_collapse_space   ? RNN_CHAR_FLAG_COLLAPSE_SPACE : 0) |
       (opt_utf8             ? RNN_CHAR_FLAG_UTF8 : 0));
 
-  if (opt_find_alphabet_threshold){
+  if (opt_find_alphabet_threshold && ! opt_alphabet){
+    DEBUG("Looking for alphabet with threshold %f", opt_find_alphabet_threshold);
     int raw_text_len;
     char* text;
     int err = rnn_char_alloc_file_contents(opt_textfile, &text, &raw_text_len);
@@ -659,6 +660,9 @@ main(int argc, char *argv[]){
     }
   }
   else { /*use given or default alphabet */
+    if (! opt_alphabet){
+      opt_alphabet = DEFAULT_CHARSET;
+    }
     if (opt_utf8){
       a_len = fill_codepoints_from_utf8(alphabet, 256, opt_alphabet);
       c_len = fill_codepoints_from_utf8(collapse_chars, 256, opt_collapse_chars);
