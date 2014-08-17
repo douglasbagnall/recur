@@ -332,7 +332,24 @@ rnn_clone(RecurNN *parent, u32 flags,
   return net;
 }
 
+static inline void
+set_array_value(float *array, int len, float value){
+  for (int i = 0; i < len; i++){
+    array[i] = value;
+  }
+}
 
+void
+rnn_set_momentum_values(RecurNN *net, float x){
+  /* bptt->*_momentums should usually be (and already are) zero, but must be
+     non-zero for adagrad */
+  set_array_value(net->bptt->ho_momentum, net->ho_size, x);
+  set_array_value(net->bptt->ih_momentum, net->ih_size, x);
+  RecurExtraLayer *bl = net->bottom_layer;
+  if (bl){
+    set_array_value(bl->momentums, bl->i_size * bl->o_size, x);
+  }
+}
 
 /* Weight initialisation */
 

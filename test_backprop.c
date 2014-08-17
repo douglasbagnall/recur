@@ -87,7 +87,7 @@ Because of ccan/opt, --help will tell you something.
 #define DEFAULT_DUMP_COLLAPSED_TEXT NULL
 #define DEFAULT_MULTI_TAP 0
 #define DEFAULT_USE_MULTI_TAP_PATH 0
-#define DEFAULT_MOMENTUM_STYLE RNN_MOMENTUM_WEIGHTED
+#define DEFAULT_LEARNING_STYLE RNN_MOMENTUM_WEIGHTED
 #define DEFAULT_INIT_WEIGHT_SCALE 0
 #define DEFAULT_REPORT_INTERVAL 1024
 #define DEFAULT_CONFAB_ONLY 0
@@ -103,6 +103,7 @@ Because of ccan/opt, --help will tell you something.
 #define DEFAULT_FIND_ALPHABET_ALPHA_ADJUST 1.0
 #define DEFAULT_PRESYNAPTIC_NOISE 0.0f
 #define DEFAULT_ADJUST_NOISE false
+#define DEFAULT_ADA_BALLAST 1000.0f
 
 #define BELOW_QUIET_LEVEL(quiet) if (opt_quiet < quiet)
 
@@ -158,7 +159,7 @@ static float opt_confab_bias = DEFAULT_CONFAB_BIAS;
 static bool opt_save_net = DEFAULT_SAVE_NET;
 static uint opt_multi_tap = DEFAULT_MULTI_TAP;
 static bool opt_use_multi_tap_path = DEFAULT_USE_MULTI_TAP_PATH;
-static int opt_momentum_style = DEFAULT_MOMENTUM_STYLE;
+static int opt_learning_style = DEFAULT_LEARNING_STYLE;
 static uint opt_report_interval = DEFAULT_REPORT_INTERVAL;
 static uint opt_confab_only = DEFAULT_CONFAB_ONLY;
 static uint opt_bottom_layer = DEFAULT_BOTTOM_LAYER;
@@ -173,6 +174,8 @@ static double opt_find_alphabet_digit_adjust = DEFAULT_FIND_ALPHABET_DIGIT_ADJUS
 static double opt_find_alphabet_alpha_adjust = DEFAULT_FIND_ALPHABET_ALPHA_ADJUST;
 static float opt_presynaptic_noise = DEFAULT_PRESYNAPTIC_NOISE;
 static bool opt_adjust_noise = DEFAULT_ADJUST_NOISE;
+static float opt_ada_ballast = DEFAULT_ADA_BALLAST;
+
 
 static struct opt_table options[] = {
   OPT_WITH_ARG("-H|--hidden-size=<n>", opt_set_uintval, opt_show_uintval,
@@ -271,8 +274,9 @@ static struct opt_table options[] = {
       &opt_multi_tap, "read at n evenly spaced points in parallel"),
   OPT_WITHOUT_ARG("--use-multi-tap-path", opt_set_bool,
       &opt_use_multi_tap_path, "use multi-tap code path on single-tap tasks"),
-  OPT_WITH_ARG("--momentum-style=<n>", opt_set_intval, opt_show_intval,
-      &opt_momentum_style, "0: weighted, 1: Nesterov, 2: simplified N., 3: classical"),
+  OPT_WITH_ARG("--learning-style=<n>", opt_set_intval, opt_show_intval,
+      &opt_learning_style, "0: weighted, 1: Nesterov, 2: simplified N., "
+      "3: classical, 4: adagrad"),
   OPT_WITH_ARG("--init-weight-scale=<float>", opt_set_floatval, opt_show_floatval,
       &opt_init_weight_scale, "scale newly initialised weights (try ~1.0)"),
   OPT_WITH_ARG("--report-interval=<n>", opt_set_uintval_bi, opt_show_uintval_bi,
@@ -309,6 +313,8 @@ static struct opt_table options[] = {
       &opt_find_alphabet_alpha_adjust, "adjust letter frequency for alphabet calculation"),
   OPT_WITH_ARG("--presynaptic-noise", opt_set_floatval, opt_show_floatval,
       &opt_presynaptic_noise, "deviation of noise to add before non-linear transform"),
+  OPT_WITH_ARG("--ada-ballast", opt_set_floatval, opt_show_floatval,
+      &opt_ada_ballast, "adagrad accumulators start at this value"),
 
 
   OPT_WITHOUT_ARG("-h|--help", opt_usage_and_exit,
@@ -456,7 +462,7 @@ load_and_train_model(struct RnnCharMetadata *m, int *alphabet, int a_len,
     .batch_size = opt_batch_size,
     .momentum = opt_momentum,
     .momentum_soft_start = opt_momentum_soft_start,
-    .momentum_style = opt_momentum_style,
+    .learning_style = opt_learning_style,
     .periodic_weight_noise = opt_periodic_weight_noise,
     .report_interval = opt_report_interval,
     .save_net = opt_save_net,
@@ -507,6 +513,10 @@ load_and_train_model(struct RnnCharMetadata *m, int *alphabet, int a_len,
 
   rnn_char_init_schedule(&model.schedule, opt_learn_rate_inertia, opt_learn_rate_min,
       opt_learn_rate_scale, opt_adjust_noise);
+
+  if (model.learning_style == RNN_ADAGRAD){
+    rnn_set_momentum_values(net, opt_ada_ballast);
+  }
 
   /* get text and validation text */
   int text_len;

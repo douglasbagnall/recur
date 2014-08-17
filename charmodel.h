@@ -54,7 +54,7 @@ struct _RnnCharModel {
   char *filename;
   float momentum;
   float momentum_soft_start;
-  int momentum_style;
+  int learning_style;
   float periodic_weight_noise;
   uint report_interval;
   bool save_net;
@@ -101,7 +101,7 @@ typedef struct _RnnCharClassifier{
   char *filename;
   float momentum;
   float momentum_soft_start;
-  int momentum_style;
+  int learning_style;
   float periodic_weight_noise;
   uint report_interval;
   bool save_net;

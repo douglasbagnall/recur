@@ -216,7 +216,7 @@ rnn_char_epoch(RnnCharModel *model, RecurNN *confab_net, RnnCharVentropy *v,
   for(i = start; i < len - 1; i++){
     float momentum = rnn_calculate_momentum_soft_start(net->generation,
         model->momentum, model->momentum_soft_start);
-    if (n_nets > 1 || model->momentum_style != RNN_MOMENTUM_WEIGHTED ||
+    if (n_nets > 1 || model->learning_style != RNN_MOMENTUM_WEIGHTED ||
         model->use_multi_tap_path){
       for (j = 0; j < n_nets; j++){
         RecurNN *n = nets[j];
@@ -236,7 +236,7 @@ rnn_char_epoch(RnnCharModel *model, RecurNN *confab_net, RnnCharVentropy *v,
          */
         rnn_bptt_calc_deltas(n, j ? 1 : 0);
       }
-      rnn_apply_learning(net, model->momentum_style, momentum);
+      rnn_apply_learning(net, model->learning_style, momentum);
     }
     else {
       RecurNNBPTT *bptt = net->bptt;

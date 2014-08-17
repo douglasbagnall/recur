@@ -117,7 +117,7 @@ rnn_char_classify_epoch(RnnCharClassifier *model){
         offset -= len - 1;
       }
     }
-    rnn_apply_learning(net, model->momentum_style, momentum);
+    rnn_apply_learning(net, model->learning_style, momentum);
 
     report_counter++;
     if (report_counter == model->report_interval){

@@ -359,7 +359,7 @@ main(int argc, char *argv[]){
   model->pgm_name = "text-classify";
   model->momentum = opt_momentum;
   model->momentum_soft_start = 2000;
-  model->momentum_style = 0;
+  model->learning_style = 0;
   model->images.temporal_pgm_dump = 0;
   model->periodic_weight_noise = 0;
   model->report_interval = 1024;

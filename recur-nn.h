@@ -296,6 +296,8 @@ void rnn_apply_extra_layer_learning(RecurExtraLayer *layer);
 
 void rnn_weight_noise(RecurNN *net, float deviation);
 
+void rnn_set_momentum_values(RecurNN *net, float x);
+
 
 static inline void
 rnn_log_float(RecurNN *net, char *name, float value){
