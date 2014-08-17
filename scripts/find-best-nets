@@ -45,7 +45,7 @@ def print_summary(nets, n, cutoff):
         for i in range(n):
             v, fn = data[i]
             summary[fn] += calc_score(k, v, best)
-            print "%2d: %.4g %s" % (i + 1, v, fn)
+            print "%2d: %#.4g %s" % (i + 1, v, fn)
 
     best = [(v, k) for k, v in summary.iteritems()]
     best.sort(reverse=True)
@@ -60,7 +60,7 @@ def print_summary(nets, n, cutoff):
         else:
             rank = "    "
         oldv = v
-        print "%s %.4g %s" % (rank, v, fn)
+        print "%s %#.3g %s" % (rank, v, fn)
 
 
 def print_list(nets, n, cutoff):
