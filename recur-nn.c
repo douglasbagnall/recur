@@ -400,6 +400,22 @@ apply_learning_with_nesterov_momentum(float *restrict weights,
   add_aligned_arrays(weights, size, momentums, 1.0f);
 }
 
+static void
+apply_adagrad_learning(float *restrict weights,
+    const float *restrict delta, float *restrict accumulators,
+    int size, const float rate){
+  ASSUME_ALIGNED(accumulators);
+  ASSUME_ALIGNED(delta);
+  ASSUME_ALIGNED(weights);
+  for (int i = 0; i < size; i++){
+    float d = delta[i];
+    float a = accumulators[i];
+    a += d * d;
+    weights[i] += d * rate / sqrtf(a);
+    accumulators[i] = a;
+  }
+}
+
 float
 rnn_calculate_momentum_soft_start(float generation, float max_momentum, float x)
 {
@@ -407,11 +423,11 @@ rnn_calculate_momentum_soft_start(float generation, float max_momentum, float x)
 }
 
 void
-rnn_apply_learning(RecurNN *net, int momentum_style,
+rnn_apply_learning(RecurNN *net, int learning_method,
     float momentum){
   RecurNNBPTT *bptt = net->bptt;
   RecurExtraLayer *bl = net->bottom_layer;
-  if (momentum_style == RNN_MOMENTUM_NESTEROV){
+  if (learning_method == RNN_MOMENTUM_NESTEROV){
     apply_learning_with_nesterov_momentum(net->ho_weights, bptt->ho_delta,
         bptt->ho_momentum, net->ho_size, bptt->learn_rate * bptt->ho_scale, momentum);
     apply_learning_with_nesterov_momentum(net->ih_weights, bptt->ih_delta,
@@ -422,12 +438,22 @@ rnn_apply_learning(RecurNN *net, int momentum_style,
           momentum);
     }
   }
+  else if (learning_method == RNN_ADAGRAD){
+    apply_adagrad_learning(net->ho_weights, bptt->ho_delta,
+        bptt->ho_momentum, net->ho_size, bptt->learn_rate * bptt->ho_scale);
+    apply_adagrad_learning(net->ih_weights, bptt->ih_delta,
+        bptt->ih_momentum, net->ih_size, bptt->learn_rate);
+    if (bl){
+      apply_adagrad_learning(bl->weights, bl->delta, bl->momentums,
+          bl->i_size * bl->o_size, net->bptt->learn_rate * bl->learn_rate_scale);
+    }
+  }
   else {
     float momentum_weight;
-    if (momentum_style == RNN_MOMENTUM_SIMPLIFIED_NESTEROV){
+    if (learning_method == RNN_MOMENTUM_SIMPLIFIED_NESTEROV){
       momentum_weight = momentum / (1.0 + momentum);
     }
-    else if (momentum_style == RNN_MOMENTUM_CLASSICAL){
+    else if (learning_method == RNN_MOMENTUM_CLASSICAL){
       momentum_weight = 1.0f;
     }
     else {

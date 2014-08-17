@@ -105,12 +105,13 @@ enum {
 /*initial momentum weight for weighted momentum */
 #define RNN_MOMENTUM_WEIGHT 0.5f
 
-enum {
+typedef enum {
   RNN_MOMENTUM_WEIGHTED = 0,
   RNN_MOMENTUM_NESTEROV,
   RNN_MOMENTUM_SIMPLIFIED_NESTEROV,
-  RNN_MOMENTUM_CLASSICAL
-};
+  RNN_MOMENTUM_CLASSICAL,
+  RNN_ADAGRAD
+} rnn_learning_method;
 
 typedef enum {
   RNN_INIT_FLAT = 1,
@@ -278,7 +279,7 @@ int rnn_save_net(RecurNN *net, const char *filename, int backup);
 void rnn_bptt_clear_deltas(RecurNN *net);
 void rnn_bptt_advance(RecurNN *net);
 void rnn_bptt_calculate(RecurNN *net, uint batch_size);
-void rnn_apply_learning(RecurNN *net, int momentum_style, float momentum);
+void rnn_apply_learning(RecurNN *net, int learning_style, float momentum);
 float rnn_calculate_momentum_soft_start(float generation, float momentum,
     float momentum_soft_start);
 
