@@ -122,7 +122,7 @@ struct _GstClassify
   int ignored_windows;
   int training;
   int random_alignment;
-  int momentum_style;
+  int learning_style;
   float *error_weight;
   GValue *pending_properties;
   TemporalPPM *error_image;

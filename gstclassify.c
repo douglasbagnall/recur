@@ -32,7 +32,7 @@ enum
   PROP_KNEE_FREQUENCY,
   PROP_FOCUS_FREQUENCY,
   PROP_MOMENTUM,
-  PROP_MOMENTUM_STYLE,
+  PROP_LEARNING_STYLE,
   PROP_MOMENTUM_SOFT_START,
   PROP_MFCCS,
   PROP_SAVE_NET,
@@ -80,7 +80,7 @@ enum
 #define DEFAULT_PROP_INTENSITY_FEATURE FALSE
 #define DEFAULT_PROP_MOMENTUM 0.95f
 #define DEFAULT_PROP_MOMENTUM_SOFT_START 0.0f
-#define DEFAULT_PROP_MOMENTUM_STYLE 1
+#define DEFAULT_PROP_LEARNING_STYLE 1
 #define DEFAULT_MIN_FREQUENCY 100
 #define DEFAULT_KNEE_FREQUENCY 700
 #define DEFAULT_FOCUS_FREQUENCY 0
@@ -114,8 +114,8 @@ enum
 #define LEARN_RATE_MAX 1.0
 #define MOMENTUM_MIN 0.0
 #define MOMENTUM_MAX 1.0
-#define MOMENTUM_STYLE_MIN 0
-#define MOMENTUM_STYLE_MAX 2
+#define LEARNING_STYLE_MIN 0
+#define LEARNING_STYLE_MAX 2
 #define DEFAULT_PROP_WEIGHT_FAN_IN_SUM 0
 #define DEFAULT_PROP_WEIGHT_FAN_IN_KURTOSIS 0.3
 #define DEFAULT_PROP_LAG 0
@@ -504,11 +504,11 @@ gst_classify_class_init (GstClassifyClass * klass)
           DEFAULT_PROP_MOMENTUM,
           G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
-  g_object_class_install_property (gobject_class, PROP_MOMENTUM_STYLE,
+  g_object_class_install_property (gobject_class, PROP_LEARNING_STYLE,
       g_param_spec_int("momentum-style", "momentum-style",
           "0: hypersimplified Nesterov, 1: Nesterov, 2: classical momentum",
-          MOMENTUM_STYLE_MIN, MOMENTUM_STYLE_MAX,
-          DEFAULT_PROP_MOMENTUM_STYLE,
+          LEARNING_STYLE_MIN, LEARNING_STYLE_MAX,
+          DEFAULT_PROP_LEARNING_STYLE,
           G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class, PROP_HIDDEN_SIZE,
@@ -1498,8 +1498,8 @@ gst_classify_set_property (GObject * object, guint prop_id, const GValue * value
       self->weight_noise = g_value_get_float(value);
       break;
 
-    case PROP_MOMENTUM_STYLE:
-      self->momentum_style = g_value_get_int(value);
+    case PROP_LEARNING_STYLE:
+      self->learning_style = g_value_get_int(value);
       break;
 
       /*this causes the net to be loaded or created based on the properties so
@@ -1661,8 +1661,8 @@ gst_classify_get_property (GObject * object, guint prop_id, GValue * value,
   case PROP_WEIGHT_NOISE:
     g_value_set_float(value, self->weight_noise);
     break;
-  case PROP_MOMENTUM_STYLE:
-    g_value_set_int(value, self->momentum_style);
+  case PROP_LEARNING_STYLE:
+    g_value_set_int(value, self->learning_style);
     break;
   case PROP_WINDOW_SIZE:
     g_value_set_int(value, self->window_size);
@@ -1911,7 +1911,7 @@ maybe_learn(GstClassify *self){
     float momentum = rnn_calculate_momentum_soft_start(net->generation,
         net->bptt->momentum, self->momentum_soft_start);
 
-    rnn_apply_learning(net, self->momentum_style, momentum);
+    rnn_apply_learning(net, self->learning_style, momentum);
     rnn_condition_net(net);
     possibly_save_net(net, self->net_filename);
     rnn_log_net(net);
