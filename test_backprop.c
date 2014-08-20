@@ -372,22 +372,16 @@ initialise_net(RecurNN *net){
 }
 
 static RecurNN *
-load_or_create_net(struct RnnCharMetadata *m, int alpha_len, int reload){
+load_or_create_net(const char *filename, struct RnnCharMetadata *m,
+    int alpha_len, int reload, bool trust_file_metadata){
   char *metadata = rnn_char_construct_metadata(m);
-  char *filename = opt_filename;
-
-  if (filename == NULL){
-    filename = rnn_char_construct_net_filename(m, opt_basename, alpha_len,
-        opt_bottom_layer, opt_hidden_size, alpha_len);
-  }
-
   RecurNN *net = (reload) ? rnn_load_net(filename) : NULL;
   if (net){
     rnn_set_log_file(net, opt_logfile, 1);
     if (net->metadata && strcmp(metadata, net->metadata)){
       DEBUG("metadata doesn't match. Expected:\n%s\nLoaded from net:\n%s\n",
           metadata, net->metadata);
-      if (opt_filename && ! opt_force_metadata){
+      if (trust_file_metadata){
         /*this filename was specifically requested, so its metadata is
           presumably right. But first check if it even loads!*/
         struct RnnCharMetadata m2;
@@ -447,8 +441,8 @@ load_or_create_net(struct RnnCharMetadata *m, int alpha_len, int reload){
 
 static inline void
 finish(RnnCharModel *model, RnnCharVentropy *v){
-  if (opt_filename && opt_save_net){
-    rnn_save_net(model->net, opt_filename, 1);
+  if (model->filename && opt_save_net){
+    rnn_save_net(model->net, model->filename, 1);
   }
   BELOW_QUIET_LEVEL(3){
     RecurNNBPTT *bptt = model->net->bptt;
@@ -483,7 +477,16 @@ load_and_train_model(struct RnnCharMetadata *m, int *alphabet, int a_len,
     model.images.periodic_pgm_dump_string = opt_pgm_dump_images;
   }
 
-  RecurNN *net = load_or_create_net(m, a_len, opt_reload);
+  if (opt_filename){
+    model.filename = opt_filename;
+  }
+  else{
+    model.filename = rnn_char_construct_net_filename(m, opt_basename, a_len,
+        opt_bottom_layer, opt_hidden_size, a_len);
+  }
+
+  RecurNN *net = load_or_create_net(model.filename, m, a_len, opt_reload,
+      (bool)opt_filename);
   if (opt_override){
     RecurNNBPTT *bptt = net->bptt;
     bptt->learn_rate = opt_learn_rate;
@@ -696,7 +699,7 @@ main(int argc, char *argv[]){
     .utf8 = opt_utf8
   };
   if (opt_confab_only){
-    RecurNN *net = load_or_create_net(&m, a_len, 1);
+    RecurNN *net = load_or_create_net(opt_filename, &m, a_len, 1, 1);
     /*XXX this could be done in small chunks */
     int byte_len = opt_confab_only * 4 + 5;
     char *t = malloc(byte_len);
