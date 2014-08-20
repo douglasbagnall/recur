@@ -87,6 +87,7 @@ enum {
   RNN_NET_FLAG_NO_DELTAS = 256, /* allocated no delta array (borrow parent's)*/
   /*XXX accumulators flag is gone */
   RNN_NET_FLAG_BOTTOM_LAYER = 1024, /*network has a layer below RNN*/
+  RNN_NET_FLAG_AUX_ARRAYS = 2048, /*allocate an extra training array (adadelta, etc)*/
 
   /*conditioning flags start at 1 << 16 (65536) */
   RNN_COND_USE_SCALE = (1 << (RNN_COND_BIT_SCALE + RNN_COND_USE_OFFSET)),
@@ -110,7 +111,10 @@ typedef enum {
   RNN_MOMENTUM_NESTEROV,
   RNN_MOMENTUM_SIMPLIFIED_NESTEROV,
   RNN_MOMENTUM_CLASSICAL,
-  RNN_ADAGRAD
+  RNN_ADAGRAD,
+  RNN_ADADELTA,
+
+  RNN_LAST_MOMENTUM_METHOD
 } rnn_learning_method;
 
 typedef enum {
@@ -178,6 +182,8 @@ struct _RecurNNBPTT {
   float *ih_delta;
   float *ho_delta;
   float *ih_delta_tmp;
+  float *ih_aux;
+  float *ho_aux;
   float *mem;
   float learn_rate;
   float ih_scale;
@@ -191,6 +197,7 @@ struct _RecurExtraLayer {
   float *mem;
   float *weights;
   float *momentums;
+  float *aux;
   float *delta;
   float *inputs;
   float *outputs;

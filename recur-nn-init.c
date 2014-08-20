@@ -8,6 +8,7 @@ new_bptt(RecurNN *net, int depth, float learn_rate, float momentum, u32 flags){
   RecurNNBPTT *bptt = calloc(sizeof(RecurNNBPTT), 1);
   int own_momentums = ! (flags & RNN_NET_FLAG_NO_MOMENTUMS);
   int own_deltas = ! (flags & RNN_NET_FLAG_NO_DELTAS);
+  int aux_arrays = !!(flags & RNN_NET_FLAG_AUX_ARRAYS);
   MAYBE_DEBUG("allocated bptt %p", bptt);
   bptt->depth = depth;
   bptt->learn_rate = learn_rate;
@@ -19,6 +20,9 @@ new_bptt(RecurNN *net, int depth, float learn_rate, float momentum, u32 flags){
   }
   if (own_momentums){
     vlen += net->ih_size + net->ho_size;
+  }
+  if (aux_arrays){
+    vlen += net->ih_size + net->ho_size + 96;
   }
   vlen += depth * net->i_size;
 
@@ -51,6 +55,13 @@ new_bptt(RecurNN *net, int depth, float learn_rate, float momentum, u32 flags){
       fm += 32;
     }
     SET_ATTR_SIZE(ih_delta_tmp,  net->ih_size);
+  }
+  if (aux_arrays){
+    if (((((size_t)fm ^ (size_t)bptt->ih_delta_tmp) & 0x3ff)) == 0){
+      fm += 32;
+    }
+    SET_ATTR_SIZE(ih_aux,  net->ih_size);
+    SET_ATTR_SIZE(ho_aux,  net->ih_size);
   }
 
 #undef SET_ATTR_SIZE
@@ -154,8 +165,8 @@ rnn_new_extra_layer(int input_size, int output_size, int overlap,
   layer->i_size = ALIGNED_VECTOR_LEN(input_size + 1, float);
   layer->o_size = ALIGNED_VECTOR_LEN(output_size, float);
   int matrix_size = layer->i_size * layer->o_size;
-
-  size_t floats = matrix_size * 3; /* weights, delta, momentums */
+  int aux_array = !!(flags & RNN_NET_FLAG_AUX_ARRAYS);
+  size_t floats = matrix_size * (3 + aux_array); /* weights, delta, momentums */
   floats += (layer->i_size + layer->o_size) * 2; /* nodes and errors */
   layer->mem = zalloc_aligned_or_die(floats * sizeof(float));
   float *fm = layer->mem;
@@ -171,6 +182,9 @@ rnn_new_extra_layer(int input_size, int output_size, int overlap,
   SET_ATTR_SIZE(delta, matrix_size);
   SET_ATTR_SIZE(i_error, layer->i_size);
   SET_ATTR_SIZE(o_error, layer->o_size);
+  if (aux_array){
+    SET_ATTR_SIZE(aux, matrix_size);
+  }
 #undef SET_ATTR_SIZE
   return layer;
 }
@@ -738,6 +752,8 @@ rnn_multi_pgm_dump(RecurNN *net, const char *dumpees, const char *basename){
         array = bptt->ih_delta;
       else if (v == 't')
         array = bptt->ih_delta_tmp;
+      else if (v == 'a' && (net->flags & RNN_NET_FLAG_AUX_ARRAYS))
+        array = bptt->ih_aux;
       else
         continue;
     }
@@ -750,6 +766,8 @@ rnn_multi_pgm_dump(RecurNN *net, const char *dumpees, const char *basename){
         array = bptt->ho_momentum;
       else if (v == 'd')
         array = bptt->ho_delta;
+      else if (v == 'a' && (net->flags & RNN_NET_FLAG_AUX_ARRAYS))
+        array = bptt->ho_aux;
       else
         continue;
     }
@@ -765,6 +783,8 @@ rnn_multi_pgm_dump(RecurNN *net, const char *dumpees, const char *basename){
         array = b->momentums;
       else if (v == 'd')
         array = b->delta;
+      else if (v == 'a' && (net->flags & RNN_NET_FLAG_AUX_ARRAYS))
+        array = b->aux;
       else
         continue;
     }

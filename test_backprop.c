@@ -224,7 +224,7 @@ static struct opt_table options[] = {
   OPT_WITH_ARG("--learn-rate-scale=<int>", opt_set_floatval, opt_show_floatval,
       &opt_learn_rate_scale, "size of learn rate reductions"),
   OPT_WITH_ARG("-m|--momentum=<0-1>", opt_set_floatval01, opt_show_floatval,
-      &opt_momentum, "momentum"),
+      &opt_momentum, "momentum (or decay rate with adadelta)"),
   OPT_WITH_ARG("--momentum-weight=<0-1>", opt_set_floatval01, opt_show_floatval,
       &opt_momentum_weight, "momentum weight"),
   OPT_WITH_ARG("--momentum-soft-start=<float>", opt_set_floatval, opt_show_floatval,
@@ -276,7 +276,7 @@ static struct opt_table options[] = {
       &opt_use_multi_tap_path, "use multi-tap code path on single-tap tasks"),
   OPT_WITH_ARG("--learning-style=<n>", opt_set_intval, opt_show_intval,
       &opt_learning_style, "0: weighted, 1: Nesterov, 2: simplified N., "
-      "3: classical, 4: adagrad"),
+      "3: classical, 4: adagrad, 5: adadelta"),
   OPT_WITH_ARG("--init-weight-scale=<float>", opt_set_floatval, opt_show_floatval,
       &opt_init_weight_scale, "scale newly initialised weights (try ~1.0)"),
   OPT_WITH_ARG("--report-interval=<n>", opt_set_uintval_bi, opt_show_uintval_bi,
@@ -314,7 +314,7 @@ static struct opt_table options[] = {
   OPT_WITH_ARG("--presynaptic-noise", opt_set_floatval, opt_show_floatval,
       &opt_presynaptic_noise, "deviation of noise to add before non-linear transform"),
   OPT_WITH_ARG("--ada-ballast", opt_set_floatval, opt_show_floatval,
-      &opt_ada_ballast, "adagrad accumulators start at this value"),
+      &opt_ada_ballast, "adagrad/adadelta accumulators start at this value"),
 
 
   OPT_WITHOUT_ARG("-h|--help", opt_usage_and_exit,
@@ -424,6 +424,10 @@ load_or_create_net(struct RnnCharMetadata *m, int alpha_len, int reload){
     if (opt_bptt_adaptive_min){/*on by default*/
       flags |= RNN_NET_FLAG_BPTT_ADAPTIVE_MIN_ERROR;
     }
+    if (opt_learning_style == RNN_ADADELTA){
+      flags |= RNN_NET_FLAG_AUX_ARRAYS;
+    }
+
     net = rnn_new_with_bottom_layer(input_size, opt_bottom_layer,
         opt_hidden_size, output_size, flags, opt_rng_seed,
         opt_logfile, opt_bptt_depth, opt_learn_rate,
