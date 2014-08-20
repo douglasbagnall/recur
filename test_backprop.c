@@ -215,7 +215,7 @@ static struct opt_table options[] = {
       &opt_validation_overlap, "> 1 to use lapped validation (quicker)"),
   OPT_WITH_ARG("--start-char=<n>", opt_set_intval, opt_show_intval,
       &opt_start_char, "character to start epoch on (-1 for auto)"),
-  OPT_WITH_ARG("-l|--learn-rate=<0-1>", opt_set_floatval01, opt_show_floatval,
+  OPT_WITH_ARG("-l|--learn-rate=<0-1>", opt_set_floatval, opt_show_floatval,
       &opt_learn_rate, "initial learning rate"),
   OPT_WITH_ARG("--learn-rate-min=<0-1>", opt_set_floatval01, opt_show_floatval,
       &opt_learn_rate_min, "minimum learning rate (>learn-rate is off)"),
