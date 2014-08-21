@@ -431,10 +431,10 @@ apply_adadelta_learning(float *restrict weights,
     float g = gradient_accumulators[i];
     float s = step_accumulators[i];
     g *= decay;
-    g += d * d * renewal;
-    float step = sqrtf((s + rate) / (g + rate)) * d;
+    g += d * d * renewal + rate;
+    float step = sqrtf(s / g) * d;
     s *= decay;
-    s += step * step * renewal;
+    s += step * step * renewal + rate;
     gradient_accumulators[i] = g;
     step_accumulators[i] = s;
     weights[i] += step;
