@@ -403,7 +403,7 @@ apply_learning_with_nesterov_momentum(float *restrict weights,
 static void
 apply_adagrad_learning(float *restrict weights,
     const float *restrict delta, float *restrict accumulators,
-    int size, const float rate){
+    int size, float rate){
   ASSUME_ALIGNED(accumulators);
   ASSUME_ALIGNED(delta);
   ASSUME_ALIGNED(weights);
@@ -425,21 +425,19 @@ apply_adadelta_learning(float *restrict weights,
   ASSUME_ALIGNED(step_accumulators);
   ASSUME_ALIGNED(delta);
   ASSUME_ALIGNED(weights);
-  const float z = 1e-6;
+  const float renewal = 1.0f - decay;
   for (int i = 0; i < size; i++){
     float d = delta[i];
-    float a = gradient_accumulators[i];
+    float g = gradient_accumulators[i];
     float s = step_accumulators[i];
-    a *= decay;
-    a += z;
-    a += d * d;// * (1 - decay);
-    float step = rate * sqrtf((s) / (a)) * d;
-    weights[i] += step;
-    s *= decay * decay;
-    s += z;
-    s += step * step;// * (1 - decay);
-    gradient_accumulators[i] = a;
+    g *= decay;
+    g += d * d * renewal;
+    float step = sqrtf((s + rate) / (g + rate)) * d;
+    s *= decay;
+    s += step * step * renewal;
+    gradient_accumulators[i] = g;
     step_accumulators[i] = s;
+    weights[i] += step;
   }
 }
 
