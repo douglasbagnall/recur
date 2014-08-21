@@ -146,8 +146,8 @@ rnn_char_confabulate(RecurNN *net, char *dest, int char_len,
       j += write_utf8_char(alphabet[n], dest + j);
     }
     else {
-      j = i;
       dest[j] = alphabet[n];
+      j++;
     }
   }
   dest[j] = 0;
