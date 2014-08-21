@@ -149,7 +149,9 @@ test/test_charmodel%: test/test_charmodel%.o $(RNN_OBJECTS) charmodel-predict.o 
 	$(CC) -Wl,-O1 $^  -I. $(DEFINES)  $(COMMON_LINKS)   -o $@
 
 #actually there are more path.h dependers.
-test_backprop.o test/test_fb_backprop.o test/test_rescale.o test/test_charmodel.o :path.h
+test/test_fb_backprop.o test/test_rescale.o test/test_charmodel.o :path.h
+
+test_backprop.o: config.h path.h
 
 test/test_%: test/test_%.o
 	$(CC) -Wl,-O1 $^  -I. $(DEFINES)  $(COMMON_LINKS)   -o $@
@@ -164,7 +166,7 @@ test/test_fb_backprop: %: $(RNN_OBJECTS) %.o $(OPT_OBJECTS)  | nets images
 	$(CC) -Iccan/opt/ -Wl,-O1 $(filter %.o,$^)   -I. $(DEFINES)  $(COMMON_LINKS)  -o $@
 
 test_backprop: %: $(RNN_OBJECTS) %.o charmodel-predict.o charmodel-init.o $(OPT_OBJECTS)  \
-	config.h  | nets images
+	| nets images
 	$(CC) -Iccan/opt/ -Wl,-O1 $(filter %.o,$^)   -I. $(DEFINES)  $(COMMON_LINKS)  -o $@
 
 text-classify: %: $(RNN_OBJECTS) %.o charmodel-classify.o charmodel-init.o \
