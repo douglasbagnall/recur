@@ -10,6 +10,7 @@ DEFAULT_LEARN_RATE = 3e-5
 DEFAULT_LEARN_RATE_DECAY = 1e-6
 DEFAULT_LEARN_RATE_MIN = 1e-8
 DEFAULT_MOMENTUM = 0.93
+DEFAULT_LEARNING_STYLE = 0
 DEFAULT_MOMENTUM_SOFT_START = 5000
 DEFAULT_LEARN_RATE_TIME_OFFSET = 2000.0
 
@@ -24,6 +25,9 @@ def main():
     group = parser.add_argument_group('classify-train specific arguments')
     group.add_argument('-l', '--learn-rate', type=float, default=DEFAULT_LEARN_RATE,
                        help="learning rate")
+    group.add_argument('--learning-style', type=int, default=DEFAULT_LEARNING_STYLE,
+                       help="0: weighted, 1: Nesterov, 2: simplified N., "
+                       "3: classical, 4: adagrad, 5:adadelta")
     group.add_argument('--momentum', type=float, default=DEFAULT_MOMENTUM,
                        help="learning momentum")
     group.add_argument('--momentum-soft-start', type=float,
@@ -115,7 +119,7 @@ def main():
             log_file=args.log_file,
             properties=(('momentum-soft-start', args.momentum_soft_start),
                         ('momentum', args.momentum),
-                        #('momentum-style', 1),
+                        ('learning-style', args.learning_style),
                         #('weight-fan-in-sum', 4),
                         #('weight-fan-in-kurtosis', 0.15),
                         ('weight-init-method', 3),

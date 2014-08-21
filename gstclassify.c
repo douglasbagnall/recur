@@ -63,6 +63,7 @@ enum
   PROP_LOAD_NET_NOW,
   PROP_WINDOWS_PER_SECOND,
   PROP_PRESYNAPTIC_NOISE,
+  PROP_ADAGRAD_BALLAST,
 
   PROP_LAST
 };
@@ -92,6 +93,7 @@ enum
 #define DEFAULT_PROP_GENERATION 0
 #define DEFAULT_PROP_WINDOWS_PER_SECOND 0
 #define DEFAULT_PROP_PRESYNAPTIC_NOISE 0
+#define DEFAULT_PROP_ADAGRAD_BALLAST 200
 
 #define DEFAULT_PROP_CLASSES "01"
 #define DEFAULT_PROP_BPTT_DEPTH 30
@@ -115,7 +117,7 @@ enum
 #define MOMENTUM_MIN 0.0
 #define MOMENTUM_MAX 1.0
 #define LEARNING_STYLE_MIN 0
-#define LEARNING_STYLE_MAX 2
+#define LEARNING_STYLE_MAX (RNN_LAST_MOMENTUM_METHOD - 1)
 #define DEFAULT_PROP_WEIGHT_FAN_IN_SUM 0
 #define DEFAULT_PROP_WEIGHT_FAN_IN_KURTOSIS 0.3
 #define DEFAULT_PROP_LAG 0
@@ -505,7 +507,7 @@ gst_classify_class_init (GstClassifyClass * klass)
           G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class, PROP_LEARNING_STYLE,
-      g_param_spec_int("momentum-style", "momentum-style",
+      g_param_spec_int("learning-style", "learning-style",
           "0: hypersimplified Nesterov, 1: Nesterov, 2: classical momentum",
           LEARNING_STYLE_MIN, LEARNING_STYLE_MAX,
           DEFAULT_PROP_LEARNING_STYLE,
@@ -569,6 +571,13 @@ gst_classify_class_init (GstClassifyClass * klass)
           "Add this much noise before nonlinear tranform",
           0, G_MAXFLOAT,
           DEFAULT_PROP_PRESYNAPTIC_NOISE,
+          G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
+
+  g_object_class_install_property (gobject_class, PROP_ADAGRAD_BALLAST,
+      g_param_spec_float("adagrad-ballast", "adagrad-ballast",
+          "Start with this gradient sum when using ADAGRAD",
+          0, G_MAXFLOAT,
+          DEFAULT_PROP_ADAGRAD_BALLAST,
           G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class, PROP_GENERATION,
@@ -937,6 +946,12 @@ create_net(GstClassify *self, int bottom_layer_size,
       NULL, bptt_depth, learn_rate, momentum, presynaptic_noise, 0);
 
   initialise_net(self, net);
+
+  if (self->learning_style == RNN_ADAGRAD){
+    float ada_ballast = PP_GET_FLOAT(self, PROP_ADAGRAD_BALLAST,
+        DEFAULT_PROP_ADAGRAD_BALLAST);
+    rnn_set_momentum_values(net, ada_ballast);
+  }
 
   if (weight_init_scale){
     rnn_scale_initial_weights(net, weight_init_scale);
