@@ -85,7 +85,7 @@ eval_simple(RnnCharModel *model, float score, int verbose){
   RecurNN *net = model->net;
   RnnCharSchedule *s = &model->schedule;
   RecurNNBPTT *bptt = net->bptt;
-  if (bptt->learn_rate <= s->learn_rate_min){
+  if (s->recent_len == 0 || bptt->learn_rate <= s->learn_rate_min){
     return;
   }
   int sample_size = s->recent_len / 3;
@@ -98,6 +98,7 @@ eval_simple(RnnCharModel *model, float score, int verbose){
   for (++i, j = 0; j < sample_size; j++, i++){
     if (i >= s->recent_len)
       i = 0;
+    MAYBE_DEBUG("score %f vs %f", score, s->recent[i]);
     if (score < s->recent[i]){
       return;
     }
@@ -119,12 +120,14 @@ eval_simple(RnnCharModel *model, float score, int verbose){
 void
 rnn_char_init_schedule(RnnCharSchedule *s, int recent_len,
     float learn_rate_min, float learn_rate_mul, int adjust_noise){
-  s->recent = malloc_aligned_or_die(recent_len * sizeof(float));
   s->recent_len = recent_len;
-  s->learn_rate_min = learn_rate_min;
-  s->learn_rate_mul = learn_rate_mul;
-  for (int i = 0; i < s->recent_len; i++){
-    s->recent[i] = 1e10;
+  if (recent_len){
+    s->recent = malloc_aligned_or_die(recent_len * sizeof(float));
+    s->learn_rate_min = learn_rate_min;
+    s->learn_rate_mul = learn_rate_mul;
+    for (int i = 0; i < s->recent_len; i++){
+      s->recent[i] = 1e10;
+    }
   }
   s->timeout = s->recent_len;
   s->eval = eval_simple;

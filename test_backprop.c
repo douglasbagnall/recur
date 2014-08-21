@@ -51,9 +51,9 @@ Because of ccan/opt, --help will tell you something.
 #define DEFAULT_TEMPORAL_PGM_DUMP 0
 #define DEFAULT_RELOAD 0
 #define DEFAULT_LEARN_RATE 0.001
-#define DEFAULT_LEARN_RATE_MIN DEFAULT_LEARN_RATE
-#define DEFAULT_LEARN_RATE_INERTIA 60
-#define DEFAULT_LEARN_RATE_SCALE 0.4
+#define DEFAULT_LEARN_RATE_MIN 0
+#define DEFAULT_LEARN_RATE_INERTIA 0
+#define DEFAULT_LEARN_RATE_SCALE 0.5
 #define DEFAULT_BPTT_DEPTH 30
 #define DEFAULT_BPTT_ADAPTIVE_MIN 1
 #define DEFAULT_MOMENTUM 0.95
@@ -103,7 +103,8 @@ Because of ccan/opt, --help will tell you something.
 #define DEFAULT_FIND_ALPHABET_ALPHA_ADJUST 1.0
 #define DEFAULT_PRESYNAPTIC_NOISE 0.0f
 #define DEFAULT_ADJUST_NOISE false
-#define DEFAULT_ADA_BALLAST 1000.0f
+#define DEFAULT_ADAGRAD_BALLAST 200.0f
+#define DEFAULT_ADADELTA_BALLAST 0
 
 #define BELOW_QUIET_LEVEL(quiet) if (opt_quiet < quiet)
 
@@ -174,7 +175,7 @@ static double opt_find_alphabet_digit_adjust = DEFAULT_FIND_ALPHABET_DIGIT_ADJUS
 static double opt_find_alphabet_alpha_adjust = DEFAULT_FIND_ALPHABET_ALPHA_ADJUST;
 static float opt_presynaptic_noise = DEFAULT_PRESYNAPTIC_NOISE;
 static bool opt_adjust_noise = DEFAULT_ADJUST_NOISE;
-static float opt_ada_ballast = DEFAULT_ADA_BALLAST;
+static float opt_ada_ballast = -1;
 
 
 static struct opt_table options[] = {
@@ -522,6 +523,15 @@ load_and_train_model(struct RnnCharMetadata *m, int *alphabet, int a_len,
       opt_learn_rate_scale, opt_adjust_noise);
 
   if (model.learning_style == RNN_ADAGRAD){
+    if (opt_ada_ballast < 0){
+      opt_ada_ballast = DEFAULT_ADAGRAD_BALLAST;
+    }
+    rnn_set_momentum_values(net, opt_ada_ballast);
+  }
+  else if (model.learning_style == RNN_ADADELTA){
+    if (opt_ada_ballast < 0){
+      opt_ada_ballast = DEFAULT_ADADELTA_BALLAST;
+    }
     rnn_set_momentum_values(net, opt_ada_ballast);
   }
 
