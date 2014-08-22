@@ -64,6 +64,7 @@ enum
   PROP_WINDOWS_PER_SECOND,
   PROP_PRESYNAPTIC_NOISE,
   PROP_ADAGRAD_BALLAST,
+  PROP_ACTIVATION,
 
   PROP_LAST
 };
@@ -587,6 +588,13 @@ gst_classify_class_init (GstClassifyClass * klass)
           DEFAULT_PROP_GENERATION,
           G_PARAM_READABLE | G_PARAM_STATIC_STRINGS));
 
+  g_object_class_install_property (gobject_class, PROP_ACTIVATION,
+      g_param_spec_int("activation", "activation",
+          "Activation function (1: ReLU, 2: ReSQRT, 3: ReLOG)",
+          RNN_RELU, RNN_ACTIVATION_LAST - 1,
+          RNN_RELU,
+          G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
+
   g_object_class_install_property (gobject_class, PROP_WINDOWS_PER_SECOND,
       g_param_spec_double("windows-per-second", "windows-per-second",
           "Expect this many classifications per second",
@@ -921,6 +929,7 @@ create_net(GstClassify *self, int bottom_layer_size,
   int n_features = get_n_features(self);
   u32 flags = CLASSIFY_RNN_FLAGS;
   int bptt_depth = PP_GET_INT(self, PROP_BPTT_DEPTH, DEFAULT_PROP_BPTT_DEPTH);
+  int activation = PP_GET_INT(self, PROP_ACTIVATION, RNN_RELU);
   float momentum = PP_GET_FLOAT(self, PROP_MOMENTUM, DEFAULT_PROP_MOMENTUM);
   float learn_rate = PP_GET_FLOAT(self, PROP_LEARN_RATE, DEFAULT_LEARN_RATE);
   float bottom_learn_rate_scale = PP_GET_FLOAT(self, PROP_BOTTOM_LEARN_RATE_SCALE,
@@ -943,7 +952,7 @@ create_net(GstClassify *self, int bottom_layer_size,
   }
   net = rnn_new_with_bottom_layer(n_features, bottom_layer_size, hidden_size,
       top_layer_size, flags, rng_seed,
-      NULL, bptt_depth, learn_rate, momentum, presynaptic_noise, RNN_RELU, 0);
+      NULL, bptt_depth, learn_rate, momentum, presynaptic_noise, activation, 0);
 
   initialise_net(self, net);
 
@@ -1573,6 +1582,8 @@ gst_classify_set_property (GObject * object, guint prop_id, const GValue * value
     case PROP_INTENSITY_FEATURE:
     case PROP_MFCCS:
     case PROP_WEIGHT_INIT_SCALE:
+    case PROP_ADAGRAD_BALLAST:
+    case PROP_ACTIVATION:
       if (self->net == NULL){
         copy_gvalue(PENDING_PROP(self, prop_id), value);
       }

@@ -77,6 +77,7 @@ KEYS = {'net.i_size': (read_int, True),
         'save_format_version': (read_int, True),
         'net.metadata': (read_string, True),
         'net.presynaptic_noise': (read_float, True),
+        'net.activation': (read_int, True),
 
         #older versions
         'bias': (read_int, True),

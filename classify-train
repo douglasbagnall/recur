@@ -65,6 +65,8 @@ def main():
                        help="scale weights to approximately this gain")
     group.add_argument('--log-file', default="auto",
                        help="log to this file (default: based on net basename)")
+    group.add_argument('--activation', default=1, type=int,
+                       help="activation function (1: Relu, 2: ReSQRT, 3: ReLOG)")
     args = parser.parse_args()
 
     if args.learn_rate_schedule == "flat":
@@ -124,6 +126,7 @@ def main():
                         #('weight-fan-in-kurtosis', 0.15),
                         ('weight-init-method', 3),
                         ('presynaptic-noise', args.presynaptic_noise),
+                        ('activation', args.activation)
                     ))
 
 main()
