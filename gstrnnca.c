@@ -327,7 +327,7 @@ load_or_create_net(GstRnnca *self){
     net = rnn_new(input_size, self->hidden_size, 3,
         RNNCA_RNN_FLAGS, RNNCA_RNG_SEED,
         NULL, RNNCA_BPTT_DEPTH, DEFAULT_LEARN_RATE,
-        RNNCA_PRESYNAPTIC_NOISE, self->momentum);
+        self->momentum, RNNCA_PRESYNAPTIC_NOISE, RNN_RELU);
     rnn_randomise_weights_auto(net);
     //net->bptt->ho_scale = 0.25;
   }

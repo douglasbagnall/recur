@@ -39,8 +39,9 @@ rnn_save_net(RecurNN *net, const char *filename, int backup){
    * 7: includes net->clockwork_cycles
    * 8: drops net->clockwork_cycles
    * 9: add net->presynaptic_noise
+   * 10: add net->activation
    */
-  const int version = 9;
+  const int version = 10;
   cdb_make_add(&cdbm, FORMAT_VERSION, strlen(FORMAT_VERSION), &version, sizeof(version));
 
 #define SAVE_SCALAR(obj, attr) do {                                     \
@@ -83,6 +84,7 @@ rnn_save_net(RecurNN *net, const char *filename, int backup){
   SAVE_SCALAR(net, generation);
   SAVE_SCALAR(net, flags);
   SAVE_SCALAR(net, presynaptic_noise);
+  SAVE_SCALAR(net, activation);
   SAVE_SCALAR(net, rng); /* a struct, should work? */
 
   SAVE_ARRAY(net, ih_weights, net->ih_size);
@@ -206,6 +208,7 @@ rnn_load_net(const char *filename){
   READ_SCALAR(net, generation);
   READ_SCALAR(net, flags);
   READ_SCALAR_IF_VERSION_ELSE_DEFAULT(net, presynaptic_noise, 9, 0);
+  READ_SCALAR_IF_VERSION_ELSE_DEFAULT(net, activation, 10, RNN_RELU);
 
   if (tmpnet.flags & RNN_NET_FLAG_OWN_BPTT){
     READ_SCALAR(bptt, depth);
@@ -232,13 +235,13 @@ rnn_load_net(const char *filename){
     net = rnn_new_with_bottom_layer(tmpbl.input_size, tmpbl.output_size,
         tmpnet.hidden_size, tmpnet.output_size, tmpnet.flags, 0, NULL,
         tmpbptt.depth, tmpbptt.learn_rate, tmpbptt.momentum,
-        tmpnet.presynaptic_noise, tmpbl.overlap);
+        tmpnet.presynaptic_noise, tmpnet.activation, tmpbl.overlap);
   }
   else {
     net = rnn_new(tmpnet.input_size, tmpnet.hidden_size,
         tmpnet.output_size, tmpnet.flags, 0, NULL,
         tmpbptt.depth, tmpbptt.learn_rate, tmpbptt.momentum,
-        tmpnet.presynaptic_noise);
+        tmpnet.presynaptic_noise, tmpnet.activation);
   }
   bptt = net->bptt;
   bottom_layer = net->bottom_layer;
@@ -277,6 +280,7 @@ rnn_load_net(const char *filename){
   CHECK_SCALAR(net, tmpnet, generation);
   CHECK_SCALAR(net, tmpnet, flags);
   CHECK_SCALAR(net, tmpnet, presynaptic_noise);
+  CHECK_SCALAR(net, tmpnet, activation);
 
   if (bptt){
     CHECK_SCALAR(bptt, tmpbptt, depth);

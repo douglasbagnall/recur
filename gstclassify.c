@@ -943,7 +943,7 @@ create_net(GstClassify *self, int bottom_layer_size,
   }
   net = rnn_new_with_bottom_layer(n_features, bottom_layer_size, hidden_size,
       top_layer_size, flags, rng_seed,
-      NULL, bptt_depth, learn_rate, momentum, presynaptic_noise, 0);
+      NULL, bptt_depth, learn_rate, momentum, presynaptic_noise, RNN_RELU, 0);
 
   initialise_net(self, net);
 

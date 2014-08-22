@@ -127,6 +127,14 @@ typedef enum {
 } rnn_init_method;
 
 typedef enum {
+  RNN_RELU = 1,
+  RNN_RESQRT,
+  RNN_RELOG,
+
+  RNN_ACTIVATION_LAST
+} rnn_activation;
+
+typedef enum {
   /*if you change this, also change test_backprop's
     --flat-init-distribution documentation*/
   RNN_INIT_DIST_UNIFORM = 1,
@@ -169,6 +177,7 @@ struct _RecurNN {
   char *metadata;
   u32 generation;
   float presynaptic_noise;
+  rnn_activation activation;
 };
 
 struct _RecurNNBPTT {
@@ -247,7 +256,7 @@ struct RecurInitialisationParameters {
 
 RecurNN * rnn_new(uint input_size, uint hidden_size, uint output_size,
     u32 flags, u64 rng_seed, const char *log_file, int depth, float learn_rate,
-    float momentum, float presynaptic_noise);
+    float momentum, float presynaptic_noise, rnn_activation activation);
 
 RecurNN * rnn_clone(RecurNN *parent, u32 flags, u64 rng_seed, const char *log_file);
 
@@ -257,7 +266,8 @@ RecurExtraLayer *rnn_new_extra_layer(int input_size, int output_size, int overla
 RecurNN *rnn_new_with_bottom_layer(int n_inputs, int r_input_size,
     int hidden_size, int output_size, u32 flags, u64 rng_seed,
     const char *log_file, int bptt_depth, float learn_rate,
-    float momentum, float presynaptic_noise, int convolutional_overlap);
+    float momentum, float presynaptic_noise,
+    rnn_activation activation, int convolutional_overlap);
 
 
 void rnn_set_log_file(RecurNN *net, const char * log_file, int append_dont_truncate);

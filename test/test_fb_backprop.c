@@ -132,7 +132,8 @@ main(void){
   feenableexcept(FE_DIVBYZERO | FE_INVALID | FE_OVERFLOW);
   RecurNN *net = rnn_new(INPUT_SIZE, HIDDEN_SIZE,
       INPUT_SIZE, RNN_NET_FLAG_STANDARD,
-      1, NET_LOG_FILE, BPTT_DEPTH, LEARN_RATE, 0, MOMENTUM);
+      1, NET_LOG_FILE, BPTT_DEPTH, LEARN_RATE, 0, MOMENTUM,
+      RNN_RELU);
   rnn_randomise_weights_auto(net);
   START_TIMER(epoch);
   epoch(net, 5000000);

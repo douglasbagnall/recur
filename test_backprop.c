@@ -82,6 +82,7 @@ Because of ccan/opt, --help will tell you something.
 #define DEFAULT_INIT_HIDDEN_RUN_LENGTH -1.0f
 #define DEFAULT_INIT_HIDDEN_RUN_DEVIATION -1.0f
 #define DEFAULT_PERFORATE_WEIGHTS 0.0f
+#define DEFAULT_ACTIVATION RNN_RELU
 
 #define DEFAULT_FORCE_METADATA 0
 #define DEFAULT_DUMP_COLLAPSED_TEXT NULL
@@ -176,7 +177,7 @@ static double opt_find_alphabet_alpha_adjust = DEFAULT_FIND_ALPHABET_ALPHA_ADJUS
 static float opt_presynaptic_noise = DEFAULT_PRESYNAPTIC_NOISE;
 static bool opt_adjust_noise = DEFAULT_ADJUST_NOISE;
 static float opt_ada_ballast = -1;
-
+static int opt_activation = DEFAULT_ACTIVATION;
 
 static struct opt_table options[] = {
   OPT_WITH_ARG("-H|--hidden-size=<n>", opt_set_uintval, opt_show_uintval,
@@ -316,6 +317,8 @@ static struct opt_table options[] = {
       &opt_presynaptic_noise, "deviation of noise to add before non-linear transform"),
   OPT_WITH_ARG("--ada-ballast", opt_set_floatval, opt_show_floatval,
       &opt_ada_ballast, "adagrad/adadelta accumulators start at this value"),
+  OPT_WITH_ARG("--activation", opt_set_intval, opt_show_intval,
+      &opt_activation, "activation function 1: ReLU, 2: ReSQRT, 3: ReLOG"),
 
 
   OPT_WITHOUT_ARG("-h|--help", opt_usage_and_exit,
@@ -426,7 +429,7 @@ load_or_create_net(const char *filename, struct RnnCharMetadata *m,
     net = rnn_new_with_bottom_layer(input_size, opt_bottom_layer,
         opt_hidden_size, output_size, flags, opt_rng_seed,
         opt_logfile, opt_bptt_depth, opt_learn_rate,
-        opt_momentum, opt_presynaptic_noise, 0);
+        opt_momentum, opt_presynaptic_noise, opt_activation, 0);
     initialise_net(net);
     net->bptt->momentum_weight = opt_momentum_weight;
     net->metadata = strdup(metadata);

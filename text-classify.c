@@ -383,7 +383,7 @@ main(int argc, char *argv[]){
   u32 net_flags = RNN_NET_FLAG_STANDARD | RNN_NET_FLAG_BPTT_ADAPTIVE_MIN_ERROR;
   RecurNN *net = rnn_new(t->a_len, opt_hidden_size, t->n_classes, net_flags,
       opt_rng_seed, opt_logfile, opt_bptt_depth, opt_learn_rate,
-      opt_momentum, opt_presynaptic_noise);
+      opt_momentum, opt_presynaptic_noise, RNN_RELU);
   rnn_randomise_weights_auto(net);
 
   net->bptt->momentum_weight = 0.5;
