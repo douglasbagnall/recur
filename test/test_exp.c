@@ -481,7 +481,7 @@ test_double_range(double (*fn1)(double), double (*fn2)(double),
   START_TIMER(name); \
   float sum ## name = 0.0;                    \
   for (int i = 0; i < N; i++){              \
-    sum ## name += fn(i + 0.1);     \
+    sum ## name += fn(i * 1e-6 + 1);     \
   }                                           \
   DEBUG_TIMER(name);                            \
   DEBUG("%s float sum %f", QUOTE(name), sum ## name);
@@ -524,8 +524,8 @@ test_double_range(double (*fn1)(double), double (*fn2)(double),
 
 int
 main(void){
-  test_float_range(expf, fast_expf_mineiro, -10, 10, 1.4);
-  //test_float_range(logf, fast_logf_mineiro2, 0.001, 170, 1.4);
+  //test_float_range(expf, fast_expf_mineiro, -10, 10, 1.4);
+  test_float_range(logf, fast_logf_b_pade, 1, 10, 1e-1);
   //test_double_range(exp, fast_exp_bits_33, -10, 10, 0.3);
   //test_double_range(log, fast_log_b_pade, 0.0001, 11, 0.4);
   rand_ctx rng;
