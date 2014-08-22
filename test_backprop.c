@@ -277,7 +277,7 @@ static struct opt_table options[] = {
       &opt_use_multi_tap_path, "use multi-tap code path on single-tap tasks"),
   OPT_WITH_ARG("--learning-style=<n>", opt_set_intval, opt_show_intval,
       &opt_learning_style, "0: weighted, 1: Nesterov, 2: simplified N., "
-      "3: classical, 4: adagrad, 5: adadelta"),
+      "3: classical, 4: adagrad, 5: adadelta, 6: rprop"),
   OPT_WITH_ARG("--init-weight-scale=<float>", opt_set_floatval, opt_show_floatval,
       &opt_init_weight_scale, "scale newly initialised weights (try ~1.0)"),
   OPT_WITH_ARG("--report-interval=<n>", opt_set_uintval_bi, opt_show_uintval_bi,
@@ -419,7 +419,7 @@ load_or_create_net(const char *filename, struct RnnCharMetadata *m,
     if (opt_bptt_adaptive_min){/*on by default*/
       flags |= RNN_NET_FLAG_BPTT_ADAPTIVE_MIN_ERROR;
     }
-    if (opt_learning_style == RNN_ADADELTA){
+    if (opt_learning_style == RNN_ADADELTA || opt_learning_style == RNN_RPROP){
       flags |= RNN_NET_FLAG_AUX_ARRAYS;
     }
 
@@ -534,7 +534,9 @@ load_and_train_model(struct RnnCharMetadata *m, int *alphabet, int a_len,
     }
     rnn_set_momentum_values(net, opt_ada_ballast);
   }
-
+  else if (model.learning_style == RNN_RPROP){
+    rnn_set_aux_values(net, 1);
+  }
   /* get text and validation text */
   int text_len;
   u8* validate_text;

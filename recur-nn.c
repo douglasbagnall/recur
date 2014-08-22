@@ -449,6 +449,41 @@ apply_adadelta_learning(float *restrict weights,
   }
 }
 
+static void
+apply_rprop_learning(float *restrict weights,
+    const float *restrict delta, float *restrict prev_gradient,
+    float *restrict prev_step, int size, float rate, float decay){
+  ASSUME_ALIGNED(prev_gradient);
+  ASSUME_ALIGNED(delta);
+  ASSUME_ALIGNED(weights);
+  /*Conventional values */
+  const float shrink = 0.5f;
+  const float grow = 1.2f;
+  /*not so conventional*/
+  const float max_step = 1 * rate;
+  const float min_step = 1e-6 * rate;
+  for (int i = 0; i < size; i++){
+    float d = delta[i];
+    float p = prev_gradient[i];
+    float step = prev_step[i];
+    if (d * p > 0.0f){
+      step = MIN(step * grow, max_step);
+    }
+    else if (d * p < 0.0f){
+      step = MAX(step * shrink, min_step);
+      d = 0;
+    }
+    if (d > 0.0f){
+      weights[i] += step;
+    }
+    else {
+      weights[i] -= step;
+    }
+    prev_step[i] = step;
+    prev_gradient[i] = d;
+  }
+}
+
 float
 rnn_calculate_momentum_soft_start(float generation, float max_momentum, float x)
 {
@@ -490,6 +525,19 @@ rnn_apply_learning(RecurNN *net, int learning_method,
         bptt->learn_rate, momentum);
     if (bl){
       apply_adadelta_learning(bl->weights, bl->delta, bl->momentums, bl->aux,
+          bl->i_size * bl->o_size, net->bptt->learn_rate * bl->learn_rate_scale,
+          momentum);
+    }
+  }
+  else if (learning_method == RNN_RPROP){
+    apply_rprop_learning(net->ho_weights, bptt->ho_delta,
+        bptt->ho_momentum, bptt->ho_aux, net->ho_size,
+        bptt->learn_rate * bptt->ho_scale, momentum);
+    apply_rprop_learning(net->ih_weights, bptt->ih_delta,
+        bptt->ih_momentum, bptt->ih_aux, net->ih_size,
+        bptt->learn_rate, momentum);
+    if (bl){
+      apply_rprop_learning(bl->weights, bl->delta, bl->momentums, bl->aux,
           bl->i_size * bl->o_size, net->bptt->learn_rate * bl->learn_rate_scale,
           momentum);
     }

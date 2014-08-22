@@ -113,6 +113,7 @@ typedef enum {
   RNN_MOMENTUM_CLASSICAL,
   RNN_ADAGRAD,
   RNN_ADADELTA,
+  RNN_RPROP,
 
   RNN_LAST_MOMENTUM_METHOD
 } rnn_learning_method;
@@ -304,6 +305,7 @@ void rnn_apply_extra_layer_learning(RecurExtraLayer *layer);
 void rnn_weight_noise(RecurNN *net, float deviation);
 
 void rnn_set_momentum_values(RecurNN *net, float x);
+void rnn_set_aux_values(RecurNN *net, float x);
 
 
 static inline void

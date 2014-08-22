@@ -364,6 +364,17 @@ rnn_set_momentum_values(RecurNN *net, float x){
     set_array_value(bl->momentums, bl->i_size * bl->o_size, x);
   }
 }
+void
+rnn_set_aux_values(RecurNN *net, float x){
+  /* bptt->*_momentums should usually be (and already are) zero, but must be
+     non-zero for adagrad */
+  set_array_value(net->bptt->ho_aux, net->ho_size, x);
+  set_array_value(net->bptt->ih_aux, net->ih_size, x);
+  RecurExtraLayer *bl = net->bottom_layer;
+  if (bl){
+    set_array_value(bl->aux, bl->i_size * bl->o_size, x);
+  }
+}
 
 /* Weight initialisation */
 
