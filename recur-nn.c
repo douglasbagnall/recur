@@ -119,9 +119,9 @@ rnn_opinion(RecurNN *net, const float *restrict inputs, float presynaptic_noise)
   MAYBE_ADD_ARRAY_NOISE(&net->rng, net->hidden_layer + 1, net->h_size - 1,
       presynaptic_noise);
 
-  for (int i = 1; i < net->h_size; i++){
-    float h = hiddens[i] - RNN_HIDDEN_PENALTY;
-    hiddens[i] = (h > 0.0f) ? h : 0.0f;
+  for (int i = 0; i < net->h_size; i++){
+    float h = hiddens[i] + 1.0f;
+    hiddens[i] = (h > 1.0f) ? sqrtf(h) - 1.0f : 0.0f;
   }
 
   hiddens[0] = 1.0f;
@@ -262,6 +262,7 @@ bptt_and_accumulate_error(RecurNN *net, float *restrict ih_delta,
           e += w_row[x] * ex;
         }
 #endif
+        e *= 0.5 / sqrtf(input + 1);
         i_error[y] = e;
         error_sum += e * e;
       }
