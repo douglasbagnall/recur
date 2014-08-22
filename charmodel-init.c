@@ -394,49 +394,96 @@ rnn_char_dump_collapsed_text(const u8 *text, int len, const char *name,
   fclose(f);
 }
 
+static inline char *
+urlencode_alloc(const char *orig){
+  size_t len = strlen(orig);
+  char *s = malloc(len * 3 + 1);
+  const char *lut = "0123456789abcdef";
+  uint i, j;
+  for (i = 0, j = 0; i < len; i++){
+    char c = orig[i];
+    if (c > 32 && c < 127 && c != '%'){
+      s[j] = c;
+      j++;
+    }
+    else {
+      s[j] = '%';
+      s[j + 1] = lut[c >> 4];
+      s[j + 2] = lut[c & 15];
+      j += 3;
+    }
+  }
+  s[j] = 0;
+  return realloc(s, j + 1);
+}
+
+static inline char *
+urldecode_alloc(const char *orig){
+  size_t len = strlen(orig);
+  char *s = malloc(len);
+  uint i, j;
+  for (i = 0, j = 0; i < len; i++){
+    char c = orig[j];
+    if (c == '%'){
+      char d;
+      c = orig[j + 1];
+      d = (((c & 0x40) ? c + 9 : c) & 15) << 4;
+      c = orig[j + 2];
+      d += ((c & 0x40) ? c + 9 : c) & 15;
+      j += 3;
+      s[i] = d;
+    }
+    else {
+      s[i] = c;
+      j++;
+    }
+  }
+  s[i] = 0;
+  return realloc(s, i + 1);
+}
+
+
 char *
 rnn_char_construct_metadata(const struct RnnCharMetadata *m){
   char *metadata;
+  char *enc_alphabet = urlencode_alloc(m->alphabet);
+  char *enc_collapse_chars = urlencode_alloc(m->collapse_chars);
+
   int ret = asprintf(&metadata,
-#define SEP "\x1F"
-      "alphabet"       SEP "%s" SEP
-      "collapse_chars" SEP "%s"
-#undef SEP
+      "alphabet %s\n"
+      "collapse_chars %s\n"
       ,
-      m->alphabet,
-      m->collapse_chars
+      enc_alphabet,
+      enc_collapse_chars
   );
   if (ret == -1){
     FATAL_ERROR("can't alloc memory for metadata. or something.");
   }
+  free(enc_alphabet);
+  free(enc_collapse_chars);
   return metadata;
 }
 
 int
 rnn_char_load_metadata(const char *metadata, struct RnnCharMetadata *m){
-
-  /*0x1f is the ascii field separator character.*/
-
-#define CHECK_KEY(str, wanted) do {                                     \
-    char * token = strtok(str, "\x1F");                                 \
-    if (strcmp(token, wanted)){                                         \
-      STDERR_DEBUG("looking for '%s', found '%s'", wanted, token);      \
-      goto error;                                                       \
-    }                                                                   \
-  }while(0)                                                             \
-
-  char *s = strdup(metadata);
-  CHECK_KEY(s, "alphabet");
-  m->alphabet = strdup(strtok(NULL, "\x1F"));
-  CHECK_KEY(s, "collapse_chars");
-  m->collapse_chars = strdup(strtok(NULL, "\x1F"));
-
-#undef CHECK_KEY
-
-  free(s);
-  return 0;
- error:
-  return 1;
+  char *enc_alphabet;
+  char *enc_collapse_chars;
+  const char expected_n = 2;
+  const char *template = (
+      "alphabet %ms\n"
+      "collapse_chars %ms\n"
+  );
+  int n = sscanf(metadata, template,
+      &enc_alphabet,
+      &enc_collapse_chars);
+  m->alphabet = urldecode_alloc(enc_alphabet);
+  m->collapse_chars = urldecode_alloc(enc_collapse_chars);
+  free(enc_alphabet);
+  free(enc_collapse_chars);
+  if (n != expected_n){
+    DEBUG("Found only %d/%d metadata items", n, expected_n);
+  }
+  return expected_n - n;
 }
 
 void
