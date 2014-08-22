@@ -214,7 +214,7 @@ bptt_and_accumulate_error(RecurNN *net, float *restrict ih_delta,
   ASSUME_ALIGNED(i_error);
 
   float error_sum = 0;
-  float max_error_sum = MAX_ERROR_GAIN * top_error_sum;
+  float max_error_sum = MAX_ERROR_GAIN * top_error_sum + 1;
   float error_sum_ceiling = ERROR_GAIN_CEILING * top_error_sum;
   float min_error_gain = MIN_ERROR_GAIN * top_error_sum;
   float min_error_sum = MIN(bptt->min_error_factor / net->bptt->learn_rate,
