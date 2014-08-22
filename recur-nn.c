@@ -95,7 +95,10 @@ rnn_opinion(RecurNN *net, const float *restrict inputs, float presynaptic_noise)
          layer->o_size, layer->weights);
     MAYBE_ADD_ARRAY_NOISE(&net->rng, layer->outputs + 1, net->input_size - 1,
         presynaptic_noise);
-    memcpy(net->real_inputs, layer->outputs, net->input_size * sizeof(float));
+    for (int i = 0; i < net->input_size; i++){
+      float x = layer->outputs[i];
+      net->real_inputs[i] = (x > 0.0f) ? x : 0.0f;
+    }
   }
   else if (inputs){
     memcpy(net->real_inputs, inputs, net->input_size * sizeof(float));
