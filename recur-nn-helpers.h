@@ -103,12 +103,13 @@ perforate_array(float *array, int len, float dropout, rand_ctx *rng){
 
 static inline float
 soft_clip(float sum, float halfmax){
+  if (halfmax == 0){
+    /*there is nothing sensible to do*/
+    return sum;
+  }
   float x = sum / halfmax;
   float fudge = 0.99 + x * x / 100;
   return 2.0f * x / (1 + x * x * fudge);
-  //((2 * x) / (1 + x * x)) / (0.99 + abs(x / 100))
-  //float fudge = 0.99 + sum * sum / (halfmax * halfmax * 100);
-  //return 2.0f * sum * halfmax / (halfmax * halfmax + sum * sum * fudge);
 }
 
 static inline float
