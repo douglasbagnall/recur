@@ -132,7 +132,7 @@ static char * opt_dump_collapsed_text = DEFAULT_DUMP_COLLAPSED_TEXT;
 static bool opt_reload = DEFAULT_RELOAD;
 static float opt_momentum_weight = DEFAULT_MOMENTUM_WEIGHT;
 static float opt_momentum_soft_start = DEFAULT_MOMENTUM_SOFT_START;
-static u64 opt_rng_seed = DEFAULT_RNG_SEED;
+static s64 opt_rng_seed = DEFAULT_RNG_SEED;
 static int opt_stop = DEFAULT_STOP;
 static int opt_validate_chars = DEFAULT_VALIDATE_CHARS;
 static int opt_validation_overlap = DEFAULT_VALIDATION_OVERLAP;
@@ -183,7 +183,7 @@ static struct opt_table options[] = {
       &opt_hidden_size, "number of hidden nodes"),
   OPT_WITH_ARG("-d|--depth=<n>", opt_set_uintval, opt_show_uintval,
       &opt_bptt_depth, "max depth of BPTT recursion"),
-  OPT_WITH_ARG("-r|--rng-seed=<seed>", opt_set_ulongval_bi, opt_show_ulongval_bi,
+  OPT_WITH_ARG("-r|--rng-seed=<seed>", opt_set_longval_bi, opt_show_longval_bi,
       &opt_rng_seed, "RNG seed (-1 for auto)"),
   OPT_WITH_ARG("-s|--stop-after=<n>", opt_set_intval_bi, opt_show_intval_bi,
       &opt_stop, "Stop at generation n (0: no stop, negative means relative)"),
@@ -712,12 +712,14 @@ main(int argc, char *argv[]){
   };
   if (opt_confab_only){
     RecurNN *net = load_or_create_net(opt_filename, &m, a_len, 1, 1);
+    init_rand64_maybe_randomly(&net->rng, opt_rng_seed);
     /*XXX this could be done in small chunks */
     int byte_len = opt_confab_only * 4 + 5;
     char *t = malloc(byte_len);
     rnn_char_confabulate(net, t, opt_confab_only, byte_len,
         alphabet, opt_utf8, opt_confab_bias);
     fputs(t, stdout);
+    fputs("\n", stdout);
     free(t);
   }
   else {
