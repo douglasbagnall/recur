@@ -130,6 +130,7 @@ typedef enum {
   RNN_RELU = 1,
   RNN_RESQRT,
   RNN_RELOG,
+  RNN_RETANH,
 
   RNN_ACTIVATION_LAST
 } rnn_activation;

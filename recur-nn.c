@@ -1,5 +1,6 @@
 /* Copyright 2014 Douglas Bagnall <douglas@halo.gen.nz> LGPL */
 #include "recur-nn.h"
+#include "badmaths.h"
 #include "recur-nn-helpers.h"
 
 #define INPUT_OFFSET(net) ((net)->hidden_size + 1)
@@ -128,10 +129,13 @@ rnn_opinion(RecurNN *net, const float *restrict inputs, float presynaptic_noise)
   else if (net->activation == RNN_RELOG){
     for (int i = 1; i < net->h_size; i++){
       volatile float h = hiddens[i] + 1.0f;
-      /*if (net->generation == 59){
-        DEBUG("i %d h %f", i, h);
-        }*/
       hiddens[i] = (h > 1.0f) ? logf(h) : 0.0f;
+    }
+  }
+  else if (net->activation == RNN_RETANH){
+    for (int i = 1; i < net->h_size; i++){
+      volatile float h = hiddens[i] + 1.0f;
+      hiddens[i] = (h > 1.0f) ? fast_tanhf(h) : 0.0f;
     }
   }
   else { //default RELU
@@ -284,6 +288,9 @@ bptt_and_accumulate_error(RecurNN *net, float *restrict ih_delta,
         }
         else if (net->activation == RNN_RELOG){
           e /= (input + 1);
+        }
+        else if (net->activation == RNN_RETANH){
+          e *= (1.0f - e * e);
         }
         i_error[y] = e;
         error_sum += e * e;

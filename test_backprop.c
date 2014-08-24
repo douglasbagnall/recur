@@ -318,7 +318,7 @@ static struct opt_table options[] = {
   OPT_WITH_ARG("--ada-ballast", opt_set_floatval, opt_show_floatval,
       &opt_ada_ballast, "adagrad/adadelta accumulators start at this value"),
   OPT_WITH_ARG("--activation", opt_set_intval, opt_show_intval,
-      &opt_activation, "activation function 1: ReLU, 2: ReSQRT, 3: ReLOG"),
+      &opt_activation, "activation function 1: ReLU, 2: ReSQRT, 3: ReLOG, 4:ReTANH"),
 
 
   OPT_WITHOUT_ARG("-h|--help", opt_usage_and_exit,
