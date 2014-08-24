@@ -463,8 +463,8 @@ rnn_char_construct_metadata(const struct RnnCharMetadata *m){
 
 int
 rnn_char_load_metadata(const char *metadata, struct RnnCharMetadata *m){
-  char *enc_alphabet;
-  char *enc_collapse_chars;
+  char *enc_alphabet = NULL;
+  char *enc_collapse_chars = NULL;
   const char expected_n = 2;
   const char *template = (
       "alphabet %ms\n"
