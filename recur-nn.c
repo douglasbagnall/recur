@@ -284,13 +284,13 @@ bptt_and_accumulate_error(RecurNN *net, float *restrict ih_delta,
         }
 #endif
         if (net->activation == RNN_RESQRT){
-          e /= 2 * sqrtf(input + 1);
+          e /= 2 * (input + 1.0f);
         }
         else if (net->activation == RNN_RELOG){
           e /= (input + 1);
         }
         else if (net->activation == RNN_RETANH){
-          e *= (1.0f - e * e);
+          e *= 1.0f - input * input;
         }
         i_error[y] = e;
         error_sum += e * e;
