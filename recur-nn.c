@@ -287,7 +287,7 @@ bptt_and_accumulate_error(RecurNN *net, float *restrict ih_delta,
           e /= 2 * (input + 1.0f);
         }
         else if (net->activation == RNN_RELOG){
-          e /= (input + 1);
+          e /= fast_expf(input);
         }
         else if (net->activation == RNN_RETANH){
           e *= 1.0f - input * input;
