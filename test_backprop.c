@@ -589,7 +589,7 @@ load_and_train_model(struct RnnCharMetadata *m, int *alphabet, int a_len,
   BELOW_QUIET_LEVEL(2){
     START_TIMER(run);
     for (int i = 0; ! finished; i++){
-      DEBUG("Starting epoch %d. learn rate %g.", i, net->bptt->learn_rate);
+      DEBUG("Starting epoch %d. learn rate %g.", i + 1, net->bptt->learn_rate);
       START_TIMER(epoch);
       finished = rnn_char_epoch(&model, confab_net, &v,
           text, text_len, start_char, opt_stop, opt_confab_bias, CONFAB_SIZE, opt_quiet);
