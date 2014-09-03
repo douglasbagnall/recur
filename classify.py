@@ -729,7 +729,7 @@ class Trainer(BaseClassifier):
 
             stat_list = self.stat_target_list
             stat_target = self.stat_target
-            if self.stat_target in classes and stat_list:
+            if stat_target and stat_target in classes and stat_list:
                 #auc2 = _calc_stats(stat_list[:])['auc']
                 # AUC avoiding in-loop maths:
                 # start off with threshold 1.0, i.e. 0% positive
