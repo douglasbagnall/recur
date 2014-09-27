@@ -22,6 +22,8 @@ def main():
                         help="only test files with at least this many class switches")
     parser.add_argument('-M', '--microphone', action="store_true",
                         help="Use the microphone instead of files")
+    parser.add_argument('--full-screen', action="store_true",
+                        help="Use the entire screen")
 
     args = parser.parse_args()
 
@@ -42,6 +44,6 @@ def main():
             files = process_common_args(c, args, timed=False)
 
         files = args.files[:] + [x.fullname for x in files]
-        run(c, files, args.reverse)
+        run(c, files, args.reverse, args.full_screen)
 
 main()

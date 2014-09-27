@@ -83,7 +83,7 @@ def on_key_press_event(widget, event):
     #print "Key %s (%d) was pressed" % (keyname, event.keyval)
 
 
-def run(classifier, files, reverse=False):
+def run(classifier, files, reverse=False, fullscreen=False):
     window = Gtk.Window()
     window.set_title ("RNN Classifier")
     app = ClassifierDisplay(classifier, 300)
@@ -95,6 +95,8 @@ def run(classifier, files, reverse=False):
     window.connect_after('destroy', window_stop)
     window.connect('key_press_event', on_key_press_event)
     window.show_all()
+    if fullscreen:
+        window.fullscreen()
 
     classifier.run(files, reverse)
     Gtk.main()
