@@ -84,7 +84,6 @@ class BaseClassifier(object):
                 fs = self.make_add_link(srcname, cf)
             self.sources.append(fs)
 
-        self.channels = channels
         caps =  Gst.caps_from_string("audio/x-raw, "
                                      "layout=(string)interleaved, "
                                      "channel-mask=(bitmask)0x0, "
