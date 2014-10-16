@@ -377,11 +377,10 @@ initialise_net(RecurNN *net){
 
 static RecurNN *
 load_or_create_net(const char *filename, struct RnnCharMetadata *m,
-    int alpha_len, int reload, bool trust_file_metadata){
+    int alpha_len, int reload, bool trust_file_metadata, bool force_metadata){
   char *metadata = rnn_char_construct_metadata(m);
   RecurNN *net = (reload) ? rnn_load_net(filename) : NULL;
   if (net){
-    rnn_set_log_file(net, opt_logfile, 1);
     if (net->metadata && strcmp(metadata, net->metadata)){
       DEBUG("metadata doesn't match. Expected:\n%s\nLoaded from net:\n%s\n",
           metadata, net->metadata);
@@ -403,7 +402,7 @@ load_or_create_net(const char *filename, struct RnnCharMetadata *m,
           rnn_char_free_metadata_items(&m2);
         }
       }
-      else if (opt_force_metadata){
+      else if (force_metadata){
         DEBUG("Updating the net's metadata to match that requested "
             "(because --force-metadata)");
         free(net->metadata);
@@ -490,7 +489,9 @@ load_and_train_model(struct RnnCharMetadata *m, int *alphabet, int a_len,
   }
 
   RecurNN *net = load_or_create_net(model.filename, m, a_len, opt_reload,
-      (bool)opt_filename);
+      (bool)opt_filename, opt_force_metadata);
+  rnn_set_log_file(net, opt_logfile, 1);
+
   if (opt_override){
     RecurNNBPTT *bptt = net->bptt;
     bptt->learn_rate = opt_learn_rate;
@@ -714,7 +715,8 @@ main(int argc, char *argv[]){
     .utf8 = opt_utf8
   };
   if (opt_confab_only){
-    RecurNN *net = load_or_create_net(opt_filename, &m, a_len, 1, 1);
+    RecurNN *net = load_or_create_net(opt_filename, &m, a_len, 1, 1, 0);
+    rnn_set_log_file(net, opt_logfile, 1);
     init_rand64_maybe_randomly(&net->rng, opt_rng_seed);
     /*XXX this could be done in small chunks */
     int byte_len = opt_confab_only * 4 + 5;
