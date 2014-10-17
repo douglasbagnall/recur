@@ -7,6 +7,7 @@ Obviously it should have been easy to use a library, but I was interested in
 how it would work.
 */
 #include "recur-common.h"
+#include <stdbool.h>
 
 /*write_escaped_char*/
 static inline int
@@ -201,6 +202,14 @@ new_bytes_from_codepoints(const int *points, int maxlen){
   return str;
 }
 
+static inline char *
+new_string_from_codepoints(const int *points, int maxlen, bool utf8){
+  if (utf8){
+    return new_utf8_from_codepoints(points, maxlen);
+  }
+  return new_bytes_from_codepoints(points, maxlen);
+}
+
 static inline int
 fill_codepoints_from_bytes(int *points, int len, const char *string){
   int i;
@@ -227,4 +236,12 @@ fill_codepoints_from_utf8(int *points, int len, const char *string){
     points[i] = c;
   }
   return i;
+}
+
+static inline int
+fill_codepoints_from_string(int *points, int len, const char *string, bool utf8){
+  if (utf8){
+    return fill_codepoints_from_utf8(points, len, string);
+  }
+  return fill_codepoints_from_bytes(points, len, string);
 }

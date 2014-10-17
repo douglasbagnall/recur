@@ -378,69 +378,45 @@ initialise_net(RecurNN *net){
   }
 }
 
-static RecurNN *
-load_or_create_net(const char *filename, struct RnnCharMetadata *m,
-    int alpha_len, int reload, bool trust_file_metadata, bool force_metadata){
-  char *metadata = rnn_char_construct_metadata(m);
-  RecurNN *net = (reload) ? rnn_load_net(filename) : NULL;
-  if (net){
-    if (net->metadata && strcmp(metadata, net->metadata)){
-      DEBUG("metadata doesn't match. Expected:\n%s\nLoaded from net:\n%s\n",
-          metadata, net->metadata);
-      if (trust_file_metadata){
-        /*this filename was specifically requested, so its metadata is
-          presumably right. But first check if it even loads!*/
-        struct RnnCharMetadata m2;
-        int err = rnn_char_load_metadata(net->metadata, &m2);
-        if (err){
-          DEBUG("The net's metadata doesn't load."
-              "Using otherwise determined metadata");
-        }
-        else {
-          /*NB. the alphabet length could be different, isn't checked*/
-          DEBUG("Using the net's metadata. Use --force-metadata to override");
-          DEBUG("alphabet %s", m2.alphabet);
-          m->alphabet = strdup(m2.alphabet);
-          m->collapse_chars = strdup(m2.collapse_chars);
-          rnn_char_free_metadata_items(&m2);
-        }
-      }
-      else if (force_metadata){
-        DEBUG("Updating the net's metadata to match that requested "
-            "(because --force-metadata)");
-        free(net->metadata);
-        net->metadata = strdup(metadata);
-      }
-      else {
-        DEBUG("Aborting. (use --force-metadata to ignore metadata issues)");
-        exit(-1);
-      }
+static void
+exit_unless_metadata_matches(RecurNN *net, struct RnnCharMetadata *m,
+    bool trust_file_metadata, bool force_metadata){
+  int r = rnn_char_check_metadata(net, m, trust_file_metadata,
+      force_metadata);
+  if (r){
+    if (r == -2){
+      DEBUG("Aborting. (use --force-metadata to ignore metadata issues)");
     }
+    else {
+      DEBUG("I cannot carry on!");
+    }
+    exit(1);
   }
-  else {
-    int input_size = alpha_len;
-    int output_size = alpha_len;
-    u32 flags = RNN_NET_FLAG_STANDARD;
-    if (opt_bptt_adaptive_min){/*on by default*/
-      flags |= RNN_NET_FLAG_BPTT_ADAPTIVE_MIN_ERROR;
-    }
-    if (opt_learning_style == RNN_ADADELTA || opt_learning_style == RNN_RPROP){
-      flags |= RNN_NET_FLAG_AUX_ARRAYS;
-    }
+}
 
-    net = rnn_new_with_bottom_layer(input_size, opt_bottom_layer,
-        opt_hidden_size, output_size, flags, opt_rng_seed,
-        opt_logfile, opt_bptt_depth, opt_learn_rate,
-        opt_momentum, opt_presynaptic_noise, opt_activation, 0);
-    initialise_net(net);
-    net->bptt->momentum_weight = opt_momentum_weight;
-    net->metadata = strdup(metadata);
+
+static RecurNN *
+create_net(const char *filename, struct RnnCharMetadata *m, int alpha_len){
+  RecurNN *net;
+  u32 flags = RNN_NET_FLAG_STANDARD;
+  if (opt_bptt_adaptive_min){/*on by default*/
+    flags |= RNN_NET_FLAG_BPTT_ADAPTIVE_MIN_ERROR;
   }
+  if (opt_learning_style == RNN_ADADELTA || opt_learning_style == RNN_RPROP){
+    flags |= RNN_NET_FLAG_AUX_ARRAYS;
+  }
+  net = rnn_new_with_bottom_layer(alpha_len, opt_bottom_layer,
+      opt_hidden_size, alpha_len, flags, opt_rng_seed,
+      opt_logfile, opt_bptt_depth, opt_learn_rate,
+      opt_momentum, opt_presynaptic_noise, opt_activation, 0);
+  initialise_net(net);
+  net->bptt->momentum_weight = opt_momentum_weight;
+  net->metadata = rnn_char_construct_metadata(m);
+
   net->bptt->ho_scale = opt_top_learn_rate_scale;
   if (net->bottom_layer){
     net->bottom_layer->learn_rate_scale = opt_bottom_learn_rate_scale;
   }
-  free(metadata);
   return net;
 }
 
@@ -459,8 +435,8 @@ finish(RnnCharModel *model, RnnCharVentropy *v){
 }
 
 static void
-load_and_train_model(struct RnnCharMetadata *m, int *alphabet, int a_len,
-    int *collapse_chars, int c_len, u32 char_flags){
+load_and_train_model(struct RnnCharMetadata *m, RnnCharAlphabet *alphabet,
+    u32 char_flags){
   RnnCharModel model = {
     .n_training_nets = MAX(opt_multi_tap, 1),
     .batch_size = opt_batch_size,
@@ -473,7 +449,6 @@ load_and_train_model(struct RnnCharMetadata *m, int *alphabet, int a_len,
     .use_multi_tap_path = opt_use_multi_tap_path,
     .alphabet = alphabet,
     .flags = char_flags,
-    .collapse_chars = collapse_chars,
     .images = {
       .basename = opt_basename,
       .temporal_pgm_dump = opt_temporal_pgm_dump
@@ -487,14 +462,21 @@ load_and_train_model(struct RnnCharMetadata *m, int *alphabet, int a_len,
     model.filename = opt_filename;
   }
   else{
-    model.filename = rnn_char_construct_net_filename(m, opt_basename, a_len,
-        opt_bottom_layer, opt_hidden_size, a_len);
+    model.filename = rnn_char_construct_net_filename(m, opt_basename, alphabet->len,
+        opt_bottom_layer, opt_hidden_size, alphabet->len);
   }
 
-  RecurNN *net = load_or_create_net(model.filename, m, a_len, opt_reload,
-      (bool)opt_filename, opt_force_metadata);
-  rnn_set_log_file(net, opt_logfile, 1);
+  RecurNN *net = opt_reload ? rnn_load_net(model.filename) : NULL;
+  if (net){
+    bool trust_metadata = (bool)opt_filename;
+    exit_unless_metadata_matches(net, m, trust_metadata, opt_force_metadata);
+  }
+  else {
+    DEBUG("Could not load '%s', let's make a new net", model.filename);
+    net = create_net(model.filename, m, alphabet->len);
+  }
 
+  rnn_set_log_file(net, opt_logfile, 1);
   if (opt_override){
     RecurNNBPTT *bptt = net->bptt;
     bptt->learn_rate = opt_learn_rate;
@@ -548,8 +530,8 @@ load_and_train_model(struct RnnCharMetadata *m, int *alphabet, int a_len,
   int text_len;
   u8* validate_text;
 
-  u8* text = rnn_char_alloc_collapsed_text(opt_textfile, alphabet, a_len,
-      collapse_chars, c_len, &text_len, char_flags, opt_quiet);
+  u8* text = rnn_char_alloc_collapsed_text(opt_textfile, alphabet,
+      &text_len, char_flags, opt_quiet);
   if (opt_dump_collapsed_text){
     rnn_char_dump_collapsed_text(text, text_len, opt_dump_collapsed_text, m->alphabet);
   }
@@ -655,6 +637,7 @@ main(int argc, char *argv[]){
     feenableexcept(FE_ALL_EXCEPT);
   }
 
+  /* make sure there is some logfile */
   if (! opt_logfile){
     if (opt_basename){
       int n = asprintf(&opt_logfile, "%s.log", opt_basename);
@@ -667,10 +650,10 @@ main(int argc, char *argv[]){
     }
   }
 
-  int *alphabet = calloc(257, sizeof(int));
-  int *collapse_chars = calloc(257, sizeof(int));
-  int a_len, c_len;
-
+  /*find an alphabet, somehow. If the options indicate it should be
+    automatically determined, the training text needs to be read.
+  */
+  RnnCharAlphabet *alphabet = rnn_char_new_alphabet();
   u32 char_flags = (
       (opt_case_insensitive ? RNN_CHAR_FLAG_CASE_INSENSITIVE : 0) |
       (opt_collapse_space   ? RNN_CHAR_FLAG_COLLAPSE_SPACE : 0) |
@@ -685,43 +668,34 @@ main(int argc, char *argv[]){
       DEBUG("Couldn't read text file '%s'. Goodbye", opt_textfile);
       exit(1);
     }
-    rnn_char_find_alphabet_s(text, raw_text_len,
-        alphabet, &a_len, collapse_chars, &c_len,
+    rnn_char_find_alphabet_s(text, raw_text_len, alphabet,
         opt_find_alphabet_threshold,
         opt_find_alphabet_digit_adjust,
         opt_find_alphabet_alpha_adjust,
         char_flags);
 
     free(text);
-    if (a_len < 1){
+    if (alphabet->len < 1){
       DEBUG("Trouble finding an alphabet");
       exit(1);
     }
-    if (opt_utf8){
-      opt_alphabet = new_utf8_from_codepoints(alphabet, a_len);
-      opt_collapse_chars = new_utf8_from_codepoints(collapse_chars, c_len);
-    }
-    else {
-      opt_alphabet = new_bytes_from_codepoints(alphabet, a_len);
-      opt_collapse_chars = new_bytes_from_codepoints(collapse_chars, c_len);
-    }
+    opt_alphabet = new_string_from_codepoints(alphabet->points, alphabet->len, opt_utf8);
+    opt_collapse_chars = new_string_from_codepoints(alphabet->collapsed_points,
+        alphabet->collapsed_len, opt_utf8);
   }
   else { /*use given or default alphabet */
     if (! opt_alphabet){
       opt_alphabet = DEFAULT_CHARSET;
     }
-    if (opt_utf8){
-      a_len = fill_codepoints_from_utf8(alphabet, 256, opt_alphabet);
-      c_len = fill_codepoints_from_utf8(collapse_chars, 256, opt_collapse_chars);
-    }
-    else {
-      a_len = fill_codepoints_from_bytes(alphabet, 256, opt_alphabet);
-      c_len = fill_codepoints_from_bytes(collapse_chars, 256, opt_collapse_chars);
-    }
+    alphabet->len = fill_codepoints_from_string(alphabet->points, 256,
+        opt_alphabet, opt_utf8);
+    alphabet->collapsed_len = fill_codepoints_from_string(alphabet->collapsed_points,
+        256, opt_alphabet, opt_utf8);
   }
-  STDERR_DEBUG("Using alphabet of length %d: '%s'", a_len, opt_alphabet);
+  STDERR_DEBUG("Using alphabet of length %d: '%s'", alphabet->len, opt_alphabet);
   STDERR_DEBUG("collapsing these %d characters into first alphabet character: '%s'",
-      c_len, opt_collapse_chars);
+      alphabet->collapsed_len, opt_collapse_chars);
+
 
   struct RnnCharMetadata m = {
     .alphabet = opt_alphabet,
@@ -729,19 +703,22 @@ main(int argc, char *argv[]){
     .utf8 = opt_utf8
   };
   if (opt_confab_only){
-    RecurNN *net = load_or_create_net(opt_filename, &m, a_len, 1, 1, 0);
-    rnn_set_log_file(net, opt_logfile, 1);
-    init_rand64_maybe_randomly(&net->rng, opt_rng_seed);
-    /*XXX this could be done in small chunks */
-    int byte_len = opt_confab_only * 4 + 5;
-    char *t = malloc(byte_len);
-    rnn_char_confabulate(net, t, opt_confab_only, byte_len,
-        alphabet, opt_utf8, opt_confab_bias);
-    fputs(t, stdout);
-    fputs("\n", stdout);
-    free(t);
+    RecurNN *net = rnn_load_net(opt_filename);
+    int err = rnn_char_check_metadata(net, &m, 1, 1);
+    if (! err){
+      rnn_set_log_file(net, opt_logfile, 1);
+      init_rand64_maybe_randomly(&net->rng, opt_rng_seed);
+      /*XXX this could be done in small chunks */
+      int byte_len = opt_confab_only * 4 + 5;
+      char *t = malloc(byte_len);
+      rnn_char_confabulate(net, t, opt_confab_only, byte_len,
+          alphabet->points, opt_utf8, opt_confab_bias);
+      fputs(t, stdout);
+      fputs("\n", stdout);
+      free(t);
+    }
   }
   else {
-    load_and_train_model(&m, alphabet, a_len, collapse_chars, c_len, char_flags);
+    load_and_train_model(&m, alphabet, char_flags);
   }
 }

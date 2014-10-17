@@ -282,7 +282,7 @@ rnn_char_epoch(RnnCharModel *model, RecurNN *confab_net, RnnCharVentropy *v,
           int alloc_size = confab_size * 4;
           char confab[alloc_size + 1];
           rnn_char_confabulate(confab_net, confab, confab_size, alloc_size,
-              model->alphabet, model->flags & RNN_CHAR_FLAG_UTF8, confab_bias);
+              model->alphabet->points, model->flags & RNN_CHAR_FLAG_UTF8, confab_bias);
           STDERR_DEBUG("%5dk e.%02d t%.2f v%.2f a.%02d %.0f/s |%s|", k,
               (int)(error * 100 + 0.5),
               entropy, ventropy,

@@ -29,9 +29,8 @@ adjust_count(int i, int count, double digit_adjust, double alpha_adjust){
 
 /* rnn_char_find_alphabet_s returns 0 for success, -1 on failure. */
 int
-rnn_char_find_alphabet_s(const char *text, int len, int *alphabet, int *a_len,
-    int *collapse_chars, int *c_len, double threshold, double digit_adjust,
-    double alpha_adjust, u32 flags){
+rnn_char_find_alphabet_s(const char *text, int len, RnnCharAlphabet *alphabet,
+    double threshold, double digit_adjust, double alpha_adjust, u32 flags){
   int ignore_case = flags & RNN_CHAR_FLAG_CASE_INSENSITIVE;
   int collapse_space = flags & RNN_CHAR_FLAG_COLLAPSE_SPACE;
   int utf8 = flags & RNN_CHAR_FLAG_UTF8;
@@ -105,11 +104,11 @@ rnn_char_find_alphabet_s(const char *text, int len, int *alphabet, int *a_len,
     }
   }
   if (max_collapsed_count){
-    alphabet[0] = max_collapsed_point;
+    alphabet->points[0] = max_collapsed_point;
     counts[max_collapsed_point] = 0; /*so as to ignore it hereafter*/
     a_count = 1;
   }
-  /*map the rest of the collapsed chars to alphabet[0]*/
+  /*map the rest of the collapsed chars to alphabet->points[0]*/
   for (int i = 0; i < n_chars; i++){
     int count = counts[i];
     if (count){
@@ -118,14 +117,14 @@ rnn_char_find_alphabet_s(const char *text, int len, int *alphabet, int *a_len,
         if (a_count == 256){
           goto error;
         }
-        alphabet[a_count] = i;
+        alphabet->points[a_count] = i;
         a_count++;
       }
       else {
         if (c_count == 256){
           goto error;
         }
-        collapse_chars[c_count] = i;
+        alphabet->collapsed_points[c_count] = i;
         c_count++;
       }
     }
@@ -135,16 +134,17 @@ rnn_char_find_alphabet_s(const char *text, int len, int *alphabet, int *a_len,
   }
 
   free(counts);
-  *a_len = a_count;
-  *c_len = c_count;
-  DEBUG("a_len %i c_len %i", a_count, c_count);
+  alphabet->len = a_count;
+  alphabet->collapsed_len = c_count;
+  DEBUG("alphabet len %i collapsed len %i", a_count, c_count);
   return 0;
  error:
   STDERR_DEBUG("threshold of %f over %d chars led to %d in alphabet, "
       "%d collapsed characters",
       threshold, n, a_count, c_count);
   free(counts);
-  *a_len = *c_len = 0;
+  alphabet->len = 0;
+  alphabet->collapsed_len = 0;
   return -1;
 }
 
@@ -196,38 +196,37 @@ rnn_char_alloc_file_contents(const char *filename, char **contents, int *len)
 
 /* rnn_char_find_alphabet_f returns 0 for success, -1 on failure. */
 int
-rnn_char_find_alphabet_f(const char *filename, int *alphabet, int *a_len,
-    int *collapse_chars, int *c_len, double threshold, double digit_adjust,
-    double alpha_adjust, u32 flags){
+rnn_char_find_alphabet_f(const char *filename, RnnCharAlphabet *alphabet,
+    double threshold, double digit_adjust, double alpha_adjust, u32 flags){
   int len;
   char *contents;
   int err = rnn_char_alloc_file_contents(filename, &contents, &len);
   if (! err){
-    err = rnn_char_find_alphabet_s(contents, len, alphabet, a_len,
-        collapse_chars, c_len, threshold, digit_adjust, alpha_adjust, flags);
+    err = rnn_char_find_alphabet_s(contents, len, alphabet,
+        threshold, digit_adjust, alpha_adjust, flags);
     free(contents);
   }
   else {
-    *a_len = *c_len = 0;
+    alphabet->len = 0;
+    alphabet->collapsed_len = 0;
   }
   return err;
 }
 
 
 static int*
-new_char_lut(const int *alphabet, int a_len, const int *collapse, int c_len,
-    int *_space, u32 flags){
+new_char_lut(const RnnCharAlphabet *alphabet, int *_space, u32 flags){
   int case_insensitive = flags & RNN_CHAR_FLAG_CASE_INSENSITIVE;
   int i;
   int collapse_target = 0;
   int space = 0;
-  for (i = 0; i < a_len; i++){
-    if (alphabet[i] == ' '){
+  for (i = 0; i < alphabet->len; i++){
+    if (alphabet->points[i] == ' '){
       space = i;
       break;
     }
   }
-  if (space == 0 && alphabet[0] != ' '){
+  if (space == 0 && alphabet->points[0] != ' '){
     DEBUG("space is not in alphabet; using collapse_target");
   }
   *_space = space;
@@ -237,14 +236,14 @@ new_char_lut(const int *alphabet, int a_len, const int *collapse, int c_len,
   for (i = 0; i < len; i++){
     ctn[i] = space;
   }
-  /*collapse chars map to alphabet[0] */
-  for (i = 0; i < c_len; i++){
-    int c = collapse[i];
+  /*collapse chars map to alphabet->points[0] */
+  for (i = 0; i < alphabet->collapsed_len; i++){
+    int c = alphabet->collapsed_points[i];
     ctn[c] = collapse_target;
   }
 
-  for (i = 0; i < a_len; i++){
-    int c = alphabet[i];
+  for (i = 0; i < alphabet->len; i++){
+    int c = alphabet->points[i];
     ctn[c] = i;
     /*FIXME: case insensitivity works for ascii only */
     if (islower(c) && case_insensitive){
@@ -255,14 +254,13 @@ new_char_lut(const int *alphabet, int a_len, const int *collapse, int c_len,
 }
 
 u8*
-rnn_char_alloc_collapsed_text(char *filename, int *alphabet, int a_len,
-    int *collapse_chars, int c_len, int *text_len, u32 flags, int quietness){
+rnn_char_alloc_collapsed_text(const char *filename, RnnCharAlphabet *alphabet,
+    int *text_len, u32 flags, int quietness){
   int collapse_space = flags & RNN_CHAR_FLAG_COLLAPSE_SPACE;
   int utf8 = flags & RNN_CHAR_FLAG_UTF8;
   int i, j;
   int space;
-  int *char_to_net = new_char_lut(alphabet, a_len,
-      collapse_chars, c_len, &space, flags);
+  int *char_to_net = new_char_lut(alphabet, &space, flags);
   u8 *text;
   int raw_len;
   rnn_char_alloc_file_contents(filename, (char**)&text, &raw_len);
@@ -306,33 +304,41 @@ rnn_char_alloc_collapsed_text(char *filename, int *alphabet, int a_len,
 }
 
 void
-rnn_char_dump_alphabet(int *alphabet, int len, int utf8){
+rnn_char_dump_alphabet(RnnCharAlphabet *alphabet, int utf8){
   char *s;
+  char *s2;
   if (utf8){
-    s = new_utf8_from_codepoints(alphabet, len);
+    s = new_utf8_from_codepoints(alphabet->points, alphabet->len);
+    s2 = new_utf8_from_codepoints(alphabet->collapsed_points, alphabet->collapsed_len);
   }
   else{
-    s = new_bytes_from_codepoints(alphabet, len);
+    s = new_bytes_from_codepoints(alphabet->points, alphabet->len);
+    s2 = new_bytes_from_codepoints(alphabet->collapsed_points, alphabet->collapsed_len);
   }
-  DEBUG(C_DARK_YELLOW "»»" C_NORMAL "%s" C_DARK_YELLOW "««" C_NORMAL, s);
-  free(s);
-
-  for (int i = 0; i < len; i++){
-    fprintf(stderr, "%d, ", alphabet[i]);
+  DEBUG("alphabet:  " C_DARK_YELLOW "»»" C_NORMAL "%s" C_DARK_YELLOW "««" C_NORMAL, s);
+  for (int i = 0; i < alphabet->len; i++){
+    fprintf(stderr, "%d, ", alphabet->points[i]);
   }
   putc('\n', stderr);
+
+  DEBUG("collapsed: " C_DARK_YELLOW "»»" C_NORMAL "%s" C_DARK_YELLOW "««" C_NORMAL, s2);
+  for (int i = 0; i < alphabet->collapsed_len; i++){
+    fprintf(stderr, "%d, ", alphabet->collapsed_points[i]);
+  }
+  putc('\n', stderr);
+
+  free(s);
+  free(s2);
 }
 
 
 RnnCharClassifiedChar *
 rnn_char_alloc_classified_text(RnnCharClassBlock *b,
-    int *alphabet, int a_len, int *collapse_chars, int c_len,
-    int *text_len, u32 flags){
+    RnnCharAlphabet *alphabet, int *text_len, u32 flags){
   int space;
   int collapse_space = flags & RNN_CHAR_FLAG_COLLAPSE_SPACE;
   int utf8 = flags & RNN_CHAR_FLAG_UTF8;
-  int *char_to_net = new_char_lut(alphabet, a_len,
-      collapse_chars, c_len, &space, flags);
+  int *char_to_net = new_char_lut(alphabet, &space, flags);
 
   int size = 1000 * 1000;
   RnnCharClassifiedChar *text = malloc(size * sizeof(RnnCharClassifiedChar));
@@ -505,4 +511,73 @@ rnn_char_construct_net_filename(struct RnnCharMetadata *m, const char *basename,
   }
   DEBUG("filename: %s", s);
   return strdup(s);
+}
+
+int
+rnn_char_check_metadata(RecurNN *net, struct RnnCharMetadata *m,
+    bool trust_file_metadata, bool force_metadata){
+  if (net == NULL || m == NULL){
+    DEBUG("net is %p, metadata is %p, in %s", net, m, __func__);
+    return -1;
+  }
+  int ret = 0;
+  char *metadata = rnn_char_construct_metadata(m);
+  if (net->metadata && strcmp(metadata, net->metadata)){
+    DEBUG("metadata doesn't match. Expected:\n%s\nLoaded from net:\n%s\n",
+        metadata, net->metadata);
+    if (trust_file_metadata){
+      /*this filename was specifically requested, so its metadata is
+        presumably right. But first check if it even loads!*/
+      struct RnnCharMetadata m2;
+      int err = rnn_char_load_metadata(net->metadata, &m2);
+      if (err){
+        DEBUG("The net's metadata doesn't load."
+            "Using otherwise determined metadata");
+      }
+      else {
+        /*NB. the alphabet length could be different, isn't checked*/
+        DEBUG("Using the net's metadata. Use --force-metadata to override");
+        DEBUG("alphabet %s", m2.alphabet);
+        m->alphabet = strdup(m2.alphabet);
+        m->collapse_chars = strdup(m2.collapse_chars);
+        rnn_char_free_metadata_items(&m2);
+      }
+    }
+    else if (force_metadata){
+      DEBUG("Updating the net's metadata to match that requested "
+          "(because --force-metadata)");
+      free(net->metadata);
+      net->metadata = strdup(metadata);
+    }
+    else {
+      ret = -2;
+    }
+  }
+
+  free(metadata);
+  return ret;
+}
+
+RnnCharAlphabet *
+rnn_char_new_alphabet(void){
+  RnnCharAlphabet *a = malloc(sizeof(RnnCharAlphabet));
+  a->points = calloc(257, sizeof(int));
+  a->collapsed_points = calloc(257, sizeof(int));
+  a->len = 0;
+  a->collapsed_len = 0;
+  return a;
+}
+
+void
+rnn_char_reset_alphabet(RnnCharAlphabet *a){
+  a->len = 0;
+  a->collapsed_len = 0;
+}
+
+void
+rnn_char_free_alphabet(RnnCharAlphabet *a){
+  rnn_char_reset_alphabet(a);
+  free(a->points);
+  free(a->collapsed_points);
+  free(a);
 }

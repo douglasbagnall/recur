@@ -45,6 +45,13 @@ typedef struct _RnnCharVentropy {
   float entropy;
 } RnnCharVentropy;
 
+typedef struct _RnnCharAlphabet {
+  int *points;
+  int *collapsed_points;
+  int len;
+  int collapsed_len;
+} RnnCharAlphabet;
+
 
 struct _RnnCharModel {
   RecurNN *net;
@@ -60,8 +67,7 @@ struct _RnnCharModel {
   bool save_net;
   bool use_multi_tap_path;
   u32 flags;
-  int *alphabet; /*unicode points */
-  int *collapse_chars;
+  RnnCharAlphabet *alphabet;
   RnnCharSchedule schedule;
   RnnCharImageSettings images;
 };
@@ -80,10 +86,7 @@ typedef struct _RnnCharClassifiedChar{
 typedef struct _RnnCharClassifiedText{
   RnnCharClassifiedChar *text;
   int len;
-  int *alphabet;
-  int a_len;
-  int *collapse_chars;
-  int c_len;
+  RnnCharAlphabet *alphabet;
   u32 flags;
   int lag;
   int n_classes;
@@ -130,21 +133,18 @@ int rnn_char_alloc_file_contents(const char *filename, char **contents, int *len
 
 RnnCharClassifiedChar *
 rnn_char_alloc_classified_text(RnnCharClassBlock *b,
-    int *alphabet, int a_len, int *collapse_chars, int c_len,
-    int *text_len, u32 flags);
+    RnnCharAlphabet *alphabet, int *text_len, u32 flags);
 
 void rnn_char_adjust_text_lag(RnnCharClassifiedText *t, int lag);
 
-int rnn_char_find_alphabet_s(const char *text, int len, int *alphabet, int *a_len,
-    int *collapse_chars, int *c_len, double threshold, double digit_adjust,
-    double alpha_adjust, u32 flags);
+int rnn_char_find_alphabet_s(const char *text, int len, RnnCharAlphabet *alphabet,
+    double threshold, double digit_adjust, double alpha_adjust, u32 flags);
 
-int rnn_char_find_alphabet_f(const char *filename, int *alphabet, int *a_len,
-    int *collapse_chars, int *c_len, double threshold, double digit_adjust,
-    double alpha_adjust, u32 flags);
+int rnn_char_find_alphabet_f(const char *filename, RnnCharAlphabet *alphabet,
+    double threshold, double digit_adjust, double alpha_adjust, u32 flags);
 
-u8* rnn_char_alloc_collapsed_text(char *filename, int *alphabet, int a_len,
-    int *collapse_chars, int c_len, int *text_len, u32 flags, int quietness);
+u8* rnn_char_alloc_collapsed_text(const char *filename, RnnCharAlphabet *alphabet,
+    int *text_len, u32 flags, int quietness);
 
 void rnn_char_dump_collapsed_text(const u8 *text, int len, const char *name,
     const char *alphabet);
@@ -175,7 +175,17 @@ char* rnn_char_construct_net_filename(struct RnnCharMetadata *m,
     const char *basename, int input_size, int bottom_size, int hidden_size,
     int output_size);
 
-void
-rnn_char_dump_alphabet(int *alphabet, int len, int utf8);
+void rnn_char_dump_alphabet(RnnCharAlphabet *alphabet, int utf8);
+
+int rnn_char_check_metadata(RecurNN *net, struct RnnCharMetadata *m,
+    bool trust_file_metadata, bool force_metadata);
+
+
+RnnCharAlphabet *rnn_char_new_alphabet(void);
+
+void rnn_char_reset_alphabet(RnnCharAlphabet *a);
+
+void rnn_char_free_alphabet(RnnCharAlphabet *a);
+
 
 #endif
