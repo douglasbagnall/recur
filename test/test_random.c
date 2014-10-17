@@ -5,7 +5,8 @@
 
 
 #define PLOT_RESOLUTION 100
-#define GAUSSIAN_SAMPLES 50000
+#define OVERSAMPLE_BITS 12
+#define GAUSSIAN_SAMPLES (50000 << OVERSAMPLE_BITS)
 
 static inline int
 scale_and_confine(float f, float scale, int centre, int min, int max){
@@ -63,8 +64,8 @@ void test_gauss2(rand_ctx *rng){
 }
 
 
-void
-test_gauss(rand_ctx *rng, int res, int samples,
+static void
+test_gauss(rand_ctx *rng, int res, int samples, int bits,
     void (*fn)(rand_ctx *, float *, float *, float),
     char *filename){
   int i, x, y;
@@ -84,13 +85,19 @@ test_gauss(rand_ctx *rng, int res, int samples,
     if (bins[i] > max)
       max = bins[i];
   }
-  u8 *plot = malloc((max + 1) * len);
-  memset (plot, 0, (max + 1) * len);
+  int height = (max >> bits) + 1;
+  u8 *plot = malloc((height + 1) * len);
+  memset (plot, 0, (height + 1) * len);
   i = 0;
-  for (y = max; y >= 0; y--){
+  for (y = height; y >= 0; y--){
     for (x = 0; x < len; x++, i++){
-      if (bins[x] > y)
+      int h = bins[x] >> bits;
+      if (h == y){
+        plot[i] = (bins[x] >> (bits - 8)) & 255;
+      }
+      else if (h > y){
         plot[i] = 255;
+      }
     }
   }
 #if 0
@@ -99,7 +106,7 @@ test_gauss(rand_ctx *rng, int res, int samples,
   }
 #endif
 
-  pgm_dump(plot, len, max, filename);
+  pgm_dump(plot, len, height, filename);
   free(plot);
 }
 
@@ -108,11 +115,13 @@ int
 main(void){
   rand_ctx rng;
   init_rand64(&rng, 12345);
-  test_gauss2(&rng);
-  test_gauss(&rng, PLOT_RESOLUTION, GAUSSIAN_SAMPLES, doublecheap_gaussian_noise_f,
+  //test_gauss2(&rng);
+  test_gauss(&rng, PLOT_RESOLUTION, GAUSSIAN_SAMPLES, OVERSAMPLE_BITS,
+      doublecheap_gaussian_noise_f,
       "doublecheap.pgm");
-  test_gauss(&rng, PLOT_RESOLUTION, GAUSSIAN_SAMPLES, doublecheap2_gaussian_noise_f,
+  test_gauss(&rng, PLOT_RESOLUTION, GAUSSIAN_SAMPLES, OVERSAMPLE_BITS,
+      doublecheap2_gaussian_noise_f,
       "doublecheap2.pgm");
-  test_gauss(&rng, PLOT_RESOLUTION, GAUSSIAN_SAMPLES, singlecheap,
-      "singlecheap.pgm");
+  test_gauss(&rng, PLOT_RESOLUTION, GAUSSIAN_SAMPLES, OVERSAMPLE_BITS,
+      singlecheap, "singlecheap.pgm");
 }
