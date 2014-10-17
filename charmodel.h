@@ -175,17 +175,18 @@ char* rnn_char_construct_net_filename(struct RnnCharMetadata *m,
     const char *basename, int input_size, int bottom_size, int hidden_size,
     int output_size);
 
-void rnn_char_dump_alphabet(RnnCharAlphabet *alphabet, int utf8);
-
 int rnn_char_check_metadata(RecurNN *net, struct RnnCharMetadata *m,
     bool trust_file_metadata, bool force_metadata);
 
-
 RnnCharAlphabet *rnn_char_new_alphabet(void);
+
+void rnn_char_dump_alphabet(RnnCharAlphabet *alphabet, int utf8);
 
 void rnn_char_reset_alphabet(RnnCharAlphabet *a);
 
 void rnn_char_free_alphabet(RnnCharAlphabet *a);
+
+RnnCharAlphabet *rnn_char_new_alphabet_from_net(RecurNN *net);
 
 
 #endif

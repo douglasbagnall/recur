@@ -455,9 +455,11 @@ rnn_char_construct_metadata(const struct RnnCharMetadata *m){
   int ret = asprintf(&metadata,
       "alphabet %s\n"
       "collapse_chars %s\n"
+      "utf8 %d\n"
       ,
       enc_alphabet,
-      enc_collapse_chars
+      enc_collapse_chars,
+      m->utf8
   );
   if (ret == -1){
     FATAL_ERROR("can't alloc memory for metadata. or something.");
@@ -475,10 +477,12 @@ rnn_char_load_metadata(const char *metadata, struct RnnCharMetadata *m){
   const char *template = (
       "alphabet %ms\n"
       "collapse_chars %ms\n"
+      "utf8 %d\n"
   );
   int n = sscanf(metadata, template,
       &enc_alphabet,
-      &enc_collapse_chars);
+      &enc_collapse_chars,
+      &m->utf8);
   m->alphabet = urldecode_alloc(enc_alphabet);
   m->collapse_chars = urldecode_alloc(enc_collapse_chars);
   free(enc_alphabet);
@@ -567,6 +571,23 @@ rnn_char_new_alphabet(void){
   a->collapsed_len = 0;
   return a;
 }
+
+RnnCharAlphabet *rnn_char_new_alphabet_from_net(RecurNN *net){
+  RnnCharMetadata m = {0};
+  rnn_char_load_metadata(net->metadata, &m);
+  RnnCharAlphabet *a = rnn_char_new_alphabet();
+
+  a->len = fill_codepoints_from_string(a->points, 256, m.alphabet, m.utf8);
+  a->collapsed_len = fill_codepoints_from_string(a->collapsed_points, 256,
+      m.collapse_chars, m.utf8);
+
+  if (a->len != net->input_size || a->len != net->output_size){
+    DEBUG("net sizes in %d out %d, alphabet length %d. Disaster pending...",
+        net->input_size, net->output_size, a->len);
+  }
+  return a;
+}
+
 
 void
 rnn_char_reset_alphabet(RnnCharAlphabet *a){
