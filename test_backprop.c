@@ -106,6 +106,7 @@ Because of ccan/opt, --help will tell you something.
 #define DEFAULT_ADJUST_NOISE false
 #define DEFAULT_ADAGRAD_BALLAST 200.0f
 #define DEFAULT_ADADELTA_BALLAST 0
+#define DEFAULT_FP_EXCEPTION_LEVEL 1
 
 #define BELOW_QUIET_LEVEL(quiet) if (opt_quiet < quiet)
 
@@ -178,6 +179,7 @@ static float opt_presynaptic_noise = DEFAULT_PRESYNAPTIC_NOISE;
 static bool opt_adjust_noise = DEFAULT_ADJUST_NOISE;
 static float opt_ada_ballast = -1;
 static int opt_activation = DEFAULT_ACTIVATION;
+static int opt_fp_exception_level = DEFAULT_FP_EXCEPTION_LEVEL;
 
 static struct opt_table options[] = {
   OPT_WITH_ARG("-H|--hidden-size=<n>", opt_set_uintval, opt_show_uintval,
@@ -319,7 +321,8 @@ static struct opt_table options[] = {
       &opt_ada_ballast, "adagrad/adadelta accumulators start at this value"),
   OPT_WITH_ARG("--activation", opt_set_intval, opt_show_intval,
       &opt_activation, "activation function 1: ReLU, 2: ReSQRT, 3: ReLOG, 4:ReTANH"),
-
+  OPT_WITH_ARG("--fp-exception-level", opt_set_intval, opt_show_intval,
+      &opt_fp_exception_level, "floating point exceptions; 0: none, 1: some, 2: all"),
 
   OPT_WITHOUT_ARG("-h|--help", opt_usage_and_exit,
       ": Rnn modelling of text at the character level",
@@ -627,8 +630,6 @@ load_and_train_model(struct RnnCharMetadata *m, int *alphabet, int a_len,
 
 int
 main(int argc, char *argv[]){
-  //feclearexcept(FE_ALL_EXCEPT);
-  feenableexcept(FE_DIVBYZERO | FE_INVALID | FE_OVERFLOW);
   opt_register_table(options, NULL);
   if (!opt_parse(&argc, argv, opt_log_stderr)){
     exit(1);
@@ -639,6 +640,19 @@ main(int argc, char *argv[]){
       Q_DEBUG(1, "   '%s'", argv[i]);
     }
     opt_usage(argv[0], NULL);
+  }
+
+  /*Default floating point exception level is 1,
+    catching only bad FP issues */
+  switch(opt_fp_exception_level){
+  case 0:
+    feclearexcept(FE_ALL_EXCEPT);
+    break;
+  case 1:
+    feenableexcept(FE_DIVBYZERO | FE_INVALID | FE_OVERFLOW);
+    break;
+  case 2:
+    feenableexcept(FE_ALL_EXCEPT);
   }
 
   if (! opt_logfile){
