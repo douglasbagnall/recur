@@ -91,7 +91,6 @@ Because of ccan/opt, --help will tell you something.
 #define DEFAULT_LEARNING_STYLE RNN_MOMENTUM_WEIGHTED
 #define DEFAULT_INIT_WEIGHT_SCALE 0
 #define DEFAULT_REPORT_INTERVAL 1024
-#define DEFAULT_CONFAB_ONLY 0
 #define DEFAULT_BOTTOM_LAYER 0
 #define DEFAULT_TOP_LEARN_RATE_SCALE 1.0f
 #define DEFAULT_BOTTOM_LEARN_RATE_SCALE 1.0f
@@ -164,7 +163,6 @@ static uint opt_multi_tap = DEFAULT_MULTI_TAP;
 static bool opt_use_multi_tap_path = DEFAULT_USE_MULTI_TAP_PATH;
 static int opt_learning_style = DEFAULT_LEARNING_STYLE;
 static uint opt_report_interval = DEFAULT_REPORT_INTERVAL;
-static uint opt_confab_only = DEFAULT_CONFAB_ONLY;
 static uint opt_bottom_layer = DEFAULT_BOTTOM_LAYER;
 static float opt_top_learn_rate_scale = DEFAULT_TOP_LEARN_RATE_SCALE;
 static float opt_bottom_learn_rate_scale = DEFAULT_BOTTOM_LEARN_RATE_SCALE;
@@ -285,8 +283,6 @@ static struct opt_table options[] = {
       &opt_init_weight_scale, "scale newly initialised weights (try ~1.0)"),
   OPT_WITH_ARG("--report-interval=<n>", opt_set_uintval_bi, opt_show_uintval_bi,
       &opt_report_interval, "how often to validate and report"),
-  OPT_WITH_ARG("--confab-only=<chars>", opt_set_uintval, opt_show_uintval,
-      &opt_confab_only, "no training, only confabulate this many characters"),
   OPT_WITH_ARG("--bottom-layer=<nodes>", opt_set_uintval, opt_show_uintval,
       &opt_bottom_layer, "use a bottom layer with this many output nodes"),
   OPT_WITH_ARG("--top-learn-rate-scale=<float>", opt_set_floatval, opt_show_floatval,
@@ -610,6 +606,64 @@ load_and_train_model(struct RnnCharMetadata *m, RnnCharAlphabet *alphabet,
   }
 }
 
+void train_new_or_existing_model(void){
+  /*find an alphabet, somehow, because it will affect the filename, which will
+    be necessary to attempt to load.
+
+    This may involve reading the training text an extra time.
+  */
+  RnnCharAlphabet *alphabet = rnn_char_new_alphabet();
+  u32 char_flags = (
+      (opt_case_insensitive ? RNN_CHAR_FLAG_CASE_INSENSITIVE : 0) |
+      (opt_collapse_space   ? RNN_CHAR_FLAG_COLLAPSE_SPACE : 0) |
+      (opt_utf8             ? RNN_CHAR_FLAG_UTF8 : 0));
+
+  if (opt_find_alphabet_threshold && ! opt_alphabet){
+    DEBUG("Looking for alphabet with threshold %f", opt_find_alphabet_threshold);
+    int raw_text_len;
+    char* text;
+    int err = rnn_char_alloc_file_contents(opt_textfile, &text, &raw_text_len);
+    if (err){
+      DEBUG("Couldn't read text file '%s'. Goodbye", opt_textfile);
+      exit(1);
+    }
+    rnn_char_find_alphabet_s(text, raw_text_len, alphabet,
+        opt_find_alphabet_threshold,
+        opt_find_alphabet_digit_adjust,
+        opt_find_alphabet_alpha_adjust,
+        char_flags);
+
+    free(text);
+    if (alphabet->len < 1){
+      DEBUG("Trouble finding an alphabet");
+      exit(1);
+    }
+    opt_alphabet = new_string_from_codepoints(alphabet->points, alphabet->len, opt_utf8);
+    opt_collapse_chars = new_string_from_codepoints(alphabet->collapsed_points,
+        alphabet->collapsed_len, opt_utf8);
+  }
+  else { /*use given or default alphabet */
+    if (! opt_alphabet){
+      opt_alphabet = DEFAULT_CHARSET;
+    }
+    alphabet->len = fill_codepoints_from_string(alphabet->points, 256,
+        opt_alphabet, opt_utf8);
+    alphabet->collapsed_len = fill_codepoints_from_string(alphabet->collapsed_points,
+        256, opt_alphabet, opt_utf8);
+  }
+  STDERR_DEBUG("Using alphabet of length %d: '%s'", alphabet->len, opt_alphabet);
+  STDERR_DEBUG("collapsing these %d characters into first alphabet character: '%s'",
+      alphabet->collapsed_len, opt_collapse_chars);
+
+  struct RnnCharMetadata m = {
+    .alphabet = opt_alphabet,
+    .collapse_chars = opt_collapse_chars,
+    .utf8 = opt_utf8
+  };
+  load_and_train_model(&m, alphabet, char_flags);
+}
+
+
 int
 main(int argc, char *argv[]){
   opt_register_table(options, NULL);
@@ -649,75 +703,5 @@ main(int argc, char *argv[]){
       opt_logfile = DEFAULT_LOG_FILE;
     }
   }
-
-  if (opt_confab_only){
-    RecurNN *net = rnn_load_net(opt_filename);
-    RnnCharAlphabet *alphabet = rnn_char_new_alphabet_from_net(net);
-    rnn_set_log_file(net, opt_logfile, 1);
-    init_rand64_maybe_randomly(&net->rng, opt_rng_seed);
-    /*XXX this could be done in small chunks */
-    int byte_len = opt_confab_only * 4 + 5;
-    char *t = malloc(byte_len);
-
-    rnn_char_confabulate(net, t, opt_confab_only, byte_len,
-        alphabet->points, opt_utf8, opt_confab_bias);
-    fputs(t, stdout);
-    fputs("\n", stdout);
-    free(t);
-  }
-  else {
-  /*find an alphabet, somehow. If the options indicate it should be
-    automatically determined, the training text needs to be read.
-  */
-    RnnCharAlphabet *alphabet = rnn_char_new_alphabet();
-    u32 char_flags = (
-        (opt_case_insensitive ? RNN_CHAR_FLAG_CASE_INSENSITIVE : 0) |
-        (opt_collapse_space   ? RNN_CHAR_FLAG_COLLAPSE_SPACE : 0) |
-        (opt_utf8             ? RNN_CHAR_FLAG_UTF8 : 0));
-
-    if (opt_find_alphabet_threshold && ! opt_alphabet){
-      DEBUG("Looking for alphabet with threshold %f", opt_find_alphabet_threshold);
-      int raw_text_len;
-      char* text;
-      int err = rnn_char_alloc_file_contents(opt_textfile, &text, &raw_text_len);
-      if (err){
-        DEBUG("Couldn't read text file '%s'. Goodbye", opt_textfile);
-        exit(1);
-      }
-      rnn_char_find_alphabet_s(text, raw_text_len, alphabet,
-          opt_find_alphabet_threshold,
-          opt_find_alphabet_digit_adjust,
-          opt_find_alphabet_alpha_adjust,
-          char_flags);
-
-      free(text);
-      if (alphabet->len < 1){
-        DEBUG("Trouble finding an alphabet");
-        exit(1);
-      }
-      opt_alphabet = new_string_from_codepoints(alphabet->points, alphabet->len, opt_utf8);
-      opt_collapse_chars = new_string_from_codepoints(alphabet->collapsed_points,
-          alphabet->collapsed_len, opt_utf8);
-    }
-    else { /*use given or default alphabet */
-      if (! opt_alphabet){
-        opt_alphabet = DEFAULT_CHARSET;
-      }
-      alphabet->len = fill_codepoints_from_string(alphabet->points, 256,
-          opt_alphabet, opt_utf8);
-      alphabet->collapsed_len = fill_codepoints_from_string(alphabet->collapsed_points,
-          256, opt_alphabet, opt_utf8);
-    }
-    STDERR_DEBUG("Using alphabet of length %d: '%s'", alphabet->len, opt_alphabet);
-    STDERR_DEBUG("collapsing these %d characters into first alphabet character: '%s'",
-        alphabet->collapsed_len, opt_collapse_chars);
-
-    struct RnnCharMetadata m = {
-      .alphabet = opt_alphabet,
-      .collapse_chars = opt_collapse_chars,
-      .utf8 = opt_utf8
-    };
-
-    load_and_train_model(&m, alphabet, char_flags);
-  }
+  train_new_or_existing_model();
 }
