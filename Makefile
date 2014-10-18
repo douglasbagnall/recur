@@ -76,7 +76,8 @@ $(subdirs):
 all:: plugins/libgstclassify.so $(subdirs)
 
 
-ELF_EXECUTABLES = test_backprop convert-saved-net rnnca-player gtk-recur text-classify
+ELF_EXECUTABLES = test_backprop convert-saved-net rnnca-player gtk-recur text-classify\
+	 text-confabulate
 
 clean:
 	rm -f plugins/*.so *.o *.a *.d *.s *.pyc
@@ -165,7 +166,8 @@ test/test_simple_rescale test/test_rescale: %: rescale.o %.o
 test/test_fb_backprop: %: $(RNN_OBJECTS) %.o $(OPT_OBJECTS)  | nets images
 	$(CC) -Iccan/opt/ -Wl,-O1 $(filter %.o,$^)   -I. $(DEFINES)  $(COMMON_LINKS)  -o $@
 
-test_backprop: %: $(RNN_OBJECTS) %.o charmodel-predict.o charmodel-init.o $(OPT_OBJECTS)  \
+text-confabulate test_backprop: %: $(RNN_OBJECTS) %.o \
+	charmodel-predict.o charmodel-init.o $(OPT_OBJECTS)  \
 	| nets images
 	$(CC) -Iccan/opt/ -Wl,-O1 $(filter %.o,$^)   -I. $(DEFINES)  $(COMMON_LINKS)  -o $@
 

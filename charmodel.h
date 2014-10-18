@@ -50,6 +50,7 @@ typedef struct _RnnCharAlphabet {
   int *collapsed_points;
   int len;
   int collapsed_len;
+  bool utf8;
 } RnnCharAlphabet;
 
 

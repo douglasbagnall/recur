@@ -136,6 +136,7 @@ rnn_char_find_alphabet_s(const char *text, int len, RnnCharAlphabet *alphabet,
   free(counts);
   alphabet->len = a_count;
   alphabet->collapsed_len = c_count;
+  alphabet->utf8 = utf8;
   DEBUG("alphabet len %i collapsed len %i", a_count, c_count);
   return 0;
  error:
@@ -577,7 +578,7 @@ RnnCharAlphabet *rnn_char_new_alphabet_from_net(RecurNN *net){
   RnnCharMetadata m = {0};
   rnn_char_load_metadata(net->metadata, &m);
   RnnCharAlphabet *a = rnn_char_new_alphabet();
-
+  a->utf8 = m.utf8;
   a->len = fill_codepoints_from_string(a->points, 256, m.alphabet, m.utf8);
   a->collapsed_len = fill_codepoints_from_string(a->collapsed_points, 256,
       m.collapse_chars, m.utf8);
