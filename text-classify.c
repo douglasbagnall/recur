@@ -162,15 +162,12 @@ new_charmodel_from_xml(char *filename, double alpha_threshold,
   char **classes;
   RnnCharClassBlock *first_block = new_langblocks_from_xml(filename, &classes, &n_classes);
   RnnCharClassifiedChar *classified_text;
-  int *alphabet = calloc(257, sizeof(int));
-  int *collapse_chars = calloc(257, sizeof(int));
-  int a_len;
-  int c_len;
+  RnnCharAlphabet *alphabet = rnn_char_new_alphabet();
+
   int textlen;
   char *fulltext = new_full_text_from_blocks(first_block, &textlen);
-  int r = rnn_char_find_alphabet_s(fulltext, textlen, alphabet, &a_len,
-      collapse_chars, &c_len, alpha_threshold, digit_adjust,
-      alpha_adjust, flags);
+  int r = rnn_char_find_alphabet_s(fulltext, textlen, alphabet,
+      alpha_threshold, digit_adjust, alpha_adjust, flags);
   free(fulltext);
 
   if (r){
@@ -179,16 +176,12 @@ new_charmodel_from_xml(char *filename, double alpha_threshold,
   }
 
   classified_text = rnn_char_alloc_classified_text(first_block,
-      alphabet, a_len, collapse_chars, c_len,
-      &textlen, flags);
+      alphabet, &textlen, flags);
 
   RnnCharClassifiedText *t = malloc(sizeof(*t));
   t->text = classified_text;
   t->len = textlen;
   t->alphabet = alphabet;
-  t->a_len = a_len;
-  t->collapse_chars = collapse_chars;
-  t->c_len = c_len;
   t->flags = flags;
   t->lag = 0;
   t->n_classes = n_classes;
@@ -207,7 +200,7 @@ dump_colourised_text(RnnCharClassifiedText *t){
   u8 n_colours = sizeof(colour_lut) / sizeof(colour_lut[0]);
   RnnCharClassifiedChar *text = t->text;
   char s[5] = {0};
-  int *clut = t->alphabet;
+  int *clut = t->alphabet->points;
   int utf8 = t->flags & RNN_CHAR_FLAG_UTF8;
   for (int i = 0; i < t->len; i++){
     u8 symbol = text[i].symbol;
@@ -349,8 +342,7 @@ main(int argc, char *argv[]){
     dump_colourised_text(t);
   }
   if (opt_verbose >= 1){
-    rnn_char_dump_alphabet(t->alphabet, t->a_len, opt_utf8);
-    rnn_char_dump_alphabet(t->collapse_chars, t->c_len, opt_utf8);
+    rnn_char_dump_alphabet(t->alphabet, opt_utf8);
   }
 
   RnnCharClassifier *model = malloc(sizeof(RnnCharModel));
@@ -367,21 +359,23 @@ main(int argc, char *argv[]){
 
   struct RnnCharMetadata m;
   if (opt_utf8){
-    m.alphabet = new_utf8_from_codepoints(t->alphabet, t->a_len);
-    m.collapse_chars = new_utf8_from_codepoints(t->collapse_chars, t->c_len);
+    m.alphabet = new_utf8_from_codepoints(t->alphabet->points, t->alphabet->len);
+    m.collapse_chars = new_utf8_from_codepoints(t->alphabet->collapsed_points,
+        t->alphabet->collapsed_len);
     m.utf8 = 1;
   }
   else {
-    m.alphabet = new_bytes_from_codepoints(t->alphabet, t->a_len);
-    m.collapse_chars = new_bytes_from_codepoints(t->collapse_chars, t->c_len);
+    m.alphabet = new_bytes_from_codepoints(t->alphabet->points, t->alphabet->len);
+    m.collapse_chars = new_bytes_from_codepoints(t->alphabet->collapsed_points,
+        t->alphabet->collapsed_len);
     m.utf8 = 0;
   }
 
-  model->filename = rnn_char_construct_net_filename(&m, opt_basename, t->a_len,
+  model->filename = rnn_char_construct_net_filename(&m, opt_basename, t->alphabet->len,
       0, opt_hidden_size, t->n_classes);
 
   u32 net_flags = RNN_NET_FLAG_STANDARD | RNN_NET_FLAG_BPTT_ADAPTIVE_MIN_ERROR;
-  RecurNN *net = rnn_new(t->a_len, opt_hidden_size, t->n_classes, net_flags,
+  RecurNN *net = rnn_new(t->alphabet->len, opt_hidden_size, t->n_classes, net_flags,
       opt_rng_seed, opt_logfile, opt_bptt_depth, opt_learn_rate,
       opt_momentum, opt_presynaptic_noise, RNN_RELU);
   rnn_randomise_weights_auto(net);
