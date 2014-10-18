@@ -410,9 +410,10 @@ urlencode_alloc(const char *orig){
       j++;
     }
     else {
+      u8 u = (u8)c;
       s[j] = '%';
-      s[j + 1] = lut[c >> 4];
-      s[j + 2] = lut[c & 15];
+      s[j + 1] = lut[u >> 4];
+      s[j + 2] = lut[u & 15];
       j += 3;
     }
   }
