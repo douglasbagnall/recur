@@ -431,8 +431,7 @@ finish(RnnCharModel *model, RnnCharVentropy *v){
 }
 
 static void
-load_and_train_model(struct RnnCharMetadata *m, RnnCharAlphabet *alphabet,
-    u32 char_flags){
+load_and_train_model(struct RnnCharMetadata *m, RnnCharAlphabet *alphabet){
   RnnCharModel model = {
     .n_training_nets = MAX(opt_multi_tap, 1),
     .batch_size = opt_batch_size,
@@ -444,7 +443,6 @@ load_and_train_model(struct RnnCharMetadata *m, RnnCharAlphabet *alphabet,
     .save_net = opt_save_net,
     .use_multi_tap_path = opt_use_multi_tap_path,
     .alphabet = alphabet,
-    .flags = char_flags,
     .images = {
       .basename = opt_basename,
       .temporal_pgm_dump = opt_temporal_pgm_dump
@@ -527,7 +525,7 @@ load_and_train_model(struct RnnCharMetadata *m, RnnCharAlphabet *alphabet,
   u8* validate_text;
 
   u8* text = rnn_char_alloc_collapsed_text(opt_textfile, alphabet,
-      &text_len, char_flags, opt_quiet);
+      &text_len, opt_quiet);
   if (opt_dump_collapsed_text){
     rnn_char_dump_collapsed_text(text, text_len, opt_dump_collapsed_text, m->alphabet);
   }
@@ -613,10 +611,10 @@ void train_new_or_existing_model(void){
     This may involve reading the training text an extra time.
   */
   RnnCharAlphabet *alphabet = rnn_char_new_alphabet();
-  u32 char_flags = (
-      (opt_case_insensitive ? RNN_CHAR_FLAG_CASE_INSENSITIVE : 0) |
-      (opt_collapse_space   ? RNN_CHAR_FLAG_COLLAPSE_SPACE : 0) |
-      (opt_utf8             ? RNN_CHAR_FLAG_UTF8 : 0));
+  rnn_char_alphabet_set_flags(alphabet,
+      opt_case_insensitive,
+      opt_utf8,
+      opt_collapse_space);
 
   if (opt_find_alphabet_threshold && ! opt_alphabet){
     DEBUG("Looking for alphabet with threshold %f", opt_find_alphabet_threshold);
@@ -630,8 +628,7 @@ void train_new_or_existing_model(void){
     rnn_char_find_alphabet_s(text, raw_text_len, alphabet,
         opt_find_alphabet_threshold,
         opt_find_alphabet_digit_adjust,
-        opt_find_alphabet_alpha_adjust,
-        char_flags);
+        opt_find_alphabet_alpha_adjust);
 
     free(text);
     if (alphabet->len < 1){
@@ -658,9 +655,11 @@ void train_new_or_existing_model(void){
   struct RnnCharMetadata m = {
     .alphabet = opt_alphabet,
     .collapse_chars = opt_collapse_chars,
-    .utf8 = opt_utf8
+    .utf8 = opt_utf8,
+    .case_insensitive = opt_case_insensitive,
+    .collapse_space = opt_collapse_space
   };
-  load_and_train_model(&m, alphabet, char_flags);
+  load_and_train_model(&m, alphabet);
 }
 
 

@@ -30,10 +30,10 @@ adjust_count(int i, int count, double digit_adjust, double alpha_adjust){
 /* rnn_char_find_alphabet_s returns 0 for success, -1 on failure. */
 int
 rnn_char_find_alphabet_s(const char *text, int len, RnnCharAlphabet *alphabet,
-    double threshold, double digit_adjust, double alpha_adjust, u32 flags){
-  int ignore_case = flags & RNN_CHAR_FLAG_CASE_INSENSITIVE;
-  int collapse_space = flags & RNN_CHAR_FLAG_COLLAPSE_SPACE;
-  int utf8 = flags & RNN_CHAR_FLAG_UTF8;
+    double threshold, double digit_adjust, double alpha_adjust){
+  int ignore_case = alphabet->flags & RNN_CHAR_FLAG_CASE_INSENSITIVE;
+  int collapse_space = alphabet->flags & RNN_CHAR_FLAG_COLLAPSE_SPACE;
+  int utf8 = alphabet->flags & RNN_CHAR_FLAG_UTF8;
   int n_chars = utf8 ? 0x200000 : 256;
   int *counts = calloc(n_chars + 1, sizeof(int));
   int c, prev = 0;
@@ -136,7 +136,8 @@ rnn_char_find_alphabet_s(const char *text, int len, RnnCharAlphabet *alphabet,
   free(counts);
   alphabet->len = a_count;
   alphabet->collapsed_len = c_count;
-  alphabet->utf8 = utf8;
+  rnn_char_alphabet_set_flags(alphabet, ignore_case, utf8, collapse_space);
+
   DEBUG("alphabet len %i collapsed len %i", a_count, c_count);
   return 0;
  error:
@@ -198,13 +199,13 @@ rnn_char_alloc_file_contents(const char *filename, char **contents, int *len)
 /* rnn_char_find_alphabet_f returns 0 for success, -1 on failure. */
 int
 rnn_char_find_alphabet_f(const char *filename, RnnCharAlphabet *alphabet,
-    double threshold, double digit_adjust, double alpha_adjust, u32 flags){
+    double threshold, double digit_adjust, double alpha_adjust){
   int len;
   char *contents;
   int err = rnn_char_alloc_file_contents(filename, &contents, &len);
   if (! err){
     err = rnn_char_find_alphabet_s(contents, len, alphabet,
-        threshold, digit_adjust, alpha_adjust, flags);
+        threshold, digit_adjust, alpha_adjust);
     free(contents);
   }
   else {
@@ -216,8 +217,8 @@ rnn_char_find_alphabet_f(const char *filename, RnnCharAlphabet *alphabet,
 
 
 static int*
-new_char_lut(const RnnCharAlphabet *alphabet, int *_space, u32 flags){
-  int case_insensitive = flags & RNN_CHAR_FLAG_CASE_INSENSITIVE;
+new_char_lut(const RnnCharAlphabet *alphabet, int *_space){
+  int case_insensitive = alphabet->flags & RNN_CHAR_FLAG_CASE_INSENSITIVE;
   int i;
   int collapse_target = 0;
   int space = 0;
@@ -231,7 +232,7 @@ new_char_lut(const RnnCharAlphabet *alphabet, int *_space, u32 flags){
     DEBUG("space is not in alphabet; using collapse_target");
   }
   *_space = space;
-  int len = (flags & RNN_CHAR_FLAG_UTF8) ? 0x200001 : 257;
+  int len = (alphabet->flags & RNN_CHAR_FLAG_UTF8) ? 0x200001 : 257;
   int *ctn = malloc(len *sizeof(int));
   /*anything unspecified goes to space */
   for (i = 0; i < len; i++){
@@ -256,12 +257,12 @@ new_char_lut(const RnnCharAlphabet *alphabet, int *_space, u32 flags){
 
 u8*
 rnn_char_alloc_collapsed_text(const char *filename, RnnCharAlphabet *alphabet,
-    int *text_len, u32 flags, int quietness){
-  int collapse_space = flags & RNN_CHAR_FLAG_COLLAPSE_SPACE;
-  int utf8 = flags & RNN_CHAR_FLAG_UTF8;
+    int *text_len, int quietness){
+  int collapse_space = alphabet->flags & RNN_CHAR_FLAG_COLLAPSE_SPACE;
+  int utf8 = alphabet->flags & RNN_CHAR_FLAG_UTF8;
   int i, j;
   int space;
-  int *char_to_net = new_char_lut(alphabet, &space, flags);
+  int *char_to_net = new_char_lut(alphabet, &space);
   u8 *text;
   int raw_len;
   rnn_char_alloc_file_contents(filename, (char**)&text, &raw_len);
@@ -305,9 +306,10 @@ rnn_char_alloc_collapsed_text(const char *filename, RnnCharAlphabet *alphabet,
 }
 
 void
-rnn_char_dump_alphabet(RnnCharAlphabet *alphabet, int utf8){
+rnn_char_dump_alphabet(RnnCharAlphabet *alphabet){
   char *s;
   char *s2;
+  int utf8 = alphabet->flags & RNN_CHAR_FLAG_UTF8;
   if (utf8){
     s = new_utf8_from_codepoints(alphabet->points, alphabet->len);
     s2 = new_utf8_from_codepoints(alphabet->collapsed_points, alphabet->collapsed_len);
@@ -335,11 +337,11 @@ rnn_char_dump_alphabet(RnnCharAlphabet *alphabet, int utf8){
 
 RnnCharClassifiedChar *
 rnn_char_alloc_classified_text(RnnCharClassBlock *b,
-    RnnCharAlphabet *alphabet, int *text_len, u32 flags){
+    RnnCharAlphabet *alphabet, int *text_len){
   int space;
-  int collapse_space = flags & RNN_CHAR_FLAG_COLLAPSE_SPACE;
-  int utf8 = flags & RNN_CHAR_FLAG_UTF8;
-  int *char_to_net = new_char_lut(alphabet, &space, flags);
+  int collapse_space = alphabet->flags & RNN_CHAR_FLAG_COLLAPSE_SPACE;
+  int utf8 = alphabet->flags & RNN_CHAR_FLAG_UTF8;
+  int *char_to_net = new_char_lut(alphabet, &space);
 
   int size = 1000 * 1000;
   RnnCharClassifiedChar *text = malloc(size * sizeof(RnnCharClassifiedChar));
@@ -458,10 +460,14 @@ rnn_char_construct_metadata(const struct RnnCharMetadata *m){
       "alphabet %s\n"
       "collapse_chars %s\n"
       "utf8 %d\n"
+      "collapse_space %d\n"
+      "case_insensitive %d\n"
       ,
       enc_alphabet,
       enc_collapse_chars,
-      m->utf8
+      m->utf8,
+      m->collapse_space,
+      m->case_insensitive
   );
   if (ret == -1){
     FATAL_ERROR("can't alloc memory for metadata. or something.");
@@ -475,22 +481,27 @@ int
 rnn_char_load_metadata(const char *metadata, struct RnnCharMetadata *m){
   char *enc_alphabet = NULL;
   char *enc_collapse_chars = NULL;
-  const char expected_n = 2;
+  const char expected_n = 5;
   const char *template = (
-      "alphabet %ms\n"
-      "collapse_chars %ms\n"
+      "alphabet %s\n"
+      "collapse_chars %s\n"
       "utf8 %d\n"
+      "collapse_space %d\n"
+      "case_insensitive %d\n"
   );
   int n = sscanf(metadata, template,
       &enc_alphabet,
       &enc_collapse_chars,
-      &m->utf8);
+      &m->utf8,
+      &m->collapse_space,
+      &m->case_insensitive
+  );
   m->alphabet = urldecode_alloc(enc_alphabet);
   m->collapse_chars = urldecode_alloc(enc_collapse_chars);
   free(enc_alphabet);
   free(enc_collapse_chars);
   if (n != expected_n){
-    DEBUG("Found only %d/%d metadata items", n, expected_n);
+    DEBUG("Found %d out of %d metadata items", n, expected_n);
   }
   return expected_n - n;
 }
@@ -499,6 +510,22 @@ void
 rnn_char_free_metadata_items(struct RnnCharMetadata *m){
   free(m->alphabet);
   free(m->collapse_chars);
+}
+
+void
+rnn_char_copy_metadata_items(struct RnnCharMetadata *src, struct RnnCharMetadata *dest){
+  if (dest->alphabet){
+    free(dest->alphabet);
+  }
+  if (dest->collapse_chars){
+    free(dest->collapse_chars);
+  }
+  dest->alphabet = strdup(src->alphabet);
+  dest->collapse_chars = strdup(src->collapse_chars);
+
+  dest->utf8 = src->utf8;
+  dest->collapse_space = src->collapse_space;
+  dest->case_insensitive = src->case_insensitive;
 }
 
 char*
@@ -522,6 +549,9 @@ rnn_char_construct_net_filename(struct RnnCharMetadata *m, const char *basename,
 int
 rnn_char_check_metadata(RecurNN *net, struct RnnCharMetadata *m,
     bool trust_file_metadata, bool force_metadata){
+  /*Check that the metadata struct matches the metadata serialisation in the
+    net. If it doesn't the solution depends on the flags.
+   */
   if (net == NULL || m == NULL){
     DEBUG("net is %p, metadata is %p, in %s", net, m, __func__);
     return -1;
@@ -544,8 +574,7 @@ rnn_char_check_metadata(RecurNN *net, struct RnnCharMetadata *m,
         /*NB. the alphabet length could be different, isn't checked*/
         DEBUG("Using the net's metadata. Use --force-metadata to override");
         DEBUG("alphabet %s", m2.alphabet);
-        m->alphabet = strdup(m2.alphabet);
-        m->collapse_chars = strdup(m2.collapse_chars);
+        rnn_char_copy_metadata_items(&m2, m);
         rnn_char_free_metadata_items(&m2);
       }
     }
@@ -571,14 +600,18 @@ rnn_char_new_alphabet(void){
   a->collapsed_points = calloc(257, sizeof(int));
   a->len = 0;
   a->collapsed_len = 0;
+  a->flags = 0;
   return a;
 }
 
-RnnCharAlphabet *rnn_char_new_alphabet_from_net(RecurNN *net){
+
+RnnCharAlphabet
+*rnn_char_new_alphabet_from_net(RecurNN *net){
   RnnCharMetadata m = {0};
   rnn_char_load_metadata(net->metadata, &m);
   RnnCharAlphabet *a = rnn_char_new_alphabet();
-  a->utf8 = m.utf8;
+  rnn_char_alphabet_set_flags(a, m.case_insensitive, m.utf8, m.collapse_space);
+
   a->len = fill_codepoints_from_string(a->points, 256, m.alphabet, m.utf8);
   a->collapsed_len = fill_codepoints_from_string(a->collapsed_points, 256,
       m.collapse_chars, m.utf8);
@@ -590,11 +623,21 @@ RnnCharAlphabet *rnn_char_new_alphabet_from_net(RecurNN *net){
   return a;
 }
 
+void
+rnn_char_alphabet_set_flags(RnnCharAlphabet *a,
+    bool case_insensitive, bool utf8, bool collapse_space){
+  a->flags = (
+      (case_insensitive ? RNN_CHAR_FLAG_CASE_INSENSITIVE : 0) |
+      (collapse_space   ? RNN_CHAR_FLAG_COLLAPSE_SPACE : 0) |
+      (utf8             ? RNN_CHAR_FLAG_UTF8 : 0));
+}
+
 
 void
 rnn_char_reset_alphabet(RnnCharAlphabet *a){
   a->len = 0;
   a->collapsed_len = 0;
+  a->flags = 0;
 }
 
 void

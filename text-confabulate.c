@@ -59,7 +59,7 @@ main(int argc, char *argv[]){
   char *t = malloc(byte_len);
 
   rnn_char_confabulate(net, t, opt_chars, byte_len,
-      alphabet->points, alphabet->utf8, opt_bias);
+      alphabet, opt_bias);
   fputs(t, stdout);
   fputs("\n", stdout);
   free(t);

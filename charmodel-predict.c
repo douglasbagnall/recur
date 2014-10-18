@@ -136,9 +136,11 @@ rnn_char_init_schedule(RnnCharSchedule *s, int recent_len,
 
 int
 rnn_char_confabulate(RecurNN *net, char *dest, int char_len,
-    int byte_len, const int* alphabet, int utf8, float bias){
+    int byte_len, RnnCharAlphabet* a, float bias){
   int i, j;
   static int n = 0;
+  bool utf8 = a->flags & RNN_CHAR_FLAG_UTF8;
+  const int *alphabet = a->points;
   int safe_end = byte_len - (utf8 ? 5 : 1);
   for (i = 0, j = 0; i < char_len && j < safe_end; i++){
     n = guess_next_character(net, n, bias);
@@ -282,7 +284,7 @@ rnn_char_epoch(RnnCharModel *model, RecurNN *confab_net, RnnCharVentropy *v,
           int alloc_size = confab_size * 4;
           char confab[alloc_size + 1];
           rnn_char_confabulate(confab_net, confab, confab_size, alloc_size,
-              model->alphabet->points, model->flags & RNN_CHAR_FLAG_UTF8, confab_bias);
+              model->alphabet, confab_bias);
           STDERR_DEBUG("%5dk e.%02d t%.2f v%.2f a.%02d %.0f/s |%s|", k,
               (int)(error * 100 + 0.5),
               entropy, ventropy,

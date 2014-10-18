@@ -50,7 +50,7 @@ typedef struct _RnnCharAlphabet {
   int *collapsed_points;
   int len;
   int collapsed_len;
-  bool utf8;
+  u32 flags;
 } RnnCharAlphabet;
 
 
@@ -67,7 +67,6 @@ struct _RnnCharModel {
   uint report_interval;
   bool save_net;
   bool use_multi_tap_path;
-  u32 flags;
   RnnCharAlphabet *alphabet;
   RnnCharSchedule schedule;
   RnnCharImageSettings images;
@@ -77,6 +76,8 @@ typedef struct RnnCharMetadata {
   char *alphabet; /*utf-8 or byte string */
   char *collapse_chars;
   bool utf8;
+  bool case_insensitive;
+  bool collapse_space;
 } RnnCharMetadata;
 
 typedef struct _RnnCharClassifiedChar{
@@ -134,18 +135,18 @@ int rnn_char_alloc_file_contents(const char *filename, char **contents, int *len
 
 RnnCharClassifiedChar *
 rnn_char_alloc_classified_text(RnnCharClassBlock *b,
-    RnnCharAlphabet *alphabet, int *text_len, u32 flags);
+    RnnCharAlphabet *alphabet, int *text_len);
 
 void rnn_char_adjust_text_lag(RnnCharClassifiedText *t, int lag);
 
 int rnn_char_find_alphabet_s(const char *text, int len, RnnCharAlphabet *alphabet,
-    double threshold, double digit_adjust, double alpha_adjust, u32 flags);
+    double threshold, double digit_adjust, double alpha_adjust);
 
 int rnn_char_find_alphabet_f(const char *filename, RnnCharAlphabet *alphabet,
-    double threshold, double digit_adjust, double alpha_adjust, u32 flags);
+    double threshold, double digit_adjust, double alpha_adjust);
 
 u8* rnn_char_alloc_collapsed_text(const char *filename, RnnCharAlphabet *alphabet,
-    int *text_len, u32 flags, int quietness);
+    int *text_len, int quietness);
 
 void rnn_char_dump_collapsed_text(const u8 *text, int len, const char *name,
     const char *alphabet);
@@ -156,7 +157,7 @@ void rnn_char_init_schedule(RnnCharSchedule *s, int recent_len,
 float rnn_char_calc_ventropy(RnnCharModel *model, RnnCharVentropy *v, int lap);
 
 int rnn_char_confabulate(RecurNN *net, char *dest, int char_len,
-    int byte_len, const int* alphabet, int utf8, float bias);
+    int byte_len, RnnCharAlphabet* a, float bias);
 
 void rnn_char_init_ventropy(RnnCharVentropy *v, RecurNN *net, const u8 *text,
     const int len, const int lap);
@@ -179,15 +180,22 @@ char* rnn_char_construct_net_filename(struct RnnCharMetadata *m,
 int rnn_char_check_metadata(RecurNN *net, struct RnnCharMetadata *m,
     bool trust_file_metadata, bool force_metadata);
 
+void rnn_char_copy_metadata_items(struct RnnCharMetadata *src,\
+    struct RnnCharMetadata *dest);
+
 RnnCharAlphabet *rnn_char_new_alphabet(void);
 
-void rnn_char_dump_alphabet(RnnCharAlphabet *alphabet, int utf8);
+void rnn_char_dump_alphabet(RnnCharAlphabet *alphabet);
 
 void rnn_char_reset_alphabet(RnnCharAlphabet *a);
 
 void rnn_char_free_alphabet(RnnCharAlphabet *a);
 
 RnnCharAlphabet *rnn_char_new_alphabet_from_net(RecurNN *net);
+
+void rnn_char_alphabet_set_flags(RnnCharAlphabet *a,
+    bool case_insensitive, bool utf8, bool collapse_space);
+
 
 
 #endif
