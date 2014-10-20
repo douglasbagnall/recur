@@ -483,8 +483,8 @@ rnn_char_load_metadata(const char *metadata, struct RnnCharMetadata *m){
   char *enc_collapse_chars = NULL;
   const char expected_n = 5;
   const char *template = (
-      "alphabet %s\n"
-      "collapse_chars %s\n"
+      "alphabet %ms\n"
+      "collapse_chars %ms\n"
       "utf8 %d\n"
       "collapse_space %d\n"
       "case_insensitive %d\n"
