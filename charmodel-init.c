@@ -255,17 +255,14 @@ new_char_lut(const RnnCharAlphabet *alphabet, int *_space){
   return ctn;
 }
 
-u8*
-rnn_char_alloc_collapsed_text(const char *filename, RnnCharAlphabet *alphabet,
-    int *text_len, int quietness){
+int
+rnn_char_collapse_buffer(RnnCharAlphabet *alphabet, u8 *text,
+    int raw_len, int *collapsed_len){
   int collapse_space = alphabet->flags & RNN_CHAR_FLAG_COLLAPSE_SPACE;
   int utf8 = alphabet->flags & RNN_CHAR_FLAG_UTF8;
   int i, j;
   int space;
   int *char_to_net = new_char_lut(alphabet, &space);
-  u8 *text;
-  int raw_len;
-  rnn_char_alloc_file_contents(filename, (char**)&text, &raw_len);
   u8 prev = 0;
   u8 c;
   int chr = 0;
@@ -296,11 +293,22 @@ rnn_char_alloc_collapsed_text(const char *filename, RnnCharAlphabet *alphabet,
     }
   }
   text[j] = 0;
-  *text_len = j;
+  *collapsed_len = j;
   free(char_to_net);
+  return i;
+}
+
+
+u8*
+rnn_char_alloc_collapsed_text(const char *filename, RnnCharAlphabet *alphabet,
+    int *text_len, int quietness){
+  u8 *text;
+  int raw_len;
+  rnn_char_alloc_file_contents(filename, (char**)&text, &raw_len);
+  int chars = rnn_char_collapse_buffer(alphabet, text, raw_len, text_len);
   if (quietness < 1){
     STDERR_DEBUG("original text was %d chars (%d bytes), collapsed is %d",
-        i, raw_len, *text_len);
+        chars, raw_len, *text_len);
   }
   return text;
 }

@@ -321,3 +321,29 @@ rnn_char_epoch(RnnCharModel *model, RecurNN *confab_net, RnnCharVentropy *v,
   }
   return 0;
 }
+
+
+float
+rnn_char_cross_entropy(RecurNN *net, RnnCharAlphabet *alphabet,
+    const u8 *text, const int len, const int ignore_first,
+    const u8 *prefix_text, const int prefix_len){
+  int i;
+  double entropy = 0.0f;
+  float *error = malloc_aligned_or_die((net->output_size + 1) * sizeof(float));
+  if (prefix_text){
+    for(i = 0; i < prefix_len; i++){
+      one_hot_opinion(net, text[i], 0);
+    }
+  }
+  for(i = 0; i < ignore_first; i++){
+    one_hot_opinion(net, text[i], 0);
+  }
+  for(; i < len - 1; i++){
+    int now = text[i];
+    int next = text[i + 1];
+    float *answer = one_hot_opinion(net, now, 0);
+    softmax(error, answer, net->output_size);
+    entropy -= (double)capped_log2f(error[next]);
+  }
+  return entropy / (len - ignore_first - 1);
+}
