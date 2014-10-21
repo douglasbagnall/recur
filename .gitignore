@@ -35,3 +35,5 @@ local.mak
 /data/
 .juliahistory
 /text-classify
+/text-confabulate
+/text-cross-entropy
