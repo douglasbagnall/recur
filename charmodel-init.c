@@ -486,32 +486,69 @@ rnn_char_construct_metadata(const struct RnnCharMetadata *m){
 }
 
 int
-rnn_char_load_metadata(const char *metadata, struct RnnCharMetadata *m){
-  char *enc_alphabet = NULL;
-  char *enc_collapse_chars = NULL;
-  const char expected_n = 5;
-  const char *template = (
-      "alphabet %ms\n"
-      "collapse_chars %ms\n"
+rnn_char_load_metadata(const char *orig, struct RnnCharMetadata *m){
+  char *metadata = strdup(orig);
+  char *key = NULL;
+  char *value = NULL;
+  char *value_end;
+  char *s = metadata;
+  DEBUG("Loading metadata\n%s", metadata);
+
+#define get_val(k) do {                                           \
+    key = strsep(&s, " ");                                        \
+    value = strsep(&s, "\n");                                     \
+    /*DEBUG("key is %s, k %s, value %s", key, k, value);   */     \
+    if (!key || strcmp(key, (k))){                                \
+      goto error;                                                 \
+    }                                                             \
+  } while(0)
+
+#define get_int_val(k, dest) do {                       \
+    get_val(k);                                         \
+    dest = strtol(value, &value_end, 10);               \
+    if (value == value_end){                            \
+      DEBUG(k " value is missing or non-integer");      \
+    }                                                   \
+  } while(0)
+
+      //key = strsep(&s, " ");
+
+  get_val("alphabet");
+  m->alphabet = urldecode_alloc(value);
+
+  get_val("collapse_chars");
+  m->collapse_chars = urldecode_alloc(value);
+
+  get_int_val("utf8", m->utf8);
+  get_int_val("collapse_space", m->collapse_space);
+  get_int_val("case_insensitive", m->case_insensitive);
+
+  if (s && *s){
+    DEBUG("Found extra metadata: %s", s);
+  }
+
+  DEBUG("alphabet %s\n"
+      "collapse_chars %s\n"
       "utf8 %d\n"
       "collapse_space %d\n"
       "case_insensitive %d\n"
+      ,
+      m->alphabet,
+      m->collapse_chars,
+      m->utf8,
+      m->collapse_space,
+      m->case_insensitive
   );
-  int n = sscanf(metadata, template,
-      &enc_alphabet,
-      &enc_collapse_chars,
-      &m->utf8,
-      &m->collapse_space,
-      &m->case_insensitive
-  );
-  m->alphabet = urldecode_alloc(enc_alphabet);
-  m->collapse_chars = urldecode_alloc(enc_collapse_chars);
-  free(enc_alphabet);
-  free(enc_collapse_chars);
-  if (n != expected_n){
-    DEBUG("Found %d out of %d metadata items", n, expected_n);
-  }
-  return expected_n - n;
+
+#undef get_val
+#undef get_int_val
+
+  free(metadata);
+  return 0;
+ error:
+  DEBUG("Error loading metadata. key is %s, value %s", key, value);
+  free(metadata);
+  return -1;
 }
 
 void
