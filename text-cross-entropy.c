@@ -70,7 +70,7 @@ main(int argc, char *argv[]){
     const char *filename = argv[i];
     u8* text = rnn_char_alloc_collapsed_text(filename, alphabet, &len, 3);
     if (len >= opt_min_length){
-      float entropy = rnn_char_cross_entropy(net, alphabet, text, len, opt_ignore_first,
+      double entropy = rnn_char_cross_entropy(net, alphabet, text, len, opt_ignore_first,
           prefix_text, prefix_len);
       fprintf(stdout, "%s %.5f\n", filename, entropy);
       count++;

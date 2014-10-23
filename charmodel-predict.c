@@ -58,14 +58,13 @@ guess_next_character(RecurNN *net, int hot, float bias){
   }
 }
 
-static float
-validate(RecurNN *net, const u8 *text, int len){
+static double
+get_cross_entropy(RecurNN *net, const u8 *text, int len, int skip){
   float error[net->output_size];
-  float entropy = 0.0f;
+  double entropy = 0.0;
   int i;
   int n_chars = net->output_size;
   /*skip the first few because state depends too much on previous experience */
-  int skip = MIN(len / 10, 5);
   for (i = 0; i < skip; i++){
     one_hot_opinion(net, text[i], 0);
   }
@@ -178,8 +177,10 @@ rnn_char_calc_ventropy(RnnCharModel *model, RnnCharVentropy *v, int lap)
       if (v->counter == v->lap){
         v->counter = 0;
       }
-      v->history[v->counter] = validate(v->net, v->text + v->lapsize * v->counter,
-          v->lapsize);
+      int skip = MIN(v->lapsize / 10, 5);
+      v->history[v->counter] = get_cross_entropy(v->net,
+          v->text + v->lapsize * v->counter,
+          v->lapsize, skip);
       float sum = 0.0f;
       float div = v->lap;
       for (int j = 0; j < v->lap; j++){
@@ -189,7 +190,8 @@ rnn_char_calc_ventropy(RnnCharModel *model, RnnCharVentropy *v, int lap)
       v->entropy = div ? sum / div : 0;
     }
     else {
-      v->entropy = validate(v->net, v->text, v->len);
+      int skip = MIN(v->len / 10, 5);
+      v->entropy = get_cross_entropy(v->net, v->text, v->len, skip);
       v->history[0] = v->entropy;
     }
   }
@@ -323,27 +325,15 @@ rnn_char_epoch(RnnCharModel *model, RecurNN *confab_net, RnnCharVentropy *v,
 }
 
 
-float
+double
 rnn_char_cross_entropy(RecurNN *net, RnnCharAlphabet *alphabet,
-    const u8 *text, const int len, const int ignore_first,
+    const u8 *text, const int len, const int skip,
     const u8 *prefix_text, const int prefix_len){
-  int i;
-  double entropy = 0.0f;
-  float *error = malloc_aligned_or_die((net->output_size + 1) * sizeof(float));
   if (prefix_text){
-    for(i = 0; i < prefix_len; i++){
-      one_hot_opinion(net, text[i], 0);
+    for(int i = 0; i < prefix_len; i++){
+      one_hot_opinion(net, prefix_text[i], 0);
     }
   }
-  for(i = 0; i < ignore_first; i++){
-    one_hot_opinion(net, text[i], 0);
-  }
-  for(; i < len - 1; i++){
-    int now = text[i];
-    int next = text[i + 1];
-    float *answer = one_hot_opinion(net, now, 0);
-    softmax(error, answer, net->output_size);
-    entropy -= (double)capped_log2f(error[next]);
-  }
-  return entropy / (len - ignore_first - 1);
+  double entropy = get_cross_entropy(net, text, len, skip);
+  return entropy;
 }
