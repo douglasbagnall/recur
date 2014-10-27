@@ -435,7 +435,7 @@ urlencode_alloc(const char *orig){
 static inline char *
 urldecode_alloc(const char *orig){
   size_t len = strlen(orig);
-  char *s = malloc(len);
+  char *s = malloc(len + 1);
   uint i, j;
   for (i = 0, j = 0; i < len; i++){
     char c = orig[j];
