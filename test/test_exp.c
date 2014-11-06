@@ -2,6 +2,11 @@
 #include "pgm_dump.h"
 #include <math.h>
 
+#define TEST_RANGE 1
+#define TEST_EXP 1
+#define TEST_LOG 1
+#define TEST_LOG2 1
+
 #define F32_EXPONENT      0x3C800000
 #define F32_EXP_ONE       0x00800000
 #define F32_MANTISSA_MASK 0x807FFFFF
@@ -56,7 +61,7 @@
 
 /*untried newcomers */
 /*https://www.allegro.cc/forums/thread/183952/183964 #1*/
-static float fast_logf_allegro(float x)
+static UNUSED float fast_logf_allegro(float x)
 {
   float y = (x - 1.0f) / (x + 1.0f);
   float y_squared = y * y;
@@ -64,7 +69,7 @@ static float fast_logf_allegro(float x)
 }
 
 /****https://www.allegro.cc/forums/thread/183952/183964 #2 ****/
-static inline float fast_logf_small(float x)
+static UNUSED inline float fast_logf_small(float x)
 {
   float y = (x-1) / (x+1);
   float y_cubed = y * y * y;
@@ -74,7 +79,7 @@ static inline float fast_logf_small(float x)
 #define MANTISSA(x)((x) & 0x7FFFFF) * 1.1920928955e-7 + 1.0
 #define EXPONENT(x) ((((x) >> 23) & 255) - 127)
 
-static float
+static UNUSED float
 fast_logf_43(float y)
 {
   union REAL {
@@ -89,7 +94,7 @@ fast_logf_43(float y)
 
 /******************/
 
-static float
+static UNUSED float
 fast_logf(float x){
   float c = 0, a;
   for (; x > 2.0f; x /= Ef, c++){}
@@ -100,7 +105,7 @@ fast_logf(float x){
   return a + c;
 }
 
-static float
+static UNUSED float
 fast_logf_b(float x){
   union {
     u32 i;
@@ -119,7 +124,7 @@ fast_logf_b(float x){
   return a + c;
 }
 
-static float
+static UNUSED float
 fast_logf_b_pade(float x){
   union {
     u32 i;
@@ -137,7 +142,7 @@ fast_logf_b_pade(float x){
 }
 
 
-static float
+static UNUSED float
 fast_logf_mineiro(float x){
   union {
     float f;
@@ -156,7 +161,7 @@ fast_logf_mineiro(float x){
 }
 
 
-static float
+static UNUSED float
 fast_logf_mineiro2 (float x)
 {
   union { float f; uint32_t i; } vx = { x };
@@ -166,7 +171,7 @@ fast_logf_mineiro2 (float x)
 }
 
 
-static double
+static UNUSED double
 fast_log(double x){
   double c, a;
   for (c = 0; x > 2.0; x /= E, c++){}
@@ -179,7 +184,7 @@ fast_log(double x){
 
 
 
-static double
+static UNUSED double
 fast_log_b_pade(double x){
   union {
     u64 i;
@@ -198,7 +203,7 @@ fast_log_b_pade(double x){
 }
 
 
-static double
+static UNUSED double
 fast_log_b(double x){
   union {
     u64 i;
@@ -218,7 +223,26 @@ fast_log_b(double x){
 }
 
 
-static float
+static UNUSED double
+fast_log2(double x){
+  union {
+    u64 i;
+    double d;
+  } b;
+  b.d = x;
+  u64 exponent = b.i & F64_EXP_MASK;
+  b.i &= F64_MANTISSA_MASK;
+  b.i |= 0x3FE0000000000000UL; /*0.5 to 1.0 */
+  x = b.d;
+  double c = (int)((exponent >> 52) - 0x3fE);
+  double y = (x - 1.0);
+  double a = y * (6 + y) / ((6 + 4 * y) * LG2);
+  return a + c;
+}
+
+
+
+static UNUSED float
 fastpow2_mineiro (float p)
 {
   float offset = (p < 0) ? 1.0f : 0.0f;
@@ -229,7 +253,7 @@ fastpow2_mineiro (float p)
   return v.f;
 }
 
-static float
+static UNUSED float
 fast_expf_mineiro (float p)
 {
   return fastpow2_mineiro (1.442695040f * p);
@@ -237,7 +261,7 @@ fast_expf_mineiro (float p)
 
 
 
-static float
+static UNUSED float
 fast_expf_taylor3(float x){
   union {
     u32 i;
@@ -260,7 +284,7 @@ fast_expf_taylor3(float x){
 }
 
 
-static float
+static UNUSED float
 fast_expf_taylor2(float x){
   union {
     u32 i;
@@ -284,7 +308,7 @@ fast_expf_taylor2(float x){
 
 
 
-static float
+static UNUSED float
 fast_expf_taylor(float x){
   int count = 0;
   while (fabsf(x) > 0.2){
@@ -301,7 +325,7 @@ fast_expf_taylor(float x){
   return a;
 }
 
-static float
+static UNUSED float
 fast_expf_22(float x){
   int count = 0;
   while (fabsf(x) > 0.2){
@@ -322,7 +346,7 @@ fast_expf_22(float x){
 
 
 
-static double
+static UNUSED double
 fast_exp_taylor2(double x){
   union {
     u64 i;
@@ -344,7 +368,7 @@ fast_exp_taylor2(double x){
   return a;
 }
 
-static double
+static UNUSED double
 fast_exp_taylor(double x){
   int count = 0;
   while (fabs(x) > 0.1){
@@ -361,7 +385,7 @@ fast_exp_taylor(double x){
   return a;
 }
 
-static double
+static UNUSED double
 fast_exp_22(double x){
   int count = 0;
   while (fabs(x) > 0.1){
@@ -381,7 +405,7 @@ fast_exp_22(double x){
   return a;
 }
 
-static double
+static UNUSED double
 fast_exp_33(double x){
   int count = 0;
   while (fabs(x) > 0.1){
@@ -416,7 +440,7 @@ fast_exp_33(double x){
 }
 
 
-static double
+static UNUSED double
 fast_exp_bits_33(double x){
   union {
     u64 i;
@@ -524,14 +548,16 @@ test_double_range(double (*fn1)(double), double (*fn2)(double),
 
 int
 main(void){
+#if TEST_RANGE
   //test_float_range(expf, fast_expf_mineiro, -10, 10, 1.4);
   test_float_range(logf, fast_logf_b_pade, 1, 10, 1e-1);
   //test_double_range(exp, fast_exp_bits_33, -10, 10, 0.3);
   //test_double_range(log, fast_log_b_pade, 0.0001, 11, 0.4);
+#endif
   rand_ctx rng;
   init_rand64(&rng, 1);
-  int N = 10000000;
-
+  const int N = 10000000;
+#if TEST_EXP
   TIME_EXPF(fast_expf_mineiro, f_mineiro);
   TIME_EXPF(fast_expf_taylor, f_taylor);
   TIME_EXPF(fast_expf_taylor2, f_taylor2);
@@ -544,8 +570,9 @@ main(void){
   TIME_EXP(fast_exp_bits_33, double_bits_33);
   TIME_EXP(fast_exp_taylor, double_taylor);
   TIME_EXP(fast_exp_taylor2, double_taylor2);
-
-  DEBUG("*********** log ***********");
+#endif
+#if TEST_LOG
+  DEBUG("*********** logf ***********");
   TIME_LOGF(fast_logf, fast_logf);
   TIME_LOGF(fast_logf_b, fast_logf_b);
   TIME_LOGF(fast_logf_b_pade, fast_logf_b_pade);
@@ -554,8 +581,15 @@ main(void){
   TIME_LOGF(fast_logf_allegro, fast_logf_allegro);
   TIME_LOGF(fast_logf_43, fast_logf_43);
   TIME_LOGF(logf, libm_logf);
+  DEBUG("*********** log ***********");
   TIME_LOG(fast_log, fast_log);
   TIME_LOG(fast_log_b, fast_log_b);
   TIME_LOG(fast_log_b_pade, fast_log_b_pade);
   TIME_LOG(log, libm_log);
+#endif
+#if TEST_LOG2
+  DEBUG("*********** log2 ***********");
+  TIME_LOG(log2, libm_log2);
+  TIME_LOG(fast_log2, fast_log2);
+#endif
 }
