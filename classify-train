@@ -66,7 +66,8 @@ def main():
     group.add_argument('--log-file', default="auto",
                        help="log to this file (default: based on net basename)")
     group.add_argument('--activation', default=1, type=int,
-                       help="activation function (1: Relu, 2: ReSQRT, 3: ReLOG, 4:ReTANH)")
+                       help="activation function (1: ReLU, 2: ReSQRT, 3: ReLOG, "
+                       "4:ReTANH, 5: Clipped ReLU)")
     args = parser.parse_args()
 
     if args.learn_rate_schedule == "flat":

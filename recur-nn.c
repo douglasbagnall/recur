@@ -138,6 +138,13 @@ rnn_opinion(RecurNN *net, const float *restrict inputs, float presynaptic_noise)
       hiddens[i] = (h > 1.0f) ? fast_tanhf(h) : 0.0f;
     }
   }
+  else if (net->activation == RNN_RECLIP20){
+    for (int i = 1; i < net->h_size; i++){
+      float h = hiddens[i] - RNN_HIDDEN_PENALTY;
+      h = h < 20.0f ? h : 20.0f;
+      hiddens[i] = (h > 0.0f) ? h : 0.0f;
+    }
+  }
   else { //default RELU
     for (int i = 1; i < net->h_size; i++){
       float h = hiddens[i] - RNN_HIDDEN_PENALTY;
@@ -257,7 +264,8 @@ bptt_and_accumulate_error(RecurNN *net, float *restrict ih_delta,
     }
     for (y = 0; y < net->i_size; y++){
       float input = inputs[y];
-      if (input != 0.0f){
+      if (input != 0.0f &&
+          (net->activation != RNN_RECLIP20 || input < 20.0f)){
         float e;
         const float *restrict w_row = weights + y * net->h_size;
         float *restrict delta_row = ih_delta + y * net->h_size;
