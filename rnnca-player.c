@@ -23,6 +23,7 @@ static gboolean option_edges = FALSE;
 static gint option_width = WIDTH;
 static gint option_height = HEIGHT;
 static char *option_uri = URI_PREFIX VID_LAGOS;
+static char *option_offsets = NULL;
 
 static GOptionEntry entries[] =
 {
@@ -32,6 +33,7 @@ static GOptionEntry entries[] =
   { "height", 'h', 0, G_OPTION_ARG_INT, &option_height, "height of screen", NULL },
   { "uri", 'u', 0, G_OPTION_ARG_FILENAME, &option_uri, "URI to play", NULL },
   { "edges", 'e', 0, G_OPTION_ARG_NONE, &option_edges, "play with edges", NULL },
+  { "offsets", 'o', 0, G_OPTION_ARG_STRING, &option_offsets, "RNNCA offsets", NULL },
   { NULL, 0, 0, 0, NULL, NULL, NULL }
 };
 
@@ -138,7 +140,11 @@ make_pipeline(GError **parse_error,  GMainLoop *loop){
   g_object_set(G_OBJECT(rnnca),
       "edges", option_edges,
       NULL);
-
+  if (option_offsets){
+    g_object_set(G_OBJECT(rnnca),
+        "offsets", option_offsets,
+        NULL);
+  }
   return pipeline;
 }
 
