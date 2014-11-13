@@ -247,7 +247,7 @@ static char * opt_logfile = NULL;
 static uint opt_bptt_depth = 40;
 static float opt_learn_rate = 0.001;
 static float opt_momentum = 0.93;
-static char * opt_basename = "text-classify";
+static char * opt_basename = "xml-lang-classify";
 static float opt_presynaptic_noise = 0;
 
 
@@ -347,7 +347,7 @@ main(int argc, char *argv[]){
   RnnCharClassifier *model = malloc(sizeof(RnnCharModel));
   model->text = t;
   model->n_training_nets = MAX(opt_multi_tap, 1);
-  model->pgm_name = "text-classify";
+  model->pgm_name = "xml-lang-classify";
   model->momentum = opt_momentum;
   model->momentum_soft_start = 2000;
   model->learning_style = 0;

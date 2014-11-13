@@ -33,7 +33,6 @@ local.mak
 /bird-data/
 *.dot
 /data/
-.juliahistory
-/text-classify
+/xml-lang-classify
 /text-confabulate
 /text-cross-entropy

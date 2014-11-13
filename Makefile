@@ -76,7 +76,7 @@ $(subdirs):
 all:: plugins/libgstclassify.so $(subdirs)
 
 
-ELF_EXECUTABLES = test_backprop convert-saved-net rnnca-player gtk-recur text-classify\
+ELF_EXECUTABLES = test_backprop convert-saved-net rnnca-player gtk-recur xml-lang-classify\
 	 text-confabulate text-cross-entropy
 
 clean:
@@ -170,8 +170,7 @@ text-confabulate text-cross-entropy test_backprop: %: $(RNN_OBJECTS) %.o \
 	charmodel-predict.o charmodel-init.o $(OPT_OBJECTS)  \
 	| nets images
 	$(CC) -Iccan/opt/ -Wl,-O1 $(filter %.o,$^)   -I. $(DEFINES)  $(COMMON_LINKS)  -o $@
-
-text-classify: %: $(RNN_OBJECTS) %.o charmodel-classify.o charmodel-init.o \
+xml-lang-classify: %: $(RNN_OBJECTS) %.o charmodel-classify.o charmodel-init.o \
 	$(OPT_OBJECTS) $(TTXML_OBJECTS) config.h  | nets images
 	$(CC) -Iccan/opt/ -Wl,-O1 $(filter %.o,$^) -l xml2  -I. $(DEFINES)  $(COMMON_LINKS)  -o $@
 
