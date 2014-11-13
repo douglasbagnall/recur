@@ -42,7 +42,7 @@ static const char *bad_utf8_strings[] = {
   "incomplete character \xF3\x82 mid-string",
   "incomplete character at end \xF7\x9F",
   "\x89\x89\x89\x98\xa8\x89\x89\xc8\xd8\xd9 garbage at start",
-
+  "\x80", "\x88", "\xee", "\xa0", /*random solitary high bytes*/
   NULL
 };
 
