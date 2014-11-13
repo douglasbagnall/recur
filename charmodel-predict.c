@@ -216,6 +216,8 @@ rnn_char_epoch(RnnCharModel *model, RecurNN *confab_net, RnnCharVentropy *v,
   RecurNN *net = model->net;
   RecurNN **nets = model->training_nets;
   uint report_counter = net->generation % model->report_interval;
+  float report_scale = 1.0f / ((model->report_interval - report_counter) * n_nets);
+
   struct timespec timers[2];
   struct timespec *time_start = timers;
   struct timespec *time_end = timers + 1;
@@ -276,12 +278,11 @@ rnn_char_epoch(RnnCharModel *model, RecurNN *confab_net, RnnCharVentropy *v,
 
       /*formerly in report_on_progress*/
       {
-        float scale = 1.0f / (model->report_interval * n_nets);
         int k = net->generation >> 10;
-        entropy *= -scale;
-        error *= scale;
-        float accuracy = correct * scale;
-        double per_sec = 1.0 / scale / elapsed;
+        entropy *= -report_scale;
+        error *= report_scale;
+        float accuracy = correct * report_scale;
+        double per_sec = 1.0 / report_scale / elapsed;
         if (confab_net && confab_size && quietness < 1){
           int alloc_size = confab_size * 4;
           char confab[alloc_size + 1];
@@ -303,6 +304,7 @@ rnn_char_epoch(RnnCharModel *model, RecurNN *confab_net, RnnCharVentropy *v,
         correct = 0;
         error = 0.0f;
         entropy = 0.0f;
+        report_scale = 1.0f / (model->report_interval * n_nets);
       }
 
       if (model->save_net && model->filename){
