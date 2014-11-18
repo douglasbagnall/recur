@@ -1,6 +1,7 @@
 /* Copyright (C) 2014 Douglas Bagnall <douglas@halo.gen.nz> GPL2+
 
-This uses the RNN to predict the next character in a text sequence.
+This tries to use the RNN to classify the language of text in TEI xml
+documents.
 
 Unlike most of the Recur repository, this file is licensed under the GNU
 General Public License, version 2 or greater. That is because it is linked to

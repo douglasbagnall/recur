@@ -1,6 +1,6 @@
 /* Copyright (C) 2014 Douglas Bagnall <douglas@halo.gen.nz> LGPL
 
-Classify text, presumably by language.
+Classify text, possibly by language or author.
 */
 
 #include "recur-nn.h"
