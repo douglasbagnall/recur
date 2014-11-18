@@ -1,5 +1,6 @@
 #include "recur-nn.h"
 #include "recur-nn-helpers.h"
+#include "ccan/opt/opt.h"
 #include <stdio.h>
 
 #define IN_RANGE_01(x) (((x) >= 0.0f) && ((x) <= 1.0f))
