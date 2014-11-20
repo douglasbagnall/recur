@@ -179,6 +179,8 @@ static float opt_presynaptic_noise = 0;
 static float opt_ada_ballast = -1;
 static int opt_activation = RNN_RELU;
 static int opt_learning_style = RNN_MOMENTUM_WEIGHTED;
+static bool opt_save_net = true;
+
 
 static struct opt_table options[] = {
   OPT_WITHOUT_ARG("-h|--help", opt_usage_and_exit,
@@ -225,6 +227,7 @@ static struct opt_table options[] = {
   OPT_WITH_ARG("--activation", opt_set_intval, opt_show_intval,
       &opt_activation, "1: ReLU, 2: ReSQRT, 3: ReLOG, 4: ReTANH, 5: clipped ReLU"),
   OPT_WITHOUT_ARG("--no-save-net", opt_set_invbool,
+      &opt_save_net, "Don't save learnt changes"),
 
   OPT_ENDTABLE
 };
@@ -272,7 +275,7 @@ main(int argc, char *argv[]){
   model->images.temporal_pgm_dump = 0;
   model->periodic_weight_noise = 0;
   model->report_interval = 1024;
-  model->save_net = 0;
+  model->save_net = opt_save_net;
 
   struct RnnCharMetadata m;
   m.alphabet = new_utf8_from_codepoints(t->alphabet->points, t->alphabet->len);
