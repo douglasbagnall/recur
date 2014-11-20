@@ -88,6 +88,8 @@ typedef struct _RnnCharClassifiedChar{
 typedef struct _RnnCharClassifiedText{
   RnnCharClassifiedChar *text;
   int len;
+  RnnCharClassifiedChar *validation_text;
+  int validation_len;
   RnnCharAlphabet *alphabet;
   u32 flags;
   int lag;

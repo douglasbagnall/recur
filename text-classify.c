@@ -51,7 +51,6 @@ free_langblocks(RnnCharClassBlock *b){
     next = b->next;
     free((char *)b->text);
     free(b);
-    b = next;
   }
 }
 
@@ -93,44 +92,71 @@ new_alphabet_from_blocks(RnnCharClassBlock *b, double alpha_threshold,
 }
 
 
-
-static RnnCharClassifiedText *
-new_charmodel_from_filelist(char *filename, double alpha_threshold,
-    double digit_adjust, double alpha_adjust, u32 flags)
-{
-  char **classes = calloc(256, sizeof(char*));
-  classes[NO_CLASS] = UNCLASSIFIED;
-  RnnCharClassBlock *first_block = malloc(sizeof(RnnCharClassBlock));
-  RnnCharClassBlock *b = first_block;
-
+static RnnCharClassBlock *
+read_class_blocks(char *filename, char *basedir, char **classes, int add_to_classes){
   FILE *f = fopen(filename, "r");
   if (!f){
     goto error;
   }
+  RnnCharClassBlock *blocks = NULL;
+  RnnCharClassBlock *prev = NULL;
+  RnnCharClassBlock *b = NULL;
   char line[501];
   while (fgets(line, 500, f)){
-    char *fn = strtok(line, " \t");
     char *text;
     int len;
-    int err = rnn_char_alloc_file_contents(fn, &text, &len);
+    char *fn = strtok(line, " \t");
+    int err;
+    if (basedir){
+      char ffn[1001];
+      snprintf(ffn, 1000, "%s/%s", basedir, fn);
+      err = rnn_char_alloc_file_contents(ffn, &text, &len);
+    }
+    else{
+      err = rnn_char_alloc_file_contents(fn, &text, &len);
+    }
     if (err){
       fclose(f);
       goto error;
     }
     char *class = strtok(NULL, "\n");
-    int class_code = lookup_class(classes, class, 1);
+    int class_code = lookup_class(classes, class, add_to_classes);
+    prev = b;
+    b = malloc(sizeof(RnnCharClassBlock));
     b->class_name = classes[class_code]; /*use the strduped copy, not the local buffer.*/
     b->class_code = class_code;
     b->text = text;
     b->len = len;
-    b->next = malloc(sizeof(RnnCharClassBlock));
-    b = b->next;
     b->next = NULL;
+    if (prev){
+      prev->next = b;
+    }
+    else{
+      blocks = b;
+    }
   }
   fclose(f);
+  return blocks;
+ error:
+  return NULL;
+}
 
+static RnnCharClassifiedText *
+new_charmodel_from_filelist(char *filename, char *basedir, char *validation_file,
+    double alpha_threshold, double digit_adjust, double alpha_adjust, u32 flags,
+    int ignore_start)
+{
+  char **classes = calloc(256, sizeof(char*));
+  classes[NO_CLASS] = UNCLASSIFIED;
+  RnnCharClassBlock *training_blocks = NULL;
+  RnnCharClassBlock *validation_blocks = NULL;
 
-  RnnCharAlphabet *alphabet = new_alphabet_from_blocks(first_block, alpha_threshold,
+  training_blocks = read_class_blocks(filename, basedir, classes, 1);
+  if (validation_file){
+    validation_blocks = read_class_blocks(validation_file, basedir, classes, 0);
+  }
+
+  RnnCharAlphabet *alphabet = new_alphabet_from_blocks(training_blocks, alpha_threshold,
       digit_adjust, alpha_adjust, flags);
   if (alphabet == NULL){
     goto error;
@@ -139,6 +165,15 @@ new_charmodel_from_filelist(char *filename, double alpha_threshold,
   RnnCharClassifiedText *t = malloc(sizeof(*t));
   t->text = rnn_char_alloc_classified_text(training_blocks,
       alphabet, &t->len, ignore_start);
+  if (validation_blocks){
+    t->validation_text = rnn_char_alloc_classified_text(validation_blocks,
+        alphabet, &t->validation_len, ignore_start);
+  }
+  else {
+    t->validation_text = NULL;
+    t->validation_len = 0;
+  }
+
   t->alphabet = alphabet;
   t->lag = 0;
 
@@ -150,10 +185,13 @@ new_charmodel_from_filelist(char *filename, double alpha_threshold,
   }
   t->n_classes = n;
   t->classes = classes;
-  free_langblocks(first_block);
+  free_langblocks(training_blocks);
+  free_langblocks(validation_blocks);
   return t;
  error:
-  free_langblocks(first_block);
+  DEBUG("error in reading filelist!");
+  free_langblocks(training_blocks);
+  free_langblocks(validation_blocks);
   free(classes);
   return NULL;
 }
@@ -162,6 +200,8 @@ new_charmodel_from_filelist(char *filename, double alpha_threshold,
 #define DEFAULT_ADADELTA_BALLAST 0
 
 static char *opt_classification_file = NULL;
+static char *opt_validation_file = NULL;
+static char *opt_classification_dir = NULL;
 static double opt_alpha_threshold = 1e-4;
 static double opt_alpha_adjust = 3.0;
 static double opt_digit_adjust = 1.0;
@@ -219,6 +259,10 @@ static struct opt_table options[] = {
       &opt_presynaptic_noise, "deviation of noise to add before non-linear transform"),
   OPT_WITH_ARG("-c|--classification-file", opt_set_charp, opt_show_charp,
       &opt_classification_file, "Read class information from this file"),
+  OPT_WITH_ARG("-v|--validation-file", opt_set_charp, opt_show_charp,
+      &opt_validation_file, "validate using this file"),
+  OPT_WITH_ARG("-D|--classification-dir", opt_set_charp, opt_show_charp,
+      &opt_classification_dir, "text file paths are relative to here"),
   OPT_WITH_ARG("--learning-style=<n>", opt_set_intval, opt_show_intval,
       &opt_learning_style, "0: weighted, 1: Nesterov, 2: simplified N., "
       "3: classical, 4: adagrad, 5: adadelta, 6: rprop"),
@@ -265,7 +309,7 @@ main(int argc, char *argv[]){
     rnn_char_dump_alphabet(t->alphabet);
   }
 
-  RnnCharClassifier *model = malloc(sizeof(RnnCharModel));
+  RnnCharClassifier *model = malloc(sizeof(RnnCharClassifier));
   model->text = t;
   model->n_training_nets = MAX(opt_multi_tap, 1);
   model->pgm_name = "text-classify";

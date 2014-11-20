@@ -76,46 +76,79 @@ rnn_char_classify_epoch(RnnCharClassifier *model){
   RnnCharClassifiedText *t = model->text;
   int len = t->len;
   RnnCharClassifiedChar *text = t->text;
-  int spacing = (len - 1) / n_nets;
+  int spacing = len / n_nets;
   int correct = 0;
   float mean_error = 0;
-  float entropy = 0;
+  float t_entropy = 0;
+  int examples_seen = 0;
+
   RecurNN *net = model->net;
   RecurNN **nets = model->training_nets;
   uint report_counter = net->generation % model->report_interval;
   struct timespec timers[2];
   struct timespec *time_start = timers;
   struct timespec *time_end = timers + 1;
-  for (int i = 0; i < len; i++){
+
+  RecurNN *vnet = NULL;
+  if (t->validation_len){
+    vnet = rnn_clone(net,
+        net->flags & ~(RNN_NET_FLAG_OWN_BPTT | RNN_NET_FLAG_OWN_WEIGHTS),
+        RECUR_RNG_SUBSEED, NULL);
+  }
+
+  /*roll through a few before training begins, to prime the net */
+  int prime = MIN(len / (n_nets * 20), 10);
+  for (int i = 0; i < prime; i++){
+    int offset = i;
+    for (int j = 0; j < n_nets; j++){
+      RnnCharClassifiedChar cc = text[offset];
+      RecurNN *n = nets[j];
+      one_hot_opinion(n, cc.symbol, net->presynaptic_noise);
+      offset += spacing;
+      if (offset >= len){
+        offset -= len;
+      }
+    }
+  }
+
+  for (int i = prime; i < len; i++){
     float momentum = rnn_calculate_momentum_soft_start(net->generation,
         model->momentum, model->momentum_soft_start);
     int offset = i;
-    //DEBUG("n_nets %i offset %i spacing %i", n_nets, offset, spacing);
     for (int j = 0; j < n_nets; j++){
-      RnnCharClassifiedChar t = text[offset];
+      RnnCharClassifiedChar cc = text[offset];
       RecurNN *n = nets[j];
       rnn_bptt_advance(n);
-      int class = t.class;
+      int class = cc.class;
       MAYBE_DEBUG("j %i offset %i symbol %i class %i output_size %i len %i",
-          j, offset, t.symbol, class, n->output_size, len);
-      float *answer = one_hot_opinion(n, t.symbol, net->presynaptic_noise);
-      if (t.class != NO_CLASS){
+          j, offset, cc.symbol, class, n->output_size, len);
+      float *answer = one_hot_opinion(n, cc.symbol, net->presynaptic_noise);
+      if (class != NO_CLASS){
         float *error = n->bptt->o_error;
         ASSUME_ALIGNED(error);
-        int winner = softmax_best_guess(error, answer, net->output_size);
+        int winner = softmax_best_guess(error, answer, n->output_size);
         correct += (winner == class);
         float e = error[class] + 1.0f;
         error[class] = e;
+        //rnn_bptt_calculate(n, model->batch_size);
         mean_error += e;
-        entropy += capped_log2f(1.0f - e);
+        t_entropy -= capped_log2f(1.0f - e);
+        examples_seen++;
+        if (n == net){
+          rnn_log_int(net, "skipping", 0);
+        }
         //DEBUG("winner %i correct %i error %.2f", winner, winner == class, e);
-        rnn_bptt_calc_deltas(n, j);
+        rnn_bptt_calc_deltas(n, j ? 1 : 0);
+      }
+      else {
+        if (n == net){
+          rnn_log_int(net, "skipping", 1);
+        }
       }
 
-
       offset += spacing;
-      if (offset >= len - 1){
-        offset -= len - 1;
+      if (offset >= len){
+        offset -= len;
       }
     }
     rnn_apply_learning(net, model->learning_style, momentum);
@@ -124,21 +157,47 @@ rnn_char_classify_epoch(RnnCharClassifier *model){
     if (report_counter == model->report_interval){
       report_counter = 0;
       double elapsed = get_elapsed_interval(&time_start, &time_end);
-      float scale = 1.0f / (model->report_interval * n_nets);
-      entropy *= -scale;
+      float scale = 1.0f / examples_seen;
+      t_entropy *= scale;
       mean_error *= scale;
       float accuracy = correct * scale;
-      double per_sec = 1.0 / scale / elapsed;
+      double per_sec = examples_seen / elapsed;
       rnn_log_float(net, "t_error", mean_error);
-      rnn_log_float(net, "t_entropy", entropy);
+      rnn_log_float(net, "t_entropy", t_entropy);
       rnn_log_float(net, "momentum", net->bptt->momentum);
       rnn_log_float(net, "accuracy", accuracy);
       rnn_log_float(net, "learn-rate", net->bptt->learn_rate);
       rnn_log_float(net, "per_second", per_sec);
+      float v_entropy = 0;
+
+      if (vnet){
+        float error[vnet->output_size];
+        int vlen = t->validation_len;
+        RnnCharClassifiedChar *vtext = t->validation_text;
+        int div = 0;
+        for (int j = 0; j < vlen; j++){
+          RnnCharClassifiedChar cc = vtext[j];
+          if (cc.class != NO_CLASS){
+            float *answer = one_hot_opinion(vnet, cc.symbol, 0);
+            softmax(error, answer, net->output_size);
+            float e = error[cc.class];
+            v_entropy -= capped_log2f(e);
+            MAYBE_DEBUG("class %d symbol %d error %.3g entropy %.3g",
+                cc.class, cc.symbol, e, capped_log2f(e));
+            div++;
+          }
+          else {
+            DEBUG("validation char %d has no class", j);
+          }
+        }
+        v_entropy /= div;
+        rnn_log_float(net, "v_entropy", v_entropy);
+      }
+
       for (int j = 0; j < net->output_size; j++){
         float x = -net->bptt->o_error[j];
         if (x < 0.0){
-          fprintf(stderr, C_DARK_RED);
+          fprintf(stderr, C_RED);
           x += 1.0;
         }
         int c = x * 9.0 + 0.5;
@@ -150,12 +209,14 @@ rnn_char_classify_epoch(RnnCharClassifier *model){
         }
       }
 
-      DEBUG("entropy %.2f accuracy %.2f error %.2f speed %.1f",
-          entropy, accuracy, mean_error, per_sec);
+      DEBUG("v_entropy %.2f t_entropy %.2f accuracy %.2f error %.2f "
+          "speed %.1f (%d examples)",
+          v_entropy, t_entropy, accuracy, mean_error, per_sec, examples_seen);
 
       correct = 0;
       mean_error = 0.0f;
-      entropy = 0.0f;
+      t_entropy = 0.0f;
+      examples_seen = 0;
     }
   }
   return 0;
