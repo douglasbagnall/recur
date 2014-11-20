@@ -180,7 +180,7 @@ static float opt_ada_ballast = -1;
 static int opt_activation = RNN_RELU;
 static int opt_learning_style = RNN_MOMENTUM_WEIGHTED;
 static bool opt_save_net = true;
-
+static int opt_epochs = 0;
 
 static struct opt_table options[] = {
   OPT_WITHOUT_ARG("-h|--help", opt_usage_and_exit,
@@ -228,6 +228,8 @@ static struct opt_table options[] = {
       &opt_activation, "1: ReLU, 2: ReSQRT, 3: ReLOG, 4: ReTANH, 5: clipped ReLU"),
   OPT_WITHOUT_ARG("--no-save-net", opt_set_invbool,
       &opt_save_net, "Don't save learnt changes"),
+  OPT_WITH_ARG("--epochs=<n>", opt_set_intval, opt_show_intval,
+      &opt_epochs, "run for this many epochs"),
 
   OPT_ENDTABLE
 };
@@ -315,7 +317,8 @@ main(int argc, char *argv[]){
   model->net = net;
   model->training_nets = rnn_new_training_set(net, model->n_training_nets);
 
-  for (;;){
+
+  for (int i = 0;i < opt_epochs; i++){
     rnn_char_classify_epoch(model);
   }
 }
