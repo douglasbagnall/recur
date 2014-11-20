@@ -158,6 +158,9 @@ new_charmodel_from_filelist(char *filename, double alpha_threshold,
   return NULL;
 }
 
+#define DEFAULT_ADAGRAD_BALLAST 200.0f
+#define DEFAULT_ADADELTA_BALLAST 0
+
 static char *opt_classification_file = NULL;
 static double opt_alpha_threshold = 1e-4;
 static double opt_alpha_adjust = 3.0;
@@ -173,6 +176,9 @@ static float opt_learn_rate = 0.001;
 static float opt_momentum = 0.93;
 static char *opt_basename = "text-classify";
 static float opt_presynaptic_noise = 0;
+static float opt_ada_ballast = -1;
+static int opt_activation = RNN_RELU;
+static int opt_learning_style = RNN_MOMENTUM_WEIGHTED;
 
 static struct opt_table options[] = {
   OPT_WITHOUT_ARG("-h|--help", opt_usage_and_exit,
@@ -211,6 +217,14 @@ static struct opt_table options[] = {
       &opt_presynaptic_noise, "deviation of noise to add before non-linear transform"),
   OPT_WITH_ARG("-c|--classification-file", opt_set_charp, opt_show_charp,
       &opt_classification_file, "Read class information from this file"),
+  OPT_WITH_ARG("--learning-style=<n>", opt_set_intval, opt_show_intval,
+      &opt_learning_style, "0: weighted, 1: Nesterov, 2: simplified N., "
+      "3: classical, 4: adagrad, 5: adadelta, 6: rprop"),
+  OPT_WITH_ARG("--ada-ballast", opt_set_floatval, opt_show_floatval,
+      &opt_ada_ballast, "adagrad/adadelta accumulators start at this value"),
+  OPT_WITH_ARG("--activation", opt_set_intval, opt_show_intval,
+      &opt_activation, "1: ReLU, 2: ReSQRT, 3: ReLOG, 4: ReTANH, 5: clipped ReLU"),
+  OPT_WITHOUT_ARG("--no-save-net", opt_set_invbool,
 
   OPT_ENDTABLE
 };
@@ -254,7 +268,7 @@ main(int argc, char *argv[]){
   model->pgm_name = "text-classify";
   model->momentum = opt_momentum;
   model->momentum_soft_start = 2000;
-  model->learning_style = 0;
+  model->learning_style = opt_learning_style;
   model->images.temporal_pgm_dump = 0;
   model->periodic_weight_noise = 0;
   model->report_interval = 1024;
@@ -272,8 +286,28 @@ main(int argc, char *argv[]){
   u32 net_flags = RNN_NET_FLAG_STANDARD | RNN_NET_FLAG_BPTT_ADAPTIVE_MIN_ERROR;
   RecurNN *net = rnn_new(t->alphabet->len, opt_hidden_size, t->n_classes, net_flags,
       opt_rng_seed, opt_logfile, opt_bptt_depth, opt_learn_rate,
-      opt_momentum, opt_presynaptic_noise, RNN_RELU);
+      opt_momentum, opt_presynaptic_noise, opt_activation);
   rnn_randomise_weights_auto(net);
+
+  switch(opt_learning_style){
+  case RNN_ADAGRAD:
+    if (opt_ada_ballast < 0){
+      opt_ada_ballast = DEFAULT_ADAGRAD_BALLAST;
+    }
+    rnn_set_momentum_values(net, opt_ada_ballast);
+    break;
+
+  case RNN_ADADELTA:
+    if (opt_ada_ballast < 0){
+      opt_ada_ballast = DEFAULT_ADADELTA_BALLAST;
+    }
+    rnn_set_momentum_values(net, opt_ada_ballast);
+    break;
+
+  case RNN_RPROP:
+    rnn_set_aux_values(net, 1);
+    break;
+  }
 
   net->bptt->momentum_weight = 0.5;
   net->metadata = rnn_char_construct_metadata(&m);
