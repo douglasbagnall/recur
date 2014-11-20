@@ -137,8 +137,8 @@ new_charmodel_from_filelist(char *filename, double alpha_threshold,
   }
 
   RnnCharClassifiedText *t = malloc(sizeof(*t));
-  t->text = rnn_char_alloc_classified_text(first_block,
-      alphabet, &t->len);
+  t->text = rnn_char_alloc_classified_text(training_blocks,
+      alphabet, &t->len, ignore_start);
   t->alphabet = alphabet;
   t->lag = 0;
 
@@ -165,7 +165,7 @@ static char *opt_classification_file = NULL;
 static double opt_alpha_threshold = 1e-4;
 static double opt_alpha_adjust = 3.0;
 static double opt_digit_adjust = 1.0;
-static int opt_lag = 0;
+static uint opt_ignore_start = 0;
 static int opt_verbose = 0;
 static uint opt_multi_tap = 20;
 static uint opt_hidden_size = 199;
@@ -197,8 +197,8 @@ static struct opt_table options[] = {
       &opt_digit_adjust, "adjust digit frequency for alphabet calculations"),
   OPT_WITH_ARG("--find-alphabet-alpha-adjust", opt_set_doubleval, opt_show_doubleval,
       &opt_alpha_adjust, "adjust letter frequency for alphabet calculation"),
-  OPT_WITH_ARG("-L|--lag", opt_set_intval, opt_show_intval,
-      &opt_lag, "classify character this far back"),
+  OPT_WITH_ARG("-i|--ignore-start", opt_set_uintval, opt_show_uintval,
+      &opt_ignore_start, "don't classify this many first characters per block"),
   OPT_WITHOUT_ARG("-v|--verbose", opt_inc_intval,
       &opt_verbose, "More debugging noise, if possible"),
   OPT_WITHOUT_ARG("-q|--quiet", opt_inc_intval,
@@ -256,11 +256,9 @@ main(int argc, char *argv[]){
       RNN_CHAR_FLAG_COLLAPSE_SPACE);
 
   RnnCharClassifiedText *t = new_charmodel_from_filelist(opt_classification_file,
-      opt_alpha_threshold, opt_digit_adjust, opt_alpha_adjust, flags);
+      opt_classification_dir, opt_validation_file, opt_alpha_threshold,
+      opt_digit_adjust, opt_alpha_adjust, flags, opt_ignore_start);
 
-  if (opt_lag){
-    rnn_char_adjust_text_lag(t, opt_lag);
-  }
   if (opt_verbose >= 1){
     rnn_char_dump_alphabet(t->alphabet);
   }

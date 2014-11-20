@@ -345,7 +345,7 @@ rnn_char_dump_alphabet(RnnCharAlphabet *alphabet){
 
 RnnCharClassifiedChar *
 rnn_char_alloc_classified_text(RnnCharClassBlock *b,
-    RnnCharAlphabet *alphabet, int *text_len){
+    RnnCharAlphabet *alphabet, int *text_len, int ignore_start){
   int space;
   int collapse_space = alphabet->flags & RNN_CHAR_FLAG_COLLAPSE_SPACE;
   int utf8 = alphabet->flags & RNN_CHAR_FLAG_UTF8;
@@ -366,7 +366,7 @@ rnn_char_alloc_classified_text(RnnCharClassBlock *b,
       size *= 2;
       text = realloc(text, size * sizeof(RnnCharClassifiedChar));
     }
-    while(len < end){
+    for(int i = 0; len < end; i++){
       if (utf8){
         chr = read_utf8_char(&s);
       }
@@ -380,7 +380,7 @@ rnn_char_alloc_classified_text(RnnCharClassBlock *b,
       prev = c;
       c = char_to_net[chr];
       if (!(collapse_space && c == space && prev == space)){
-        text[len].class = class;
+        text[len].class = (i >= ignore_start) ? class : NO_CLASS;
         text[len].symbol = c;
         len++;
       }

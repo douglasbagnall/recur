@@ -133,9 +133,8 @@ int rnn_char_classify_epoch(RnnCharClassifier *model);
 
 int rnn_char_alloc_file_contents(const char *filename, char **contents, int *len);
 
-RnnCharClassifiedChar *
-rnn_char_alloc_classified_text(RnnCharClassBlock *b,
-    RnnCharAlphabet *alphabet, int *text_len);
+RnnCharClassifiedChar * rnn_char_alloc_classified_text(RnnCharClassBlock *b,
+    RnnCharAlphabet *alphabet, int *text_len, int ignore_start);
 
 void rnn_char_adjust_text_lag(RnnCharClassifiedText *t, int lag);
 
