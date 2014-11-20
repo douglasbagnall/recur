@@ -501,7 +501,7 @@ randomise_array_flat(rand_ctx *rng, float *array,
     const rnn_init_distribution shape, const double perforation){
   int x, y;
   float stddev = sqrtf(variance);
-  STDERR_DEBUG("using method %d, variance %g", shape, variance);
+  STDERR_DEBUG("initialising using method %d, variance %g", shape, variance);
   for (y = 0; y < height; y++){
     for (x = offset; x < width + offset; x++){
       if (perforation == 0 ||
