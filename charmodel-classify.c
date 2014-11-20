@@ -8,6 +8,7 @@ Classify text, possibly by language or author.
 #include <math.h>
 #include "path.h"
 #include "badmaths.h"
+#include "colour.h"
 #include <stdio.h>
 
 #include "charmodel.h"
@@ -134,6 +135,21 @@ rnn_char_classify_epoch(RnnCharClassifier *model){
       rnn_log_float(net, "accuracy", accuracy);
       rnn_log_float(net, "learn-rate", net->bptt->learn_rate);
       rnn_log_float(net, "per_second", per_sec);
+      for (int j = 0; j < net->output_size; j++){
+        float x = -net->bptt->o_error[j];
+        if (x < 0.0){
+          fprintf(stderr, C_DARK_RED);
+          x += 1.0;
+        }
+        int c = x * 9.0 + 0.5;
+        if (c == 0){
+          fprintf(stderr, " ");
+        }
+        else {
+          fprintf(stderr, "\xe2\x96%c" C_NORMAL, 128 + c);
+        }
+      }
+
       DEBUG("entropy %.2f accuracy %.2f error %.2f speed %.1f",
           entropy, accuracy, mean_error, per_sec);
 

@@ -36,3 +36,4 @@ local.mak
 /xml-lang-classify
 /text-confabulate
 /text-cross-entropy
+/text-classify
