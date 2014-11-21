@@ -365,18 +365,22 @@ main(int argc, char *argv[]){
   for (int i = 0; i < opt_epochs; i++){
     for (int j = 0; j < t->n_classes; j++){
       for (int k = 0; k < j; k++){
-        fputc('|', stderr);
+        fputs((k & 1) ? C_GREY : C_WHITE, stderr);
+        fputs("\xE2\x94\x82", stderr);
       }
-      fputc('+', stderr);
+      fputs((j & 1) ? C_GREY : C_WHITE, stderr);
+      fputs("\xE2\x95\xad", stderr);
       for (int k = j; k < t->n_classes; k++){
-        fputc('-', stderr);
+        fputs("\xE2\x94\x80", stderr);
       }
-      fprintf(stderr, " %s\n", t->classes[j]);
+
+      fprintf(stderr, "\xE2\x95\xB4%s" C_NORMAL "\n", t->classes[j]);
     }
+    /*
     for (int j = 0; j < t->n_classes; j++){
-      fputc('|', stderr);
-    }
-    fputc('\n', stderr);
+      fputs("\xE2\x94\x82", stderr);
+      }
+      fputc('\n', stderr);*/
     rnn_char_classify_epoch(model);
   }
 }
