@@ -197,13 +197,14 @@ rnn_char_classify_epoch(RnnCharClassifier *model){
 
       for (int j = 0; j < net->output_size; j++){
         float x = -net->bptt->o_error[j];
-        if (x < 0.0){
+        int is_target = x < 0.0;
+        if (is_target){
           fprintf(stderr, C_RED);
           x += 1.0;
         }
         int c = x * 9.0 + 0.5;
         if (c == 0){
-          fprintf(stderr, " ");
+          fprintf(stderr, is_target ? "." C_NORMAL : " ");
         }
         else {
           fprintf(stderr, "\xe2\x96%c" C_NORMAL, 128 + c);
