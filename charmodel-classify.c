@@ -169,6 +169,7 @@ rnn_char_classify_epoch(RnnCharClassifier *model){
       rnn_log_float(net, "learn-rate", net->bptt->learn_rate);
       rnn_log_float(net, "per_second", per_sec);
       float v_entropy = 0;
+      float v_error = 0;
 
       if (vnet){
         float error[vnet->output_size];
@@ -181,17 +182,17 @@ rnn_char_classify_epoch(RnnCharClassifier *model){
             float *answer = one_hot_opinion(vnet, cc.symbol, 0);
             softmax(error, answer, net->output_size);
             float e = error[cc.class];
+            v_error += 1.0 - e;
             v_entropy -= capped_log2f(e);
             MAYBE_DEBUG("class %d symbol %d error %.3g entropy %.3g",
                 cc.class, cc.symbol, e, capped_log2f(e));
             div++;
           }
-          else {
-            DEBUG("validation char %d has no class", j);
-          }
         }
         v_entropy /= div;
+        v_error /= div;
         rnn_log_float(net, "v_entropy", v_entropy);
+        rnn_log_float(net, "v_error", v_error);
       }
 
       for (int j = 0; j < net->output_size; j++){
@@ -209,9 +210,9 @@ rnn_char_classify_epoch(RnnCharClassifier *model){
         }
       }
 
-      DEBUG("v_entropy %.2f t_entropy %.2f accuracy %.2f error %.2f "
+      DEBUG("v_entropy %.2f v_error %.2f t_entropy %.2f acc. %.2f error %.2f "
           "speed %.1f (%d examples)",
-          v_entropy, t_entropy, accuracy, mean_error, per_sec, examples_seen);
+          v_entropy, v_error, t_entropy, accuracy, mean_error, per_sec, examples_seen);
 
       correct = 0;
       mean_error = 0.0f;
