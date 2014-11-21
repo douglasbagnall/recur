@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #Copyright 2014 Douglas Bagnall <douglas@halo.gen.nz> LGPL
 
-#import matplotlib
+import matplotlib
 #matplotlib.use("gtkagg")
 import matplotlib.pyplot as plt
 #import guiqwt.pyplot as plt
@@ -97,7 +97,10 @@ def graph(lists):
         else:
             ax2 = plt.subplot(len(lists), 1, i, sharex=ax)
         ax2.plot(times, v, 'r.', linewidth=0.5, label=k)
-        plt.legend(loc='upper left', numpoints=1, frameon=False, markerscale=0,borderpad=0)
+        if matplotlib.__version__[0] == '0':
+            plt.legend(loc='upper left', numpoints=1, markerscale=0, borderpad=0)
+        else:
+            plt.legend(loc='upper left', numpoints=1, frameon=False, markerscale=0, borderpad=0)
         i += 1
         plt.grid(True)
     plt.show()
