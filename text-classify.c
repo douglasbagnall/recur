@@ -221,6 +221,8 @@ static int opt_activation = RNN_RELU;
 static int opt_learning_style = RNN_MOMENTUM_WEIGHTED;
 static bool opt_save_net = true;
 static int opt_epochs = 0;
+static char *opt_filename = NULL;
+
 
 static struct opt_table options[] = {
   OPT_WITHOUT_ARG("-h|--help", opt_usage_and_exit,
@@ -274,6 +276,8 @@ static struct opt_table options[] = {
       &opt_save_net, "Don't save learnt changes"),
   OPT_WITH_ARG("--epochs=<n>", opt_set_intval, opt_show_intval,
       &opt_epochs, "run for this many epochs"),
+  OPT_WITH_ARG("-f|--filename=<file>", opt_set_charp, opt_show_charp,
+      &opt_filename, "load/save net here"),
 
   OPT_ENDTABLE
 };
@@ -327,8 +331,13 @@ main(int argc, char *argv[]){
       t->alphabet->collapsed_len);
   m.utf8 = 1;
 
-  model->filename = rnn_char_construct_net_filename(&m, opt_basename, t->alphabet->len,
-      0, opt_hidden_size, t->n_classes);
+  if (opt_filename){
+    model->filename = opt_filename;
+  }
+  else{
+    model->filename = rnn_char_construct_net_filename(&m, opt_basename, t->alphabet->len,
+        0, opt_hidden_size, t->n_classes);
+  }
 
   u32 net_flags = RNN_NET_FLAG_STANDARD | RNN_NET_FLAG_BPTT_ADAPTIVE_MIN_ERROR;
   RecurNN *net = rnn_new(t->alphabet->len, opt_hidden_size, t->n_classes, net_flags,
@@ -382,5 +391,8 @@ main(int argc, char *argv[]){
       }
       fputc('\n', stderr);*/
     rnn_char_classify_epoch(model);
+  }
+  if (model->filename && opt_save_net){
+    rnn_save_net(model->net, model->filename, 1);
   }
 }

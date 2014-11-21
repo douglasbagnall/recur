@@ -219,6 +219,10 @@ rnn_char_classify_epoch(RnnCharClassifier *model){
       mean_error = 0.0f;
       t_entropy = 0.0f;
       examples_seen = 0;
+
+      if (model->save_net && model->filename){
+        rnn_save_net(net, model->filename, 1);
+      }
     }
   }
   return 0;
