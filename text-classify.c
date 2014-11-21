@@ -179,7 +179,7 @@ new_charmodel_from_filelist(char *filename, char *basedir, char *validation_file
 
   int n;
   for (n = 0; n < 256; n++){
-    if (! (*classes)[n]){
+    if (classes[n] == NULL){
       break;
     }
   }
@@ -361,8 +361,22 @@ main(int argc, char *argv[]){
   model->net = net;
   model->training_nets = rnn_new_training_set(net, model->n_training_nets);
 
-
-  for (int i = 0;i < opt_epochs; i++){
+  DEBUG("n_classes %d", t->n_classes);
+  for (int i = 0; i < opt_epochs; i++){
+    for (int j = 0; j < t->n_classes; j++){
+      for (int k = 0; k < j; k++){
+        fputc('|', stderr);
+      }
+      fputc('+', stderr);
+      for (int k = j; k < t->n_classes; k++){
+        fputc('-', stderr);
+      }
+      fprintf(stderr, " %s\n", t->classes[j]);
+    }
+    for (int j = 0; j < t->n_classes; j++){
+      fputc('|', stderr);
+    }
+    fputc('\n', stderr);
     rnn_char_classify_epoch(model);
   }
 }

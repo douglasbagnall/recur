@@ -211,7 +211,7 @@ rnn_char_classify_epoch(RnnCharClassifier *model){
         }
       }
 
-      DEBUG("v_entropy %.2f v_error %.2f t_entropy %.2f acc. %.2f error %.2f "
+      DEBUG(" v_entropy %.2f v_error %.2f t_entropy %.2f acc. %.2f error %.2f "
           "speed %.1f (%d examples)",
           v_entropy, v_error, t_entropy, accuracy, mean_error, per_sec, examples_seen);
 
