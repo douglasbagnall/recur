@@ -369,27 +369,22 @@ main(int argc, char *argv[]){
   net->metadata = rnn_char_construct_metadata(&m);
   model->net = net;
   model->training_nets = rnn_new_training_set(net, model->n_training_nets);
-
+  /*bar chart column titles */
   DEBUG("n_classes %d", t->n_classes);
   for (int i = 0; i < opt_epochs; i++){
     for (int j = 0; j < t->n_classes; j++){
       for (int k = 0; k < j; k++){
         fputs((k & 1) ? C_GREY : C_WHITE, stderr);
-        fputs("\xE2\x94\x82", stderr);
+        fputs("\xE2\x94\x82", stderr); /* vertical */
       }
       fputs((j & 1) ? C_GREY : C_WHITE, stderr);
-      fputs("\xE2\x95\xad", stderr);
+      fputs("\xE2\x95\xad", stderr); /* corner */
       for (int k = j; k < t->n_classes; k++){
-        fputs("\xE2\x94\x80", stderr);
+        fputs("\xE2\x94\x80", stderr); /* horizontal */
       }
-
+      /* finish with a half horizontal */
       fprintf(stderr, "\xE2\x95\xB4%s" C_NORMAL "\n", t->classes[j]);
     }
-    /*
-    for (int j = 0; j < t->n_classes; j++){
-      fputs("\xE2\x94\x82", stderr);
-      }
-      fputc('\n', stderr);*/
     rnn_char_classify_epoch(model);
   }
   if (model->filename && opt_save_net){
