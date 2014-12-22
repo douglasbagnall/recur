@@ -662,7 +662,7 @@ RnnCharAlphabet
       m.collapse_chars, m.utf8);
 
   if (a->len != net->input_size || a->len != net->output_size){
-    DEBUG("net sizes in %d out %d, alphabet length %d. Disaster pending...",
+    DEBUG("net sizes in %d out %d, alphabet length %d.",
         net->input_size, net->output_size, a->len);
   }
   return a;
