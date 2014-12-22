@@ -37,3 +37,4 @@ local.mak
 /text-confabulate
 /text-cross-entropy
 /text-classify
+/text-classify-results
