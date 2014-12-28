@@ -698,3 +698,15 @@ rnn_char_free_alphabet(RnnCharAlphabet *a){
   free(a->collapsed_points);
   free(a);
 }
+
+int
+rnn_char_get_codepoint(RnnCharAlphabet *a, const char *s){
+  int p = 0;
+  fill_codepoints_from_string(&p, 1, s, a->flags & RNN_CHAR_FLAG_UTF8);
+  for (int i = 0; i < a->len; i++){
+    if (a->points[i] == p){
+      return i;
+    }
+  }
+  return -1;
+}
