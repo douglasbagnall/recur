@@ -49,7 +49,13 @@ rnn_char_find_alphabet_s(const char *text, int len, RnnCharAlphabet *alphabet,
     if (utf8){
       c = read_utf8_char(&s);
       if (c < 0){
-        STDERR_DEBUG("Unicode Error!");
+        if (i > 8){
+          STDERR_DEBUG("Unicode Error at %d (%c %c %c %c %c %c %c %c)!", i,
+              s[-7], s[-6], s[-5], s[-4], s[-3], s[-2], s[-1], s[0]);
+        }
+        else{
+          STDERR_DEBUG("Unicode Error at %d!", i);
+        }
         break;
       }
       else if (c == 0){
