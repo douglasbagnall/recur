@@ -202,6 +202,9 @@ RnnCharAlphabet *rnn_char_new_alphabet_from_net(RecurNN *net);
 void rnn_char_alphabet_set_flags(RnnCharAlphabet *a,
     bool case_insensitive, bool utf8, bool collapse_space);
 
+void rnn_char_prime(RecurNN *net, RnnCharAlphabet *alphabet,
+    const u8 *text, const int len);
+
 double rnn_char_cross_entropy(RecurNN *net, RnnCharAlphabet *alphabet,
     const u8 *text, const int len, const int ignore_first,
     const u8 *prefix_text, const int prefix_len);

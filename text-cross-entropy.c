@@ -23,7 +23,7 @@ static struct opt_table options[] = {
       "ignore texts shorter than this"),
   OPT_WITH_ARG("-i|--ignore-first=<n>", opt_set_intval, opt_show_intval, &opt_ignore_first,
       "ignore first n characters"),
-  OPT_WITH_ARG("-p|--prefix=<file>", opt_set_charp, opt_show_charp, &opt_prefix,
+  OPT_WITH_ARG("-p|--prefix=<chars>", opt_set_charp, opt_show_charp, &opt_prefix,
       "pretend each file starts with this"),
 
   OPT_WITHOUT_ARG("-h|--help", opt_usage_and_exit,

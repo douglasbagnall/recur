@@ -18,6 +18,7 @@ Because of ccan/opt, --help will tell you something.
 static char * opt_filename = NULL;
 static float opt_bias = 0;
 static uint opt_chars = 72;
+static char *opt_prefix = NULL;
 static char *opt_until = NULL;
 
 static struct opt_table options[] = {
@@ -28,6 +29,8 @@ static struct opt_table options[] = {
       "(100 == deterministic)"),
   OPT_WITH_ARG("-n|--length=<chars>", opt_set_uintval, opt_show_uintval,
       &opt_chars, "confabulate this many characters"),
+  OPT_WITH_ARG("-p|--prefix=<chars>", opt_set_charp, opt_show_charp, &opt_prefix,
+      "seed the confabulator with this"),
   OPT_WITH_ARG("-u|--until=<char>", opt_set_charp, opt_show_charp, &opt_until,
       "stop when this charactor appears"),
 
@@ -54,8 +57,19 @@ main(int argc, char *argv[]){
   RecurNN *net = rnn_load_net(opt_filename);
   RnnCharAlphabet *alphabet = rnn_char_new_alphabet_from_net(net);
 
-  /* I am not soure if this is necessary */
+  /* I am not sure if this is necessary */
   init_rand64_maybe_randomly(&net->rng, -1);
+
+  u8 *prefix_text;
+  int prefix_len;
+
+  if (opt_prefix){
+    prefix_text = (u8*)strdup(opt_prefix);
+    int raw_len = strlen(opt_prefix);
+    rnn_char_collapse_buffer(alphabet, prefix_text,
+        raw_len, &prefix_len);
+    rnn_char_prime(net, alphabet, prefix_text, prefix_len);
+  }
 
   /*XXX this could be done in small chunks */
   int byte_len = opt_chars * 4 + 5;

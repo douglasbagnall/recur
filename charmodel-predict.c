@@ -367,15 +367,23 @@ rnn_char_epoch(RnnCharModel *model, RecurNN *confab_net, RnnCharVentropy *v,
   return 0;
 }
 
+void
+rnn_char_prime(RecurNN *net, RnnCharAlphabet *alphabet,
+    const u8 *text, const int len){
+  if (text){
+    for(int i = 0; i < len; i++){
+      one_hot_opinion(net, text[i], 0);
+    }
+  }
+}
+
 
 double
 rnn_char_cross_entropy(RecurNN *net, RnnCharAlphabet *alphabet,
     const u8 *text, const int len, const int skip,
     const u8 *prefix_text, const int prefix_len){
   if (prefix_text){
-    for(int i = 0; i < prefix_len; i++){
-      one_hot_opinion(net, prefix_text[i], 0);
-    }
+    rnn_char_prime(net, alphabet, prefix_text, prefix_len);
   }
   double entropy = get_cross_entropy(net, text, len, skip);
   return entropy;
