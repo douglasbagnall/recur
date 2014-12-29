@@ -135,7 +135,7 @@ rnn_char_init_schedule(RnnCharSchedule *s, int recent_len,
 
 int
 rnn_char_confabulate(RecurNN *net, char *dest, int char_len,
-    int byte_len, RnnCharAlphabet* a, float bias){
+    int byte_len, RnnCharAlphabet* a, float bias, int stop_point){
   int i, j;
   static int n = 0;
   bool utf8 = a->flags & RNN_CHAR_FLAG_UTF8;
@@ -150,9 +150,40 @@ rnn_char_confabulate(RecurNN *net, char *dest, int char_len,
       dest[j] = alphabet[n];
       j++;
     }
+    if (n == stop_point){
+      break;
+    }
   }
   dest[j] = 0;
   return j;
+}
+
+
+int
+rnn_char_fconfab_variable(FILE *f, RecurNN *net,
+    const int end_code, int max_len, RnnCharAlphabet *a, float bias){
+  int i;
+  static int n = 0;
+  bool utf8 = a->flags & RNN_CHAR_FLAG_UTF8;
+  const int *alphabet = a->points;
+  for(i = 0; i < max_len; i++){
+    n = guess_next_character(net, n, bias);
+    if (n == end_code){
+      break;
+    }
+    if (utf8){
+      fput_utf8_char(alphabet[n], f);
+    }
+    else {
+      fputc(alphabet[n], f);
+    }
+  }
+  if (i == max_len){
+    fputs(C_YELLOW "\\" C_NORMAL, f);
+  }
+  fputc('\n', f);
+  //DEBUG("n %d, max_len %d, i %d", n, max_len, i);
+  return i;
 }
 
 void
@@ -287,7 +318,7 @@ rnn_char_epoch(RnnCharModel *model, RecurNN *confab_net, RnnCharVentropy *v,
           int alloc_size = confab_size * 4;
           char confab[alloc_size + 1];
           rnn_char_confabulate(confab_net, confab, confab_size, alloc_size,
-              model->alphabet, confab_bias);
+              model->alphabet, confab_bias, -1);
           STDERR_DEBUG("%5dk e.%02d t%.2f v%.2f a.%02d %.0f/s |%s|", k,
               (int)(error * 100 + 0.5),
               entropy, ventropy,

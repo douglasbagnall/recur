@@ -18,6 +18,7 @@ Because of ccan/opt, --help will tell you something.
 static char * opt_filename = NULL;
 static float opt_bias = 0;
 static uint opt_chars = 72;
+static char *opt_until = NULL;
 
 static struct opt_table options[] = {
   OPT_WITH_ARG("-f|--filename=<file>", opt_set_charp, opt_show_charp, &opt_filename,
@@ -27,6 +28,8 @@ static struct opt_table options[] = {
       "(100 == deterministic)"),
   OPT_WITH_ARG("-n|--length=<chars>", opt_set_uintval, opt_show_uintval,
       &opt_chars, "confabulate this many characters"),
+  OPT_WITH_ARG("-u|--until=<char>", opt_set_charp, opt_show_charp, &opt_until,
+      "stop when this charactor appears"),
 
   OPT_WITHOUT_ARG("-h|--help", opt_usage_and_exit,
       ": Confabulate text using previously trained RNN",
@@ -58,8 +61,14 @@ main(int argc, char *argv[]){
   int byte_len = opt_chars * 4 + 5;
   char *t = malloc(byte_len);
 
+  int stop_point = -1;
+  if (opt_until){
+    stop_point = rnn_char_get_codepoint(alphabet, opt_until);
+  }
+
+
   rnn_char_confabulate(net, t, opt_chars, byte_len,
-      alphabet, opt_bias);
+      alphabet, opt_bias, stop_point);
   fputs(t, stdout);
   fputs("\n", stdout);
   free(t);

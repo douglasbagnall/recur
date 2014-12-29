@@ -161,7 +161,7 @@ void rnn_char_init_schedule(RnnCharSchedule *s, int recent_len,
 float rnn_char_calc_ventropy(RnnCharModel *model, RnnCharVentropy *v, int lap);
 
 int rnn_char_confabulate(RecurNN *net, char *dest, int char_len,
-    int byte_len, RnnCharAlphabet* a, float bias);
+    int byte_len, RnnCharAlphabet* a, float bias, int stop_point);
 
 void rnn_char_init_ventropy(RnnCharVentropy *v, RecurNN *net, const u8 *text,
     const int len, const int lap);
@@ -169,7 +169,7 @@ void rnn_char_init_ventropy(RnnCharVentropy *v, RecurNN *net, const u8 *text,
 int rnn_char_epoch(RnnCharModel *model, RecurNN *confab_net, RnnCharVentropy *v,
     const u8 *text, const int len,
     const int start, const int stop,
-    float confab_bias, int confab_size,
+    float confab_bias, int confab_size, int confab_line_end,
     int quietness);
 
 char *rnn_char_construct_metadata(const struct RnnCharMetadata *m);

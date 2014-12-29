@@ -52,6 +52,17 @@ write_utf8_char(uint code, char *s){
   return 0;
 }
 
+static inline int
+fput_utf8_char(uint code, FILE *f){
+  char s[5];
+  int n = write_utf8_char(code, s);
+  s[n] = 0;
+  if (fputs(s, f) == EOF){
+    return EOF;
+  }
+  return n;
+}
+
 static inline ALWAYS_INLINE int
 _parse_utf8_byte(int c, int *extra_bytes)
 {
