@@ -13,6 +13,7 @@ This uses the RNN to predict the next character in a text sequence.
 #include "charmodel.h"
 #include "charmodel-helpers.h"
 #include "utf8.h"
+#include "colour.h"
 
 static inline float
 net_error_bptt(RecurNN *net, float *restrict error, int c, int next, int *correct){
@@ -234,7 +235,7 @@ int
 rnn_char_epoch(RnnCharModel *model, RecurNN *confab_net, RnnCharVentropy *v,
     const u8 *text, const int len,
     const int start, const int stop,
-    float confab_bias, int confab_size,
+    float confab_bias, int confab_size, int confab_line_end,
     int quietness){
   int i, j;
   float error = 0.0f;
@@ -315,15 +316,24 @@ rnn_char_epoch(RnnCharModel *model, RecurNN *confab_net, RnnCharVentropy *v,
         float accuracy = correct * report_scale;
         double per_sec = 1.0 / report_scale / elapsed;
         if (confab_net && confab_size && quietness < 1){
-          int alloc_size = confab_size * 4;
-          char confab[alloc_size + 1];
-          rnn_char_confabulate(confab_net, confab, confab_size, alloc_size,
-              model->alphabet, confab_bias, -1);
-          STDERR_DEBUG("%5dk e.%02d t%.2f v%.2f a.%02d %.0f/s |%s|", k,
-              (int)(error * 100 + 0.5),
-              entropy, ventropy,
-              (int)(accuracy * 100 + 0.5), per_sec + 0.5, confab);
-
+          if (confab_line_end >= 0){
+            fprintf(stderr, C_GREY "%5dk t%.2f " C_RED "v%.2f"
+                C_NORMAL " %.0f/s |" C_NORMAL,
+                k, entropy, ventropy, per_sec + 0.5);
+            rnn_char_fconfab_variable(stderr, confab_net,
+                confab_line_end, confab_size, model->alphabet, confab_bias);
+          }
+          else{
+            fprintf(stderr, C_GREY "%5dk e.%02d t%.2f v%.2f a.%02d %.0f/s |" C_NORMAL,
+                k, (int)(error * 100 + 0.5),
+                entropy, ventropy,
+                (int)(accuracy * 100 + 0.5), per_sec + 0.5);
+            int alloc_size = confab_size * 4;
+            char confab[alloc_size + 1];
+            rnn_char_confabulate(confab_net, confab, confab_size, alloc_size,
+                model->alphabet, confab_bias, -1);
+            STDERR_DEBUG("%s|", confab);
+          }
         }
         rnn_log_float(net, "t_error", error);
         rnn_log_float(net, "t_entropy", entropy);

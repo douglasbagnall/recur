@@ -565,14 +565,21 @@ load_and_train_model(struct RnnCharMetadata *m, RnnCharAlphabet *alphabet){
 
   rnn_print_net_stats(net);
 
+  int confab_line_end = -1;
+  if (opt_collapse_space == 0){
+    confab_line_end = rnn_char_get_codepoint(alphabet, "\n");
+  }
+
   int finished = 0;
   BELOW_QUIET_LEVEL(2){
     START_TIMER(run);
     for (int i = 0; ! finished; i++){
-      DEBUG("Starting epoch %d. learn rate %g.", i + 1, net->bptt->learn_rate);
+      DEBUG("Starting epoch %d. learn rate %g. collapse space %d",
+          i + 1, net->bptt->learn_rate, opt_collapse_space);
       START_TIMER(epoch);
       finished = rnn_char_epoch(&model, confab_net, &v,
-          text, text_len, start_char, opt_stop, opt_confab_bias, CONFAB_SIZE, opt_quiet);
+          text, text_len, start_char, opt_stop, opt_confab_bias, CONFAB_SIZE,
+          confab_line_end, opt_quiet);
       DEBUG_TIMER(epoch);
       DEBUG_TIMER(run);
       start_char = 0;
@@ -581,7 +588,8 @@ load_and_train_model(struct RnnCharMetadata *m, RnnCharAlphabet *alphabet){
   else {/* quiet level 2+ */
     do {
       finished = rnn_char_epoch(&model, NULL, &v,
-          text, text_len, start_char, opt_stop, 0, 0, opt_quiet);
+          text, text_len, start_char, opt_stop, 0, 0,
+          confab_line_end, opt_quiet);
       start_char = 0;
     }
     while (! finished);
