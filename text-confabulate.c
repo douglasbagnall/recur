@@ -13,12 +13,14 @@ Because of ccan/opt, --help will tell you something.
 #include "recur-nn-helpers.h"
 #include "ccan/opt/opt.h"
 #include "charmodel.h"
+#include "colour.h"
 #include "opt-helpers.h"
 
 static char * opt_filename = NULL;
 static float opt_bias = 0;
 static uint opt_chars = 72;
 static char *opt_prefix = NULL;
+static bool opt_show_prefix = false;
 static char *opt_until = NULL;
 
 static struct opt_table options[] = {
@@ -31,6 +33,8 @@ static struct opt_table options[] = {
       &opt_chars, "confabulate this many characters"),
   OPT_WITH_ARG("-p|--prefix=<chars>", opt_set_charp, opt_show_charp, &opt_prefix,
       "seed the confabulator with this"),
+  OPT_WITHOUT_ARG("--show-prefix", opt_set_bool, &opt_show_prefix,
+      "print the prefix (if any)"),
   OPT_WITH_ARG("-u|--until=<char>", opt_set_charp, opt_show_charp, &opt_until,
       "stop when this charactor appears"),
 
@@ -69,6 +73,9 @@ main(int argc, char *argv[]){
     rnn_char_collapse_buffer(alphabet, prefix_text,
         raw_len, &prefix_len);
     rnn_char_prime(net, alphabet, prefix_text, prefix_len);
+    if (opt_show_prefix){
+      printf(C_CYAN "%s" C_NORMAL, opt_prefix);
+    }
   }
 
   /*XXX this could be done in small chunks */
