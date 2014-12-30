@@ -176,7 +176,7 @@ new_charmodel_from_xml(char *filename, double alpha_threshold,
   }
 
   classified_text = rnn_char_alloc_classified_text(first_block,
-      alphabet, &textlen);
+      alphabet, &textlen, 0);
 
   RnnCharClassifiedText *t = malloc(sizeof(*t));
   t->text = classified_text;
