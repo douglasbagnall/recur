@@ -75,7 +75,7 @@ $(subdirs):
 all:: plugins/libgstclassify.so $(subdirs)
 
 
-ELF_EXECUTABLES = test_backprop convert-saved-net rnnca-player gtk-recur xml-lang-classify\
+ELF_EXECUTABLES = text-predict convert-saved-net rnnca-player gtk-recur xml-lang-classify\
 	 text-confabulate text-cross-entropy text-classify  text-classify-results
 
 clean:
@@ -151,7 +151,7 @@ test/test_charmodel%: test/test_charmodel%.o $(RNN_OBJECTS) charmodel-predict.o 
 #actually there are more path.h dependers.
 test/test_fb_backprop.o test/test_rescale.o test/test_charmodel.o :path.h
 
-test_backprop.o: config.h path.h
+text-predict.o: config.h path.h
 
 test/test_%: test/test_%.o
 	$(CC) -Wl,-O1 $^  -I. $(DEFINES)  $(COMMON_LINKS)   -o $@
@@ -165,7 +165,7 @@ test/test_simple_rescale test/test_rescale: %: rescale.o %.o
 test/test_fb_backprop: %: $(RNN_OBJECTS) %.o $(OPT_OBJECTS)  | nets images
 	$(CC) -Iccan/opt/ -Wl,-O1 $(filter %.o,$^)   -I. $(DEFINES)  $(COMMON_LINKS)  -o $@
 
-text-confabulate text-cross-entropy test_backprop: %: $(RNN_OBJECTS) %.o \
+text-confabulate text-cross-entropy text-predict: %: $(RNN_OBJECTS) %.o \
 	charmodel-predict.o charmodel-init.o $(OPT_OBJECTS)  \
 	| nets images
 	$(CC) -Iccan/opt/ -Wl,-O1 $(filter %.o,$^)   -I. $(DEFINES)  $(COMMON_LINKS)  -o $@
@@ -470,4 +470,4 @@ cppcheck:
 	-UG_OS_WIN32  *.[ch]
 
 perf-stat:
-	sudo perf stat -e cpu-cycles,instructions,cache-references,cache-misses ./test_backprop
+	sudo perf stat -e cpu-cycles,instructions,cache-references,cache-misses ./text-predict

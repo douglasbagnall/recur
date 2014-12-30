@@ -102,12 +102,12 @@ Documentation is slight. Sorry.
 
 ## Character level language modelling
 
-The `test_backprop` program learns to predict the next character of a
+The `text-predict` program learns to predict the next character of a
 sequence of text. There are a lot of options. The defaults options
 will train quickly to a cross entropy around 2.
 
-    make test_backprop
-    ./test_backprop --help
+    make text-predict
+    ./text-predict --help
 
 ## Copyright and license
 
@@ -133,6 +133,6 @@ General Public License, version 2.
 
 The contents of the ccan directory and mdct.c are by various authors,
 and have with various licenses, mostly very liberal. The file
-`test_backprop.c`, and the contents of `ccan/opt`, are covered by the
-GPL. This does not affect your use of the Gstreamer plugins. See
+`text-predict.c`, and the contents of `ccan/opt`, are covered by the
+GPLv2. This does not affect your use of the Gstreamer plugins. See
 licences/README for more detail.

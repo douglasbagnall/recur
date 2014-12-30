@@ -137,7 +137,7 @@ typedef enum {
 } rnn_activation;
 
 typedef enum {
-  /*if you change this, also change test_backprop's
+  /*if you change this, also change text-predict's
     --flat-init-distribution documentation*/
   RNN_INIT_DIST_UNIFORM = 1,
   RNN_INIT_DIST_GAUSSIAN,

@@ -1,7 +1,7 @@
 /* Copyright (C) 2014 Douglas Bagnall <douglas@halo.gen.nz> GPL2+
 
 Print the cross entropy of the text in the given files against the predictions
-of a net trained by test_backprop.
+of a net trained by text-predict.
 
 This file is GPL2+, due to the ccan/opt link.
 */

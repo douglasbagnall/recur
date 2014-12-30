@@ -2,7 +2,7 @@ Which licence applies where:
 
 * CC0 applies to some of the ccan modules (see ccan/*/LICENSE).
 
-* GPL-2+ applies to ccan/opt and test_backprop which depends on
+* GPL-2+ applies to ccan/opt and text-predict which depends on
   ccan/opt. It doesn't affect the Gstreamer plug-ins.
 
 * mdct.c is from libvorbis and comes with a BSD license (see
