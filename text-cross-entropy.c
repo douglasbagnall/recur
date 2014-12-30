@@ -8,7 +8,7 @@ This file is GPL2+, due to the ccan/opt link.
 
 #include "recur-nn.h"
 #include "recur-nn-helpers.h"
-#include "ccan/opt/opt.h"
+#include "opt-helpers.h"
 #include "charmodel.h"
 
 static char *opt_filename = NULL;

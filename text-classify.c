@@ -13,7 +13,6 @@ Because of ccan/opt, --help will tell you something.
 #include "recur-nn-helpers.h"
 #include "path.h"
 #include "badmaths.h"
-#include "ccan/opt/opt.h"
 #include <errno.h>
 #include <stdio.h>
 #include <fenv.h>

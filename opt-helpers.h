@@ -1,3 +1,11 @@
+/* Copyright (C) 2014 Douglas Bagnall <douglas@halo.gen.nz> GPL2+
+
+This thinly wraps and extends ccan/opt/opt.h.
+
+All files that include this are licensed under the GNU General Public License,
+version 2 or greater, due to the ccan/opt link.
+*/
+
 #include "recur-nn.h"
 #include "recur-nn-helpers.h"
 #include "ccan/opt/opt.h"

@@ -1,6 +1,6 @@
 /* Copyright (C) 2014 Douglas Bagnall <douglas@halo.gen.nz> GPL2+
 
-This uses the RNN to predict the next character in a text sequence.
+This generates text using an RNN trained by text-predict.
 
 Unlike most of the Recur repository, this file is licensed under the GNU
 General Public License, version 2 or greater. That is because it is linked to
@@ -11,7 +11,6 @@ Because of ccan/opt, --help will tell you something.
 
 #include "recur-nn.h"
 #include "recur-nn-helpers.h"
-#include "ccan/opt/opt.h"
 #include "charmodel.h"
 #include "colour.h"
 #include "opt-helpers.h"
