@@ -134,23 +134,50 @@ rnn_char_init_schedule(RnnCharSchedule *s, int recent_len,
   s->adjust_noise = adjust_noise;
 }
 
+static inline int
+write_possibly_utf8_char(int c, char *dest, int utf8){
+  if (utf8){
+    return write_utf8_char(c, dest);
+  }
+  *dest = c;
+  return 1;
+}
+
 int
 rnn_char_confabulate(RecurNN *net, char *dest, int char_len,
-    int byte_len, RnnCharAlphabet* a, float bias, int stop_point){
+    int byte_len, RnnCharAlphabet* a, float bias,
+    int start_point, int stop_point){
   int i, j;
   static int n = 0;
   bool utf8 = a->flags & RNN_CHAR_FLAG_UTF8;
   const int *alphabet = a->points;
   int safe_end = byte_len - (utf8 ? 5 : 1);
-  for (i = 0, j = 0; i < char_len && j < safe_end; i++){
-    n = guess_next_character(net, n, bias);
-    if (utf8){
-      j += write_utf8_char(alphabet[n], dest + j);
+  if (safe_end <= 0){
+    DEBUG("insufficient space to confabulate (%d bytes)", byte_len);
+    if (byte_len){
+      *dest = 0;
+    }
+    return 0;
+  }
+  j = 0;
+  if (start_point >= 0 && char_len > 0){
+    for (i = 0; i < 1000000 && n != start_point; i++){
+      n = guess_next_character(net, n, bias);
+    }
+    j = write_possibly_utf8_char(alphabet[n], dest, utf8);
+    dest[j] = 0;
+    if (n != start_point){
+      DEBUG("start char '%s' not found in first %d characters, giving up",
+          dest, i);
     }
     else {
-      dest[j] = alphabet[n];
-      j++;
+      DEBUG("start char '%s' found after %d others", dest, i);
     }
+  }
+
+  for (i = 0; i < char_len && j < safe_end; i++){
+    n = guess_next_character(net, n, bias);
+    j += write_possibly_utf8_char(alphabet[n], dest + j, utf8);
     if (n == stop_point){
       break;
     }
@@ -331,7 +358,7 @@ rnn_char_epoch(RnnCharModel *model, RecurNN *confab_net, RnnCharVentropy *v,
             int alloc_size = confab_size * 4;
             char confab[alloc_size + 1];
             rnn_char_confabulate(confab_net, confab, confab_size, alloc_size,
-                model->alphabet, confab_bias, -1);
+                model->alphabet, confab_bias, -1, -1);
             STDERR_DEBUG("%s|", confab);
           }
         }

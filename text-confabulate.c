@@ -22,6 +22,7 @@ static uint opt_chars = 72;
 static char *opt_prefix = NULL;
 static bool opt_show_prefix = false;
 static char *opt_until = NULL;
+static char *opt_wait_for = NULL;
 
 static struct opt_table options[] = {
   OPT_WITH_ARG("-f|--filename=<file>", opt_set_charp, opt_show_charp, &opt_filename,
@@ -37,6 +38,8 @@ static struct opt_table options[] = {
       "print the prefix (if any)"),
   OPT_WITH_ARG("-u|--until=<char>", opt_set_charp, opt_show_charp, &opt_until,
       "stop when this charactor appears"),
+  OPT_WITH_ARG("--wait-for=<char>", opt_set_charp, opt_show_charp, &opt_wait_for,
+      "don't start until this charactor appears"),
 
   OPT_WITHOUT_ARG("-h|--help", opt_usage_and_exit,
       ": Confabulate text using previously trained RNN",
@@ -83,13 +86,16 @@ main(int argc, char *argv[]){
   char *t = malloc(byte_len);
 
   int stop_point = -1;
+  int start_point = -1;
   if (opt_until){
     stop_point = rnn_char_get_codepoint(alphabet, opt_until);
   }
-
+  if (opt_wait_for){
+    start_point = rnn_char_get_codepoint(alphabet, opt_wait_for);
+  }
 
   rnn_char_confabulate(net, t, opt_chars, byte_len,
-      alphabet, opt_bias, stop_point);
+      alphabet, opt_bias, start_point, stop_point);
   fputs(t, stdout);
   fputs("\n", stdout);
   free(t);
