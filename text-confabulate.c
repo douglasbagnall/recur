@@ -22,6 +22,7 @@ static char *opt_prefix = NULL;
 static bool opt_show_prefix = false;
 static char *opt_until = NULL;
 static char *opt_wait_for = NULL;
+static s64 opt_rng_seed = -1;
 
 static struct opt_table options[] = {
   OPT_WITH_ARG("-f|--filename=<file>", opt_set_charp, opt_show_charp, &opt_filename,
@@ -39,6 +40,8 @@ static struct opt_table options[] = {
       "stop when this charactor appears"),
   OPT_WITH_ARG("--wait-for=<char>", opt_set_charp, opt_show_charp, &opt_wait_for,
       "don't start until this charactor appears"),
+  OPT_WITH_ARG("-r|--rng-seed=<seed>", opt_set_longval_bi, opt_show_longval_bi,
+      &opt_rng_seed, "RNG seed (default: -1 for auto)"),
 
   OPT_WITHOUT_ARG("-h|--help", opt_usage_and_exit,
       ": Confabulate text using previously trained RNN",
@@ -63,8 +66,7 @@ main(int argc, char *argv[]){
   RecurNN *net = rnn_load_net(opt_filename);
   RnnCharAlphabet *alphabet = rnn_char_new_alphabet_from_net(net);
 
-  /* I am not sure if this is necessary */
-  init_rand64_maybe_randomly(&net->rng, -1);
+  init_rand64_maybe_randomly(&net->rng, opt_rng_seed);
 
   int prev_char = 0;
 
