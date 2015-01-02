@@ -66,15 +66,16 @@ main(int argc, char *argv[]){
   /* I am not sure if this is necessary */
   init_rand64_maybe_randomly(&net->rng, -1);
 
-  u8 *prefix_text;
-  int prefix_len;
+  int prev_char = 0;
 
   if (opt_prefix){
+    u8 *prefix_text;
+    int prefix_len;
     prefix_text = (u8*)strdup(opt_prefix);
     int raw_len = strlen(opt_prefix);
     rnn_char_collapse_buffer(alphabet, prefix_text,
         raw_len, &prefix_len);
-    rnn_char_prime(net, alphabet, prefix_text, prefix_len);
+    prev_char = rnn_char_prime(net, alphabet, prefix_text, prefix_len);
     if (opt_show_prefix){
       printf(C_CYAN "%s" C_NORMAL, opt_prefix);
     }
@@ -94,7 +95,7 @@ main(int argc, char *argv[]){
   }
 
   rnn_char_confabulate(net, t, opt_chars, byte_len,
-      alphabet, opt_bias, start_point, stop_point);
+      alphabet, opt_bias, &prev_char, start_point, stop_point);
   fputs(t, stdout);
   fputs("\n", stdout);
   free(t);

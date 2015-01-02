@@ -145,10 +145,10 @@ write_possibly_utf8_char(int c, char *dest, int utf8){
 
 int
 rnn_char_confabulate(RecurNN *net, char *dest, int char_len,
-    int byte_len, RnnCharAlphabet* a, float bias,
+    int byte_len, RnnCharAlphabet* a, float bias, int *prev_char,
     int start_point, int stop_point){
   int i, j;
-  static int n = 0;
+  int n = *prev_char;
   bool utf8 = a->flags & RNN_CHAR_FLAG_UTF8;
   const int *alphabet = a->points;
   int safe_end = byte_len - (utf8 ? 5 : 1);
@@ -183,15 +183,16 @@ rnn_char_confabulate(RecurNN *net, char *dest, int char_len,
     }
   }
   dest[j] = 0;
+  *prev_char = n;
   return j;
 }
 
 
 int
-rnn_char_fconfab_variable(FILE *f, RecurNN *net,
-    const int end_code, int max_len, RnnCharAlphabet *a, float bias){
+rnn_char_fconfab_variable(FILE *f, RecurNN *net, const int end_code,
+    int *prev_char, int max_len, RnnCharAlphabet *a, float bias){
   int i;
-  static int n = 0;
+  int n = *prev_char;
   bool utf8 = a->flags & RNN_CHAR_FLAG_UTF8;
   const int *alphabet = a->points;
   for(i = 0; i < max_len; i++){
@@ -211,6 +212,7 @@ rnn_char_fconfab_variable(FILE *f, RecurNN *net,
   }
   fputc('\n', f);
   //DEBUG("n %d, max_len %d, i %d", n, max_len, i);
+  *prev_char = n;
   return i;
 }
 
@@ -276,7 +278,7 @@ rnn_char_epoch(RnnCharModel *model, RecurNN *confab_net, RnnCharVentropy *v,
   RecurNN **nets = model->training_nets;
   uint report_counter = net->generation % model->report_interval;
   float report_scale = 1.0f / ((model->report_interval - report_counter) * n_nets);
-
+  int confab_char = 0;
   struct timespec timers[2];
   struct timespec *time_start = timers;
   struct timespec *time_end = timers + 1;
@@ -347,8 +349,8 @@ rnn_char_epoch(RnnCharModel *model, RecurNN *confab_net, RnnCharVentropy *v,
             fprintf(stderr, C_GREY "%5dk t%.2f " C_RED "v%.2f"
                 C_NORMAL " %.0f/s |" C_NORMAL,
                 k, entropy, ventropy, per_sec + 0.5);
-            rnn_char_fconfab_variable(stderr, confab_net,
-                confab_line_end, confab_size, model->alphabet, confab_bias);
+            rnn_char_fconfab_variable(stderr, confab_net, confab_line_end,
+                &confab_char, confab_size, model->alphabet, confab_bias);
           }
           else{
             fprintf(stderr, C_GREY "%5dk e.%02d t%.2f v%.2f a.%02d %.0f/s |" C_NORMAL,
@@ -358,7 +360,7 @@ rnn_char_epoch(RnnCharModel *model, RecurNN *confab_net, RnnCharVentropy *v,
             int alloc_size = confab_size * 4;
             char confab[alloc_size + 1];
             rnn_char_confabulate(confab_net, confab, confab_size, alloc_size,
-                model->alphabet, confab_bias, -1, -1);
+                model->alphabet, confab_bias, &confab_char, -1, -1);
             STDERR_DEBUG("%s|", confab);
           }
         }
@@ -394,14 +396,16 @@ rnn_char_epoch(RnnCharModel *model, RecurNN *confab_net, RnnCharVentropy *v,
   return 0;
 }
 
-void
+int
 rnn_char_prime(RecurNN *net, RnnCharAlphabet *alphabet,
     const u8 *text, const int len){
-  if (text){
-    for(int i = 0; i < len; i++){
-      one_hot_opinion(net, text[i], 0);
-    }
+  if (! text || ! len){
+    return 0;
   }
+  for(int i = 0; i < len - 1; i++){
+    one_hot_opinion(net, text[i], 0);
+  }
+  return text[len - 1];
 }
 
 
