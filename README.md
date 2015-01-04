@@ -12,9 +12,9 @@ success for identifying birds and human languages.
 ## Technical overview
 
 The recurrent neural network (RNN) core uses rectified linear units
-(ReLU). It learns via backpropagation through time (BPTT), often using
-synchronic mini-batches: the weight updates are combined from tens or
-hundreds of parallel streams.
+(ReLU) or rectified square root units. It learns via backpropagation
+through time (BPTT), often using synchronic mini-batches: the weight
+updates are combined from tens or hundreds of parallel streams.
 
 The calculations are done in 32 bit floats on the CPU, and are quite
 fast: on x86-64 it is significantly faster than libatlas and openblas.
@@ -132,7 +132,9 @@ General Public License, version 2.
 > Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 The contents of the ccan directory and mdct.c are by various authors,
-and have with various licenses, mostly very liberal. The file
-`text-predict.c`, and the contents of `ccan/opt`, are covered by the
-GPLv2. This does not affect your use of the Gstreamer plugins. See
-licences/README for more detail.
+and have with various licenses, mostly very liberal. The files
+`text-predict.c`, `xml-lang-classify`, `text-confabulate`,
+`text-cross-entropy`, `text-classify`, `text-classify-results`, and
+the contents of `ccan/opt`, are covered by the GPLv2. This does not
+affect your use of the Gstreamer plugins. See licences/README for more
+detail.
