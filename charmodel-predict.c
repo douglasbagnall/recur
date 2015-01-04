@@ -346,8 +346,8 @@ rnn_char_epoch(RnnCharModel *model, RecurNN *confab_net, RnnCharVentropy *v,
         double per_sec = 1.0 / report_scale / elapsed;
         if (confab_net && confab_size && quietness < 1){
           if (confab_line_end >= 0){
-            fprintf(stderr, C_GREY "%5dk t%.2f " C_RED "v%.2f"
-                C_NORMAL " %.0f/s |" C_NORMAL,
+            fprintf(stderr, C_GREY "%5dk t%.2f " C_CYAN "v%.2f"
+                C_GREY " %.0f/s |" C_NORMAL,
                 k, entropy, ventropy, per_sec + 0.5);
             rnn_char_fconfab_variable(stderr, confab_net, confab_line_end,
                 &confab_char, confab_size, model->alphabet, confab_bias);
