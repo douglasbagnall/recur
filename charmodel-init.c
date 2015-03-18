@@ -683,17 +683,8 @@ rnn_char_alphabet_set_flags(RnnCharAlphabet *a,
       (utf8             ? RNN_CHAR_FLAG_UTF8 : 0));
 }
 
-
-void
-rnn_char_reset_alphabet(RnnCharAlphabet *a){
-  a->len = 0;
-  a->collapsed_len = 0;
-  a->flags = 0;
-}
-
 void
 rnn_char_free_alphabet(RnnCharAlphabet *a){
-  rnn_char_reset_alphabet(a);
   free(a->points);
   free(a->collapsed_points);
   free(a);

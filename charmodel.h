@@ -192,8 +192,6 @@ RnnCharAlphabet *rnn_char_new_alphabet(void);
 
 void rnn_char_dump_alphabet(RnnCharAlphabet *alphabet);
 
-void rnn_char_reset_alphabet(RnnCharAlphabet *a);
-
 void rnn_char_free_alphabet(RnnCharAlphabet *a);
 
 int rnn_char_get_codepoint(RnnCharAlphabet *a, const char *s);
