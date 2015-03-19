@@ -324,14 +324,11 @@ rnn_char_dump_alphabet(RnnCharAlphabet *alphabet){
   char *s;
   char *s2;
   int utf8 = alphabet->flags & RNN_CHAR_FLAG_UTF8;
-  if (utf8){
-    s = new_utf8_from_codepoints(alphabet->points, alphabet->len);
-    s2 = new_utf8_from_codepoints(alphabet->collapsed_points, alphabet->collapsed_len);
-  }
-  else{
-    s = new_bytes_from_codepoints(alphabet->points, alphabet->len);
-    s2 = new_bytes_from_codepoints(alphabet->collapsed_points, alphabet->collapsed_len);
-  }
+
+  s = new_string_from_codepoints(alphabet->points, alphabet->len, utf8);
+  s2 = new_string_from_codepoints(alphabet->collapsed_points,
+      alphabet->collapsed_len, utf8);
+
   DEBUG("alphabet:  " C_DARK_YELLOW "»»" C_NORMAL "%s" C_DARK_YELLOW "««" C_NORMAL, s);
   for (int i = 0; i < alphabet->len; i++){
     fprintf(stderr, "%d, ", alphabet->points[i]);
