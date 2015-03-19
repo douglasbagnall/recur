@@ -674,6 +674,7 @@ RnnCharAlphabet
 void
 rnn_char_alphabet_set_flags(RnnCharAlphabet *a,
     bool case_insensitive, bool utf8, bool collapse_space){
+  /*XXX changing flags late could break things */
   a->flags = (
       (case_insensitive ? RNN_CHAR_FLAG_CASE_INSENSITIVE : 0) |
       (collapse_space   ? RNN_CHAR_FLAG_COLLAPSE_SPACE : 0) |

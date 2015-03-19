@@ -301,7 +301,7 @@ rnn_char_epoch(RnnCharModel *model, RecurNN *confab_net, RnnCharVentropy *v,
         error += e;
         entropy += capped_log2f(1.0f - e);
         /*Second argument to r_b_c_deltas toggles delta accumulation. Turning
-          it off on the first run avoids expicit zeroing outside of the loop
+          it off on the first run avoids explicit zeroing outside of the loop
           (via rnn_bptt_clear_deltas) and is thus slightly faster.
          */
         rnn_bptt_calc_deltas(n, j ? 1 : 0);
