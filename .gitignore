@@ -38,3 +38,4 @@ local.mak
 /text-cross-entropy
 /text-classify
 /text-classify-results
+/text-predict
