@@ -1,0 +1,31 @@
+#!/usr/bin/python
+import sys, os
+
+os.environ['LD_LIBRARY_PATH'] = '.'
+
+import charmodel
+
+a = charmodel.Alphabet('vwervwr234wrvw ')
+print a
+print a.alphabet
+print a.get_codepoint('2')
+print a.get_codepoint('c')
+
+try:
+    a.encode_text(1)
+except ValueError, e:
+    print "got expected error %r" % e
+
+t = a.encode_text('fgdgergegewvwvwg')
+
+print a.decode_text(t)
+
+b = charmodel.Alphabet('vwevw ')
+
+c = charmodel.Alphabet('vcws', utf8=0)
+
+#print c, dir(c)
+
+print c.alphabet
+print c.get_codepoint('c')
+print c.utf8

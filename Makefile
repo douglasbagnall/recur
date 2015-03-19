@@ -139,6 +139,9 @@ libcharmodel.so: charmodel-classify.o charmodel-predict.o charmodel-init.o $(RNN
 	$(CC) -shared -Wl,-O1 $+ $(INCLUDES) $(DEFINES) $(LINKS) -Wl,-soname -Wl,$@ \
 	  -o $@
 
+charmodel.so: py-recur-text.c *.h
+	python setup.py build_ext --inplace -f
+
 test/test_mfcc_table: %:  mfcc.o rescale.o %.o
 	$(CC) -Wl,-O1 $^ $(INCLUDES) $(DEFINES) $(LINKS)   -o $@
 

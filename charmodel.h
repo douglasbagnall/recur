@@ -149,6 +149,9 @@ int rnn_char_find_alphabet_f(const char *filename, RnnCharAlphabet *alphabet,
 int rnn_char_collapse_buffer(RnnCharAlphabet *alphabet, u8 *text,
     int raw_len, int *collapsed_len);
 
+char *rnn_char_uncollapse_text(RnnCharAlphabet *alphabet, const u8 *orig, int len,
+    int *dest_len);
+
 u8* rnn_char_alloc_collapsed_text(const char *filename, RnnCharAlphabet *alphabet,
     int *text_len, int quietness);
 

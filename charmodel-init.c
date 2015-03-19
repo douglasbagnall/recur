@@ -411,6 +411,46 @@ rnn_char_dump_collapsed_text(const u8 *text, int len, const char *name,
   fclose(f);
 }
 
+
+/*see also new_string_from_codepoints() et.al. in utf8.h */
+char *
+rnn_char_uncollapse_text(RnnCharAlphabet *alphabet, const u8 *orig, int len,
+    int *dest_len)
+{
+  int i;
+  int utf8 = alphabet->flags & RNN_CHAR_FLAG_UTF8;
+  int mem_len = (len + 2) * (utf8 ? 4 : 1);
+  char *mem = malloc(mem_len);
+  char *s = mem;
+  const int *lut = alphabet->points;
+  for (i = 0; i < len; i++){
+    u8 c = orig[i];
+    int code = lut[c];
+    if (code == 0){
+      break;
+    }
+    if (utf8){
+      int wrote = write_utf8_char(code, s);
+      if (wrote == 0){
+        STDERR_DEBUG("bad unicode code %d", code);
+        break;
+      }
+      s += wrote;
+    }
+    else {
+      *s = code;
+      s++;
+    }
+  }
+  *s = 0;
+  s++;
+  *dest_len = s - mem - 1;
+  return realloc(mem, s - mem);
+}
+
+
+
+
 static inline char *
 urlencode_alloc(const char *orig){
   size_t len = strlen(orig);
