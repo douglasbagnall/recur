@@ -131,6 +131,12 @@ Alphabet_getalphabet(Alphabet *self, void *closure)
     return PyString_FromString(s);
 }
 
+/*
+void rnn_char_dump_collapsed_text(const u8 *text, int len, const char *name,
+    const char *alphabet);
+*/
+
+
 
 static const u32 flag_ignore_case = RNN_CHAR_FLAG_CASE_INSENSITIVE;
 static const u32 flag_utf8 = RNN_CHAR_FLAG_UTF8;
@@ -244,13 +250,204 @@ static PyTypeObject AlphabetType = {
 };
 
 
+/*net object */
+
+typedef struct {
+    PyObject_HEAD
+    RecurNN *net;
+    PyObject *class_names;
+    PyObject *class_name_lut;
+    rnn_learning_method learning_method;
+} Net;
+
+
+static void
+Net_dealloc(Net* self)
+{
+    if (self->net){
+        /* save first? */
+        rnn_delete_net(self->net);
+    }
+    self->ob_type->tp_free((PyObject*)self);
+}
+
+static PyObject *
+Net_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
+{
+    Net *self = (Net *)PyType_GenericNew(type, args, kwds);
+    self->net = NULL;
+    self->class_names = NULL;
+    self->class_name_lut = NULL;
+    return (PyObject *)self;
+}
 
 
 
-/*
-void rnn_char_dump_collapsed_text(const u8 *text, int len, const char *name,
-    const char *alphabet);
-*/
+static int
+Net_init(Net *self, PyObject *args, PyObject *kwds)
+{
+    /* mandatory arguments */
+    Alphabet *alphabet;
+    PyObject *class_names;
+    uint hidden_size;
+
+    /* optional arguments */
+    unsigned long long rng_seed = 2;
+    const char *log_file = "muli-text.log";
+    int bptt_depth = 30;
+    float learn_rate = 0.001;
+    float momentum = 0.95;
+    float presynaptic_noise = 0.1;
+    rnn_activation activation = RNN_RESQRT;
+    int learning_method = RNN_ADAGRAD;
+
+    /* other vars */
+    PyObject *class_name_lut;
+    int n_classes;
+    uint output_size;
+    u32 flags = RNN_NET_FLAG_STANDARD | RNN_NET_FLAG_BPTT_ADAPTIVE_MIN_ERROR;
+
+    static char *kwlist[] = {"alphabet",             /* O! */
+                             "classes",              /* O  */
+                             "hidden_size",          /* i  |  */
+                             "log_file",             /* s  */
+                             "bptt_depth",           /* i  */
+                             "learn_rate",           /* f  */
+                             "momentum",             /* f  */
+                             "presynaptic_noise",    /* f  */
+                             "rng_seed",             /* K  */
+                             "activation",           /* i  */
+                             "learning_method",      /* i  */
+                             NULL};
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "O!Oi|sifffKii", kwlist,
+            &AlphabetType,
+            &alphabet,          /* O! */
+            &class_names,       /* O  */
+            &hidden_size,       /* i  |  */
+            &log_file,          /* s  */
+            &bptt_depth,        /* i  */
+            &learn_rate,        /* f  */
+            &momentum,          /* f  */
+            &presynaptic_noise, /* f  */
+            &rng_seed,          /* K  */
+            &activation,        /* i  */
+            &learning_method    /* i  */
+        )){
+        return -1;
+    }
+    if (activation >= RNN_ACTIVATION_LAST || activation < 1){
+        PyErr_Format(PyExc_ValueError, "%d is not a valid activation", activation);
+        return -1;
+    }
+
+    if ((unsigned)learning_method >= RNN_LAST_LEARNING_METHOD){
+        PyErr_Format(PyExc_ValueError, "%d is not a valid learning method",
+            learning_method);
+        return -1;
+    }
+    if (learning_method == RNN_ADADELTA || learning_method == RNN_RPROP){
+        flags |= RNN_NET_FLAG_AUX_ARRAYS;
+    }
+
+    n_classes = PySequence_Length(class_names);
+
+    if (! PySequence_Check(class_names) || n_classes < 1){
+        PyErr_Format(PyExc_ValueError, "class_names should be a sequence of strings");
+        return -1;
+    }
+
+    output_size = alphabet->alphabet->len * n_classes;
+
+    self->net = rnn_new(
+        alphabet->alphabet->len,
+        hidden_size,
+        output_size,
+        flags,
+        rng_seed,
+        log_file,
+        bptt_depth,
+        learn_rate,
+        momentum,
+        presynaptic_noise,
+        activation);
+
+    self->learning_method = learning_method;
+    self->class_names = class_names;
+    class_name_lut = PyDict_New();
+    for (long i = 0; i < n_classes; i++){
+        PyObject *k = PySequence_GetItem(class_names, i);
+        PyObject *v = PyInt_FromLong(i);
+        PyDict_SetItem(class_name_lut, k, v);
+    }
+    self->class_name_lut = class_name_lut;
+
+    return 0;
+}
+
+static PyGetSetDef Net_getsetters[] = {
+    {NULL}  /* Sentinel */
+};
+
+
+static PyMemberDef Net_members[] = {
+    {"class_names", T_OBJECT_EX, offsetof(Net, class_names), READONLY,
+     "names of classes"},
+    {"class_name_lut", T_OBJECT_EX, offsetof(Net, class_name_lut), READONLY,
+     "mapping classes to indices"},
+    {NULL}
+};
+
+static PyMethodDef Net_methods[] = {
+    {NULL}
+};
+
+
+static PyTypeObject NetType = {
+    PyObject_HEAD_INIT(NULL)
+    0,                            /*ob_size*/
+    "charmodel.Net",              /*tp_name*/
+    sizeof(Net),                  /*tp_basicsize*/
+    0,                            /*tp_itemsize*/
+    (destructor)Net_dealloc,      /*tp_dealloc*/
+    0,                            /*tp_print*/
+    0,                            /*tp_getattr*/
+    0,                            /*tp_setattr*/
+    0,                            /*tp_compare*/
+    0,                            /*tp_repr*/
+    0,                            /*tp_as_number*/
+    0,                            /*tp_as_sequence*/
+    0,                            /*tp_as_mapping*/
+    0,                            /*tp_hash */
+    0,                            /*tp_call*/
+    0,                            /*tp_str*/
+    0,                            /*tp_getattro*/
+    0,                            /*tp_setattro*/
+    0,                            /*tp_as_buffer*/
+    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE, /*tp_flags*/
+    "Net objects",                /* tp_doc */
+    0,                            /* tp_traverse */
+    0,                            /* tp_clear */
+    0,                            /* tp_richcompare */
+    0,                            /* tp_weaklistoffset */
+    0,                            /* tp_iter */
+    0,                            /* tp_iternext */
+    Net_methods,                  /* tp_methods */
+    Net_members,                  /* tp_members */
+    Net_getsetters,               /* tp_getset */
+    0,                            /* tp_base */
+    0,                            /* tp_dict */
+    0,                            /* tp_descr_get */
+    0,                            /* tp_descr_set */
+    0,                            /* tp_dictoffset */
+    (initproc)Net_init,           /* tp_init */
+    0,                            /* tp_alloc */
+    Net_new,                      /* tp_new */
+};
+
+
+
+
 /*
 void rnn_char_init_schedule(RnnCharSchedule *s, int recent_len,
     float learn_rate_min, float learn_rate_mul, int adjust_noise);
@@ -327,7 +524,8 @@ static PyMethodDef top_level_functions[] = {
 PyMODINIT_FUNC
 initcharmodel(void)
 {
-    if (PyType_Ready(&AlphabetType) < 0)
+    if (PyType_Ready(&AlphabetType) < 0 ||
+        PyType_Ready(&NetType) < 0)
       return;
 
     PyObject* m = Py_InitModule3("charmodel", top_level_functions,
@@ -338,11 +536,23 @@ initcharmodel(void)
         return;
     }
 
-#define ADD_INT_CONSTANT(x) (PyModule_AddIntConstant(m, QUOTE(x), (x)))
+#define ADD_INT_CONSTANT(x) (PyModule_AddIntConstant(m, QUOTE(x), (RNN_ ##x)))
 
-    int r = (ADD_INT_CONSTANT(RNN_CHAR_FLAG_CASE_INSENSITIVE)
-             || ADD_INT_CONSTANT(RNN_CHAR_FLAG_UTF8)
-             || ADD_INT_CONSTANT(RNN_CHAR_FLAG_COLLAPSE_SPACE));
+    int r = 0;
+
+    r = r || ADD_INT_CONSTANT(MOMENTUM_WEIGHTED);
+    r = r || ADD_INT_CONSTANT(MOMENTUM_NESTEROV);
+    r = r || ADD_INT_CONSTANT(MOMENTUM_SIMPLIFIED_NESTEROV);
+    r = r || ADD_INT_CONSTANT(MOMENTUM_CLASSICAL);
+    r = r || ADD_INT_CONSTANT(ADAGRAD);
+    r = r || ADD_INT_CONSTANT(ADADELTA);
+    r = r || ADD_INT_CONSTANT(RPROP);
+
+    r = r || ADD_INT_CONSTANT(RELU);
+    r = r || ADD_INT_CONSTANT(RESQRT);
+    r = r || ADD_INT_CONSTANT(RELOG);
+    r = r || ADD_INT_CONSTANT(RETANH);
+    r = r || ADD_INT_CONSTANT(RECLIP20);
 
     if (r < 0){
         DEBUG("can't add constants to module charmodel");
@@ -353,4 +563,6 @@ initcharmodel(void)
 
     Py_INCREF(&AlphabetType);
     PyModule_AddObject(m, "Alphabet", (PyObject *)&AlphabetType);
+    Py_INCREF(&NetType);
+    PyModule_AddObject(m, "Net", (PyObject *)&NetType);
 }

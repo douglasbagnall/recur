@@ -29,3 +29,12 @@ c = charmodel.Alphabet('vcws', utf8=0)
 print c.alphabet
 print c.get_codepoint('c')
 print c.utf8
+
+
+n = charmodel.Net(a, ('a', 'bb', 3), 99)
+
+print n
+print dir(n)
+print n.class_name_lut
+
+print vars(charmodel)
