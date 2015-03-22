@@ -115,7 +115,7 @@ typedef enum {
   RNN_ADADELTA,
   RNN_RPROP,
 
-  RNN_LAST_MOMENTUM_METHOD
+  RNN_LAST_LEARNING_METHOD
 } rnn_learning_method;
 
 typedef enum {
