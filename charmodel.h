@@ -129,6 +129,16 @@ struct _RnnCharClassBlock
   u8 class_code;
 };
 
+
+typedef struct _RnnCharProgressReport
+{
+  float training_entropy;
+  float training_error;
+  float training_accuracy;
+  float per_second;
+} RnnCharProgressReport;
+
+
 #define NO_CLASS 0xFF
 
 int rnn_char_classify_epoch(RnnCharClassifier *model);
