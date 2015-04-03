@@ -262,7 +262,8 @@ def _calc_stats(results, include_scores=False):
 
     return d
 
-def calc_stats(results, presence_results=None, presence_gt=None, presence_i=0, include_scores=False):
+def calc_stats(results, presence_results=None, presence_gt=None, presence_i=0,
+               include_scores=False):
     stats = _calc_stats([x[:2] for x in results], include_scores=include_scores)
 
     if presence_results is not None:

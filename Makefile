@@ -33,7 +33,9 @@ BLAS_FLAGS = -DUSE_CBLAS
 endif
 
 
-ALL_CFLAGS = -march=native -pthread $(WARNINGS) -pipe  -D_GNU_SOURCE $(INCLUDES) $(ARCH_CFLAGS) $(CFLAGS) $(DEV_CFLAGS) -ffast-math $(CLANG_FLAGS) -std=gnu11 $(CFLAGS) $(BLAS_CFLAGS) $(LOCAL_FLAGS)
+ALL_CFLAGS = -march=native -pthread $(WARNINGS) -pipe  -D_GNU_SOURCE \
+	$(INCLUDES) $(ARCH_CFLAGS) $(CFLAGS) $(DEV_CFLAGS) -ffast-math \
+	$(CLANG_FLAGS) -std=gnu11 $(CFLAGS) $(BLAS_CFLAGS) $(LOCAL_FLAGS)
 ALL_LDFLAGS = $(LDFLAGS)
 
 GST_INCLUDES =  -isystem $(INC_DIR)/gstreamer-1.0\
@@ -257,7 +259,7 @@ test-video/%-$(VID_W)x$(VID_H)-$(VID_FPS)fps.avi: test-video/%.mov
 VID_SPECS = video/x-raw, format=I420, width=$(VID_W), height=$(VID_H), framerate=20/1
 
 VID_TEST_SRC_1 = videotestsrc pattern=14 kt=2 kxt=1 kyt=3  kxy=3 !\
-        $(VID_SPECS), framerate=\(fraction\)25/1
+	$(VID_SPECS), framerate=\(fraction\)25/1
 
 VID_LINE=videoscale method=nearest-neighbour ! videoconvert ! $(VID_SPECS)
 AUD_LINE=audioconvert ! audioresample
@@ -267,7 +269,8 @@ AUD_LINE=audioconvert ! audioresample
 #TIMER = time -f '\nused %P CPU\n' timeout 10
 #GDB = gdb --args
 #GDB=valgrind --tool=memcheck  --track-origins=yes
-VALGRIND = valgrind --tool=memcheck --log-file=valgrind.log --trace-children=yes --suppressions=valgrind-python.supp  --leak-check=full --show-reachable=yes
+VALGRIND = valgrind --tool=memcheck --log-file=valgrind.log --trace-children=yes\
+	--suppressions=valgrind-python.supp  --leak-check=full --show-reachable=yes
 
 DEFAULT_VIDEO = test-video/filmcollectief-09-542-288x192-20fps.avi
 #DEFAULT_VIDEO = test-video/camille-288x192-20fps.avi
@@ -277,14 +280,14 @@ VID_FILE_SRC_DEFAULT = uridecodebin name=src uri=file://$(CURDIR)/$(DEFAULT_VIDE
 #RNNCA_DEBUG=GST_DEBUG=rnnca*:5,recur*:5
 
 test-rnnca: plugins/libgstrnnca.so $(subdirs) $(DEFAULT_VIDEO)
-	$(RNNCA_DEBUG)	$(GDB) 	gst-launch-1.0  \
+	$(RNNCA_DEBUG)	$(GDB) gst-launch-1.0  \
 	  --gst-plugin-path=$(PLUGIN_DIR) \
 	$(VID_FILE_SRC_DEFAULT) \
 	! rnnca log-file=rnnca.log training=1 playing=1 edges=0  \
 	! videoconvert ! xvimagesink force-aspect-ratio=0
 
 train-rnnca: plugins/libgstrnnca.so $(subdirs) $(DEFAULT_VIDEO)
-	$(RNNCA_DEBUG) $(GDB) 	gst-launch-1.0  \
+	$(RNNCA_DEBUG) $(GDB) gst-launch-1.0  \
 		  --gst-plugin-path=$(PLUGIN_DIR) \
 		$(VID_FILE_SRC_DEFAULT) \
 		! rnnca log-file=rnnca.log training=1 playing=0 \
@@ -294,7 +297,7 @@ PROPER_RNNCA_PROPERTIES = momentum-soft-start=3000 momentum=0.95 learn-rate=3e-6
 	hidden-size=79 log-file=rnnca.log offsets=Y000111C000111
 
 train-rnnca-properly: plugins/libgstrnnca.so $(subdirs) $(DEFAULT_VIDEO)
-	$(RNNCA_DEBUG) $(GDB) 	gst-launch-1.0  \
+	$(RNNCA_DEBUG) $(GDB) gst-launch-1.0  \
 		  --gst-plugin-path=$(PLUGIN_DIR) \
 		$(VID_FILE_SRC_DEFAULT) \
 		! rnnca $(PROPER_RNNCA_PROPERTIES) \
@@ -302,7 +305,7 @@ train-rnnca-properly: plugins/libgstrnnca.so $(subdirs) $(DEFAULT_VIDEO)
 		! fakesink ;\
 
 test-rnnca-properly: plugins/libgstrnnca.so $(subdirs) $(DEFAULT_VIDEO)
-	$(RNNCA_DEBUG) $(GDB) 	gst-launch-1.0  \
+	$(RNNCA_DEBUG) $(GDB) gst-launch-1.0  \
 		  --gst-plugin-path=$(PLUGIN_DIR) \
 		$(VID_FILE_SRC_DEFAULT) \
 		! rnnca $(PROPER_RNNCA_PROPERTIES) \
@@ -310,7 +313,7 @@ test-rnnca-properly: plugins/libgstrnnca.so $(subdirs) $(DEFAULT_VIDEO)
 		!  xvimagesink force-aspect-ratio=0
 
 play-rnnca-properly: plugins/libgstrnnca.so $(subdirs)
-	$(RNNCA_DEBUG)	$(GDB) 	gst-launch-1.0  \
+	$(RNNCA_DEBUG)	$(GDB) gst-launch-1.0  \
 	  --gst-plugin-path=$(PLUGIN_DIR) \
 	videotestsrc pattern=black  ! $(VID_SPECS)  \
 	! rnnca $(PROPER_RNNCA_PROPERTIES) \
@@ -320,7 +323,7 @@ play-rnnca-properly: plugins/libgstrnnca.so $(subdirs)
 #RNNCA_DEBUG=GST_DEBUG=5
 
 record-rnnca-properly: plugins/libgstrnnca.so
-	$(RNNCA_DEBUG)	$(GDB) 	gst-launch-1.0 	--gst-plugin-path=$(PLUGIN_DIR) \
+	$(RNNCA_DEBUG)	$(GDB) gst-launch-1.0 --gst-plugin-path=$(PLUGIN_DIR) \
 	avimux name=mux ! filesink location=rnnca2.avi \
 	videotestsrc pattern=black  ! $(VID_SPECS) \
 	! rnnca $(PROPER_RNNCA_PROPERTIES) \
@@ -329,14 +332,14 @@ record-rnnca-properly: plugins/libgstrnnca.so
 
 
 play-rnnca: plugins/libgstrnnca.so $(subdirs)
-	$(RNNCA_DEBUG)	$(GDB) 	gst-launch-1.0  \
+	$(RNNCA_DEBUG)	$(GDB) gst-launch-1.0  \
 	  --gst-plugin-path=$(PLUGIN_DIR) \
 	videotestsrc pattern=black  ! $(VID_SPECS) ! \
 	rnnca training=0 playing=1 edges=0 \
 	! videoconvert ! xvimagesink force-aspect-ratio=0
 
 record-rnnca: plugins/libgstrnnca.so
-	$(RNNCA_DEBUG)	$(GDB) 	gst-launch-1.0  \
+	$(RNNCA_DEBUG)	$(GDB) gst-launch-1.0  \
 	  --gst-plugin-path=$(PLUGIN_DIR) \
 	videotestsrc pattern=black  ! $(VID_SPECS), framerate=20/1 ! \
 	 rnnca training=0 playing=1 edges=0 \
