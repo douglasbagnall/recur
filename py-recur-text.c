@@ -536,9 +536,9 @@ initcharmodel(void)
         return;
     }
 
-#define ADD_INT_CONSTANT(x) (PyModule_AddIntConstant(m, QUOTE(x), (RNN_ ##x)))
-
     int r = 0;
+
+#define ADD_INT_CONSTANT(x) (PyModule_AddIntConstant(m, QUOTE(x), (RNN_ ##x)))
 
     r = r || ADD_INT_CONSTANT(MOMENTUM_WEIGHTED);
     r = r || ADD_INT_CONSTANT(MOMENTUM_NESTEROV);
@@ -554,12 +554,12 @@ initcharmodel(void)
     r = r || ADD_INT_CONSTANT(RETANH);
     r = r || ADD_INT_CONSTANT(RECLIP20);
 
+#undef ADD_INT_CONSTANT
+
     if (r < 0){
         DEBUG("can't add constants to module charmodel");
         return;
     }
-
-#undef ADD_INT_CONSTANT
 
     Py_INCREF(&AlphabetType);
     PyModule_AddObject(m, "Alphabet", (PyObject *)&AlphabetType);
