@@ -2,8 +2,6 @@
 # Copyright 2014 Douglas Bagnall <douglas@halo.gen.nz> LGPL
 import os, sys
 import random
-import itertools
-import time
 import argparse
 
 DEFAULT_LEARN_RATE = 3e-5

@@ -451,7 +451,6 @@ class Classifier(BaseClassifier):
             row = [fn]
             #XXX convolve?
             start = 0
-            end = 0
             score = 0
             for s, t, timestamp in scores[self.target_index]:
                 if score == 0.0:

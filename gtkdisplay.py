@@ -2,9 +2,6 @@
 
 # used by classify-gtk
 
-import os, sys
-import random
-
 import gi
 gi.require_version('Gst', '1.0')
 from gi.repository import Gtk, Gdk

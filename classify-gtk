@@ -1,12 +1,10 @@
 #!/usr/bin/python
 # Copyright 2014 Douglas Bagnall <douglas@halo.gen.nz> LGPL
-import os, sys
-import random
 import argparse
 from gtkdisplay import run
 
-from classify import GTKClassifier, gst_init, Gst
-from classify import Classifier, add_common_args, process_common_args
+from classify import GTKClassifier, gst_init
+from classify import add_common_args, process_common_args
 
 def main():
     gst_init()
@@ -28,12 +26,10 @@ def main():
     args = parser.parse_args()
 
     if args.microphone:
-        load_files = False
         c = GTKClassifier(sinkname='fakesink', srcname='autoaudiosrc')
         process_common_args(c, args, timed=False, load_files=False)
         run(c, [], args.reverse)
     else:
-        load_files = True
         c = GTKClassifier(sinkname='autoaudiosink', srcname='filesrc')
         if args.min_changes:
             files = process_common_args(c, args, timed=True)

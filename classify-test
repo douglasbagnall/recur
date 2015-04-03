@@ -3,7 +3,7 @@
 import os, sys
 import argparse
 
-from classify import gst_init, Gst
+from classify import gst_init
 from classify import Classifier, add_common_args, process_common_args
 
 def main():

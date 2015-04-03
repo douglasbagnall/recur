@@ -1,7 +1,4 @@
 # Copyright 2013 Douglas Bagnall <douglas@halo.gen.nz> LGPL
-import sys
-from math import sqrt
-
 
 def prepare_roc_data(results):
     results.sort()
@@ -118,7 +115,6 @@ def _calc_stats(results, include_scores=False):
     max_dfd = 0
     best_dfd_score = 0
     sum_dfc2 = 0 #distance from centre, squared
-    max_dfc2 = 0
     sum_dfb, min_dfb = 0, 1e99 #distance from best
     pos_95 = 0
     neg_95 = 0
@@ -309,13 +305,6 @@ def draw_presence_roc(scores, label='presence', label_every=0.0):
             next_label += step
         fp.append(x)
         tp.append(y)
-
-    if half < len(fp):
-        hx = (fp[half - 1] + fp[half]) * 0.5
-        hy = (tp[half - 1] + tp[half]) * 0.5
-    else:
-        hx = fp[half - 1]
-        hy = tp[half - 1]
 
     fp.reverse()
     tp.reverse()
