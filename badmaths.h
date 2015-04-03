@@ -114,11 +114,11 @@ static inline int
 softmax_best_guess(float *restrict error, const float *restrict src, int len)
 {
   softmax(error, src, len);
-  /*softmax error is 0-1. all values should be 0, EXCEPT the hot one, which
-   should be 1. The passed in error array is overwritten with negated softmax
-   values. Training error encodes the desired change, i.e., a negative number
-   in most cases, and 1 - softmax for the correct answer, so in training
-   situations you want to add one straight afterwards:
+  /*softmax error is 0-1. all values should be 0, EXCEPT the right answer,
+   which should be 1. The passed in error array is overwritten with negated
+   softmax values. Training error encodes the desired change, i.e., a negative
+   number in most cases, and 1 - softmax for the correct answer, so in
+   training situations you want to add one straight afterwards:
 
     int target = whatever();
     int winner = softmax_best_guess(error, answer, len);
