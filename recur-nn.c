@@ -122,8 +122,13 @@ rnn_opinion(RecurNN *net, const float *restrict inputs, float presynaptic_noise)
 
   if (net->activation == RNN_RESQRT){
     for (int i = 0; i < net->h_size; i++){
-      float h = hiddens[i] + 1.0f;
-      hiddens[i] = (h > 1.0f) ? sqrtf(h) - 1.0f : 0.0f;
+      volatile float h = hiddens[i];
+      if (h > 0.0f){
+        hiddens[i] = sqrtf(h + 1.0f) - 1.0f;
+      }
+      else {
+        hiddens[i] = 0.0f;
+      }
     }
   }
   else if (net->activation == RNN_RELOG){
