@@ -605,12 +605,44 @@ static PyMemberDef Net_members[] = {
     {NULL}
 };
 
+static PyObject *
+Net_dump_parameters(Net *self, PyObject *args)
+{
+    RecurNN *net = self->net;
+    RecurNNBPTT *bptt = net->bptt;
+    printf("Net object\n");
+    printf("learning method %d\n", self->learning_method);
+    printf("n_classes %d (class_names length %d)\n",
+        self->n_classes, (int)PySequence_Length(self->class_names));
+    printf("momentum %.2f\n", self->momentum);
+    printf("batch size %d\n", self->batch_size);
+    printf("i_size %5d  input_size %5d\n", net->i_size, net->input_size);
+    printf("h_size %5d hidden_size %5d\n", net->h_size, net->hidden_size);
+    printf("o_size %5d output_size %5d\n", net->o_size, net->output_size);
+    printf("flags %x\n", net->flags);
+    printf("generation %d\n", net->generation);
+    printf("presynaptic noise %f\n", net->presynaptic_noise);
+    printf("activation %x\n", net->activation);
+    printf("bptt depth %d\n", bptt->depth);
+    printf("bptt index %d\n", bptt->index);
+    printf("learn_rate %f\n", bptt->learn_rate);
+    printf("ih_scale %f\n", bptt->ih_scale);
+    printf("ho_scale %f\n", bptt->ho_scale);
+    printf("bptt momentum %g\n", bptt->momentum);
+    printf("bptt momentum_weight %g\n", bptt->momentum_weight);
+    printf("bptt min_error_factor %g\n", bptt->min_error_factor);
+    return Py_BuildValue("");
+}
+
+
+
 static PyMethodDef Net_methods[] = {
     {"train", (PyCFunction)Net_train, METH_VARARGS | METH_KEYWORDS,
      "train the net with a block of text"},
+    {"dump_parameters", (PyCFunction)Net_dump_parameters, METH_NOARGS,
+     "print net parameters"},
     {NULL}
 };
-
 
 static PyTypeObject NetType = {
     PyObject_HEAD_INIT(NULL)
