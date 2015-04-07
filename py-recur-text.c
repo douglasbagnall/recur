@@ -264,6 +264,10 @@ typedef struct {
     PyObject *class_names;
     PyObject *class_name_lut;
     rnn_learning_method learning_method;
+    RnnCharProgressReport *report;
+    float momentum;
+    int n_classes;
+    int batch_size;
 } Net;
 
 
@@ -285,13 +289,10 @@ static PyObject *
 Net_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
     Net *self = (Net *)PyType_GenericNew(type, args, kwds);
-    self->net = NULL;
-    self->class_names = NULL;
-    self->class_name_lut = NULL;
+    /*I believe PyType_GenericNew zeros the memory, so all pointers are NULL, etc */
+    self->batch_size = 1;
     return (PyObject *)self;
 }
-
-
 
 static int
 Net_init(Net *self, PyObject *args, PyObject *kwds)
@@ -361,6 +362,7 @@ Net_init(Net *self, PyObject *args, PyObject *kwds)
     }
 
     n_classes = PySequence_Length(class_names);
+    self->n_classes = n_classes;
 
     if (! PySequence_Check(class_names) || n_classes < 1){
         PyErr_Format(PyExc_ValueError, "class_names should be a sequence of strings");
@@ -382,6 +384,8 @@ Net_init(Net *self, PyObject *args, PyObject *kwds)
         presynaptic_noise,
         activation);
 
+    self->momentum = momentum;
+    self->report = verbose ? calloc(sizeof(*self->report), 1) : NULL;
     self->learning_method = learning_method;
     self->class_names = class_names;
     Py_INCREF(self->class_names);
@@ -513,6 +517,13 @@ static PyMemberDef Net_members[] = {
      "names of classes"},
     {"class_name_lut", T_OBJECT_EX, offsetof(Net, class_name_lut), READONLY,
      "mapping classes to indices"},
+    {"batch_size", T_INT, offsetof(Net, batch_size), 0,
+     "generations per mini-batch"},
+    {"learning_method", T_INT, offsetof(Net, learning_method), READONLY,
+     "learing method: 0: weighted, 1: Nesterov, 2: simplified N.,"
+     "3: classical, 4: adagrad, 5: adadelta, 6: rprop;"},
+    {"momentum", T_FLOAT, offsetof(Net, momentum), 0,
+     "momentum rate (if applicable)"},
     {NULL}
 };
 
