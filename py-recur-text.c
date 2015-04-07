@@ -9,6 +9,10 @@ Python bindings for text RNNs.
 #include <math.h>
 #include <string.h>
 
+#define DEFAULT_ADAGRAD_BALLAST 100
+#define DEFAULT_ADADELTA_BALLAST 100
+
+
 typedef struct {
     PyObject_HEAD
     RnnCharAlphabet *alphabet;
@@ -382,6 +386,17 @@ Net_init(Net *self, PyObject *args, PyObject *kwds)
     }
     self->class_name_lut = class_name_lut;
 
+    switch(learning_method){
+    case RNN_ADAGRAD:
+        rnn_set_momentum_values(self->net, DEFAULT_ADAGRAD_BALLAST);
+        break;
+    case RNN_ADADELTA:
+        rnn_set_momentum_values(self->net, DEFAULT_ADADELTA_BALLAST);
+        break;
+    case RNN_RPROP:
+        rnn_set_aux_values(self->net, 1);
+        break;
+    }
     return 0;
 }
 
