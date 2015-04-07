@@ -268,6 +268,7 @@ typedef struct {
     float momentum;
     int n_classes;
     int batch_size;
+    RnnCharImageSettings images;
 } Net;
 
 
@@ -278,6 +279,14 @@ Net_dealloc(Net* self)
         /* save first? */
         rnn_delete_net(self->net);
         self->net = NULL;
+    }
+    if (self->images.input_ppm){
+        free(self->images.input_ppm);
+        self->images.input_ppm = NULL;
+    }
+    if (self->images.error_ppm){
+        free(self->images.error_ppm);
+        self->images.error_ppm = NULL;
     }
     Py_CLEAR(self->alphabet);
     Py_CLEAR(self->class_names);
@@ -304,13 +313,16 @@ Net_init(Net *self, PyObject *args, PyObject *kwds)
 
     /* optional arguments */
     unsigned long long rng_seed = 2;
-    const char *log_file = "muli-text.log";
+    const char *log_file = "multi-text.log";
     int bptt_depth = 30;
     float learn_rate = 0.001;
     float momentum = 0.95;
     float presynaptic_noise = 0.1;
     rnn_activation activation = RNN_RESQRT;
     int learning_method = RNN_ADAGRAD;
+    int verbose = 0;
+    int temporal_pgm_dump = 0;
+    int periodic_pgm_dump = 0;
 
     /* other vars */
     PyObject *class_name_lut;
@@ -321,7 +333,7 @@ Net_init(Net *self, PyObject *args, PyObject *kwds)
     static char *kwlist[] = {"alphabet",             /* O! */
                              "classes",              /* O  */
                              "hidden_size",          /* i  |  */
-                             "log_file",             /* s  */
+                             "log_file",             /* z  */
                              "bptt_depth",           /* i  */
                              "learn_rate",           /* f  */
                              "momentum",             /* f  */
@@ -329,21 +341,27 @@ Net_init(Net *self, PyObject *args, PyObject *kwds)
                              "rng_seed",             /* K  */
                              "activation",           /* i  */
                              "learning_method",      /* i  */
+                             "verbose",              /* i  */
+                             "temporal_pgm_dump",    /* i  */
+                             "periodic_pgm_dump",    /* i  */
                              NULL};
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "O!Oi|sifffKii", kwlist,
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "O!Oi|zifffKiiiii", kwlist,
             &AlphabetType,
             &alphabet,          /* O! */
             &class_names,       /* O  */
             &hidden_size,       /* i  |  */
-            &log_file,          /* s  */
+            &log_file,          /* z  */
             &bptt_depth,        /* i  */
             &learn_rate,        /* f  */
             &momentum,          /* f  */
             &presynaptic_noise, /* f  */
             &rng_seed,          /* K  */
             &activation,        /* i  */
-            &learning_method    /* i  */
+            &learning_method,   /* i  */
+            &verbose,           /* i  */
+            &temporal_pgm_dump, /* i  */
+            &periodic_pgm_dump  /* i  */
         )){
         return -1;
     }
@@ -386,6 +404,15 @@ Net_init(Net *self, PyObject *args, PyObject *kwds)
 
     self->momentum = momentum;
     self->report = verbose ? calloc(sizeof(*self->report), 1) : NULL;
+    self->images.temporal_pgm_dump = temporal_pgm_dump;
+    self->images.periodic_pgm_dump = periodic_pgm_dump;
+    if (temporal_pgm_dump){
+        self->images.input_ppm = temporal_ppm_alloc(self->net->i_size, 300,
+            "input_layer", 0, PGM_DUMP_COLOUR, NULL);
+        self->images.error_ppm = temporal_ppm_alloc(self->net->o_size, 300,
+            "output_error", 0, PGM_DUMP_COLOUR, NULL);
+    }
+
     self->learning_method = learning_method;
     self->class_names = class_names;
     Py_INCREF(self->class_names);
