@@ -8,6 +8,7 @@ Python bindings for text RNNs.
 #include "py-recur-text.h"
 #include <math.h>
 #include <string.h>
+#include <fenv.h>
 
 #define DEFAULT_ADAGRAD_BALLAST 100
 #define DEFAULT_ADADELTA_BALLAST 100
@@ -515,6 +516,12 @@ double rnn_char_cross_entropy(RecurNN *net, RnnCharAlphabet *alphabet,
 
 */
 
+static PyObject *
+Function_enable_fp_exceptions(Net *self, PyObject *nothing)
+{
+    feenableexcept(FE_DIVBYZERO | FE_INVALID | FE_OVERFLOW);
+    return Py_BuildValue("");
+}
 
 
 /**********************************************************************/
@@ -522,6 +529,8 @@ double rnn_char_cross_entropy(RecurNN *net, RnnCharAlphabet *alphabet,
 /**********************************************************************/
 /* bindings for top_level */
 static PyMethodDef top_level_functions[] = {
+    {"enable_fp_exceptions", (PyCFunction)Function_enable_fp_exceptions,
+     METH_NOARGS, "turn on some floating point exceptions"},
     {NULL}
 };
 
