@@ -260,6 +260,7 @@ static PyTypeObject AlphabetType = {
 typedef struct {
     PyObject_HEAD
     RecurNN *net;
+    Alphabet *alphabet;
     PyObject *class_names;
     PyObject *class_name_lut;
     rnn_learning_method learning_method;
@@ -272,7 +273,11 @@ Net_dealloc(Net* self)
     if (self->net){
         /* save first? */
         rnn_delete_net(self->net);
+        self->net = NULL;
     }
+    Py_CLEAR(self->alphabet);
+    Py_CLEAR(self->class_names);
+    Py_CLEAR(self->class_name_lut);
     self->ob_type->tp_free((PyObject*)self);
 }
 
@@ -379,13 +384,22 @@ Net_init(Net *self, PyObject *args, PyObject *kwds)
 
     self->learning_method = learning_method;
     self->class_names = class_names;
+    Py_INCREF(self->class_names);
+
     class_name_lut = PyDict_New();
     for (long i = 0; i < n_classes; i++){
-        PyObject *k = PySequence_GetItem(class_names, i);
+        PyObject *k = PySequence_Fast_GET_ITEM(class_names, i);
         PyObject *v = PyInt_FromLong(i);
         PyDict_SetItem(class_name_lut, k, v);
+        /* PyInt_FromLong does an incref. So does PyDict_SetItem.
+           That's one two many. */
+        Py_DECREF(v);
     }
     self->class_name_lut = class_name_lut;
+
+    Py_INCREF(alphabet);
+    self->alphabet = alphabet;
+
 
     switch(learning_method){
     case RNN_ADAGRAD:
