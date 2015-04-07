@@ -270,6 +270,7 @@ typedef struct {
     int batch_size;
     RnnCharImageSettings images;
     int periodic_pgm_period;
+    const char *filename;
 } Net;
 
 
@@ -325,11 +326,13 @@ Net_init(Net *self, PyObject *args, PyObject *kwds)
     int temporal_pgm_dump = 0;
     char *periodic_pgm_dump = NULL;
     int periodic_pgm_period = 1000;
+    const char *basename = "multi-text";
 
     /* other vars */
     PyObject *class_name_lut;
     int n_classes;
     uint output_size;
+    RecurNN *net;
     u32 flags = RNN_NET_FLAG_STANDARD | RNN_NET_FLAG_BPTT_ADAPTIVE_MIN_ERROR;
 
     static char *kwlist[] = {"alphabet",             /* O! */
@@ -343,29 +346,31 @@ Net_init(Net *self, PyObject *args, PyObject *kwds)
                              "rng_seed",             /* K  */
                              "activation",           /* i  */
                              "learning_method",      /* i  */
+                             "basename",             /* z  */
                              "verbose",              /* i  */
                              "temporal_pgm_dump",    /* i  */
                              "periodic_pgm_dump",    /* z  */
                              "periodic_pgm_period",  /* i  */
                              NULL};
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "O!Oi|zifffKiiiizi", kwlist,
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "O!Oi|zifffKiiziizi", kwlist,
             &AlphabetType,
-            &alphabet,          /* O! */
-            &class_names,       /* O  */
-            &hidden_size,       /* i  |  */
-            &log_file,          /* z  */
-            &bptt_depth,        /* i  */
-            &learn_rate,        /* f  */
-            &momentum,          /* f  */
-            &presynaptic_noise, /* f  */
-            &rng_seed,          /* K  */
-            &activation,        /* i  */
-            &learning_method,   /* i  */
-            &verbose,           /* i  */
-            &temporal_pgm_dump, /* i  */
-            &periodic_pgm_dump, /* z  */
-            &periodic_pgm_period/* i  */
+            &alphabet,            /* O! */
+            &class_names,         /* O  */
+            &hidden_size,         /* i  |  */
+            &log_file,            /* z  */
+            &bptt_depth,          /* i  */
+            &learn_rate,          /* f  */
+            &momentum,            /* f  */
+            &presynaptic_noise,   /* f  */
+            &rng_seed,            /* K  */
+            &activation,          /* i  */
+            &learning_method,     /* i  */
+            &basename,            /* z  */
+            &verbose,             /* i  */
+            &temporal_pgm_dump,   /* i  */
+            &periodic_pgm_dump,   /* z  */
+            &periodic_pgm_period  /* i  */
         )){
         return -1;
     }
@@ -393,7 +398,7 @@ Net_init(Net *self, PyObject *args, PyObject *kwds)
 
     output_size = alphabet->alphabet->len * n_classes;
 
-    self->net = rnn_new(
+    net = rnn_new(
         alphabet->alphabet->len,
         hidden_size,
         output_size,
@@ -406,14 +411,27 @@ Net_init(Net *self, PyObject *args, PyObject *kwds)
         presynaptic_noise,
         activation);
 
+    self->net = net;
     self->momentum = momentum;
     self->report = verbose ? calloc(sizeof(*self->report), 1) : NULL;
+
+    char s[500];
+    int wrote = snprintf(s, sizeof(s), "%s-i%d-h%d-o%d.net",
+        basename, net->input_size, net->hidden_size, net->output_size);
+    if (wrote >= sizeof(s)){
+        DEBUG("basename is too long!");
+        return -1;
+    }
+    self->filename = strdup(s);
+
     self->images.temporal_pgm_dump = temporal_pgm_dump;
     if (temporal_pgm_dump){
-        self->images.input_ppm = temporal_ppm_alloc(self->net->i_size, 300,
-            "input_layer", 0, PGM_DUMP_COLOUR, NULL);
-        self->images.error_ppm = temporal_ppm_alloc(self->net->o_size, 300,
-            "output_error", 0, PGM_DUMP_COLOUR, NULL);
+        snprintf(s, sizeof(s), "%s-input_layer", basename);
+        self->images.input_ppm = temporal_ppm_alloc(net->i_size, 300,
+            s, 0, PGM_DUMP_COLOUR, NULL);
+        snprintf(s, sizeof(s), "%s-output_error", basename);
+        self->images.error_ppm = temporal_ppm_alloc(net->o_size, 300,
+            s, 0, PGM_DUMP_COLOUR, NULL);
     }
     if (periodic_pgm_dump){
         self->images.periodic_pgm_dump_string = periodic_pgm_dump;
@@ -643,11 +661,40 @@ Net_dump_parameters(Net *self, PyObject *args)
     return Py_BuildValue("");
 }
 
+static PyObject *
+Net_save(Net *self, PyObject *args, PyObject *kwds)
+{
+    RecurNN *net = self->net;
+    const char *filename = NULL;
+    int backup = 1;
+
+    static char *kwlist[] = {"filename",             /* s */
+                             "backup",               /* i */
+                             NULL};
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "|si", kwlist,
+            &filename,
+            &backup
+        )){
+        return NULL;
+    }
+    if (filename == NULL){
+        filename = self->filename;
+    }
+    int r = rnn_save_net(net, filename, backup);
+    if (r){
+        return PyErr_Format(PyExc_IOError, "could not save to %s",
+            filename);
+    }
+    return Py_BuildValue("");
+}
 
 
 static PyMethodDef Net_methods[] = {
     {"train", (PyCFunction)Net_train, METH_VARARGS | METH_KEYWORDS,
      "train the net with a block of text"},
+    {"save", (PyCFunction)Net_save, METH_VARARGS | METH_KEYWORDS,
+     "Save the net"},
     {"dump_parameters", (PyCFunction)Net_dump_parameters, METH_NOARGS,
      "print net parameters"},
     {NULL}
