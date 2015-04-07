@@ -117,29 +117,29 @@ text_train_fancy(RecurNN *net, u8 *text, int len, int learning_style,
 
 #undef INNER_CYCLE_REPORTING
 
+/* stochastic leakage? */
+
 void
-rnn_char_text_train(RnnCharModel *model, u8 *text, int len,
-    int target_class, float leakage, RnnCharProgressReport *report)
+rnn_char_multitext_train(RecurNN *net, u8 *text, int len, int alphabet_len,
+    int target_class, float leakage, RnnCharProgressReport *report,
+    int learning_style, float momentum, int batch_size,
+    TemporalPPM *input_ppm, TemporalPPM *error_ppm)
 {
-  RecurNN *net = model->net;
-  RecurNNBPTT *bptt = net->bptt;
   struct timespec time_start;
   struct timespec time_end;
-  int batch_size = batch_size; /*XXX adjust for len */
+  batch_size = MAX(batch_size, 1); /*XXX adjust for len */
   if (report){
     clock_gettime(CLOCK_MONOTONIC, &time_start);
   }
-  if (model->learning_style == RNN_MOMENTUM_WEIGHTED){
-    bptt->momentum = rnn_calculate_momentum_soft_start(net->generation,
-        model->momentum, model->momentum_soft_start);
+  if (learning_style == RNN_MOMENTUM_WEIGHTED){
     text_train_plain_sgd(net, text, len, target_class, batch_size,
-        leakage, model->alphabet->len, report,
-        model->images.input_ppm, model->images.error_ppm);
+        leakage, alphabet_len, report,
+        input_ppm, error_ppm);
   }
   else {
-    text_train_fancy(net, text, len, model->learning_style,
-        target_class, batch_size, leakage, model->alphabet->len,
-        report, model->images.input_ppm, model->images.error_ppm);
+    text_train_fancy(net, text, len, learning_style,
+        target_class, batch_size, leakage, alphabet_len,
+        report, input_ppm, error_ppm);
   }
   if (report){
     clock_gettime(CLOCK_MONOTONIC, &time_end);
