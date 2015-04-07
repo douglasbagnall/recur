@@ -269,6 +269,7 @@ typedef struct {
     int n_classes;
     int batch_size;
     RnnCharImageSettings images;
+    int periodic_pgm_period;
 } Net;
 
 
@@ -322,7 +323,8 @@ Net_init(Net *self, PyObject *args, PyObject *kwds)
     int learning_method = RNN_ADAGRAD;
     int verbose = 0;
     int temporal_pgm_dump = 0;
-    int periodic_pgm_dump = 0;
+    char *periodic_pgm_dump = NULL;
+    int periodic_pgm_period = 1000;
 
     /* other vars */
     PyObject *class_name_lut;
@@ -343,10 +345,11 @@ Net_init(Net *self, PyObject *args, PyObject *kwds)
                              "learning_method",      /* i  */
                              "verbose",              /* i  */
                              "temporal_pgm_dump",    /* i  */
-                             "periodic_pgm_dump",    /* i  */
+                             "periodic_pgm_dump",    /* z  */
+                             "periodic_pgm_period",  /* i  */
                              NULL};
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "O!Oi|zifffKiiiii", kwlist,
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "O!Oi|zifffKiiiizi", kwlist,
             &AlphabetType,
             &alphabet,          /* O! */
             &class_names,       /* O  */
@@ -361,7 +364,8 @@ Net_init(Net *self, PyObject *args, PyObject *kwds)
             &learning_method,   /* i  */
             &verbose,           /* i  */
             &temporal_pgm_dump, /* i  */
-            &periodic_pgm_dump  /* i  */
+            &periodic_pgm_dump, /* z  */
+            &periodic_pgm_period/* i  */
         )){
         return -1;
     }
@@ -405,13 +409,17 @@ Net_init(Net *self, PyObject *args, PyObject *kwds)
     self->momentum = momentum;
     self->report = verbose ? calloc(sizeof(*self->report), 1) : NULL;
     self->images.temporal_pgm_dump = temporal_pgm_dump;
-    self->images.periodic_pgm_dump = periodic_pgm_dump;
     if (temporal_pgm_dump){
         self->images.input_ppm = temporal_ppm_alloc(self->net->i_size, 300,
             "input_layer", 0, PGM_DUMP_COLOUR, NULL);
         self->images.error_ppm = temporal_ppm_alloc(self->net->o_size, 300,
             "output_error", 0, PGM_DUMP_COLOUR, NULL);
     }
+    if (periodic_pgm_dump){
+        self->images.periodic_pgm_dump_string = periodic_pgm_dump;
+        self->periodic_pgm_period = periodic_pgm_period;
+    }
+
 
     self->learning_method = learning_method;
     self->class_names = class_names;
@@ -488,7 +496,8 @@ Net_train(Net *self, PyObject *args, PyObject *kwds)
     rnn_char_multitext_train(self->net, (u8*)text, text_len,
         self->alphabet->alphabet->len, target_index, leakage,
         self->report, self->learning_method, self->momentum,
-        self->batch_size, self->images.input_ppm, self->images.error_ppm);
+        self->batch_size, self->images.input_ppm, self->images.error_ppm,
+        self->images.periodic_pgm_dump_string, self->periodic_pgm_period);
     if (self->report){
         RnnCharProgressReport *r = self->report;
         char *s = PyString_AsString(target_class);

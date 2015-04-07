@@ -17,11 +17,10 @@ typedef struct _RnnCharModel RnnCharModel;
 
 typedef struct _RnnCharImageSettings{
   char *basename;
-  bool periodic_pgm_dump;
   bool temporal_pgm_dump;
   TemporalPPM *input_ppm;
   TemporalPPM *error_ppm;
-  char * periodic_pgm_dump_string;
+  char *periodic_pgm_dump_string;
 } RnnCharImageSettings;
 
 struct _RnnCharSchedule {
@@ -221,11 +220,12 @@ double rnn_char_cross_entropy(RecurNN *net, RnnCharAlphabet *alphabet,
     const u8 *text, const int len, const int ignore_first,
     const u8 *prefix_text, const int prefix_len);
 
+
 void
 rnn_char_multitext_train(RecurNN *net, u8 *text, int len, int alphabet_len,
     int target_class, float leakage, RnnCharProgressReport *report,
     int learning_style, float momentum, int batch_size,
-    TemporalPPM *input_ppm, TemporalPPM *error_ppm);
-
+    TemporalPPM *input_ppm, TemporalPPM *error_ppm,
+    const char *periodic_pgm_string, int periodic_pgm_period);
 
 #endif
