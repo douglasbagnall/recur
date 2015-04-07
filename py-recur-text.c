@@ -415,7 +415,95 @@ Net_init(Net *self, PyObject *args, PyObject *kwds)
     return 0;
 }
 
+
+static PyObject *
+Net_getfloat_rnn(Net *self, int *closure)
+{
+    void *addr = ((void *)self->net) + *closure;
+    float f = *(float *)addr;
+    return PyFloat_FromDouble((double)f);
+}
+
+static int
+Net_setfloat_rnn(Net *self, PyObject *value, int *closure)
+{
+    PyObject *pyfloat = PyNumber_Float(value);
+    if (pyfloat == NULL){
+        return -1;
+    }
+    void *addr = ((void *)self->net) + *(int*)closure;
+    float f = PyFloat_AS_DOUBLE(pyfloat);
+    *(float *)addr = f;
+    return 0;
+}
+
+static PyObject *
+Net_getfloat_bptt(Net *self, void *closure)
+{
+    void *addr = ((void *)self->net->bptt) + *(int*)closure;
+    float f = *(float *)addr;
+    return PyFloat_FromDouble((double)f);
+}
+
+static int
+Net_setfloat_bptt(Net *self, PyObject *value, void *closure)
+{
+    PyObject *pyfloat = PyNumber_Float(value);
+    if (pyfloat == NULL){
+        return -1;
+    }
+    void *addr = ((void *)self->net->bptt) + *(int*)closure;
+    float f = PyFloat_AS_DOUBLE(pyfloat);
+    *(float *)addr = f;
+    return 0;
+}
+
+static const int rnn_offset_presynaptic_noise = offsetof(RecurNN, presynaptic_noise);
+
+static const int bptt_offset_learn_rate = offsetof(RecurNNBPTT, learn_rate);
+static const int bptt_offset_momentum = offsetof(RecurNNBPTT, momentum);
+static const int bptt_offset_ih_scale = offsetof(RecurNNBPTT, ih_scale);
+static const int bptt_offset_ho_scale = offsetof(RecurNNBPTT, ho_scale);
+static const int bptt_offset_momentum_weight = offsetof(RecurNNBPTT, momentum_weight);
+
 static PyGetSetDef Net_getsetters[] = {
+    {"presynaptic_noise",
+     (getter)Net_getfloat_rnn,
+     (setter)Net_setfloat_rnn,
+     "Scale of presynaptic noise",
+     (void *)&rnn_offset_presynaptic_noise
+    },
+    {"learn_rate",
+     (getter)Net_getfloat_bptt,
+     (setter)Net_setfloat_bptt,
+     "learning rate",
+     (void *)&bptt_offset_learn_rate
+    },
+    {"momentum",
+     (getter)Net_getfloat_bptt,
+     (setter)Net_setfloat_bptt,
+     "momentum",
+     (void *)&bptt_offset_momentum
+    },
+    {"ih_scale",
+     (getter)Net_getfloat_bptt,
+     (setter)Net_setfloat_bptt,
+     "scale input to hidden learn-rate",
+     (void *)&bptt_offset_ih_scale
+    },
+    {"ho_scale",
+     (getter)Net_getfloat_bptt,
+     (setter)Net_setfloat_bptt,
+     "scale hidden to output learn-rate",
+     (void *)&bptt_offset_ho_scale
+    },
+    {"momentum_weight",
+     (getter)Net_getfloat_bptt,
+     (setter)Net_setfloat_bptt,
+     "give this much weight to momentum",
+     (void *)&bptt_offset_momentum_weight
+    },
+
     {NULL}  /* Sentinel */
 };
 
