@@ -145,7 +145,7 @@ libcharmodel.so: charmodel-classify.o charmodel-predict.o charmodel-init.o $(RNN
 CHARMODEL_SRCS = py-recur-text.c *.h charmodel-predict.c charmodel-init.c \
 	recur-nn.c recur-nn-io.c recur-nn-init.c setup.py
 
-charmodel.so: $(CHARMODEL_SRCS)
+charmodel.so: $(CHARMODEL_SRCS) path.h
 	python setup.py build_ext --inplace
 
 test/test_mfcc_table: %:  mfcc.o rescale.o %.o
