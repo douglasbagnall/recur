@@ -326,7 +326,7 @@ Net_init(Net *self, PyObject *args, PyObject *kwds)
     int temporal_pgm_dump = 0;
     char *periodic_pgm_dump = NULL;
     int periodic_pgm_period = 1000;
-    const char *basename = "multi-text";
+    const char *basename = NULL;
     char *metadata = NULL;
 
     /* other vars */
@@ -418,6 +418,9 @@ Net_init(Net *self, PyObject *args, PyObject *kwds)
     self->momentum = momentum;
     self->report = verbose ? calloc(sizeof(*self->report), 1) : NULL;
     net->metadata = metadata;
+    if (basename == NULL){
+        basename = "multi-text";
+    }
     char s[500];
     u32 sig = rnn_hash32(metadata);
     int wrote = snprintf(s, sizeof(s), "%s-%0" PRIx32 "i%d-h%d-o%d.net",
