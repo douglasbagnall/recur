@@ -327,6 +327,7 @@ Net_init(Net *self, PyObject *args, PyObject *kwds)
     char *periodic_pgm_dump = NULL;
     int periodic_pgm_period = 1000;
     const char *basename = "multi-text";
+    char *metadata = NULL;
 
     /* other vars */
     PyObject *class_name_lut;
@@ -344,6 +345,7 @@ Net_init(Net *self, PyObject *args, PyObject *kwds)
                              "momentum",             /* f  */
                              "presynaptic_noise",    /* f  */
                              "rng_seed",             /* K  */
+                             "metadata",             /* z  */
                              "activation",           /* i  */
                              "learning_method",      /* i  */
                              "basename",             /* z  */
@@ -353,7 +355,7 @@ Net_init(Net *self, PyObject *args, PyObject *kwds)
                              "periodic_pgm_period",  /* i  */
                              NULL};
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "O!Oi|zifffKiiziizi", kwlist,
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "O!Oi|zifffKziiziizi", kwlist,
             &AlphabetType,
             &alphabet,            /* O! */
             &class_names,         /* O  */
@@ -364,6 +366,7 @@ Net_init(Net *self, PyObject *args, PyObject *kwds)
             &momentum,            /* f  */
             &presynaptic_noise,   /* f  */
             &rng_seed,            /* K  */
+            &metadata,            /* z  */
             &activation,          /* i  */
             &learning_method,     /* i  */
             &basename,            /* z  */
@@ -414,10 +417,11 @@ Net_init(Net *self, PyObject *args, PyObject *kwds)
     self->net = net;
     self->momentum = momentum;
     self->report = verbose ? calloc(sizeof(*self->report), 1) : NULL;
-
+    net->metadata = metadata;
     char s[500];
-    int wrote = snprintf(s, sizeof(s), "%s-i%d-h%d-o%d.net",
-        basename, net->input_size, net->hidden_size, net->output_size);
+    u32 sig = rnn_hash32(metadata);
+    int wrote = snprintf(s, sizeof(s), "%s-%0" PRIx32 "i%d-h%d-o%d.net",
+        basename, sig, net->input_size, net->hidden_size, net->output_size);
     if (wrote >= sizeof(s)){
         DEBUG("basename is too long!");
         return -1;
