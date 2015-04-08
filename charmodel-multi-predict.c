@@ -44,7 +44,6 @@ multi_softmax_error(RecurNN *net, float *restrict error, int c, int next,
 }
 
 
-
 #define INNER_CYCLE_REPORTING()                                 \
   if (report){                                                  \
     error += e;                                                 \

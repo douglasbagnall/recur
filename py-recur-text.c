@@ -136,12 +136,6 @@ Alphabet_getalphabet(Alphabet *self, void *closure)
     return PyString_FromString(s);
 }
 
-/*
-void rnn_char_dump_collapsed_text(const u8 *text, int len, const char *name,
-    const char *alphabet);
-*/
-
-
 
 static const u32 flag_ignore_case = RNN_CHAR_FLAG_CASE_INSENSITIVE;
 static const u32 flag_utf8 = RNN_CHAR_FLAG_UTF8;
@@ -255,6 +249,7 @@ static PyTypeObject AlphabetType = {
 };
 
 
+
 /*net object */
 
 typedef struct {
@@ -272,7 +267,6 @@ typedef struct {
     int periodic_pgm_period;
     const char *filename;
 } Net;
-
 
 static void
 Net_dealloc(Net* self)
@@ -440,11 +434,11 @@ Net_init(Net *self, PyObject *args, PyObject *kwds)
         self->images.error_ppm = temporal_ppm_alloc(net->o_size, 300,
             s, 0, PGM_DUMP_COLOUR, NULL);
     }
+
     if (periodic_pgm_dump){
         self->images.periodic_pgm_dump_string = periodic_pgm_dump;
         self->periodic_pgm_period = periodic_pgm_period;
     }
-
 
     self->learning_method = learning_method;
     self->class_names = class_names;
@@ -750,59 +744,7 @@ static PyTypeObject NetType = {
 };
 
 
-
-
-/*
-void rnn_char_init_schedule(RnnCharSchedule *s, int recent_len,
-    float learn_rate_min, float learn_rate_mul, int adjust_noise);
-
-float rnn_char_calc_ventropy(RnnCharModel *model, RnnCharVentropy *v, int lap);
-*/
-/*
-int rnn_char_confabulate(RecurNN *net, char *dest, int char_len,
-    int byte_len, RnnCharAlphabet* a, float bias, int *prev_char,
-    int start_point, int stop_point);
-*/
-/*
-void rnn_char_init_ventropy(RnnCharVentropy *v, RecurNN *net, const u8 *text,
-    const int len, const int lap);
-*/
-/*
-int rnn_char_epoch(RnnCharModel *model, RecurNN *confab_net, RnnCharVentropy *v,
-    const u8 *text, const int len,
-    const int start, const int stop,
-    float confab_bias, int confab_size, int confab_line_end,
-    int quietness);
-*/
-/*
-char *rnn_char_construct_metadata(const struct RnnCharMetadata *m);
-int rnn_char_load_metadata(const char *metadata, struct RnnCharMetadata *m);
-
-void rnn_char_free_metadata_items(struct RnnCharMetadata *m);
-
-char* rnn_char_construct_net_filename(struct RnnCharMetadata *m,
-    const char *basename, int input_size, int bottom_size, int hidden_size,
-    int output_size);
-
-int rnn_char_check_metadata(RecurNN *net, struct RnnCharMetadata *m,
-    bool trust_file_metadata, bool force_metadata);
-
-void rnn_char_copy_metadata_items(struct RnnCharMetadata *src,\
-    struct RnnCharMetadata *dest);
-*/
-/*
-RnnCharAlphabet *rnn_char_new_alphabet_from_net(RecurNN *net);
-*/
-/*
-int rnn_char_prime(RecurNN *net, RnnCharAlphabet *alphabet,
-    const u8 *text, const int len);
-*/
-/*
-double rnn_char_cross_entropy(RecurNN *net, RnnCharAlphabet *alphabet,
-    const u8 *text, const int len, const int ignore_first,
-    const u8 *prefix_text, const int prefix_len);
-
-*/
+/* top level functions */
 
 static PyObject *
 Function_enable_fp_exceptions(Net *self, PyObject *nothing)
@@ -812,10 +754,9 @@ Function_enable_fp_exceptions(Net *self, PyObject *nothing)
 }
 
 
-/**********************************************************************/
-/* method binding structs                                             */
-/**********************************************************************/
+
 /* bindings for top_level */
+
 static PyMethodDef top_level_functions[] = {
     {"enable_fp_exceptions", (PyCFunction)Function_enable_fp_exceptions,
      METH_NOARGS, "turn on some floating point exceptions"},
@@ -823,12 +764,7 @@ static PyMethodDef top_level_functions[] = {
 };
 
 
-
-
-/**********************************************************************/
-/* initialisation.                                                    */
-/**********************************************************************/
-
+/* initialisation.    */
 
 #ifndef PyMODINIT_FUNC
 #define PyMODINIT_FUNC void
