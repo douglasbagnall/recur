@@ -46,12 +46,7 @@ multi_softmax_error(RecurNN *net, float *restrict error, int c, int next,
   return err;
 }
 
-
-#define INNER_CYCLE_REPORTING()                                 \
-  if (report){                                                  \
-    error += e;                                                 \
-    entropy += capped_log2f(1.0f - e);                          \
-  }                                                             \
+#define INNER_CYCLE_PGM_DUMP()                                  \
   if (input_ppm){                                               \
     temporal_ppm_add_row(input_ppm, net->input_layer);          \
   }                                                             \
@@ -64,7 +59,16 @@ multi_softmax_error(RecurNN *net, float *restrict error, int c, int next,
       rnn_multi_pgm_dump(net, periodic_pgm_string,              \
           "multi-text");                                        \
     }                                                           \
+  }
+
+
+#define INNER_CYCLE_REPORTING()                                 \
+  if (report){                                                  \
+    error += e;                                                 \
+    entropy += capped_log2f(1.0f - e);                          \
   }                                                             \
+  INNER_CYCLE_PGM_DUMP()
+
 
 static inline void
 text_train_plain_sgd(RecurNN *net, u8 *text, int len,
@@ -126,7 +130,28 @@ text_train_fancy(RecurNN *net, u8 *text, int len, int learning_style,
   }
 }
 
+void
+rnn_char_multitext_spin(RecurNN *net, u8 *text, int len,
+    TemporalPPM *input_ppm, TemporalPPM *error_ppm,
+    const char *periodic_pgm_string, int periodic_pgm_period)
+{
+  int periodic_pgm_countdown;
+  if (periodic_pgm_period){
+    periodic_pgm_countdown = (periodic_pgm_period -
+        net->generation % periodic_pgm_period);
+  }
+  else {
+    periodic_pgm_countdown = 0;
+  }
+  for(int i = 0; i < len; i++){
+    rnn_bptt_advance(net);
+    one_hot_opinion(net, text[i], net->presynaptic_noise);
+    INNER_CYCLE_PGM_DUMP();
+  }
+}
+
 #undef INNER_CYCLE_REPORTING
+#undef INNER_CYCLE_PGM_DUMP
 
 /* stochastic leakage? */
 

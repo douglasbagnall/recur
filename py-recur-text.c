@@ -476,22 +476,25 @@ Net_init(Net *self, PyObject *args, PyObject *kwds)
 static PyObject *
 Net_train(Net *self, PyObject *args, PyObject *kwds)
 {
-    char *text;
+    const char *text;
     Py_ssize_t text_len = 0;
     PyObject *target_class;
     int target_index;
     float leakage = -1;
+    int ignore_start = 0;
 
     static char *kwlist[] = {"text",                 /* s# */
                              "target_class",         /* O | */
                              "leakage",              /* f  */
+                             "ignore_start",         /* i  */
                              NULL};
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "s#O|f", kwlist,
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "s#O|fi", kwlist,
             &text,
             &text_len,
             &target_class,
-            &leakage
+            &leakage,
+            &ignore_start
         )){
         return NULL;
     }
@@ -510,6 +513,13 @@ Net_train(Net *self, PyObject *args, PyObject *kwds)
 
     if (leakage < 0){
         leakage = -leakage / self->n_classes;
+    }
+    if (ignore_start){
+        rnn_char_multitext_spin(self->net, (u8*)text, ignore_start,
+            self->images.input_ppm, self->images.error_ppm,
+            self->images.periodic_pgm_dump_string, self->periodic_pgm_period);
+        text += ignore_start;
+        text_len -= ignore_start;
     }
 
     rnn_char_multitext_train(self->net, (u8*)text, text_len,

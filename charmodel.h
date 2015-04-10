@@ -228,4 +228,9 @@ rnn_char_multitext_train(RecurNN *net, u8 *text, int len, int alphabet_len,
     TemporalPPM *input_ppm, TemporalPPM *error_ppm,
     const char *periodic_pgm_string, int periodic_pgm_period);
 
+void rnn_char_multitext_spin(RecurNN *net, u8 *text, int len,
+    TemporalPPM *input_ppm, TemporalPPM *error_ppm,
+    const char *periodic_pgm_string, int periodic_pgm_period);
+
+
 #endif
