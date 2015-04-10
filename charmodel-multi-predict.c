@@ -20,22 +20,25 @@ static inline float
 multi_softmax_error(RecurNN *net, float *restrict error, int c, int next,
     int target_class, int alphabet_len, float leakage)
 {
-  int i, j;
+  int i;
   float *restrict answer = one_hot_opinion(net, c, net->presynaptic_noise);
   int n_classes = net->output_size / alphabet_len;
   float err = 0;
-
+  u64 threshold = leakage * UINT64_MAX;
   for (i = 0; i < n_classes; i ++){
-    /*XXX also try stochastic leakage, randomly zeroing instead of reducing */
-    softmax_best_guess(error, answer, alphabet_len);
-    error[next] += 1.0f;
-    if (i != target_class){
-      for (j = 0; j < alphabet_len; j++){
-        error[j] *= leakage;
-      }
+    if (i == target_class){
+      softmax_best_guess(error, answer, alphabet_len);
+      error[next] += 1.0f;
+      err = error[next];
     }
     else {
-      err = error[next];
+      if (rand64(&net->rng) < threshold){
+        softmax_best_guess(error, answer, alphabet_len);
+        error[next] += 1.0f;
+      }
+      else {
+        memset(error, 0, alphabet_len * sizeof(float));
+      }
     }
     error += alphabet_len;
     answer += alphabet_len;
