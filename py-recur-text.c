@@ -310,7 +310,7 @@ Net_init(Net *self, PyObject *args, PyObject *kwds)
     /* optional arguments */
     unsigned long long rng_seed = 2;
     const char *log_file = "multi-text.log";
-    int bptt_depth = 30;
+    int bptt_depth = 50;
     float learn_rate = 0.001;
     float momentum = 0.95;
     float presynaptic_noise = 0.1;
