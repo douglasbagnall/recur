@@ -58,7 +58,7 @@ multi_softmax_error(RecurNN *net, float *restrict error, int c, int next,
   if (error_ppm){                                               \
     temporal_ppm_add_row(error_ppm, net->bptt->o_error);        \
   }                                                             \
-  if (periodic_pgm_string) {                                    \
+  if (periodic_pgm_period) {                                    \
     if (! --periodic_pgm_countdown){                            \
       periodic_pgm_countdown = periodic_pgm_period;             \
       rnn_multi_pgm_dump(net, periodic_pgm_string,              \
@@ -66,19 +66,18 @@ multi_softmax_error(RecurNN *net, float *restrict error, int c, int next,
     }                                                           \
   }                                                             \
 
-static void
+static inline void
 text_train_plain_sgd(RecurNN *net, u8 *text, int len,
     int target_class, int batch_size, float leakage,
     int alphabet_len, RnnCharProgressReport *report,
     TemporalPPM *input_ppm, TemporalPPM *error_ppm,
-    const char *periodic_pgm_string, int periodic_pgm_period)
+    const char *periodic_pgm_string, int periodic_pgm_period,
+    int periodic_pgm_countdown)
 {
   int i;
   float error = 0.0f;
   float entropy = 0.0f;
   RecurNNBPTT *bptt = net->bptt;
-  int periodic_pgm_countdown = (periodic_pgm_period -
-      net->generation % periodic_pgm_period);
   for(i = 0; i < len - 1; i++){
     rnn_bptt_advance(net);
     float e = multi_softmax_error(net, bptt->o_error, text[i], text[i + 1],
@@ -93,20 +92,19 @@ text_train_plain_sgd(RecurNN *net, u8 *text, int len,
   }
 }
 
-static void
+static inline void
 text_train_fancy(RecurNN *net, u8 *text, int len, int learning_style,
     int target_class, int batch_size, float leakage,
     int alphabet_len, RnnCharProgressReport *report,
     TemporalPPM *input_ppm, TemporalPPM *error_ppm,
-    const char *periodic_pgm_string, int periodic_pgm_period)
+    const char *periodic_pgm_string, int periodic_pgm_period,
+    int periodic_pgm_countdown)
 {
   int i;
   float error = 0.0f;
   float entropy = 0.0f;
   RecurNNBPTT *bptt = net->bptt;
   int countdown = batch_size - net->generation % batch_size;
-  int periodic_pgm_countdown = (periodic_pgm_period -
-      net->generation % periodic_pgm_period);
   for(i = 0; i < len - 1; i++, countdown--){
     rnn_bptt_advance(net);
     float e = multi_softmax_error(net, bptt->o_error, text[i], text[i + 1],
@@ -141,7 +139,17 @@ rnn_char_multitext_train(RecurNN *net, u8 *text, int len, int alphabet_len,
 {
   struct timespec time_start;
   struct timespec time_end;
+  int periodic_pgm_countdown;
+  if (periodic_pgm_period){
+    periodic_pgm_countdown = (periodic_pgm_period -
+        net->generation % periodic_pgm_period);
+  }
+  else {
+    periodic_pgm_countdown = 0;
+  }
+
   batch_size = MAX(batch_size, 1); /*XXX adjust for len */
+
   if (report){
     clock_gettime(CLOCK_MONOTONIC, &time_start);
   }
@@ -149,13 +157,15 @@ rnn_char_multitext_train(RecurNN *net, u8 *text, int len, int alphabet_len,
     text_train_plain_sgd(net, text, len, target_class, batch_size,
         leakage, alphabet_len, report,
         input_ppm, error_ppm,
-        periodic_pgm_string, periodic_pgm_period);
+        periodic_pgm_string, periodic_pgm_period,
+        periodic_pgm_countdown);
   }
   else {
     text_train_fancy(net, text, len, learning_style,
         target_class, batch_size, leakage, alphabet_len,
         report, input_ppm, error_ppm,
-        periodic_pgm_string, periodic_pgm_period);
+        periodic_pgm_string, periodic_pgm_period,
+        periodic_pgm_countdown);
   }
   if (report){
     clock_gettime(CLOCK_MONOTONIC, &time_end);
