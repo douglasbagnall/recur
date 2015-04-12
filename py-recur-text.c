@@ -684,6 +684,48 @@ Net_train(Net *self, PyObject *args, PyObject *kwds)
 
 
 static PyObject *
+Net_test(Net *self, PyObject *args, PyObject *kwds)
+{
+    const u8 *text;
+    Py_ssize_t text_len = 0;
+    int ignore_start = 0;
+
+    static char *kwlist[] = {"text",                 /* s# | */
+                             "ignore_start",         /* i  */
+                             NULL};
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "s#|i", kwlist,
+            &text,
+            &text_len,
+            &ignore_start
+        )){
+        return NULL;
+    }
+
+    if (ignore_start < 0 || ignore_start >= text_len){
+        return PyErr_Format(PyExc_ValueError,
+            "bad ignore_start value (%d bytes)", ignore_start);
+    }
+    if (text_len < 2 + ignore_start){
+        return PyErr_Format(PyExc_ValueError,
+            "The text is not long enough (%ld bytes)", text_len);
+    }
+
+    double *entropy = calloc(self->n_classes, sizeof(double));
+
+    rnn_char_multi_cross_entropy(self->net, text, text_len,
+        self->alphabet->alphabet->len, entropy, ignore_start);
+
+    PyObject *py_entropy = PyList_New(self->n_classes);
+    for (int i = 0; i < self->n_classes; i++){
+	PyList_SET_ITEM(py_entropy, i, PyFloat_FromDouble(entropy[i]));
+    }
+    free(entropy);
+    return py_entropy;
+}
+
+
+static PyObject *
 Net_save(Net *self, PyObject *args, PyObject *kwds)
 {
     RecurNN *net = self->net;
@@ -715,6 +757,8 @@ Net_save(Net *self, PyObject *args, PyObject *kwds)
 static PyMethodDef Net_methods[] = {
     {"train", (PyCFunction)Net_train, METH_VARARGS | METH_KEYWORDS,
      "train the net with a block of text"},
+    {"test", (PyCFunction)Net_test, METH_VARARGS | METH_KEYWORDS,
+     "calculate cross entropies for a block of text"},
     {"save", (PyCFunction)Net_save, METH_VARARGS | METH_KEYWORDS,
      "Save the net"},
     {"dump_parameters", (PyCFunction)Net_dump_parameters, METH_NOARGS,

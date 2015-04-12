@@ -232,5 +232,9 @@ void rnn_char_multitext_spin(RecurNN *net, u8 *text, int len,
     TemporalPPM *input_ppm, TemporalPPM *error_ppm,
     const char *periodic_pgm_string, int periodic_pgm_period);
 
+void
+rnn_char_multi_cross_entropy(RecurNN *net, const u8 *text, int len,
+    int alphabet_len, double *entropy, int ignore_start);
+
 
 #endif

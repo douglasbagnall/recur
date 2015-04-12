@@ -199,3 +199,28 @@ rnn_char_multitext_train(RecurNN *net, u8 *text, int len, int alphabet_len,
     report->per_second = (len - 1) / elapsed;
   }
 }
+
+
+void
+rnn_char_multi_cross_entropy(RecurNN *net, const u8 *text, int len,
+    int alphabet_len, double *entropy, int ignore_start){
+  float error[alphabet_len];
+  int i, j;
+  int n_classes = net->output_size / alphabet_len;
+  /*skip the first few because state depends too much on previous experience */
+  for (i = 0; i < ignore_start; i++){
+    one_hot_opinion(net, text[i], 0);
+  }
+  for (; i < len - 1; i++){
+    float *restrict answer = one_hot_opinion(net, text[i], 0);
+    for (j = 0; j < n_classes; j++){
+      float *group = answer + alphabet_len * j;
+      softmax(error, group, alphabet_len);
+      float e = error[text[i + 1]];
+      entropy[j] -= capped_log2f(e);
+    }
+  }
+  for (j = 0; j < n_classes; j++){
+    entropy[j] /= (len - ignore_start - 1);
+  }
+}
