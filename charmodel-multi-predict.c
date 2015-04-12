@@ -139,6 +139,9 @@ rnn_char_multitext_spin(RecurNN *net, u8 *text, int len,
   else {
     periodic_pgm_countdown = 0;
   }
+  if (error_ppm){
+    memset(net->bptt->o_error, 0, net->output_size * sizeof(float));
+  }
   for(int i = 0; i < len; i++){
     rnn_bptt_advance(net);
     one_hot_opinion(net, text[i], net->presynaptic_noise);
