@@ -482,69 +482,6 @@ Net_init(Net *self, PyObject *args, PyObject *kwds)
 }
 
 static PyObject *
-Net_train(Net *self, PyObject *args, PyObject *kwds)
-{
-    const char *text;
-    Py_ssize_t text_len = 0;
-    PyObject *target_class;
-    int target_index;
-    float leakage = -1;
-    int ignore_start = 0;
-
-    static char *kwlist[] = {"text",                 /* s# */
-                             "target_class",         /* O | */
-                             "leakage",              /* f  */
-                             "ignore_start",         /* i  */
-                             NULL};
-
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "s#O|fi", kwlist,
-            &text,
-            &text_len,
-            &target_class,
-            &leakage,
-            &ignore_start
-        )){
-        return NULL;
-    }
-    if (text_len < 2){
-        return PyErr_Format(PyExc_ValueError, "The text is not long enough");
-    }
-    PyObject *target_py_int = PyDict_GetItem(self->class_name_lut, target_class);
-    if (target_py_int == NULL){
-        PyObject *r = PyObject_Repr(target_class);
-        PyObject *e = PyErr_Format(PyExc_KeyError, "unknown class: %s",
-                                   PyString_AS_STRING(r));
-        Py_DECREF(r);
-        return e;
-    }
-    target_index = PyInt_AsLong(target_py_int);
-
-    if (leakage < 0){
-        leakage = -leakage / self->n_classes;
-    }
-    if (ignore_start){
-        rnn_char_multitext_spin(self->net, (u8*)text, ignore_start,
-            self->images.input_ppm, self->images.error_ppm,
-            self->images.periodic_pgm_dump_string, self->periodic_pgm_period);
-        text += ignore_start;
-        text_len -= ignore_start;
-    }
-
-    rnn_char_multitext_train(self->net, (u8*)text, text_len,
-        self->alphabet->alphabet->len, target_index, leakage,
-        self->report, self->learning_method, self->momentum,
-        self->batch_size, self->images.input_ppm, self->images.error_ppm,
-        self->images.periodic_pgm_dump_string, self->periodic_pgm_period);
-    if (self->report){
-        RnnCharProgressReport *r = self->report;
-        char *s = PyString_AsString(target_class);
-        printf("%8d t%.1f %d/s %s\n", self->net->generation,
-            r->training_entropy, (int)r->per_second, s);
-    }
-    return Py_BuildValue("");
-}
-
-static PyObject *
 Net_getfloat_rnn(Net *self, int *closure)
 {
     void *addr = ((void *)self->net) + *closure;
@@ -679,6 +616,72 @@ Net_dump_parameters(Net *self, PyObject *args)
     printf("bptt min_error_factor %g\n", bptt->min_error_factor);
     return Py_BuildValue("");
 }
+
+
+
+static PyObject *
+Net_train(Net *self, PyObject *args, PyObject *kwds)
+{
+    const char *text;
+    Py_ssize_t text_len = 0;
+    PyObject *target_class;
+    int target_index;
+    float leakage = -1;
+    int ignore_start = 0;
+
+    static char *kwlist[] = {"text",                 /* s# */
+                             "target_class",         /* O | */
+                             "leakage",              /* f  */
+                             "ignore_start",         /* i  */
+                             NULL};
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "s#O|fi", kwlist,
+            &text,
+            &text_len,
+            &target_class,
+            &leakage,
+            &ignore_start
+        )){
+        return NULL;
+    }
+    if (text_len < 2){
+        return PyErr_Format(PyExc_ValueError, "The text is not long enough");
+    }
+    PyObject *target_py_int = PyDict_GetItem(self->class_name_lut, target_class);
+    if (target_py_int == NULL){
+        PyObject *r = PyObject_Repr(target_class);
+        PyObject *e = PyErr_Format(PyExc_KeyError, "unknown class: %s",
+                                   PyString_AS_STRING(r));
+        Py_DECREF(r);
+        return e;
+    }
+    target_index = PyInt_AsLong(target_py_int);
+
+    if (leakage < 0){
+        leakage = -leakage / self->n_classes;
+    }
+    if (ignore_start){
+        rnn_char_multitext_spin(self->net, (u8*)text, ignore_start,
+            self->images.input_ppm, self->images.error_ppm,
+            self->images.periodic_pgm_dump_string, self->periodic_pgm_period);
+        text += ignore_start;
+        text_len -= ignore_start;
+    }
+
+    rnn_char_multitext_train(self->net, (u8*)text, text_len,
+        self->alphabet->alphabet->len, target_index, leakage,
+        self->report, self->learning_method, self->momentum,
+        self->batch_size, self->images.input_ppm, self->images.error_ppm,
+        self->images.periodic_pgm_dump_string, self->periodic_pgm_period);
+    if (self->report){
+        RnnCharProgressReport *r = self->report;
+        char *s = PyString_AsString(target_class);
+        printf("%8d t%.1f %d/s %s\n", self->net->generation,
+            r->training_entropy, (int)r->per_second, s);
+    }
+    return Py_BuildValue("");
+}
+
 
 static PyObject *
 Net_save(Net *self, PyObject *args, PyObject *kwds)
