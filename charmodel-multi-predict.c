@@ -25,20 +25,16 @@ multi_softmax_error(RecurNN *net, float *restrict error, int c, int next,
   int n_classes = net->output_size / alphabet_len;
   float err = 0;
   u64 threshold = leakage * UINT64_MAX;
+  memset(error, 0, net->output_size * sizeof(float));
   for (i = 0; i < n_classes; i ++){
     if (i == target_class){
       softmax_best_guess(error, answer, alphabet_len);
       error[next] += 1.0f;
       err = error[next];
     }
-    else {
-      if (rand64(&net->rng) < threshold){
-        softmax_best_guess(error, answer, alphabet_len);
-        error[next] += 1.0f;
-      }
-      else {
-        memset(error, 0, alphabet_len * sizeof(float));
-      }
+    else if (rand64(&net->rng) < threshold){
+      softmax_best_guess(error, answer, alphabet_len);
+      error[next] += 1.0f;
     }
     error += alphabet_len;
     answer += alphabet_len;
