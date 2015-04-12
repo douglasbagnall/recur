@@ -627,15 +627,15 @@ Net_train(Net *self, PyObject *args, PyObject *kwds)
     PyObject *target_class;
     int target_index;
     float leakage = -1;
-    int ignore_start = 0;
+    uint ignore_start = 0;
 
     static char *kwlist[] = {"text",                 /* s# */
                              "target_class",         /* O | */
                              "leakage",              /* f  */
-                             "ignore_start",         /* i  */
+                             "ignore_start",         /* I  */
                              NULL};
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "s#O|fi", kwlist,
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "s#O|fI", kwlist,
             &text,
             &text_len,
             &target_class,
@@ -644,7 +644,7 @@ Net_train(Net *self, PyObject *args, PyObject *kwds)
         )){
         return NULL;
     }
-    if (text_len < 2){
+    if (text_len < 2 + ignore_start){
         return PyErr_Format(PyExc_ValueError, "The text is not long enough");
     }
     PyObject *target_py_int = PyDict_GetItem(self->class_name_lut, target_class);
@@ -688,13 +688,13 @@ Net_test(Net *self, PyObject *args, PyObject *kwds)
 {
     const u8 *text;
     Py_ssize_t text_len = 0;
-    int ignore_start = 0;
+    uint ignore_start = 0;
 
     static char *kwlist[] = {"text",                 /* s# | */
-                             "ignore_start",         /* i  */
+                             "ignore_start",         /* I  */
                              NULL};
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "s#|i", kwlist,
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "s#|I", kwlist,
             &text,
             &text_len,
             &ignore_start
@@ -702,10 +702,6 @@ Net_test(Net *self, PyObject *args, PyObject *kwds)
         return NULL;
     }
 
-    if (ignore_start < 0 || ignore_start >= text_len){
-        return PyErr_Format(PyExc_ValueError,
-            "bad ignore_start value (%d bytes)", ignore_start);
-    }
     if (text_len < 2 + ignore_start){
         return PyErr_Format(PyExc_ValueError,
             "The text is not long enough (%ld bytes)", text_len);
