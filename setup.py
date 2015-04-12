@@ -17,8 +17,11 @@ setup(
             include_dirs = ["."],
             define_macros = [('_GNU_SOURCE', None),
                              ('VECTOR', None)],
-            extra_compile_args=['-ggdb', '-std=gnu11', '-I.', '-Wall',
-                                '-Ofast', '-ffast-math', '-fno-inline'],
+            extra_compile_args=['-march=native', '-ggdb', '-std=gnu11', '-I.',
+                                '-Wall', '-O3', '-ffast-math', '-fno-inline',
+                                '-DVECTOR',
+                                '-DPIC',
+                            ],
             language="c"
         )
     ]
