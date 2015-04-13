@@ -318,6 +318,7 @@ Net_init(Net *self, PyObject *args, PyObject *kwds)
     rnn_activation activation = RNN_RESQRT;
     int learning_method = RNN_ADAGRAD;
     int verbose = 0;
+    int batch_size = 1;
     int temporal_pgm_dump = 0;
     char *periodic_pgm_dump = NULL;
     int periodic_pgm_period = 1000;
@@ -349,9 +350,10 @@ Net_init(Net *self, PyObject *args, PyObject *kwds)
                              "temporal_pgm_dump",    /* i  */
                              "periodic_pgm_dump",    /* z  */
                              "periodic_pgm_period",  /* i  */
+                             "batch_size",           /* i  */
                              NULL};
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "O!Oi|zifzffKziiziizi", kwlist,
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "O!Oi|zifzffKziiziizii", kwlist,
             &AlphabetType,
             &alphabet,            /* O! */
             &class_names,         /* O  */
@@ -370,12 +372,18 @@ Net_init(Net *self, PyObject *args, PyObject *kwds)
             &verbose,             /* i  */
             &temporal_pgm_dump,   /* i  */
             &periodic_pgm_dump,   /* z  */
-            &periodic_pgm_period  /* i  */
+            &periodic_pgm_period, /* i  */
+            &batch_size            /* i  */
         )){
         return -1;
     }
     if (activation >= RNN_ACTIVATION_LAST || activation < 1){
         PyErr_Format(PyExc_ValueError, "%d is not a valid activation", activation);
+        return -1;
+    }
+
+    if (batch_size < 1){
+        PyErr_Format(PyExc_ValueError, "batch_size %d won't work", batch_size);
         return -1;
     }
 
@@ -414,6 +422,8 @@ Net_init(Net *self, PyObject *args, PyObject *kwds)
     self->net = net;
     self->momentum = momentum;
     self->report = verbose ? calloc(sizeof(*self->report), 1) : NULL;
+    self->batch_size = batch_size;
+
     net->metadata = metadata;
     if (basename == NULL){
         basename = "multi-text";
