@@ -699,15 +699,17 @@ Net_test(Net *self, PyObject *args, PyObject *kwds)
     const u8 *text;
     Py_ssize_t text_len = 0;
     uint ignore_start = 0;
-
+    int as_list = 0;
     static char *kwlist[] = {"text",                 /* s# | */
                              "ignore_start",         /* I  */
+                             "as_list",              /* i  */
                              NULL};
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "s#|I", kwlist,
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "s#|Ii", kwlist,
             &text,
             &text_len,
-            &ignore_start
+            &ignore_start,
+            &as_list
         )){
         return NULL;
     }
@@ -722,10 +724,21 @@ Net_test(Net *self, PyObject *args, PyObject *kwds)
     rnn_char_multi_cross_entropy(self->net, text, text_len,
         self->alphabet->alphabet->len, entropy, ignore_start);
 
-    PyObject *py_entropy = PyList_New(self->n_classes);
-    for (int i = 0; i < self->n_classes; i++){
-	PyList_SET_ITEM(py_entropy, i, PyFloat_FromDouble(entropy[i]));
+    PyObject *py_entropy;
+    if (as_list){
+        py_entropy = PyList_New(self->n_classes);
+        for (int i = 0; i < self->n_classes; i++){
+            PyList_SET_ITEM(py_entropy, i, PyFloat_FromDouble(entropy[i]));
+        }
     }
+    else { /* as dict */
+        py_entropy = PyDict_New();
+        for (int i = 0; i < self->n_classes; i++){
+            PyObject *k = PyList_GET_ITEM(self->class_names, i);
+            PyDict_SetItem(py_entropy, k, PyFloat_FromDouble(entropy[i]));
+        }
+    }
+
     free(entropy);
     return py_entropy;
 }
