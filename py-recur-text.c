@@ -588,6 +588,8 @@ static PyMemberDef Net_members[] = {
      "names of classes"},
     {"class_name_lut", T_OBJECT_EX, offsetof(Net, class_name_lut), READONLY,
      "mapping classes to indices"},
+    {"n_classes", T_INT, offsetof(Net, n_classes), READONLY,
+     "the same as len(Net.class_names)"},
     {"batch_size", T_INT, offsetof(Net, batch_size), 0,
      "generations per mini-batch"},
     {"learning_method", T_INT, offsetof(Net, learning_method), READONLY,
