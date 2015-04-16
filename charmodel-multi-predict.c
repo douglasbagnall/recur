@@ -58,42 +58,8 @@ multi_softmax_error(RecurNN *net, float *restrict error, int c, int next,
   }
 
 
-#define INNER_CYCLE_REPORTING()                                 \
-  if (report){                                                  \
-    error += e;                                                 \
-    entropy += capped_log2f(1.0f - e);                          \
-  }                                                             \
-  INNER_CYCLE_PGM_DUMP()
-
-
 static inline void
-text_train_plain_sgd(RecurNN *net, u8 *text, int len,
-    int target_class, int batch_size, float leakage,
-    int alphabet_len, RnnCharProgressReport *report,
-    TemporalPPM *input_ppm, TemporalPPM *error_ppm,
-    const char *periodic_pgm_string, int periodic_pgm_period,
-    int periodic_pgm_countdown)
-{
-  int i;
-  float error = 0.0f;
-  float entropy = 0.0f;
-  RecurNNBPTT *bptt = net->bptt;
-  for(i = 0; i < len - 1; i++){
-    rnn_bptt_advance(net);
-    float e = multi_softmax_error(net, bptt->o_error, text[i], text[i + 1],
-        target_class, alphabet_len, leakage);
-    rnn_bptt_calculate(net, batch_size);
-    INNER_CYCLE_REPORTING();
-  }
-  if (report){
-    float report_scale = 1.0f / (len - 1);
-    report->training_entropy = -entropy * report_scale;
-    report->training_error = error * report_scale;
-  }
-}
-
-static inline void
-text_train_fancy(RecurNN *net, u8 *text, int len, int learning_style,
+text_train(RecurNN *net, u8 *text, int len, int learning_style,
     int target_class, int batch_size, float leakage,
     int alphabet_len, RnnCharProgressReport *report,
     TemporalPPM *input_ppm, TemporalPPM *error_ppm,
@@ -117,7 +83,11 @@ text_train_fancy(RecurNN *net, u8 *text, int len, int learning_style,
     else {
       rnn_bptt_calc_deltas(net, 1);
     }
-    INNER_CYCLE_REPORTING();
+    if (report){
+      error += e;
+      entropy += capped_log2f(1.0f - e);
+    }
+    INNER_CYCLE_PGM_DUMP();
   }
   if (report){
     float report_scale = 1.0f / (len - 1);
@@ -149,7 +119,6 @@ rnn_char_multitext_spin(RecurNN *net, u8 *text, int len,
   }
 }
 
-#undef INNER_CYCLE_REPORTING
 #undef INNER_CYCLE_PGM_DUMP
 
 /* stochastic leakage? */
@@ -177,20 +146,12 @@ rnn_char_multitext_train(RecurNN *net, u8 *text, int len, int alphabet_len,
   if (report){
     clock_gettime(CLOCK_MONOTONIC, &time_start);
   }
-  if (learning_style == RNN_MOMENTUM_WEIGHTED){
-    text_train_plain_sgd(net, text, len, target_class, batch_size,
-        leakage, alphabet_len, report,
-        input_ppm, error_ppm,
-        periodic_pgm_string, periodic_pgm_period,
-        periodic_pgm_countdown);
-  }
-  else {
-    text_train_fancy(net, text, len, learning_style,
-        target_class, batch_size, leakage, alphabet_len,
-        report, input_ppm, error_ppm,
-        periodic_pgm_string, periodic_pgm_period,
-        periodic_pgm_countdown);
-  }
+  text_train(net, text, len, learning_style,
+      target_class, batch_size, leakage, alphabet_len,
+      report, input_ppm, error_ppm,
+      periodic_pgm_string, periodic_pgm_period,
+      periodic_pgm_countdown);
+
   if (report){
     clock_gettime(CLOCK_MONOTONIC, &time_end);
     s64 secs = time_end.tv_sec - time_start.tv_sec;
