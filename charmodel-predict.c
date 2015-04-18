@@ -304,7 +304,7 @@ rnn_char_epoch(RnnCharModel *model, RecurNN *confab_net, RnnCharVentropy *v,
           it off on the first run avoids explicit zeroing outside of the loop
           (via rnn_bptt_clear_deltas) and is thus slightly faster.
          */
-        rnn_bptt_calc_deltas(n, j ? 1 : 0);
+        rnn_bptt_calc_deltas(n, j ? 1 : 0, NULL);
       }
       rnn_apply_learning(net, model->learning_style, momentum);
     }

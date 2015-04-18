@@ -16,29 +16,52 @@ This uses the RNN to predict the next character in a text sequence.
 #include "colour.h"
 
 
+static inline int
+add_or_adjust_error_range(int *ranges, int alphabet_len, int i, int j){
+  int start = i * alphabet_len;
+  int end = start + alphabet_len;
+  ASSUME_ALIGNED_LENGTH(start);
+  ALIGNED_LENGTH_ROUND_UP(end);
+
+  if (j && ranges[j - 1] >= start){
+    ranges[j - 1] = end;
+    return j;
+  }
+  ranges[j] = start;
+  ranges[j + 1] = end;
+  return j + 2;
+}
+
+
 static inline float
 multi_softmax_error(RecurNN *net, float *restrict error, int c, int next,
-    int target_class, int alphabet_len, float leakage)
+    int target_class, int alphabet_len, float leakage, int *error_ranges)
 {
   int i;
   float *restrict answer = one_hot_opinion(net, c, net->presynaptic_noise);
   int n_classes = net->output_size / alphabet_len;
   float err = 0;
+  int j = 0;
   u64 threshold = leakage * UINT64_MAX;
+  /* XXX memset is *almost* redundant with error_ranges, but the zeros are
+     necessary for alignment, and are useful for debug images. */
   memset(error, 0, net->output_size * sizeof(float));
   for (i = 0; i < n_classes; i ++){
     if (i == target_class){
       softmax_best_guess(error, answer, alphabet_len);
       error[next] += 1.0f;
       err = error[next];
+      j = add_or_adjust_error_range(error_ranges, alphabet_len, i, j);
     }
     else if (rand64(&net->rng) < threshold){
       softmax_best_guess(error, answer, alphabet_len);
       error[next] += 1.0f;
+      j = add_or_adjust_error_range(error_ranges, alphabet_len, i, j);
     }
     error += alphabet_len;
     answer += alphabet_len;
   }
+  error_ranges[j] = -1;
   return err;
 }
 
@@ -70,18 +93,19 @@ text_train(RecurNN *net, u8 *text, int len, int learning_style,
   float error = 0.0f;
   float entropy = 0.0f;
   RecurNNBPTT *bptt = net->bptt;
+  int top_error_ranges[net->output_size / alphabet_len * 2 + 2];
   int countdown = batch_size - net->generation % batch_size;
   for(i = 0; i < len - 1; i++, countdown--){
     rnn_bptt_advance(net);
     float e = multi_softmax_error(net, bptt->o_error, text[i], text[i + 1],
-        target_class, alphabet_len, leakage);
+        target_class, alphabet_len, leakage, top_error_ranges);
     if (countdown == 0){
       rnn_apply_learning(net, learning_style, bptt->momentum);
       countdown = batch_size;
-      rnn_bptt_calc_deltas(net, 0);
+      rnn_bptt_calc_deltas(net, 0, top_error_ranges);
     }
     else {
-      rnn_bptt_calc_deltas(net, 1);
+      rnn_bptt_calc_deltas(net, 1, top_error_ranges);
     }
     if (report){
       error += e;

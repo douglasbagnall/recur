@@ -1859,7 +1859,7 @@ train_channel(GstClassify *self, ClassifyChannel *c, int *win_count){
       error[i] *= self->error_weight[i];
     }
   }
-  rnn_bptt_calc_deltas(net, 1);
+  rnn_bptt_calc_deltas(net, 1, NULL);
   rnn_bptt_advance(net);
   return wrongness;
 }

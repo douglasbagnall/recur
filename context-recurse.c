@@ -151,7 +151,7 @@ recur_train_nets(RecurContext *context, RecurFrame *src_frame,
       float slope = a * (1.0f - a);
       net->bptt->o_error[i] = slope * (target - a);
     }
-    rnn_bptt_calc_deltas(net, j ? 1 : 0);
+    rnn_bptt_calc_deltas(net, j ? 1 : 0, NULL);
   }
   rnn_apply_learning(context->net, RNN_MOMENTUM_WEIGHTED,
       context->net->bptt->momentum);

@@ -138,7 +138,7 @@ rnn_char_classify_epoch(RnnCharClassifier *model){
           rnn_log_int(net, "skipping", 0);
         }
         //DEBUG("winner %i correct %i error %.2f", winner, winner == class, e);
-        rnn_bptt_calc_deltas(n, j ? 1 : 0);
+        rnn_bptt_calc_deltas(n, j ? 1 : 0, NULL);
       }
       else {
         if (n == net){

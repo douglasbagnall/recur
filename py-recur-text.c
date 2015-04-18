@@ -13,7 +13,6 @@ Python bindings for text RNNs.
 #define DEFAULT_ADAGRAD_BALLAST 100
 #define DEFAULT_ADADELTA_BALLAST 100
 
-
 typedef struct {
     PyObject_HEAD
     RnnCharAlphabet *alphabet;

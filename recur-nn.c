@@ -166,6 +166,53 @@ rnn_opinion(RecurNN *net, const float *restrict inputs, float presynaptic_noise)
 }
 
 static inline float
+backprop_single_layer_sparse(
+    const float *restrict weights,
+    const float *restrict inputs,
+    float *restrict i_error,
+    int i_size,
+    const float *restrict o_error,
+    int o_size,
+    int *ranges)
+{
+  int x, y, i;
+  float error_sum = 0.0f;
+  ASSUME_ALIGNED(inputs);
+  ASSUME_ALIGNED(i_error);
+  ASSUME_ALIGNED(o_error);
+  ASSUME_ALIGNED(weights);
+
+  for (y = 1; y < i_size; y++){
+    float e = 0.0f;
+    if (inputs[y]){
+      const float *restrict row = weights + y * o_size;
+      ASSUME_ALIGNED(row);
+      for (i = 0; ranges[i] >= 0; i += 2){
+        int range_start = ranges[i];
+        int range_cap = ranges[i + 1];
+
+        /*round the range to an aligned size. It should already be rounded,
+          but here we tell GCC that. */
+        ASSUME_ALIGNED_LENGTH(range_start);
+        ALIGNED_LENGTH_ROUND_UP(range_cap);
+
+        float const *restrict subrow = row + range_start;
+        float const *restrict suberror = o_error + range_start;
+        ASSUME_ALIGNED(subrow);
+        ASSUME_ALIGNED(suberror);
+        for (x = 0; x < range_cap - range_start; x++){
+          e += subrow[x] * suberror[x];
+        }
+        error_sum += fabsf(e);
+      }
+      i_error[y] = e;
+    }
+  }
+  return error_sum;
+}
+
+
+static inline float
 backprop_single_layer(
     const float *restrict weights,
     const float *restrict inputs,
@@ -197,17 +244,26 @@ backprop_single_layer(
 }
 
 
-
 static inline float
-backprop_top_layer(RecurNN *net)
+backprop_top_layer(RecurNN *net, int *ranges)
 {
-  return backprop_single_layer(
+  if (ranges == NULL){
+    return backprop_single_layer(
+        net->ho_weights,
+        net->hidden_layer,
+        net->bptt->h_error,
+        net->h_size,
+        net->bptt->o_error,
+        net->o_size);
+  }
+  return backprop_single_layer_sparse(
       net->ho_weights,
       net->hidden_layer,
       net->bptt->h_error,
       net->h_size,
       net->bptt->o_error,
-      net->o_size);
+      net->o_size,
+      ranges);
 }
 
 /*single_layer_sgd does gradient descent for a single layer (i.e., top layer
@@ -227,6 +283,37 @@ single_layer_sgd(float const *restrict inputs, int i_size, const float *restrict
       ASSUME_ALIGNED(drow);
       for (x = 0; x < o_size; x++){
         drow[x] += o_error[x] * input;
+      }
+    }
+  }
+}
+
+static inline void
+single_layer_sgd_sparse(float const *restrict inputs, int i_size,
+    const float *restrict o_error, int o_size,
+    float *restrict deltas, int *error_ranges){
+  ASSUME_ALIGNED(inputs);
+  ASSUME_ALIGNED(o_error);
+  ASSUME_ALIGNED(deltas);
+  int x, y;
+  for (y = 0; y < i_size; y++){
+    float input = inputs[y];
+    if (input){
+      float *restrict drow = deltas + y * o_size;
+      ASSUME_ALIGNED(drow);
+      for (int i = 0; error_ranges[i] >= 0; i += 2){
+        int range_start = error_ranges[i];
+        int range_cap = error_ranges[i + 1];
+        /*round the range to an aligned size */
+        ASSUME_ALIGNED_LENGTH(range_start);
+        ALIGNED_LENGTH_ROUND_UP(range_cap);
+        float *restrict subrow = drow + range_start;
+        float const *restrict suberror = o_error + range_start;
+        ASSUME_ALIGNED(subrow);
+        ASSUME_ALIGNED(suberror);
+        for (x = 0; x < range_cap - range_start; x++){
+          subrow[x] += suberror[x] * input;
+        }
       }
     }
   }
@@ -643,7 +730,7 @@ rnn_bptt_advance(RecurNN *net){
 
 
 void
-rnn_bptt_calc_deltas(RecurNN *net, int accumulate_delta)
+rnn_bptt_calc_deltas(RecurNN *net, int accumulate_delta, int *top_error_ranges)
 {
   RecurNNBPTT *bptt = net->bptt;
   RecurExtraLayer *bottom = net->bottom_layer;
@@ -653,13 +740,18 @@ rnn_bptt_calc_deltas(RecurNN *net, int accumulate_delta)
   if (! accumulate_delta){
     zero_aligned_array(bptt->ho_delta, net->ho_size);
   }
-  float top_error_sum = backprop_top_layer(net);
+  float top_error_sum = backprop_top_layer(net, top_error_ranges);
   float top_error_scaled = softclip_scale(top_error_sum,
       net->h_size * MAX_TOP_ERROR_FACTOR, bptt->h_error, net->h_size);
 
-  single_layer_sgd(net->hidden_layer, net->h_size, bptt->o_error, net->o_size,
-      bptt->ho_delta);
-
+  if (top_error_ranges){
+    single_layer_sgd_sparse(net->hidden_layer, net->h_size, bptt->o_error,
+        net->o_size, bptt->ho_delta, top_error_ranges);
+  }
+  else{
+    single_layer_sgd(net->hidden_layer, net->h_size, bptt->o_error, net->o_size,
+        bptt->ho_delta);
+  }
   /*recurrent layer. Both accumulating and non-accumulating branches are
     complicated by emergency scaling requirements.*/
   float bptt_error_sum;
@@ -868,7 +960,7 @@ apply_sgd_top_layer(RecurNN *net){
   int y, x;
 
   hiddens[0] = 1.0f;
-  error_sum = backprop_top_layer(net);
+  error_sum = backprop_top_layer(net, NULL);
 
   for (y = 0; y < net->h_size; y++){
     float *restrict momentum_row = momentums + y * net->o_size;
