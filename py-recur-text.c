@@ -88,8 +88,7 @@ Alphabet_encode_text(Alphabet *self, PyObject *orig_obj)
     if (orig_str == NULL || orig_len < 0){
         return PyErr_Format(PyExc_ValueError, "encode_text requires a string");
     }
-    u8 *s = malloc(orig_len + 2);
-    memcpy(s, orig_str, orig_len);
+    u8 *s = (u8 *)strndup(orig_str, orig_len + 1);
     rnn_char_collapse_buffer(self->alphabet, s, orig_len, &new_len);
     PyObject *final_obj = PyString_FromStringAndSize((char *)s, new_len);
     free(s);
