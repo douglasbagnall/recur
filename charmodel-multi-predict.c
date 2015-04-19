@@ -41,14 +41,10 @@ multi_softmax_error(RecurNN *net, float *restrict error, int c, int next,
       }
       int range_start = ALIGNED_ROUND_DOWN(offset);
       int range_end = ALIGNED_ROUND_UP(offset + alphabet_len);
-      DEBUG("i %d j %d r_start %d r_end %d len %d o_size %d",
-          i, j, range_start, range_end, range_end - range_start, net->o_size);
       if (j){
         RecurErrorRange prev = error_ranges[j - 1];
         if (prev.start + prev.len >= range_start){
           error_ranges[j - 1].len = range_end - prev.start;
-          DEBUG("i %d j %d r_start %d r_end %d len %d COMPOUNDED",
-              i, j, prev.start, range_end, error_ranges[j - 1].len);
           continue;
         }
       }
