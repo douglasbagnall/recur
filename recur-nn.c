@@ -173,7 +173,7 @@ backprop_single_layer_sparse(
     int i_size,
     const float *restrict o_error,
     int o_size,
-    int *ranges)
+    RecurErrorRange *ranges)
 {
   int x, y, i;
   float error_sum = 0.0f;
@@ -187,20 +187,16 @@ backprop_single_layer_sparse(
     if (inputs[y]){
       const float *restrict row = weights + y * o_size;
       ASSUME_ALIGNED(row);
-      for (i = 0; ranges[i] >= 0; i += 2){
-        int range_start = ranges[i];
-        int range_cap = ranges[i + 1];
-
+      for (i = 0; ranges[i].start >= 0; i++){
         /*round the range to an aligned size. It should already be rounded,
           but here we tell GCC that. */
-        ASSUME_ALIGNED_LENGTH(range_start);
-        ALIGNED_LENGTH_ROUND_UP(range_cap);
-
+        int range_start = ALIGNED_ROUND_DOWN(ranges[i].start);
+        int range_len = ALIGNED_ROUND_UP(ranges[i].len);
         float const *restrict subrow = row + range_start;
         float const *restrict suberror = o_error + range_start;
         ASSUME_ALIGNED(subrow);
         ASSUME_ALIGNED(suberror);
-        for (x = 0; x < range_cap - range_start; x++){
+        for (x = 0; x < range_len; x++){
           e += subrow[x] * suberror[x];
         }
         error_sum += fabsf(e);
@@ -245,7 +241,7 @@ backprop_single_layer(
 
 
 static inline float
-backprop_top_layer(RecurNN *net, int *ranges)
+backprop_top_layer(RecurNN *net, RecurErrorRange *ranges)
 {
   if (ranges == NULL){
     return backprop_single_layer(
@@ -291,7 +287,7 @@ single_layer_sgd(float const *restrict inputs, int i_size, const float *restrict
 static inline void
 single_layer_sgd_sparse(float const *restrict inputs, int i_size,
     const float *restrict o_error, int o_size,
-    float *restrict deltas, int *error_ranges){
+    float *restrict deltas, RecurErrorRange *error_ranges){
   ASSUME_ALIGNED(inputs);
   ASSUME_ALIGNED(o_error);
   ASSUME_ALIGNED(deltas);
@@ -301,17 +297,14 @@ single_layer_sgd_sparse(float const *restrict inputs, int i_size,
     if (input){
       float *restrict drow = deltas + y * o_size;
       ASSUME_ALIGNED(drow);
-      for (int i = 0; error_ranges[i] >= 0; i += 2){
-        int range_start = error_ranges[i];
-        int range_cap = error_ranges[i + 1];
-        /*round the range to an aligned size */
-        ASSUME_ALIGNED_LENGTH(range_start);
-        ALIGNED_LENGTH_ROUND_UP(range_cap);
+      for (int i = 0; error_ranges[i].start >= 0; i++){
+        int range_start = ALIGNED_ROUND_DOWN(error_ranges[i].start);
+        int range_len = ALIGNED_ROUND_UP(error_ranges[i].len);
         float *restrict subrow = drow + range_start;
         float const *restrict suberror = o_error + range_start;
         ASSUME_ALIGNED(subrow);
         ASSUME_ALIGNED(suberror);
-        for (x = 0; x < range_cap - range_start; x++){
+        for (x = 0; x < range_len; x++){
           subrow[x] += suberror[x] * input;
         }
       }
@@ -730,7 +723,8 @@ rnn_bptt_advance(RecurNN *net){
 
 
 void
-rnn_bptt_calc_deltas(RecurNN *net, int accumulate_delta, int *top_error_ranges)
+rnn_bptt_calc_deltas(RecurNN *net, int accumulate_delta,
+    RecurErrorRange *top_error_ranges)
 {
   RecurNNBPTT *bptt = net->bptt;
   RecurExtraLayer *bottom = net->bottom_layer;

@@ -254,6 +254,13 @@ struct RecurInitialisationParameters {
   int run_input_at_start;
 };
 
+typedef struct _RecurErrorRange RecurErrorRange;
+
+struct _RecurErrorRange {
+  int start;
+  int len;
+};
+
 /* functions */
 
 RecurNN * rnn_new(uint input_size, uint hidden_size, uint output_size,
@@ -304,7 +311,7 @@ float rnn_calculate_momentum_soft_start(float generation, float momentum,
     float momentum_soft_start);
 
 void rnn_bptt_calc_deltas(RecurNN *net, int accumulate_delta,
-    int *top_error_ranges);
+    RecurErrorRange *top_error_ranges);
 
 void rnn_condition_net(RecurNN *net);
 void rnn_log_net(RecurNN *net);

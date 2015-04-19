@@ -146,11 +146,13 @@ realloc_or_die(void *p, size_t size){
 #ifndef __clang__
 #define ASSUME_ALIGNED(x)   (x) = __builtin_assume_aligned ((x), 16)
 #define ASSUME_ALIGNED_LENGTH(x) (x) = ((x) & ~3ULL)
-#define ALIGNED_LENGTH_ROUND_UP(x) (x) = (((x) + 3) & ~3ULL)
 #else
 #define ASSUME_ALIGNED(x) /* x */
 #define ASSUME_ALIGNED_LENGTH(x) /* x */
 #endif
+
+#define ALIGNED_ROUND_DOWN(x) ((x) & ~3ULL)
+#define ALIGNED_ROUND_UP(x) (((x) + 3) & ~3ULL)
 
 static inline void
 recur_start_timer(struct timespec *time)
