@@ -552,12 +552,6 @@ static PyGetSetDef Net_getsetters[] = {
      "learning rate",
      (void *)&bptt_offset_learn_rate
     },
-    {"momentum",
-     (getter)Net_getfloat_bptt,
-     (setter)Net_setfloat_bptt,
-     "momentum",
-     (void *)&bptt_offset_momentum
-    },
     {"ih_scale",
      (getter)Net_getfloat_bptt,
      (setter)Net_setfloat_bptt,
