@@ -39,7 +39,7 @@ Alphabet_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 static int
 Alphabet_init(Alphabet *self, PyObject *args, PyObject *kwds)
 {
-    char *text;
+    char *text = NULL;
     Py_ssize_t text_len = 0;
     float threshold = 1e-5;
     float digit_adjust = 0.3;
@@ -47,26 +47,55 @@ Alphabet_init(Alphabet *self, PyObject *args, PyObject *kwds)
     int ignore_case = 1;
     int utf8 = 1;
     int collapse_space = 1;
+    const char *alphabet_chars = NULL;
+    const char *collapse_chars = NULL;
 
     static char *kwlist[] = {"text", "threshold", "digit_adjust", "alpha_adjust",
-                             "ignore_case", "utf8", "collapse_space", NULL};
+                             "ignore_case", "utf8", "collapse_space",
+                             "alphabet_chars", "collapse_chars", NULL};
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "s#|fffiii", kwlist, &text, &text_len,
-                                     &threshold, &digit_adjust, &alpha_adjust,
-                                     &ignore_case, &utf8, &collapse_space)){
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "z#|fffiiizz",
+            kwlist, &text, &text_len,
+            &threshold, &digit_adjust, &alpha_adjust,
+            &ignore_case, &utf8, &collapse_space,
+            &alphabet_chars, &collapse_chars)){
+	PyErr_PrintEx(1);
         return -1;
     }
 
     self->alphabet = rnn_char_new_alphabet();
-    rnn_char_alphabet_set_flags(self->alphabet, ignore_case, utf8, collapse_space);
+    rnn_char_alphabet_set_flags(self->alphabet, ignore_case, utf8,
+				collapse_space);
 
-    int r = rnn_char_find_alphabet_s(text, text_len, self->alphabet,
-                                     threshold, digit_adjust, alpha_adjust);
-    if (r) {
-        rnn_char_free_alphabet(self->alphabet);
-        self->alphabet = NULL;
-        PyErr_Format(PyExc_ValueError, "can't find an alphabet!");
-        return -1;
+
+    if (text == NULL){
+	if (alphabet_chars == NULL){
+            PyErr_Format(PyExc_ValueError, "Neither text nor alphabet_chars"
+			 " is set");
+            return -1;
+	}
+	if (collapse_chars == NULL){
+	    collapse_chars = "";
+	}
+
+	RnnCharAlphabet *a = self->alphabet;
+	a->len = fill_codepoints_from_string(a->points,
+					     256, alphabet_chars,
+					     utf8);
+	a->collapsed_len = fill_codepoints_from_string(a->collapsed_points,
+						       256, collapse_chars,
+						       utf8);
+    }
+    else {
+	int r = rnn_char_find_alphabet_s(text, text_len, self->alphabet,
+					 threshold, digit_adjust, alpha_adjust);
+        if (r) {
+            rnn_char_free_alphabet(self->alphabet);
+            self->alphabet = NULL;
+            PyErr_Format(PyExc_ValueError, "can't find an alphabet!");
+            return -1;
+        }
     }
     return 0;
 }
@@ -298,6 +327,91 @@ Net_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 }
 
 static int
+set_net_classnames(Net *self, PyObject *class_names)
+{
+    PyObject *class_name_lut;
+
+    int n_classes = PySequence_Length(class_names);
+    self->n_classes = n_classes;
+
+    if (! PySequence_Check(class_names) || n_classes < 1){
+	PyErr_Format(PyExc_ValueError,
+		     "class_names should be a sequence of strings");
+	return -1;
+    }
+    if (self->class_names){
+        PyErr_Format(PyExc_AttributeError,
+		     "net->class_names is already set!");
+	return -1;
+    }
+
+    self->class_names = class_names;
+    Py_INCREF(self->class_names);
+
+    class_name_lut = PyDict_New();
+    for (long i = 0; i < n_classes; i++){
+        PyObject *k = PySequence_Fast_GET_ITEM(class_names, i);
+        PyObject *v = PyInt_FromLong(i);
+        PyDict_SetItem(class_name_lut, k, v);
+        /* PyInt_FromLong does an incref. So does PyDict_SetItem.
+           That's one two many. */
+        Py_DECREF(v);
+    }
+    self->class_name_lut = class_name_lut;
+
+    return n_classes;
+}
+
+static int
+set_net_filename(Net *self, const char *filename, const char *basename,
+		 char *metadata)
+{
+    char s[1000];
+    RecurNN *net = self->net;
+    if (filename){
+        self->filename = strdup(filename);
+    }
+    else {
+        u32 sig = rnn_hash32(metadata);
+        int wrote = snprintf(s, sizeof(s), "%s-%0" PRIx32 "i%d-h%d-o%d.net",
+            basename, sig, net->input_size, net->hidden_size, net->output_size);
+        if (wrote >= sizeof(s)){
+	    PyErr_Format(PyExc_ValueError,
+			 "filename is trying to be too long!");
+            return -1;
+        }
+        self->filename = strdup(s);
+    }
+    return 0;
+}
+
+
+static int
+set_net_pgm_dump(Net *self, const char *basename, int temporal_pgm_dump,
+		 char *periodic_pgm_dump, int periodic_pgm_period)
+{
+    char s[1000];
+    RecurNN *net = self->net;
+    self->images.temporal_pgm_dump = temporal_pgm_dump;
+    if (temporal_pgm_dump){
+        snprintf(s, sizeof(s), "%s-input_layer", basename);
+        self->images.input_ppm = temporal_ppm_alloc(net->i_size, 300,
+            s, 0, PGM_DUMP_COLOUR, NULL);
+        snprintf(s, sizeof(s), "%s-output_error", basename);
+        self->images.error_ppm = temporal_ppm_alloc(net->o_size, 300,
+            s, 0, PGM_DUMP_COLOUR, NULL);
+    }
+
+    if (periodic_pgm_dump){
+        self->images.periodic_pgm_dump_string = periodic_pgm_dump;
+        self->periodic_pgm_period = periodic_pgm_period;
+    }
+    return 0;
+}
+
+
+
+static int
 Net_init(Net *self, PyObject *args, PyObject *kwds)
 {
     /* mandatory arguments */
@@ -324,7 +438,6 @@ Net_init(Net *self, PyObject *args, PyObject *kwds)
     char *metadata = NULL;
 
     /* other vars */
-    PyObject *class_name_lut;
     int n_classes;
     uint output_size;
     RecurNN *net;
@@ -390,16 +503,14 @@ Net_init(Net *self, PyObject *args, PyObject *kwds)
             learning_method);
         return -1;
     }
-    if (learning_method == RNN_ADADELTA || learning_method == RNN_RPROP){
-        flags |= RNN_NET_FLAG_AUX_ARRAYS;
+
+    n_classes = set_net_classnames(self, class_names);
+    if (n_classes < 1){
+	return -1;
     }
 
-    n_classes = PySequence_Length(class_names);
-    self->n_classes = n_classes;
-
-    if (! PySequence_Check(class_names) || n_classes < 1){
-        PyErr_Format(PyExc_ValueError, "class_names should be a sequence of strings");
-        return -1;
+    if (learning_method == RNN_ADADELTA || learning_method == RNN_RPROP){
+        flags |= RNN_NET_FLAG_AUX_ARRAYS;
     }
 
     output_size = alphabet->alphabet->len * n_classes;
@@ -426,50 +537,13 @@ Net_init(Net *self, PyObject *args, PyObject *kwds)
     if (basename == NULL){
         basename = "multi-text";
     }
-    char s[500];
-    if (filename){
-        self->filename = strdup(filename);
-    }
-    else {
-        u32 sig = rnn_hash32(metadata);
-        int wrote = snprintf(s, sizeof(s), "%s-%0" PRIx32 "i%d-h%d-o%d.net",
-            basename, sig, net->input_size, net->hidden_size, net->output_size);
-        if (wrote >= sizeof(s)){
-            DEBUG("basename is too long!");
-            return -1;
-        }
-        self->filename = strdup(s);
-    }
 
-    self->images.temporal_pgm_dump = temporal_pgm_dump;
-    if (temporal_pgm_dump){
-        snprintf(s, sizeof(s), "%s-input_layer", basename);
-        self->images.input_ppm = temporal_ppm_alloc(net->i_size, 300,
-            s, 0, PGM_DUMP_COLOUR, NULL);
-        snprintf(s, sizeof(s), "%s-output_error", basename);
-        self->images.error_ppm = temporal_ppm_alloc(net->o_size, 300,
-            s, 0, PGM_DUMP_COLOUR, NULL);
-    }
+    set_net_filename(self, filename, basename, metadata);
 
-    if (periodic_pgm_dump){
-        self->images.periodic_pgm_dump_string = periodic_pgm_dump;
-        self->periodic_pgm_period = periodic_pgm_period;
-    }
+    set_net_pgm_dump(self, basename, temporal_pgm_dump,
+		     periodic_pgm_dump, periodic_pgm_period);
 
     self->learning_method = learning_method;
-    self->class_names = class_names;
-    Py_INCREF(self->class_names);
-
-    class_name_lut = PyDict_New();
-    for (long i = 0; i < n_classes; i++){
-        PyObject *k = PySequence_Fast_GET_ITEM(class_names, i);
-        PyObject *v = PyInt_FromLong(i);
-        PyDict_SetItem(class_name_lut, k, v);
-        /* PyInt_FromLong does an incref. So does PyDict_SetItem.
-           That's one two many. */
-        Py_DECREF(v);
-    }
-    self->class_name_lut = class_name_lut;
 
     Py_INCREF(alphabet);
     self->alphabet = alphabet;
@@ -534,7 +608,6 @@ Net_setfloat_bptt(Net *self, PyObject *value, void *closure)
 static const int rnn_offset_presynaptic_noise = offsetof(RecurNN, presynaptic_noise);
 
 static const int bptt_offset_learn_rate = offsetof(RecurNNBPTT, learn_rate);
-static const int bptt_offset_momentum = offsetof(RecurNNBPTT, momentum);
 static const int bptt_offset_ih_scale = offsetof(RecurNNBPTT, ih_scale);
 static const int bptt_offset_ho_scale = offsetof(RecurNNBPTT, ho_scale);
 static const int bptt_offset_momentum_weight = offsetof(RecurNNBPTT, momentum_weight);
@@ -771,6 +844,107 @@ Net_save(Net *self, PyObject *args, PyObject *kwds)
 }
 
 
+static PyObject*
+Net_load(PyTypeObject *class, PyObject *args, PyObject *kwds)
+{
+    const char *filename;
+    PyObject *parse_metadata;
+    RecurNN *net;
+    Net *self;
+
+    static char *kwlist[] = {"filename",             /* s */
+                             "parse_metadata",       /* O */
+                             NULL};
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "sO", kwlist,
+            &filename,            /* s  */
+            &parse_metadata       /* O  */
+        )){
+        return NULL;
+    }
+
+    net = rnn_load_net(filename);
+    if (net == NULL){
+        return PyErr_Format(PyExc_IOError,
+			    "I could not load file '%s'", filename);
+    }
+
+    /* parse the metadata using a passed-in python function into a python
+       dictionary. The keys and the tpyes of the values are proscribed. */
+    PyObject *metadata_pystring = PyString_FromString(net->metadata);
+    PyObject *metadata = PyObject_CallFunctionObjArgs(parse_metadata,
+        metadata_pystring, NULL);
+
+#define METADATA(x) PyDict_GetItemString(metadata, (x))
+
+    PyObject *version_pyint = METADATA("version");
+    int version = PyInt_AsLong(version_pyint);
+    if (version != 1){
+        return PyErr_Format(PyExc_ValueError,
+            "I don't know metadata format version %d", version);
+    }
+
+    PyObject *alphabet_chars = METADATA("alphabet");
+    PyObject *collapse_chars = METADATA("collapse_chars");
+    PyObject *case_insensitive = METADATA("case_insensitive");
+    PyObject *utf8 = METADATA("utf8");
+    PyObject *collapse_space = METADATA("collapse_space");
+
+    PyObject *classnames = METADATA("classnames");
+    PyObject *batch_size = METADATA("batch_size");
+    PyObject *verbose = METADATA("verbose");
+    PyObject *momentum = METADATA("momentum");
+    PyObject *learning_method = METADATA("learning_method");
+
+    PyObject *temporal_pgm_dump = METADATA("temporal_pgm_dump");
+    PyObject *periodic_pgm_dump = METADATA("periodic_pgm_dump");
+    PyObject *periodic_pgm_period = METADATA("periodic_pgm_period");
+    PyObject *basename = METADATA("basename");
+
+#undef METADATA
+
+    PyObject *alphabet = PyObject_CallFunction((PyObject *)&AlphabetType,
+					       "zfffOOOOO", NULL,
+					       0.0, 0.0, 0.0,
+					       case_insensitive,
+					       utf8,
+					       collapse_space,
+					       alphabet_chars,
+					       collapse_chars);
+
+
+    Py_INCREF(alphabet);
+    self = (Net *)class->tp_new(class, args, kwds);
+    self->net = net;
+    self->alphabet = (Alphabet *)alphabet;
+
+    Py_INCREF(classnames);
+    self->n_classes = set_net_classnames(self, classnames);
+    self->momentum = PyFloat_AsDouble(momentum);
+    self->learning_method = PyInt_AsLong(learning_method);
+    self->batch_size = PyInt_AsLong(batch_size);
+    int verbose_flag = PyInt_AsLong(verbose);
+    self->report = verbose_flag ? calloc(sizeof(*self->report), 1) : NULL;
+    self->filename = strdup(filename);
+
+    const char *basename_char;
+    if (PyString_Check(basename)){
+	basename_char = PyString_AsString(basename);
+    }
+    else {
+	basename_char = "multi-text";
+    }
+
+    set_net_pgm_dump(self, basename_char,
+		     PyInt_AsLong(temporal_pgm_dump),
+		     PyString_AsString(periodic_pgm_dump),
+		     PyInt_AsLong(periodic_pgm_period));
+
+    Py_INCREF(self);
+    return (PyObject *)self;
+}
+
+
 static PyMethodDef Net_methods[] = {
     {"train", (PyCFunction)Net_train, METH_VARARGS | METH_KEYWORDS,
      "train the net with a block of text"},
@@ -778,6 +952,8 @@ static PyMethodDef Net_methods[] = {
      "calculate cross entropies for a block of text"},
     {"save", (PyCFunction)Net_save, METH_VARARGS | METH_KEYWORDS,
      "Save the net"},
+    {"load", (PyCFunction)Net_load, METH_VARARGS | METH_KEYWORDS | METH_CLASS,
+     "Load a net (class method)"},
     {"dump_parameters", (PyCFunction)Net_dump_parameters, METH_NOARGS,
      "print net parameters"},
     {NULL}
