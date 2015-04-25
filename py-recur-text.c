@@ -582,6 +582,8 @@ static PyGetSetDef Net_getsetters[] = {
 
 
 static PyMemberDef Net_members[] = {
+    {"alphabet", T_OBJECT_EX, offsetof(Net, alphabet), READONLY,
+     "the net's Alphabet object"},
     {"class_names", T_OBJECT_EX, offsetof(Net, class_names), READONLY,
      "names of classes"},
     {"class_name_lut", T_OBJECT_EX, offsetof(Net, class_name_lut), READONLY,
@@ -595,6 +597,8 @@ static PyMemberDef Net_members[] = {
      "3: classical, 4: adagrad, 5: adadelta, 6: rprop;"},
     {"momentum", T_FLOAT, offsetof(Net, momentum), 0,
      "momentum rate (if applicable)"},
+    {"filename", T_STRING, offsetof(Net, filename), 0,
+     "net will be saved/loaded here"},
     {NULL}
 };
 
