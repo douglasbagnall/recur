@@ -755,11 +755,11 @@ Net_save(Net *self, PyObject *args, PyObject *kwds)
     const char *filename = NULL;
     int backup = 1;
 
-    static char *kwlist[] = {"filename",             /* s */
+    static char *kwlist[] = {"filename",             /* z */
                              "backup",               /* i */
                              NULL};
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "|si", kwlist,
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "|zi", kwlist,
             &filename,
             &backup
         )){
