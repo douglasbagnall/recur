@@ -232,6 +232,34 @@ static PyMethodDef Alphabet_methods[] = {
     {NULL}
 };
 
+static const char alphabet_doc[] =                                      \
+    "Representation of the characters recognised by a Net.\n\n"         \
+    "The Alphabet can be initialised with with a text string from "     \
+    "which a reasonable set of characters will be deduced, or with "    \
+    "explicit string of acceptable characters.\n\n"                     \
+    "When the alphabet is being deduced from a text, the "              \
+    "``threshold``,``digit_adjust``, and ``alpha_adjust`` parameters "  \
+    "determine which characters are used. Characters less frequent "    \
+    "than ``threshold`` (by default 1e-5) are collapsed together into " \
+    "a single representative character. ``alpha_adjust`` and "          \
+    "``digit_adjust`` alter the threshold for ascii letters and "       \
+    "digits respectively. The threshold is divided by this "            \
+    "number for members of the class. By default ``alpha_adjust`` is "  \
+    "3 and ``digit_adjust`` is 0.3; thus with the default "             \
+    "``threshold`` the effective threshold for letters is around "      \
+    "3.3e-6, and that digits is 3.3e-5. Punctuation and other "         \
+    "characters use 1e-5.\n\n"                                          \
+    "There are 3 boolean flag parameters. The ``ignore_case`` causes "  \
+    "uppercase and lowercase versions of a letter to be treated as "    \
+    "one. The ``utf8`` flag causes the string the be treated as "       \
+    "utf-8. If ``utf8`` is False the string is parsed as bytes. "       \
+    "The ``collapse_space`` flag reduces all runs of whitespace to "    \
+    "a single space.\n\n"                                               \
+    "If ``text`` is ``None``, ``alphabet_chars`` must be a string "     \
+    "of characters to use as the alphabet. ``collapse_chars can be "    \
+    "used to specify characters that get mapped to the first "          \
+    "character of ``alphabet_chars``. ``ignore_case``, ``utf8``, and "  \
+    "``collapse_space`` still have meaning.";
 
 static PyTypeObject AlphabetType = {
     PyObject_HEAD_INIT(NULL)
@@ -255,7 +283,7 @@ static PyTypeObject AlphabetType = {
     0,                            /*tp_setattro*/
     0,                            /*tp_as_buffer*/
     Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE, /*tp_flags*/
-    "Alphabet objects",           /* tp_doc */
+    alphabet_doc,                 /* tp_doc */
     0,                            /* tp_traverse */
     0,                            /* tp_clear */
     0,                            /* tp_richcompare */
@@ -959,6 +987,35 @@ static PyMethodDef Net_methods[] = {
     {NULL}
 };
 
+static const char Net_doc[] =                                           \
+    "Multi-headed predictive recurrent neural network\n\n"              \
+    "Besides the ``Net()`` constructor, you can load a saved "          \
+    "with the class method ``Net.load()``.\n\n"                         \
+    "Net.__init__ parameters:\n"                                        \
+    ":param alphabet: an Alphabet object\n"                             \
+    ":param classes: sequence of class names\n"                         \
+    ":param hidden_size: number of hidden recurrent nodes\n"            \
+    "Optional parameters:\n"                                            \
+    ":param log_file: log statistics here (default None meaning "       \
+    "no log)\n"                                                         \
+    ":param bptt_depth: how fat to back-propagate through time\n"       \
+    ":param learn_rate: \n"                                             \
+    ":param filename: save net here\n"                                  \
+    ":param momentum: \n"                                               \
+    ":param presynaptic_noise: \n"                                      \
+    ":param rng_seed: -1 for automatic seed\n"                          \
+    ":param metadata: \n"                                               \
+    ":param activation: \n"                                             \
+    ":param learning_method: \n"                                        \
+    ":param basename: \n"                                               \
+    ":param verbose: \n"                                                \
+    ":param temporal_pgm_dump: \n"                                      \
+    ":param periodic_pgm_dump: \n"                                      \
+    ":param periodic_pgm_period: \n"                                    \
+    ":param batch_size: \n"                                             \
+    ;
+
+
 static PyTypeObject NetType = {
     PyObject_HEAD_INIT(NULL)
     0,                            /*ob_size*/
@@ -981,7 +1038,7 @@ static PyTypeObject NetType = {
     0,                            /*tp_setattro*/
     0,                            /*tp_as_buffer*/
     Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE, /*tp_flags*/
-    "Net objects",                /* tp_doc */
+    Net_doc,                      /* tp_doc */
     0,                            /* tp_traverse */
     0,                            /* tp_clear */
     0,                            /* tp_richcompare */
