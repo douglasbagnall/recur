@@ -156,7 +156,7 @@ int rnn_char_find_alphabet_f(const char *filename, RnnCharAlphabet *alphabet,
     double threshold, double digit_adjust, double alpha_adjust);
 
 int rnn_char_collapse_buffer(RnnCharAlphabet *alphabet, u8 *text,
-    int raw_len, int *collapsed_len);
+    int raw_len, int *collapsed_len, int *char_to_net);
 
 char *rnn_char_uncollapse_text(RnnCharAlphabet *alphabet, const u8 *orig, int len,
     int *dest_len);
@@ -209,6 +209,8 @@ void rnn_char_free_alphabet(RnnCharAlphabet *a);
 int rnn_char_get_codepoint(RnnCharAlphabet *a, const char *s);
 
 RnnCharAlphabet *rnn_char_new_alphabet_from_net(RecurNN *net);
+
+int *rnn_char_new_char_lut(const RnnCharAlphabet *alphabet);
 
 void rnn_char_alphabet_set_flags(RnnCharAlphabet *a,
     bool case_insensitive, bool utf8, bool collapse_space);

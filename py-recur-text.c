@@ -16,6 +16,7 @@ Python bindings for text RNNs.
 typedef struct {
     PyObject_HEAD
     RnnCharAlphabet *alphabet;
+    int *char_to_net;
 } Alphabet;
 
 
@@ -24,6 +25,9 @@ Alphabet_dealloc(Alphabet* self)
 {
     if (self->alphabet){
         rnn_char_free_alphabet(self->alphabet);
+    }
+    if (self->char_to_net){
+        free(self->char_to_net);
     }
     self->ob_type->tp_free((PyObject*)self);
 }
@@ -97,6 +101,8 @@ Alphabet_init(Alphabet *self, PyObject *args, PyObject *kwds)
             return -1;
         }
     }
+    self->char_to_net = rnn_char_new_char_lut(self->alphabet);
+
     return 0;
 }
 
@@ -118,7 +124,8 @@ Alphabet_encode_text(Alphabet *self, PyObject *orig_obj)
         return PyErr_Format(PyExc_ValueError, "encode_text requires a string");
     }
     u8 *s = (u8 *)strndup(orig_str, orig_len + 1);
-    rnn_char_collapse_buffer(self->alphabet, s, orig_len, &new_len);
+    rnn_char_collapse_buffer(self->alphabet, s, orig_len, &new_len,
+        self->char_to_net);
     PyObject *final_obj = PyString_FromStringAndSize((char *)s, new_len);
     free(s);
 

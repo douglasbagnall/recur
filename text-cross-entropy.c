@@ -56,7 +56,7 @@ main(int argc, char *argv[]){
     prefix_text = (u8*)strdup(opt_prefix);
     int raw_len = strlen(opt_prefix);
     rnn_char_collapse_buffer(alphabet, prefix_text,
-        raw_len, &prefix_len);
+        raw_len, &prefix_len, NULL);
   }
   else {
     prefix_text = NULL;
