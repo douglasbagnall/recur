@@ -466,6 +466,7 @@ Net_init(Net *self, PyObject *args, PyObject *kwds)
     int learning_method = RNN_ADAGRAD;
     int verbose = 0;
     int batch_size = 1;
+    int init_method = RNN_INIT_FLAT;
     int temporal_pgm_dump = 0;
     char *periodic_pgm_dump = NULL;
     int periodic_pgm_period = 1000;
@@ -497,10 +498,11 @@ Net_init(Net *self, PyObject *args, PyObject *kwds)
                              "periodic_pgm_dump",    /* z  */
                              "periodic_pgm_period",  /* i  */
                              "batch_size",           /* i  */
+                             "init_method",          /* i  */
                              NULL};
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "O!Oi|zifzffKziiziizii", kwlist,
-            &AlphabetType,
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "O!Oi|zifzffKziiziiziii",
+            kwlist, &AlphabetType,
             &alphabet,            /* O! */
             &class_names,         /* O  */
             &hidden_size,         /* i  |  */
@@ -519,7 +521,8 @@ Net_init(Net *self, PyObject *args, PyObject *kwds)
             &temporal_pgm_dump,   /* i  */
             &periodic_pgm_dump,   /* z  */
             &periodic_pgm_period, /* i  */
-            &batch_size            /* i  */
+            &batch_size,          /* i  */
+            &init_method          /* i  */
         )){
         return -1;
     }
@@ -568,7 +571,10 @@ Net_init(Net *self, PyObject *args, PyObject *kwds)
     self->report = verbose ? calloc(sizeof(*self->report), 1) : NULL;
     self->batch_size = batch_size;
 
-    rnn_randomise_weights_auto(net);
+    if (init_method < RNN_INIT_ZERO || init_method >= RNN_INIT_LAST){
+        init_method = RNN_INIT_ZERO;
+    }
+    rnn_randomise_weights_simple(net, init_method);
 
     net->metadata = metadata;
     if (basename == NULL){
@@ -1022,6 +1028,7 @@ static const char Net_doc[] =                                           \
     ":param periodic_pgm_dump: \n"                                      \
     ":param periodic_pgm_period: \n"                                    \
     ":param batch_size: \n"                                             \
+    ":param init_method: 0: zeros, 1: flat, 2: fan-in, 3: runs\n"       \
     ;
 
 
@@ -1125,6 +1132,11 @@ initcharmodel(void)
     r = r || ADD_INT_CONSTANT(RELOG);
     r = r || ADD_INT_CONSTANT(RETANH);
     r = r || ADD_INT_CONSTANT(RECLIP20);
+
+    r = r || ADD_INT_CONSTANT(INIT_ZERO);
+    r = r || ADD_INT_CONSTANT(INIT_FLAT);
+    r = r || ADD_INT_CONSTANT(INIT_FAN_IN);
+    r = r || ADD_INT_CONSTANT(INIT_RUNS);
 
 #undef ADD_INT_CONSTANT
 
