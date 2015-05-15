@@ -119,7 +119,8 @@ typedef enum {
 } rnn_learning_method;
 
 typedef enum {
-  RNN_INIT_FLAT = 1,
+  RNN_INIT_ZERO = 0,
+  RNN_INIT_FLAT,
   RNN_INIT_FAN_IN,
   RNN_INIT_RUNS,
 

@@ -650,7 +650,11 @@ maybe_randomise_using_submethod(RecurNN *net, struct RecurInitialisationParamete
 
 void
 rnn_randomise_weights_clever(RecurNN *net, struct RecurInitialisationParameters *p){
-  if (p->method == RNN_INIT_FAN_IN){
+  if (p->method == RNN_INIT_ZERO){
+    memset(net->ih_weights, 0, net->ih_size * sizeof(float));
+    memset(net->ho_weights, 0, net->ho_size * sizeof(float));
+  }
+  else if (p->method == RNN_INIT_FAN_IN){
     randomise_weights_fan_in(net,
         p->fan_in_sum,
         p->fan_in_step,
