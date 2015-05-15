@@ -568,6 +568,8 @@ Net_init(Net *self, PyObject *args, PyObject *kwds)
     self->report = verbose ? calloc(sizeof(*self->report), 1) : NULL;
     self->batch_size = batch_size;
 
+    rnn_randomise_weights_auto(net);
+
     net->metadata = metadata;
     if (basename == NULL){
         basename = "multi-text";
