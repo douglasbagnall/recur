@@ -109,6 +109,21 @@ will train quickly to a cross entropy around 2.
     make text-predict
     ./text-predict --help
 
+## Multi-head character level modelling in Python
+
+If you want to measure the comparative cross-entropy of a text against
+a number of related character-level language models, and you want to
+use Python 2.7 to wrangle the text, you are probably looking for
+`charmodel.so`. To build it you need the `python2.7-dev` (or
+equivalent) package. Try:
+
+    make charmodel.so
+    python -c 'import charmodel'
+
+The [caravel] project is based on this module.
+
+[caravel]: https://github.com/pan-webis-de/caravel
+
 ## Copyright and license
 
 Copyright (C) 2014 Douglas Bagnall douglas@halo.gen.nz
