@@ -928,6 +928,8 @@ Net_load(PyTypeObject *class, PyObject *args, PyObject *kwds)
     PyObject *version_pyint = METADATA("version");
     int version = PyInt_AsLong(version_pyint);
     if (version != 1){
+        Py_DECREF(metadata_pystring);
+        Py_DECREF(metadata);
         return PyErr_Format(PyExc_ValueError,
             "I don't know metadata format version %d", version);
     }
@@ -989,6 +991,8 @@ Net_load(PyTypeObject *class, PyObject *args, PyObject *kwds)
 		     PyInt_AsLong(periodic_pgm_period));
 
     Py_INCREF(self);
+    Py_DECREF(metadata_pystring);
+    Py_DECREF(metadata);
     return (PyObject *)self;
 }
 
