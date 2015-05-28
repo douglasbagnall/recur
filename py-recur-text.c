@@ -572,7 +572,7 @@ Net_init(Net *self, PyObject *args, PyObject *kwds)
     self->batch_size = batch_size;
 
     if (init_method < RNN_INIT_ZERO || init_method >= RNN_INIT_LAST){
-        init_method = RNN_INIT_ZERO;
+        init_method = RNN_INIT_FLAT;
     }
     rnn_randomise_weights_simple(net, init_method);
 
