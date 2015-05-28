@@ -913,10 +913,15 @@ Net_load(PyTypeObject *class, PyObject *args, PyObject *kwds)
     }
 
     /* parse the metadata using a passed-in python function into a python
-       dictionary. The keys and the tpyes of the values are proscribed. */
+       dictionary. The keys and the types of the values are proscribed. */
     PyObject *metadata_pystring = PyString_FromString(net->metadata);
     PyObject *metadata = PyObject_CallFunctionObjArgs(parse_metadata,
         metadata_pystring, NULL);
+    if (metadata == NULL){
+        /* an exception in parse_metadata() */
+        Py_DECREF(metadata_pystring);
+        return NULL;
+    }
 
 #define METADATA(x) PyDict_GetItemString(metadata, (x))
 
