@@ -134,15 +134,6 @@ rnn_char_init_schedule(RnnCharSchedule *s, int recent_len,
   s->adjust_noise = adjust_noise;
 }
 
-static inline int
-write_possibly_utf8_char(int c, char *dest, int utf8){
-  if (utf8){
-    return write_utf8_char(c, dest);
-  }
-  *dest = c;
-  return 1;
-}
-
 int
 rnn_char_confabulate(RecurNN *net, char *dest, int char_len,
     int byte_len, RnnCharAlphabet* a, float bias, int *prev_char,

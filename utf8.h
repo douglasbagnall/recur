@@ -53,6 +53,15 @@ write_utf8_char(uint code, char *s){
 }
 
 static inline int
+write_possibly_utf8_char(int c, char *dest, int utf8){
+  if (utf8){
+    return write_utf8_char(c, dest);
+  }
+  *dest = c;
+  return 1;
+}
+
+static inline int
 fput_utf8_char(uint code, FILE *f){
   char s[5];
   int n = write_utf8_char(code, s);
