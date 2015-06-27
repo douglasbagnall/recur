@@ -94,9 +94,9 @@ colourise_text(RecurNN *net, RnnCharAlphabet *alphabet, u8 *text, int len,
     //printf("(%.3f %d)", log_p, colour_index);
     fputs(colours[colour_index], stdout);
     if (colour_index > 20){
-      fputs(ITALIC, stdout);
+      fputs(C_ITALIC, stdout);
       fwrite(buffer, 1, j, stdout);
-      fputs(STANDARD, stdout);
+      fputs(C_STANDARD, stdout);
     }
     else {
       fwrite(buffer, 1, j, stdout);
