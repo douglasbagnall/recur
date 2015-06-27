@@ -1,6 +1,7 @@
 /*Colour strings for ANSI compatible terminals.*/
 
 #define C_NORMAL  "\033[00m"
+#define BG_NORMAL  "\043[00m"
 #define C_DARK_RED  "\033[00;31m"
 #define C_RED "\033[01;31m"
 #define C_DARK_GREEN  "\033[00;32m"
