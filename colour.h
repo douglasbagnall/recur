@@ -19,5 +19,5 @@
 
 #define C_REV_RED "\033[01;41m"
 
-#define C_ITALIC "\\x1B[3m"
-#define C_STANDARD "\\x1B[23m"
+#define C_ITALIC "\x1B[3m"
+#define C_STANDARD "\x1B[23m"
