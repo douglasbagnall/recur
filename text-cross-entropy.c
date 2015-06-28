@@ -23,6 +23,7 @@ static char *opt_prefix = NULL;
 static float opt_colour_scale = 0;
 static float opt_colour_decay = 1;
 static bool opt_colour_24_bit = false;
+static float opt_italic_threshold = 100;
 
 static struct opt_table options[] = {
   OPT_WITH_ARG("-f|--filename=<file>", opt_set_charp, opt_show_charp, &opt_filename,
@@ -39,6 +40,9 @@ static struct opt_table options[] = {
       &opt_colour_decay, "set < 1 for exponential decay in colour"),
   OPT_WITHOUT_ARG("--colour-24-bit", opt_set_bool,
       &opt_colour_24_bit, "use a 24 bit RGB colour spectrum"),
+  OPT_WITH_ARG("--italic-threshold=<n>", opt_set_floatval, opt_show_floatval,
+      &opt_italic_threshold, "characters with this much entropy are italicised"
+      " (only in colour mode)"),
 
   OPT_WITHOUT_ARG("-h|--help", opt_usage_and_exit,
       "-f NET TEXTFILE [TEXT...] \n"
@@ -51,7 +55,7 @@ static struct opt_table options[] = {
 static double
 colourise_text(RecurNN *net, RnnCharAlphabet *alphabet, u8 *text, int len,
     int skip, u8 *prefix_text, int prefix_len, float scale, float decay,
-    bool use_24_bit){
+    bool use_24_bit, float italic_threshold){
   double entropy = 0;
   float error[net->output_size];
   int i;
@@ -81,6 +85,8 @@ colourise_text(RecurNN *net, RnnCharAlphabet *alphabet, u8 *text, int len,
   }
   write_possibly_utf8_char(alphabet->points[text[skip]], buffer, utf8);
   float rolling_log_p = 1;
+  float prev_log_p = 1;
+  uint prev_index = 0xffff;
   for (; i < len - 1; i++){
     float *answer = one_hot_opinion(net, text[i], 0);
     softmax(error, answer, n_chars);
@@ -91,19 +97,22 @@ colourise_text(RecurNN *net, RnnCharAlphabet *alphabet, u8 *text, int len,
     float log_p = -capped_log2f(e);
     rolling_log_p = rolling_log_p * (1.0f - decay) + log_p * decay;
     uint colour_index = MIN(rolling_log_p * scale, n_colours - 1);
-    //printf("(%.3f %d)", log_p, colour_index);
-    fputs(colours[colour_index], stdout);
-    if (colour_index > 20){
-      fputs(C_ITALIC, stdout);
-      fwrite(buffer, 1, j, stdout);
-      fputs(C_STANDARD, stdout);
+    if (colour_index != prev_index){
+      fputs(colours[colour_index], stdout);
+      if (prev_log_p >= italic_threshold && log_p < italic_threshold){
+        fputs(C_STANDARD, stdout);
+      }
+      else if (log_p >= italic_threshold){
+        fputs(C_ITALIC, stdout);
+      }
+      prev_index = colour_index;
     }
-    else {
-      fwrite(buffer, 1, j, stdout);
-    }
+    prev_log_p = log_p;
+    fwrite(buffer, 1, j, stdout);
     entropy += log_p;
   }
   entropy /= (len - skip - 1);
+  fputs(C_STANDARD, stdout);
   puts(normal_colour);
   return entropy;
 }
@@ -150,7 +159,7 @@ main(int argc, char *argv[]){
       if (opt_colour_scale){
         entropy = colourise_text(net, alphabet, text, len, opt_ignore_first,
             prefix_text, prefix_len, opt_colour_scale, opt_colour_decay,
-            opt_colour_24_bit);
+            opt_colour_24_bit, opt_italic_threshold);
       }
       else {
         entropy = rnn_char_cross_entropy(net, alphabet, text, len, opt_ignore_first,
