@@ -183,7 +183,7 @@ int rnn_char_epoch(RnnCharModel *model, RecurNN *confab_net, RnnCharVentropy *v,
     const u8 *text, const int len,
     const int start, const int stop,
     float confab_bias, int confab_size, int confab_line_end,
-    int quietness);
+    int quietness, uint diagonal_only_section, uint diagonal_only_friends);
 
 char *rnn_char_construct_metadata(const struct RnnCharMetadata *m);
 int rnn_char_load_metadata(const char *metadata, struct RnnCharMetadata *m);

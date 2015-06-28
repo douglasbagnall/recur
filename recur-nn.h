@@ -328,6 +328,9 @@ void rnn_weight_noise(RecurNN *net, float deviation);
 void rnn_set_momentum_values(RecurNN *net, float x);
 void rnn_set_aux_values(RecurNN *net, float x);
 
+void rnn_zap_non_diagonals(RecurNN *net, int start, int stop, int n_friends);
+void rnn_clear_diagonal_only_section(RecurNN *net, uint len, uint friends);
+
 
 static inline void
 rnn_log_float(RecurNN *net, char *name, float value){

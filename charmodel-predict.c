@@ -256,7 +256,7 @@ rnn_char_epoch(RnnCharModel *model, RecurNN *confab_net, RnnCharVentropy *v,
     const u8 *text, const int len,
     const int start, const int stop,
     float confab_bias, int confab_size, int confab_line_end,
-    int quietness){
+    int quietness, uint diagonal_only_section, uint diagonal_only_friends){
   int i, j;
   float error = 0.0f;
   float entropy = 0.0f;
@@ -274,6 +274,11 @@ rnn_char_epoch(RnnCharModel *model, RecurNN *confab_net, RnnCharVentropy *v,
   struct timespec *time_start = timers;
   struct timespec *time_end = timers + 1;
   clock_gettime(CLOCK_MONOTONIC, time_start);
+
+  if (diagonal_only_section){
+    rnn_clear_diagonal_only_section(net, diagonal_only_section,
+        diagonal_only_friends);
+  }
   for(i = start; i < len - 1; i++){
     float momentum = rnn_calculate_momentum_soft_start(net->generation,
         model->momentum, model->momentum_soft_start);
@@ -309,6 +314,11 @@ rnn_char_epoch(RnnCharModel *model, RecurNN *confab_net, RnnCharVentropy *v,
       error += e;
       entropy += capped_log2f(1.0f - e);
     }
+
+    /* XXX this will be happening too often in the case of temporal
+       batching */
+    rnn_clear_diagonal_only_section(net, diagonal_only_section,
+        diagonal_only_friends);
 
     if (model->images.input_ppm){
       temporal_ppm_add_row(model->images.input_ppm, net->input_layer);

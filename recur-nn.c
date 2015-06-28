@@ -1092,3 +1092,72 @@ rnn_scale_initial_weights(RecurNN *net, float target_gain){
   DEBUG("scaled toward target gain %.3f; hit roughly %.3f; adjusted by %.3f",
       target_gain, tail_out / tail_in, net_adjustment);
 }
+
+/* Zero non-diagonal hidden to hidden wieghts in some region of the matrix.
+
+ */
+
+void
+rnn_zap_non_diagonals(RecurNN *net, int start, int stop,
+    int friend_n)
+{
+  int x, y;
+  float *restrict weights = net->ih_weights;
+  int h_end = net->hidden_size + 1;
+  int friend_start = start - friend_n;
+  if (start >= h_end || start < 0){
+    MAYBE_DEBUG("net->hidden size is %d, diagonal zap start is %d; doing nothing",
+        net->hidden_size, start);
+    return;
+  }
+  if (start > stop){
+    DEBUG("diagonal zap start is %d, stop is %d; doing nothing",
+        start, stop);
+    return;
+  }
+  if (stop > h_end){
+    DEBUG("net->hidden size is %d, diagonal zap stop is %d; truncating",
+        net->hidden_size, stop);
+    stop = h_end;
+  }
+  if (friend_n > stop - start || friend_start <= 0){
+    DEBUG("diagonal friend parameter %d is stupid: start is %d stop %d, "
+        "size %d ...ignoring it", friend_n, start, stop, h_end);
+    friend_n = 0;
+  }
+
+  float *row_start = weights + start;
+  int zero_len = stop - start;
+  int stride = net->h_size;
+
+  MAYBE_DEBUG("start %d stop %d, len %d stride %d offset %d",
+      start, stop, zero_len, stride, row_start - weights);
+
+  for (y = 0; y < h_end; y++){
+    if (y < friend_start || y >= stop){
+      memset(row_start, 0, zero_len * sizeof(float));
+    }
+    else if (y < start){
+      x = y - friend_start;
+      memset(row_start, 0, x * sizeof(float));
+      memset(row_start + x + 1, 0, (zero_len - x - 1) * sizeof(float));
+    }
+    else {
+      x = y - start;
+      memset(row_start, 0, x * sizeof(float));
+      memset(row_start + x + 1, 0, (zero_len - x - 1) * sizeof(float));
+    }
+    row_start += stride;
+  }
+}
+
+void
+rnn_clear_diagonal_only_section(RecurNN *net, uint len,
+    uint friends)
+{
+  int h_end = net->hidden_size + 1; /* because bias */
+  int start = h_end - len;
+  int stop = h_end;
+  friends = MIN(friends, len);
+  rnn_zap_non_diagonals(net, start, stop, friends);
+}

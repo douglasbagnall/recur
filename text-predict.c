@@ -177,6 +177,9 @@ static bool opt_adjust_noise = DEFAULT_ADJUST_NOISE;
 static float opt_ada_ballast = -1;
 static int opt_activation = DEFAULT_ACTIVATION;
 static int opt_fp_exception_level = DEFAULT_FP_EXCEPTION_LEVEL;
+static uint opt_diagonal_only_section = 0;
+static float opt_diagonal_only_boost = 0;
+static uint opt_diagonal_only_friends = 0;
 
 static struct opt_table options[] = {
   OPT_WITH_ARG("-H|--hidden-size=<n>", opt_set_uintval, opt_show_uintval,
@@ -318,6 +321,14 @@ static struct opt_table options[] = {
       &opt_activation, "1: ReLU, 2: ReSQRT, 3: ReLOG, 4: ReTANH, 5: clipped ReLU"),
   OPT_WITH_ARG("--fp-exception-level", opt_set_intval, opt_show_intval,
       &opt_fp_exception_level, "floating point exceptions; 0: none, 1: some, 2: all"),
+  OPT_WITH_ARG("--diagonal-only-section", opt_set_uintval, opt_show_uintval,
+      &opt_diagonal_only_section, "restrict this many hidden neurons to diagonal "
+      "connections"),
+  OPT_WITH_ARG("--diagonal-only-friends", opt_set_uintval, opt_show_uintval,
+      &opt_diagonal_only_friends, "this many of the diagonal-only neurons have "
+      "a recurrent friend"),
+  OPT_WITH_ARG("--diagonal-only-boost", opt_set_floatval, opt_show_floatval,
+      &opt_diagonal_only_boost, "add to weights in --diagonal-only-section"),
 
   OPT_WITHOUT_ARG("-h|--help", opt_usage_and_exit,
       ": Rnn modelling of text at the character level",
@@ -426,6 +437,25 @@ finish(RnnCharModel *model, RnnCharVentropy *v){
     float ventropy = rnn_char_calc_ventropy(model, v, 0);
     DEBUG("final entropy %.3f; learn rate %.2g; momentum %.2g",
         ventropy, bptt->learn_rate, bptt->momentum);
+  }
+}
+
+static void prepare_diagonal_only_section(RecurNN *net,
+    uint len, uint friends, float boost)
+{
+  if (len > (unsigned)net->hidden_size){
+    FATAL_ERROR("diagonal_only_section is too big! %u > %d",
+        len, net->hidden_size);
+  }
+  rnn_clear_diagonal_only_section(net, len, friends);
+
+  int h_end = net->hidden_size + 1;
+  int start = h_end - len;
+  int stop = h_end;
+  if (boost){
+    for (int i = start; i < stop; i++){
+      net->ih_weights[i * net->h_size + i] += boost;
+    }
   }
 }
 
@@ -569,6 +599,12 @@ load_and_train_model(struct RnnCharMetadata *m, RnnCharAlphabet *alphabet){
     confab_line_end = rnn_char_get_codepoint(alphabet, "\n");
   }
 
+  if (opt_diagonal_only_section){
+    prepare_diagonal_only_section(net, opt_diagonal_only_section,
+        opt_diagonal_only_friends,
+        opt_diagonal_only_boost);
+  }
+
   int finished = 0;
   BELOW_QUIET_LEVEL(2){
     START_TIMER(run);
@@ -578,7 +614,8 @@ load_and_train_model(struct RnnCharMetadata *m, RnnCharAlphabet *alphabet){
       START_TIMER(epoch);
       finished = rnn_char_epoch(&model, confab_net, &v,
           text, text_len, start_char, opt_stop, opt_confab_bias, CONFAB_SIZE,
-          confab_line_end, opt_quiet);
+          confab_line_end, opt_quiet, opt_diagonal_only_section,
+          opt_diagonal_only_friends);
       DEBUG_TIMER(epoch);
       DEBUG_TIMER(run);
       start_char = 0;
@@ -588,7 +625,8 @@ load_and_train_model(struct RnnCharMetadata *m, RnnCharAlphabet *alphabet){
     do {
       finished = rnn_char_epoch(&model, NULL, &v,
           text, text_len, start_char, opt_stop, 0, 0,
-          confab_line_end, opt_quiet);
+          confab_line_end, opt_quiet, opt_diagonal_only_section,
+          opt_diagonal_only_friends);
       start_char = 0;
     }
     while (! finished);
