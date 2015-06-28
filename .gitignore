@@ -39,3 +39,4 @@ local.mak
 /text-classify
 /text-classify-results
 /text-predict
+/colour-spectrum.h
