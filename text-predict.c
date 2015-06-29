@@ -507,11 +507,6 @@ load_and_train_model(struct RnnCharMetadata *m, RnnCharAlphabet *alphabet){
     bptt->momentum_weight = opt_momentum_weight;
   }
 
-  if (model.images.periodic_pgm_dump_string){
-    rnn_multi_pgm_dump(net, model.images.periodic_pgm_dump_string,
-        model.images.basename);
-  }
-
   model.net = net;
   model.training_nets = rnn_new_training_set(net, model.n_training_nets);
 
@@ -603,6 +598,11 @@ load_and_train_model(struct RnnCharMetadata *m, RnnCharAlphabet *alphabet){
     prepare_diagonal_only_section(net, opt_diagonal_only_section,
         opt_diagonal_only_friends,
         opt_diagonal_only_boost);
+  }
+
+  if (model.images.periodic_pgm_dump_string){
+    rnn_multi_pgm_dump(net, model.images.periodic_pgm_dump_string,
+        model.images.basename);
   }
 
   int finished = 0;
