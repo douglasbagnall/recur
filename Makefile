@@ -178,7 +178,7 @@ test/test_fb_backprop: %: $(RNN_OBJECTS) %.o $(OPT_OBJECTS)  | nets images
 colour-spectrum.h:
 	scripts/colour-gen > $@
 
-text-cross-entropy: colour-spectrum.h
+text-cross-entropy.o: colour-spectrum.h
 
 text-confabulate text-cross-entropy text-predict: %: $(RNN_OBJECTS) %.o \
 	charmodel-predict.o charmodel-init.o $(OPT_OBJECTS)  \
