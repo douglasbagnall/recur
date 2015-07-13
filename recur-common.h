@@ -91,7 +91,7 @@ typedef unsigned int uint;
 /*memory allocation. It needs to be SSE aligned */
 #define ALIGNMENT 16
 static inline __attribute__((__malloc__, __assume_aligned__(16),
-        __alloc_size__(1), __nonnull__)) void *
+        __returns_nonnull__)) void *
 malloc_aligned_or_die(size_t size){
   void *mem;
   if (sizeof(void*) * 2 >= ALIGNMENT){
