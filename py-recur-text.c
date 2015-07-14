@@ -119,16 +119,17 @@ Alphabet_encode_text(Alphabet *self, PyObject *orig_obj)
 {
     const char *orig_str = PyString_AsString(orig_obj);
     int orig_len = PyString_Size(orig_obj);
-    int new_len;
+    int encoded_len;
+
     if (orig_str == NULL || orig_len < 0){
         return PyErr_Format(PyExc_ValueError, "encode_text requires a string");
     }
-    u8 *s = (u8 *)strndup(orig_str, orig_len + 1);
-    rnn_char_collapse_buffer(self->alphabet, s, orig_len, &new_len,
-        self->char_to_net);
-    PyObject *final_obj = PyString_FromStringAndSize((char *)s, new_len);
-    free(s);
 
+    u8 *encoded_text = rnn_char_alloc_encoded_text(alphabet,
+        orig_str, orig_len, &encoded_len, NULL, false);
+
+    PyObject *final_obj = PyString_FromStringAndSize((char *)encoded_text,
+        encoded_len);
     return final_obj;
 }
 

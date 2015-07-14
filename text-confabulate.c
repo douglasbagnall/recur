@@ -71,12 +71,9 @@ main(int argc, char *argv[]){
   int prev_char = 0;
 
   if (opt_prefix){
-    u8 *prefix_text;
     int prefix_len;
-    prefix_text = (u8*)strdup(opt_prefix);
-    int raw_len = strlen(opt_prefix);
-    rnn_char_collapse_buffer(alphabet, prefix_text,
-        raw_len, &prefix_len, NULL);
+    u8 *prefix_text = rnn_char_alloc_encoded_text(alphabet,
+        opt_prefix, strlen(opt_prefix), &prefix_len, NULL, false);
     prev_char = rnn_char_prime(net, alphabet, prefix_text, prefix_len);
     if (opt_show_prefix){
       printf(C_CYAN "%s" C_NORMAL, opt_prefix);

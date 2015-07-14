@@ -138,10 +138,8 @@ main(int argc, char *argv[]){
   int prefix_len;
 
   if (opt_prefix){
-    prefix_text = (u8*)strdup(opt_prefix);
-    int raw_len = strlen(opt_prefix);
-    rnn_char_collapse_buffer(alphabet, prefix_text,
-        raw_len, &prefix_len, NULL);
+    prefix_text = rnn_char_alloc_encoded_text(alphabet,
+        opt_prefix, strlen(opt_prefix), &prefix_len, NULL, false);
   }
   else {
     prefix_text = NULL;

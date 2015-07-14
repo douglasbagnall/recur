@@ -264,10 +264,13 @@ rnn_char_new_char_lut(const RnnCharAlphabet *alphabet){
   return ctn;
 }
 
+/* Encode a text string in a given alphabet, returning
+   new (u8*) memory */
 
-int
-rnn_char_collapse_buffer(RnnCharAlphabet *alphabet, u8 *text,
-    int raw_len, int *collapsed_len, int *char_to_net){
+u8 *
+rnn_char_alloc_encoded_text(RnnCharAlphabet *alphabet, const char *text,
+    int byte_len, int *encoded_len, int *char_to_net, bool verbose)
+{
   int collapse_space = alphabet->flags & RNN_CHAR_FLAG_COLLAPSE_SPACE;
   int utf8 = alphabet->flags & RNN_CHAR_FLAG_UTF8;
   int i, j;
@@ -284,8 +287,10 @@ rnn_char_collapse_buffer(RnnCharAlphabet *alphabet, u8 *text,
     cleanup_char_to_net = 0;
   }
 
-  const char *s = (char*)text;
-  for(i = 0, j = 0; i < raw_len; i++){
+  u8 *encoded_text = malloc_aligned_or_die(byte_len * 2 + 4);
+
+  const char *s = text;
+  for(i = 0, j = 0; i < byte_len; i++){
     if (utf8){
       chr = read_utf8_char(&s);
       if (chr <= 0){
@@ -301,37 +306,42 @@ rnn_char_collapse_buffer(RnnCharAlphabet *alphabet, u8 *text,
     if (collapse_space){
       if (c != space || prev != space){
         prev = c;
-        text[j] = c;
+        encoded_text[j] = c;
         j++;
       }
     }
     else {
-      text[j] = c;
+      encoded_text[j] = c;
       j = i;
     }
   }
-  text[j] = 0;
-  *collapsed_len = j;
+  encoded_text[j] = 0;
+  *encoded_len = j;
   if (cleanup_char_to_net){
     free(char_to_net);
   }
-  return i;
+  if (verbose){
+    STDERR_DEBUG("original text was %d chars (%d bytes), encoded is %d",
+        i, byte_len, *encoded_len);
+  }
+  return realloc(encoded_text, j + 1);
 }
 
 
 u8*
 rnn_char_alloc_collapsed_text(const char *filename, RnnCharAlphabet *alphabet,
-    int *text_len, int quietness){
-  u8 *text;
+    int *encoded_len, int quietness){
+  char *raw_text;
   int raw_len;
-  rnn_char_alloc_file_contents(filename, (char**)&text, &raw_len);
-  int chars = rnn_char_collapse_buffer(alphabet, text, raw_len, text_len,
-      NULL);
-  if (quietness < 1){
-    STDERR_DEBUG("original text was %d chars (%d bytes), collapsed is %d",
-        chars, raw_len, *text_len);
-  }
-  return text;
+
+  rnn_char_alloc_file_contents(filename, &raw_text, &raw_len);
+
+  bool verbose = (quietness < 1);
+  u8 *encoded_text = rnn_char_alloc_encoded_text(alphabet,
+      raw_text, raw_len, encoded_len, NULL, verbose);
+
+  free(raw_text);
+  return encoded_text;
 }
 
 void
