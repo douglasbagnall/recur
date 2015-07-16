@@ -158,11 +158,11 @@ int rnn_char_find_alphabet_f(const char *filename, RnnCharAlphabet *alphabet,
 u8 *rnn_char_alloc_encoded_text(RnnCharAlphabet *alphabet, const char *text,
     int byte_len, int *encoded_len, int *char_to_net, bool verbose);
 
+u8* rnn_char_load_new_encoded_text(const char *filename,
+    RnnCharAlphabet *alphabet, int *encoded_len, int quietness);
+
 char *rnn_char_uncollapse_text(RnnCharAlphabet *alphabet, const u8 *orig, int len,
     int *dest_len);
-
-u8* rnn_char_alloc_collapsed_text(const char *filename, RnnCharAlphabet *alphabet,
-    int *text_len, int quietness);
 
 void rnn_char_dump_collapsed_text(const u8 *text, int len, const char *name,
     const char *alphabet);

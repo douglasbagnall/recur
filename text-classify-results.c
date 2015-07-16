@@ -82,7 +82,9 @@ main(int argc, char *argv[]){
 
   for (int i = 1; i < argc; i++){
     const char *filename = argv[i];
-    u8* text = rnn_char_alloc_collapsed_text(filename, alphabet, &len, 3);
+    u8* text = rnn_char_load_new_encoded_text(filename, alphabet, &len, 3);
+
+
     if (len >= opt_min_length){
       memset(sum, 0, net->output_size * sizeof(float));
       memset(sumsq, 0, net->output_size * sizeof(float));

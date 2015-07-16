@@ -327,16 +327,19 @@ rnn_char_alloc_encoded_text(RnnCharAlphabet *alphabet, const char *text,
   return realloc(encoded_text, j + 1);
 }
 
+/* Load and encode text from the named file, using the given alphabet.
+   Returns new (u8*) memory */
 
 u8*
-rnn_char_alloc_collapsed_text(const char *filename, RnnCharAlphabet *alphabet,
-    int *encoded_len, int quietness){
+rnn_char_load_new_encoded_text(const char *filename,
+    RnnCharAlphabet *alphabet, int *encoded_len, int quietness)
+{
   char *raw_text;
   int raw_len;
+  bool verbose = (quietness < 1);
 
   rnn_char_alloc_file_contents(filename, &raw_text, &raw_len);
 
-  bool verbose = (quietness < 1);
   u8 *encoded_text = rnn_char_alloc_encoded_text(alphabet,
       raw_text, raw_len, encoded_len, NULL, verbose);
 

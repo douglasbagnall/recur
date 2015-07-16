@@ -548,7 +548,7 @@ load_and_train_model(struct RnnCharMetadata *m, RnnCharAlphabet *alphabet){
   int text_len;
   u8* validate_text;
 
-  u8* text = rnn_char_alloc_collapsed_text(opt_textfile, alphabet,
+  u8* text = rnn_char_load_new_encoded_text(opt_textfile, alphabet,
       &text_len, opt_quiet);
   if (opt_dump_collapsed_text){
     rnn_char_dump_collapsed_text(text, text_len, opt_dump_collapsed_text, m->alphabet);
