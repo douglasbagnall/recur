@@ -135,6 +135,7 @@ main(int argc, char *argv[]){
 
   RecurNN *net = rnn_load_net(opt_filename);
   RnnCharAlphabet *alphabet = rnn_char_new_alphabet_from_net(net);
+  int *char_to_net = rnn_char_new_char_lut(alphabet);
   init_rand64_maybe_randomly(&net->rng, -1);
 
   u8 *prefix_text;
@@ -182,7 +183,7 @@ main(int argc, char *argv[]){
     useful_len = raw_len - start;
     if (useful_len >= opt_min_length){
       encoded_text = rnn_char_alloc_encoded_text(alphabet,
-          useful_text, useful_len, &encoded_len, NULL, false);
+          useful_text, useful_len, &encoded_len, char_to_net, false);
       double entropy;
       if (opt_colour_scale){
         entropy = colourise_text(net, alphabet, encoded_text, encoded_len,
@@ -199,6 +200,7 @@ main(int argc, char *argv[]){
     }
     free(raw_text);
   }
+  free(char_to_net);
   DEBUG("processed %d texts", count);
   return 0;
 }
