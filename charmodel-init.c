@@ -275,7 +275,7 @@ rnn_char_alloc_encoded_text(RnnCharAlphabet *alphabet, const char *text,
   int utf8 = alphabet->flags & RNN_CHAR_FLAG_UTF8;
   int i, j;
   int space = find_space(alphabet);
-  u8 prev = 0;
+  u8 prev = space;
   u8 c;
   int chr = 0;
   int cleanup_char_to_net;
@@ -312,7 +312,7 @@ rnn_char_alloc_encoded_text(RnnCharAlphabet *alphabet, const char *text,
     }
     else {
       encoded_text[j] = c;
-      j = i;
+      j++;
     }
   }
   encoded_text[j] = 0;
@@ -324,6 +324,7 @@ rnn_char_alloc_encoded_text(RnnCharAlphabet *alphabet, const char *text,
     STDERR_DEBUG("original text was %d chars (%d bytes), encoded is %d",
         i, byte_len, *encoded_len);
   }
+
   return realloc(encoded_text, j + 1);
 }
 
