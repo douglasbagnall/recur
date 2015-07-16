@@ -19,6 +19,7 @@ This file is GPL2+, due to the ccan/opt link.
 static char *opt_filename = NULL;
 static int opt_min_length = 0;
 static int opt_ignore_first = 0;
+static int opt_ignore_lines = 0;
 static char *opt_prefix = NULL;
 static float opt_colour_scale = 0;
 static float opt_colour_decay = 1;
@@ -32,6 +33,8 @@ static struct opt_table options[] = {
       "ignore texts shorter than this"),
   OPT_WITH_ARG("-i|--ignore-first=<n>", opt_set_intval, opt_show_intval, &opt_ignore_first,
       "ignore first n characters"),
+  OPT_WITH_ARG("-I|--ignore-lines=<n>", opt_set_intval, opt_show_intval, &opt_ignore_lines,
+      "ignore first n lines (altogether, without priming)"),
   OPT_WITH_ARG("-p|--prefix=<chars>", opt_set_charp, opt_show_charp, &opt_prefix,
       "pretend each file starts with this"),
   OPT_WITH_ARG("-c|--colour-scale", opt_set_floatval, opt_show_floatval,
@@ -146,27 +149,55 @@ main(int argc, char *argv[]){
     prefix_len = 0;
   }
 
-  int len;
   int count = 0;
 
   for (int i = 1; i < argc; i++){
     const char *filename = argv[i];
-    u8* text = rnn_char_alloc_collapsed_text(filename, alphabet, &len, 3);
-    if (len >= opt_min_length){
+    char *raw_text;
+    int raw_len;
+    char *useful_text;
+    int useful_len;
+    u8 *encoded_text;
+    int encoded_len;
+    int start = 0;
+    rnn_char_alloc_file_contents(filename, &raw_text, &raw_len);
+    if (opt_ignore_lines){
+      int lines = 0;
+      for (start = 0; start < raw_len; start++){
+        if (raw_text[start] == '\n'){
+          lines++;
+          if (lines == opt_ignore_lines){
+            break;
+          }
+        }
+      }
+      if (start == raw_len){
+        DEBUG("Completely ignoring %s because --ignore-lines=%d, "
+            "more than we have", filename, opt_ignore_lines);
+        free(raw_text);
+        continue;
+      }
+    }
+    useful_text = raw_text + start;
+    useful_len = raw_len - start;
+    if (useful_len >= opt_min_length){
+      encoded_text = rnn_char_alloc_encoded_text(alphabet,
+          useful_text, useful_len, &encoded_len, NULL, false);
       double entropy;
       if (opt_colour_scale){
-        entropy = colourise_text(net, alphabet, text, len, opt_ignore_first,
-            prefix_text, prefix_len, opt_colour_scale, opt_colour_decay,
-            opt_colour_24_bit, opt_italic_threshold);
+        entropy = colourise_text(net, alphabet, encoded_text, encoded_len,
+            opt_ignore_first, prefix_text, prefix_len, opt_colour_scale,
+            opt_colour_decay, opt_colour_24_bit, opt_italic_threshold);
       }
       else {
-        entropy = rnn_char_cross_entropy(net, alphabet, text, len, opt_ignore_first,
-            prefix_text, prefix_len);
+        entropy = rnn_char_cross_entropy(net, alphabet, encoded_text,
+            encoded_len, opt_ignore_first, prefix_text, prefix_len);
       }
       fprintf(stdout, "%s %.5f\n", filename, entropy);
       count++;
+      free(encoded_text);
     }
-    free(text);
+    free(raw_text);
   }
   DEBUG("processed %d texts", count);
   return 0;
