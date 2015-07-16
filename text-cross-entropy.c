@@ -81,12 +81,13 @@ colourise_text(RecurNN *net, RnnCharAlphabet *alphabet, u8 *text, int len,
   if (prefix_text){
     rnn_char_prime(net, alphabet, prefix_text, prefix_len);
   }
-  puts(normal_colour);
   for (i = 0; i < skip; i++){
     one_hot_opinion(net, text[i], 0);
     write_possibly_utf8_char(alphabet->points[text[i]], buffer, utf8);
+    fwrite(buffer, 1, j, stdout);
   }
-  write_possibly_utf8_char(alphabet->points[text[skip]], buffer, utf8);
+  int j = write_possibly_utf8_char(alphabet->points[text[i]], buffer, utf8);
+  fwrite(buffer, 1, j, stdout);
   float rolling_log_p = 1;
   float prev_log_p = 1;
   uint prev_index = 0xffff;
