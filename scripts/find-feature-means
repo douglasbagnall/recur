@@ -1,0 +1,23 @@
+#!/usr/bin/python
+import sys
+import numpy as np
+
+def load(fn):
+    # Find the number of fields in order to skip the first column
+    f = open(fn)
+    line = f.next()
+    f.close()
+    fields = line.count(',') + 1
+    usecols = range(1, fields)
+
+    return np.loadtxt(fn, delimiter=',', usecols=usecols)
+
+def main():
+    fn = sys.argv[1]
+    data = load(fn)
+    print "mean"
+    print np.mean(data, axis=0)
+    print "standard deviation"
+    print np.std(data, axis=0)
+
+main()
