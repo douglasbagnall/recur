@@ -4,6 +4,7 @@ import random
 import itertools
 import time
 import json
+import re
 import numpy as np
 from math import sqrt
 from classify_stats import draw_roc_curve, calc_stats, draw_presence_roc
@@ -1056,8 +1057,11 @@ class TimedFile(object):
         self.timings = timings
         self.targets = [x[3] for x in timings]
 
+def always(x):
+    return True
+
 def load_timings(all_classes, timing_files, audio_directories, min_call_intensity=0,
-                 max_call_duration=0):
+                 max_call_duration=0, accept=always):
     timings = {}
     for fn in timing_files:
         classes = None
@@ -1072,12 +1076,13 @@ def load_timings(all_classes, timing_files, audio_directories, min_call_intensit
     timed_files = []
     for d in audio_directories:
         for fn, ffn in targeted_wav_finder(d, timings):
-            t = TimedFile(fn, ffn, timings[fn])
-            timed_files.append(t)
+            if accept(fn):
+                t = TimedFile(fn, ffn, timings[fn])
+                timed_files.append(t)
 
     return timed_files
 
-def load_timings_from_file_names(classes, audio_directories):
+def load_timings_from_file_names(classes, audio_directories, accept):
     group_map = {}
     for i, group in enumerate(classes):
         for x in group:
@@ -1087,7 +1092,7 @@ def load_timings_from_file_names(classes, audio_directories):
         for d, subdirs, files in os.walk(root):
             for fn in files:
                 c = fn[0]
-                if fn.endswith('.wav') and c in group_map:
+                if accept(fn) and c in group_map:
                     ffn = os.path.join(d, fn)
                     group = group_map[c]
                     target = 'c%dt0:' + '=' * group + c + '=' * (len(classes) - group - 1)
@@ -1097,12 +1102,12 @@ def load_timings_from_file_names(classes, audio_directories):
 
     return timed_files
 
-def load_untimed_files(audio_directories):
+def load_untimed_files(audio_directories, accept):
     untimed_files = []
     for root in audio_directories:
         for d, subdirs, files in os.walk(root):
             for fn in files:
-                if fn.endswith('.wav'):
+                if accept(fn):
                     ffn = os.path.join(d, fn)
                     t = TimedFile(fn, ffn, None)
                     untimed_files.append(t)
@@ -1160,6 +1165,8 @@ def add_common_args(parser):
                        help="ignore calls longer than this")
     group.add_argument('--features-file', type=str, default=None,
                        help="write raw features to this file")
+    group.add_argument('--accept-file-regex', type=str, default='.+\.(wav|WAV)$',
+                       help="accept files matching this regex ['.+\.(wav|WAV)$']")
 
 def process_common_args(c, args, random_seed=1, timed=True,
                         load_net=True, load_files=True):
@@ -1190,21 +1197,27 @@ def process_common_args(c, args, random_seed=1, timed=True,
     if random_seed is not None:
         random.seed(random_seed)
 
+    accept_file = re.compile(args.accept_file_regex).search
+
     if not load_files:
         return None
     if not timed:
         if args.audio_directory:
-            files = load_untimed_files(args.audio_directory)
+            files = load_untimed_files(args.audio_directory,
+                                       accept_file)
         else:
             files = []
     elif args.classes_from_file_names:
         files = load_timings_from_file_names(c.class_groups,
-                                             args.audio_directory)
+                                             args.audio_directory,
+                                             accept_file)
     else:
         files = load_timings(c.class_groups,
                              args.timings,
                              args.audio_directory,
                              args.min_call_intensity,
-                             args.max_call_duration)
+                             args.max_call_duration,
+                             accept_file)
     random.shuffle(files)
+
     return files
