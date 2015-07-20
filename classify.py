@@ -107,6 +107,7 @@ class BaseClassifier(object):
         #XXX many arguments are quietly ignored.
         self.setp('net-filename', filename)
         for gstarg, kwarg in (('ignore-start', 'ignore_start'),
+                              ('features-file', 'features_file'),
                               ):
             val = kwargs.get(kwarg)
             if val is not None:
@@ -129,7 +130,8 @@ class BaseClassifier(object):
               bottom_layer=0, window_size=None, min_freq=None,
               knee_freq=None, max_freq=None, lag=0,
               ignore_start=0, delta_features=0,
-              focus_freq=0, intensity_feature=0):
+              focus_freq=0, intensity_feature=0,
+              features_file=None):
         self._setup_classes(class_string)
         for gstarg, pyarg in (('window-size', window_size),
                               ('mfccs', mfccs),
@@ -141,12 +143,12 @@ class BaseClassifier(object):
                               ('focus-frequency', focus_freq),
                               ('delta-features', delta_features),
                               ('intensity-feature', intensity_feature),
+                              ('features-file', features_file),
                               ('lag', lag),
                               ('ignore-start', ignore_start),
                               ('basename', basename)):
             if pyarg is not None:
                 self.setp(gstarg, pyarg)
-
 
     def on_eos(self, bus, msg):
         print('on_eos()')
@@ -1156,6 +1158,8 @@ def add_common_args(parser):
                        help="threshold for call intensity (if calls have intensity)")
     group.add_argument('--max-call-duration', type=float, default=0,
                        help="ignore calls longer than this")
+    group.add_argument('--features-file', type=str, default=None,
+                       help="write raw features to this file")
 
 def process_common_args(c, args, random_seed=1, timed=True,
                         load_net=True, load_files=True):
@@ -1164,7 +1168,8 @@ def process_common_args(c, args, random_seed=1, timed=True,
         c.setp('force-load', args.force_load)
         if args.net_filename:
             c.setup_from_file(args.net_filename,
-                              ignore_start=args.ignore_start)
+                              ignore_start=args.ignore_start,
+                              features_file=args.features_file)
         else:
             c.setup(args.mfccs,
                     args.hidden_size,
@@ -1179,7 +1184,8 @@ def process_common_args(c, args, random_seed=1, timed=True,
                     lag=args.lag,
                     ignore_start=args.ignore_start,
                     delta_features=args.delta_features,
-                    intensity_feature=args.intensity_feature)
+                    intensity_feature=args.intensity_feature,
+                    features_file=args.features_file)
 
     if random_seed is not None:
         random.seed(random_seed)

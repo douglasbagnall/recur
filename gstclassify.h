@@ -93,6 +93,7 @@ typedef struct _ClassifyChannel
   int *group_target;
   int *group_winner;
   TemporalPPM *mfcc_image;
+  FILE *features_file;
 } ClassifyChannel;
 
 struct _GstClassify
