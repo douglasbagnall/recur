@@ -330,7 +330,7 @@ class Classifier(BaseClassifier):
         r_sum2, w_sum2 = 0, 0
         r_count = 0
         w_count = 0
-        for s, t, time in scores:
+        for s, t, _time in scores:
             if t:
                 r_sum += s
                 r_sum2 += s * s
