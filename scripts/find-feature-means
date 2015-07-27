@@ -1,6 +1,7 @@
 #!/usr/bin/python
 import sys
 import numpy as np
+import argparse
 
 def load(fn):
     # Find the number of fields in order to skip the first column
@@ -12,12 +13,48 @@ def load(fn):
 
     return np.loadtxt(fn, delimiter=',', usecols=usecols)
 
+def bounded_identity(bound):
+    def big_or_zero(x):
+        if abs(x) >= bound:
+            return x
+        return 0.0
+    return big_or_zero
+
+def bounded_recip(bound):
+    def recip_or_bound(x):
+        if abs(x) >= bound:
+            return 1.0 / abs(x)
+        return 1.0 / bound
+    return recip_or_bound
+
 def main():
-    fn = sys.argv[1]
-    data = load(fn)
-    print "mean"
-    print np.mean(data, axis=0)
-    print "standard deviation"
-    print np.std(data, axis=0)
+    parser = argparse.ArgumentParser()
+    parser.add_argument("csv_file",
+                        help="where to find the raw numbers")
+    parser.add_argument("-F", "--feature-offsets", action="store_true",
+                        help="output in style needed by classify plugin")
+    parser.add_argument("-b", "--bound", type=float, default=1e-4,
+                        help="disregard values smaller than this")
+    args = parser.parse_args()
+    data = load(args.csv_file)
+    if args.feature_offsets:
+        for name, raw_seq, f in (
+                ('mean', np.mean(data, axis=0), bounded_identity(args.bound)),
+                ('std', np.std(data, axis=0), bounded_recip(args.bound))
+                ):
+            print name,
+            seq = []
+            for x in raw_seq:
+                seq.append(f(x))
+            i = len(seq) - 1
+            while i and not seq[i]:
+                i -= 1
+
+            print ':'.join('%.3g' % x for x in seq[:i + 1])
+    else:
+        print "mean"
+        print np.mean(data, axis=0)
+        print "standard deviation"
+        print np.std(data, axis=0)
 
 main()
