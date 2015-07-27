@@ -93,7 +93,6 @@ typedef struct _ClassifyChannel
   int *group_target;
   int *group_winner;
   TemporalPPM *mfcc_image;
-  FILE *features_file;
 } ClassifyChannel;
 
 struct _GstClassify
@@ -132,6 +131,7 @@ struct _GstClassify
   float lag;
   float confirmation_lag;
   float weight_noise;
+  FILE *features_file;
 };
 
 struct _GstClassifyClass

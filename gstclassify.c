@@ -175,8 +175,7 @@ G_DEFINE_TYPE (GstClassify, gst_classify, GST_TYPE_AUDIO_FILTER)
 
 static inline void
 init_channel(ClassifyChannel *c, RecurNN *net,
-    int window_size, int id, int n_groups, uint delta_depth,
-    FILE *features_file)
+    int window_size, int id, int n_groups, uint delta_depth)
 {
   c->net = net;
   int n_inputs;
@@ -205,7 +204,6 @@ init_channel(ClassifyChannel *c, RecurNN *net,
     c->mfcc_image = temporal_ppm_alloc(n_inputs, 300, "features", id,
         PGM_DUMP_COLOUR, &c->features);
   }
-  c->features_file = features_file;
 }
 
 static inline void
@@ -224,9 +222,6 @@ finalise_channel(ClassifyChannel *c)
     c->mfcc_image = NULL;
   }
   free(c->group_target);
-  if (c->features_file){
-    fclose(c->features_file);
-  }
 }
 
 /* Clean up */
@@ -1138,13 +1133,16 @@ gst_classify_setup(GstAudioFilter *base, const GstAudioInfo *info){
     }
     self->subnets = rnn_new_training_set(self->net, self->n_channels);
 
-    const char *s = get_gvalue_string(PENDING_PROP(self, PROP_FEATURES_FILE), NULL);
-    FILE *features_file = s ? fopen(s, "w") : NULL;
-
+    if (self->features_file){
+      fclose(self->features_file);
+    }
+    const char *features_filename = PP_GET_STRING(self, PROP_FEATURES_FILE, NULL);
+    DEBUG("features file %s", features_filename);
+    self->features_file = features_filename ? fopen(features_filename, "w") : NULL;
+    free((char *)features_filename);
     for (int i = 0; i < self->n_channels; i++){
       init_channel(&self->channels[i], self->subnets[i],
-          self->window_size, i, self->n_groups, self->delta_features,
-          features_file);
+          self->window_size, i, self->n_groups, self->delta_features);
     }
   }
   const float ignore_start = PP_GET_FLOAT(self, PROP_IGNORE_START,
@@ -1838,12 +1836,12 @@ prepare_channel_features(GstClassify *self, s16 *buffer_i, int j){
   if (c->mfcc_image){
     temporal_ppm_row_from_source(c->mfcc_image);
   }
-  if (c->features_file){
-    fprintf(c->features_file, "channel %d,", j);
+  if (self->features_file){
+    fprintf(self->features_file, "channel %d,", j);
     for(i = 0; i < c->net->input_size - 1; i++){
-      fprintf(c->features_file, "%5e,", c->features[i]);
+      fprintf(self->features_file, "%5e,", c->features[i]);
     }
-    fprintf(c->features_file, "%5e\n", c->features[i]);
+    fprintf(self->features_file, "%5e\n", c->features[i]);
   }
   float *tmp;
   tmp = c->pcm_next;
