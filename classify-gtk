@@ -9,7 +9,7 @@ from classify import add_common_args, process_common_args
 def main():
     gst_init()
     parser = argparse.ArgumentParser()
-    add_common_args(parser)
+    prop_names = add_common_args(parser)
     parser.add_argument('-C', '--first-n', type=int, default=0,
                         help="look at this many files from the audio directory")
     parser.add_argument('-R', '--reverse', action='store_true',
@@ -27,17 +27,17 @@ def main():
 
     if args.microphone:
         c = GTKClassifier(sinkname='fakesink', srcname='autoaudiosrc')
-        process_common_args(c, args, timed=False, load_files=False)
+        process_common_args(c, args, prop_names, timed=False, load_files=False)
         run(c, [], args.reverse)
     else:
         c = GTKClassifier(sinkname='autoaudiosink', srcname='filesrc')
         if args.min_changes:
-            files = process_common_args(c, args, timed=True)
+            files = process_common_args(c, args, prop_names, timed=True)
             files = [x for x in files
                      if len(x.timings) >= args.min_changes]
         else:
             #by default ignore timings
-            files = process_common_args(c, args, timed=False)
+            files = process_common_args(c, args, prop_names, timed=False)
 
         files = args.files[:] + [x.fullname for x in files]
         run(c, files, args.reverse, args.full_screen)

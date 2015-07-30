@@ -14,23 +14,42 @@ DEFAULT_LEARN_RATE_TIME_OFFSET = 2000.0
 
 from classify import gst_init
 from classify import Trainer, lr_sqrt_exp, lr_inverse_time
+from classify import add_args_from_classifier
 from classify import add_common_args, process_common_args
 
 def main():
     gst_init()
     parser = argparse.ArgumentParser()
-    add_common_args(parser)
+    prop_names = add_common_args(parser)
+
     group = parser.add_argument_group('classify-train specific arguments')
-    group.add_argument('-l', '--learn-rate', type=float, default=DEFAULT_LEARN_RATE,
-                       help="learning rate")
-    group.add_argument('--learning-style', type=int, default=DEFAULT_LEARNING_STYLE,
-                       help="0: weighted, 1: Nesterov, 2: simplified N., "
-                       "3: classical, 4: adagrad, 5:adadelta")
-    group.add_argument('--momentum', type=float, default=DEFAULT_MOMENTUM,
-                       help="learning momentum")
-    group.add_argument('--momentum-soft-start', type=float,
-                       default=DEFAULT_MOMENTUM_SOFT_START,
-                       help="high numbers slowly build up momentum")
+
+    add_args_from_classifier(group, (['-H', '--hidden-size'],
+                                     ['-B', '--bottom-layer'],
+                                     ['--pgm-dump'],
+                                     ['-l', '--learn-rate'],
+                                     ['--learning-style'],
+                                     ['-m', '--momentum'],
+                                     ['--momentum-soft-start'],
+                                     ['--top-learn-rate-scale'],
+                                     ['--bottom-learn-rate-scale'],
+                                     ['-r', '--random-alignment'],
+                                     ['-E', '--error-weight'],
+                                     ['--bptt-depth'],
+                                     ['--mfccs'],
+                                     ['--weight-noise'],
+                                     ['--presynaptic-noise'],
+                                     ['--activation'],
+                                     ['--delta-features'],
+                                     ['--intensity-feature'],
+                                     ['-w', '--window-size'],
+                                     ['--focus-frequency'],
+                                     ['--min-frequency'],
+                                     ['--max-frequency'],
+                                     ['--knee-frequency'],
+                                     ['--lag'],
+                                 ))
+
     group.add_argument('--learn-rate-decay', type=float, default=DEFAULT_LEARN_RATE_DECAY,
                        help="learning rate decay")
     group.add_argument('--learn-rate-time-offset', type=float,
@@ -43,29 +62,16 @@ def main():
                        help="don't save the net, periodically or otherwise")
     group.add_argument('-C', '--channels', default=12, type=int,
                        help="how many channels to use")
-    group.add_argument('-r', '--random-alignment', action='store_true',
-                       help="slightly randomise alignment of fft windows")
-    group.add_argument('-E', '--error-weights',
-                       help="multiply output errors by these ratios")
-    group.add_argument('--bptt-depth', type=int,
-                       help="Depth of BPTT training")
     group.add_argument('--activity-bias', type=int, default=1,
                        help="Train more on examples with changing classes")
     group.add_argument('-P', '--prioritise', action='store_true',
                        help="Do not renice downwards")
     group.add_argument('--test-interval', type=int, default=0,
                        help="Test after this many training cycles")
-    group.add_argument('--weight-noise', type=float, default=0.0,
-                       help="std dev of noise added to weights before each cycle")
-    group.add_argument('--presynaptic-noise', type=float, default=0.0,
-                       help="std dev of noise added before non-linearity")
     group.add_argument('--weight-init-scale', type=float, default=0.0,
                        help="scale weights to approximately this gain")
     group.add_argument('--log-file', default="auto",
                        help="log to this file (default: based on net basename)")
-    group.add_argument('--activation', default=1, type=int,
-                       help="activation function (1: ReLU, 2: ReSQRT, 3: ReLOG, "
-                       "4:ReTANH, 5: Clipped ReLU)")
     args = parser.parse_args()
 
     if args.learn_rate_schedule == "flat":
@@ -97,7 +103,7 @@ def main():
         c.test_interval = args.test_interval
     c.setp('weight-noise', args.weight_noise)
     c.setp('weight-init-scale', args.weight_init_scale)
-    timed_files = process_common_args(c, args)
+    timed_files = process_common_args(c, args, prop_names)
 
     validate_streams = [timed_files[:n_channels]]
     training_streams = [timed_files[n_channels:]]
@@ -110,9 +116,6 @@ def main():
             break
         random.shuffle(s)
         training_streams.append(s[i:])
-
-    if args.error_weights:
-        c.setp('error-weight', args.error_weights)
 
     c.train(training_streams, validate_streams,
             iterations=args.iterations,

@@ -104,15 +104,13 @@ class BaseClassifier(object):
         self.setp = self.classifier.set_property
         self.getp = self.classifier.get_property
 
-    def setup_from_file(self, filename, **kwargs):
+    def setup_from_file(self, filename, properties):
         #XXX many arguments are quietly ignored.
         self.setp('net-filename', filename)
-        for gstarg, kwarg in (('ignore-start', 'ignore_start'),
-                              ('features-file', 'features_file'),
-                              ):
-            val = kwargs.get(kwarg)
-            if val is not None:
-                self.setp(gstarg, val)
+        for k in ('ignore-start', 'features-file'):
+            v = properties.get(k)
+            if v is not None:
+                self.setp(k, v)
         self._setup_classes()
 
     def _setup_classes(self, class_string=None):
@@ -127,29 +125,10 @@ class BaseClassifier(object):
                 self.classes.append(k)
                 self.class_group_indices[k] = i
 
-    def setup(self, mfccs, hsize, class_string, basename='classify',
-              bottom_layer=0, window_size=None, min_freq=None,
-              knee_freq=None, max_freq=None, lag=0,
-              ignore_start=0, delta_features=0,
-              focus_freq=0, intensity_feature=0,
-              features_file=None):
-        self._setup_classes(class_string)
-        for gstarg, pyarg in (('window-size', window_size),
-                              ('mfccs', mfccs),
-                              ('hidden-size', hsize),
-                              ('bottom-layer', bottom_layer),
-                              ('min-frequency', min_freq),
-                              ('max-frequency', max_freq),
-                              ('knee-frequency', knee_freq),
-                              ('focus-frequency', focus_freq),
-                              ('delta-features', delta_features),
-                              ('intensity-feature', intensity_feature),
-                              ('features-file', features_file),
-                              ('lag', lag),
-                              ('ignore-start', ignore_start),
-                              ('basename', basename)):
-            if pyarg is not None:
-                self.setp(gstarg, pyarg)
+    def setup(self, properties):
+        self._setup_classes(properties.pop('classes', None))
+        for k, v in properties.items():
+            self.setp(k, v)
 
     def on_eos(self, bus, msg):
         print('on_eos()')
@@ -566,7 +545,6 @@ def peak_periodic_scores(scores, period, nth, smooth=0, kaiser=7):
             c = [x[0] for x in scores[start:i]]
             if endtime > 0 and len(c) > nth:
                 chunks.append([starttime, endtime, c])
-                #sys.exit()
             start = i
             starttime = endtime
             endtime += period
@@ -577,10 +555,8 @@ def peak_periodic_scores(scores, period, nth, smooth=0, kaiser=7):
         chunks.append([starttime, endtime, c])
 
     for c in chunks:
-        #print c
-        #print len(c[2])
         c[2] = sorted(c[2])[-nth]
-        #print c
+
     return chunks
 
 
@@ -1114,93 +1090,86 @@ def load_untimed_files(audio_directories, accept):
 
     return untimed_files
 
+def add_args_from_classifier(group, arg_names):
+    classifier = Gst.ElementFactory.make('classify')
+    prop_lut = {x.name : x for x in classifier.list_properties()}
+    type_lut = {
+        'gchararray': str,
+        'gint': int,
+        'guint': int,
+        'guint64': long,
+        'gfloat': float,
+        'gdouble': float,
+        'gboolean': bool,
+    }
+    for args in arg_names:
+        prop_name = args[-1][2:]
+        prop = prop_lut[prop_name]
+        prop_type = type_lut[prop.value_type.name]
+        kwargs = {
+            'type': prop_type,
+            'default': prop.default_value,
+            'help': prop.blurb
+        }
+        if prop_type is bool and not prop.default_value:
+            kwargs['action'] = 'store_true'
+            del kwargs['type']
+
+        group.add_argument(*args, **kwargs)
+    return set(prop_lut)
 
 def add_common_args(parser):
     group = parser.add_argument_group('Common arguments')
+
     group.add_argument('-v', '--verbosity', type=int, default=1,
                        help='0 for near silence, 2 for lots of rubbish output')
     group.add_argument('-t', '--timings', action='append',
                        help='read timings from here')
     group.add_argument('--classes-from-file-names', action='store_true',
                        help='the first letter of each file indicates its class')
-    group.add_argument('-f', '--net-filename',
-                       help='load RNN from here')
     group.add_argument('-d', '--audio-directory', action='append',
                        help='find audio in this directory')
     group.add_argument('-i', '--iterations', type=int, default=10000,
                        help="how many file cycles to run for")
-    group.add_argument('-H', '--hidden-size', type=int,
-                       help="number of hidden neurons")
-    group.add_argument('-B', '--bottom-layer', type=int,
-                       help="number of bottom layer output nodes")
-    group.add_argument('-c', '--classes', default='01',
-                       help="classes (letter per class, groups separated by commas)")
-    group.add_argument('-w', '--window-size', default=WINDOW_SIZE, type=int,
-                       help="size of the FFT window")
-    group.add_argument('-n', '--basename', default=BASENAME,
-                       help="save nets etc using this basename")
-    group.add_argument('-F', '--force-load', action='store_true',
-                       help="load the net even if metadata doesn't match")
-    group.add_argument('--delta-features', type=int,
-                       help="use this many layers of derivitive features")
-    group.add_argument('--intensity-feature', action='store_true',
-                       help="use the overall intensity as a feature")
-    group.add_argument('--lag', type=float, default=0.0,
-                       help="add this much lag to loaded times")
-    group.add_argument('--ignore-start', type=float, default=0.0,
-                       help="ignore this many seconds at start of file")
-    group.add_argument('--focus-frequency', type=float, default=0.0,
-                       help="focus on frequencies around this")
-    group.add_argument('--min-frequency', type=float, default=MIN_FREQUENCY,
-                       help="lowest audio frequency to consider")
-    group.add_argument('--max-frequency', type=float, default=MAX_FREQUENCY,
-                       help="highest audio frequency to consider")
-    group.add_argument('--knee-frequency', type=float, default=KNEE_FREQUENCY,
-                       help="higher for more top-end response")
-    group.add_argument('--mfccs', type=int, default=0,
-                       help="How many MFCCs to use (0 for raw fft bins)")
     group.add_argument('--min-call-intensity', type=float, default=0,
                        help="threshold for call intensity (if calls have intensity)")
     group.add_argument('--max-call-duration', type=float, default=0,
                        help="ignore calls longer than this")
-    group.add_argument('--features-file', type=str, default=None,
-                       help="write raw features to this file")
     group.add_argument('--accept-file-regex', type=str, default='.+\.(wav|WAV)$',
                        help="accept files matching this regex ['.+\.(wav|WAV)$']")
 
-def process_common_args(c, args, random_seed=1, timed=True,
+    return  add_args_from_classifier(group, (['-f', '--net-filename'],
+                                             ['-c', '--classes'],
+                                             ['-n', '--basename'],
+                                             ['-F', '--force-load'],
+                                             ['--ignore-start'],
+                                             ['--features-file'],
+                                         ))
+
+
+def process_common_args(c, args, prop_names, random_seed=1, timed=True,
                         load_net=True, load_files=True):
+    vargs = vars(args)
+    properties = {k.replace('_', '-'): v for k, v in vargs.items()
+                  if k in prop_names}
+
     c.verbosity = args.verbosity
     if load_net:
         c.setp('force-load', args.force_load)
         if args.net_filename:
             c.setup_from_file(args.net_filename,
-                              ignore_start=args.ignore_start,
-                              features_file=args.features_file)
+                              properties)
         else:
-            c.setup(args.mfccs,
-                    args.hidden_size,
-                    args.classes,
-                    window_size=args.window_size,
-                    bottom_layer=args.bottom_layer,
-                    basename=args.basename,
-                    min_freq=args.min_frequency,
-                    max_freq=args.max_frequency,
-                    knee_freq=args.knee_frequency,
-                    focus_freq=args.focus_frequency,
-                    lag=args.lag,
-                    ignore_start=args.ignore_start,
-                    delta_features=args.delta_features,
-                    intensity_feature=args.intensity_feature,
-                    features_file=args.features_file)
+            c.setup(properties)
 
     if random_seed is not None:
         random.seed(random_seed)
 
-    accept_file = re.compile(args.accept_file_regex).search
-
     if not load_files:
         return None
+
+    accept_file = re.compile(args.accept_file_regex).search
+
     if not timed:
         if args.audio_directory:
             files = load_untimed_files(args.audio_directory,

@@ -295,7 +295,7 @@ class MultiClassifier(BaseClassifier):
 def main():
     gst_init()
     parser = argparse.ArgumentParser()
-    add_common_args(parser)
+    prop_names = add_common_args(parser)
     group = parser.add_argument_group('multi-test specific arguments')
     group.add_argument('-C', '--first-n', type=int, default=0,
                        help="classify this many files")
@@ -326,7 +326,8 @@ def main():
     c = MultiClassifier(n_classifiers=len(args.nets))
     #c.verbosity = 2
     c.set_filenames(*args.nets)
-    timed_files = process_common_args(c, args, timed=timed, load_net=False)
+    timed_files = process_common_args(c, args, prop_names, timed=timed,
+                                      load_net=False)
     if args.min_changes:
         timed_files = [x for x in timed_files
                        if len(x.timings) >= args.min_changes]
