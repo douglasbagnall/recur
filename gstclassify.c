@@ -76,11 +76,8 @@ enum
 #define DEFAULT_PROP_ERROR_WEIGHT ""
 #define DEFAULT_BASENAME "classify"
 #define DEFAULT_PROP_SAVE_NET NULL
-#define DEFAULT_PROP_LAWN_MOWER 0
-#define DEFAULT_PROP_TRAINING 0
 #define DEFAULT_PROP_MFCCS 0
 #define DEFAULT_PROP_DELTA_FEATURES 0
-#define DEFAULT_PROP_INTENSITY_FEATURE FALSE
 #define DEFAULT_PROP_MOMENTUM 0.95f
 #define DEFAULT_PROP_MOMENTUM_SOFT_START 0.0f
 #define DEFAULT_PROP_LEARNING_STYLE 1
@@ -99,10 +96,7 @@ enum
 
 #define DEFAULT_PROP_CLASSES "01"
 #define DEFAULT_PROP_BPTT_DEPTH 30
-#define DEFAULT_PROP_FORGET 0
-#define DEFAULT_PROP_FORCE_LOAD 0
 #define DEFAULT_PROP_BOTTOM_LAYER 0
-#define DEFAULT_PROP_RANDOM_ALIGNMENT 1
 #define DEFAULT_WINDOW_SIZE 256
 #define DEFAULT_HIDDEN_SIZE 199
 #define DEFAULT_LEARN_RATE 0.0001
@@ -365,25 +359,25 @@ gst_classify_class_init (GstClassifyClass * klass)
   g_object_class_install_property (gobject_class, PROP_INTENSITY_FEATURE,
       g_param_spec_boolean("intensity-feature", "intensity-feature",
           "Use the total signal intensity as one input",
-          DEFAULT_PROP_INTENSITY_FEATURE,
+          0,
           G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class, PROP_FORGET,
       g_param_spec_boolean("forget", "forget",
           "Forget the current hidden layer (all channels)",
-          DEFAULT_PROP_FORGET,
+          0,
           G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class, PROP_FORCE_LOAD,
       g_param_spec_boolean("force-load", "force-load",
           "Force the net to load even if metadata doesn't match",
-          DEFAULT_PROP_FORCE_LOAD,
+          0,
           G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class, PROP_RANDOM_ALIGNMENT,
       g_param_spec_boolean("random-alignment", "random-alignment",
           "randomly offset beginning of audio frames",
-          DEFAULT_PROP_RANDOM_ALIGNMENT,
+          0,
           G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class, PROP_BOTTOM_LAYER,
@@ -397,7 +391,7 @@ gst_classify_class_init (GstClassifyClass * klass)
   g_object_class_install_property (gobject_class, PROP_TRAINING,
       g_param_spec_boolean("training", "training",
           "set to true to train",
-          DEFAULT_PROP_TRAINING,
+          0,
           G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class, PROP_LAG,
@@ -538,7 +532,7 @@ gst_classify_class_init (GstClassifyClass * klass)
   g_object_class_install_property (gobject_class, PROP_LAWN_MOWER,
       g_param_spec_boolean("lawn-mower", "lawn-mower",
           "Don't let any weight grow bigger than " QUOTE(RNN_LAWN_MOWER_THRESHOLD),
-          DEFAULT_PROP_LAWN_MOWER,
+          0,
           G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class, PROP_LOAD_NET_NOW,
@@ -623,7 +617,7 @@ gst_classify_init (GstClassify * self)
   self->mfcc_factory = NULL;
   self->audio_queue = NULL;
   self->net_filename = NULL;
-  self->training = DEFAULT_PROP_TRAINING;
+  self->training = FALSE;
   self->pending_properties = calloc(PROP_LAST, sizeof(GValue));
   self->class_events = NULL;
   self->class_events_index = 0;
@@ -723,7 +717,7 @@ static int parse_classes_string(GstClassify *self, const char *orig)
     PP_GET_INT(self, PROP_DELTA_FEATURES, DEFAULT_PROP_DELTA_FEATURES), \
     PP_GET_FLOAT(self, PROP_FOCUS_FREQUENCY, DEFAULT_FOCUS_FREQUENCY),  \
     PP_GET_FLOAT(self, PROP_LAG, DEFAULT_PROP_LAG),                     \
-    PP_GET_BOOLEAN(self, PROP_INTENSITY_FEATURE, DEFAULT_PROP_INTENSITY_FEATURE), \
+    PP_GET_BOOLEAN(self, PROP_INTENSITY_FEATURE, 0),                    \
     PP_GET_FLOAT(self, PROP_CONFIRMATION_LAG, DEFAULT_PROP_CONFIRMATION_LAG), \
     }
 
@@ -851,12 +845,23 @@ setup_audio(GstClassify *self, int window_size, int mfccs, float min_freq,
   self->confirmation_lag = confirmation_lag;
   GST_LOG("mfccs: %d", mfccs);
   self->mfccs = mfccs;
+  int n_features = get_n_features(self);
+
+  self->features_offset_string = features_offset_string;
+  self->n_feature_offsets = alloc_floats_from_colon_sep_string(self,
+      features_offset_string,
+      &self->feature_offsets, n_features);
+
+  self->features_scale_string = features_scale_string;
+  self->n_feature_scales = alloc_floats_from_colon_sep_string(self,
+      features_scale_string,
+      &self->feature_scales, n_features);
 }
 
 static RecurNN *
 load_specified_net(GstClassify *self, const char *filename){
   struct ClassifyMetadata m = CLASSIFY_METADATA_DEFAULTS(self);
-  int force_load = PP_GET_BOOLEAN(self, PROP_FORCE_LOAD, DEFAULT_PROP_FORCE_LOAD);
+  int force_load = PP_GET_BOOLEAN(self, PROP_FORCE_LOAD, 0);
   RecurNN *net = rnn_load_net(filename);
   if (net == NULL){
     FATAL_ERROR("Could not load %s", filename);
@@ -951,7 +956,7 @@ create_net(GstClassify *self, int bottom_layer_size,
   float presynaptic_noise = PP_GET_FLOAT(self, PROP_PRESYNAPTIC_NOISE,
     DEFAULT_PROP_PRESYNAPTIC_NOISE);
 
-  int lawnmower = PP_GET_BOOLEAN(self, PROP_LAWN_MOWER, DEFAULT_PROP_LAWN_MOWER);
+  int lawnmower = PP_GET_BOOLEAN(self, PROP_LAWN_MOWER, 0);
   if (lawnmower){
     flags |= RNN_COND_USE_LAWN_MOWER;
   }
@@ -992,7 +997,7 @@ load_or_create_net(GstClassify *self){
   int bottom_layer_size = PP_GET_INT(self, PROP_BOTTOM_LAYER, 0);
   const char *class_string = PP_GET_STRING(self, PROP_CLASSES, DEFAULT_PROP_CLASSES);
   int top_layer_size = count_class_group_members(class_string);
-  int force_load = PP_GET_BOOLEAN(self, PROP_FORCE_LOAD, DEFAULT_PROP_FORCE_LOAD);
+  int force_load = PP_GET_BOOLEAN(self, PROP_FORCE_LOAD, 0);
   if (self->net_filename == NULL){
     set_net_filename(self, hidden_size, bottom_layer_size, top_layer_size, metadata);
   }
@@ -1080,7 +1085,7 @@ load_or_create_net_and_audio(GstClassify *self)
       PP_GET_FLOAT(self, PROP_KNEE_FREQUENCY, DEFAULT_KNEE_FREQUENCY),
       PP_GET_FLOAT(self, PROP_FOCUS_FREQUENCY, DEFAULT_FOCUS_FREQUENCY),
       PP_GET_INT(self, PROP_DELTA_FEATURES, DEFAULT_PROP_DELTA_FEATURES),
-      PP_GET_BOOLEAN(self, PROP_INTENSITY_FEATURE, DEFAULT_PROP_INTENSITY_FEATURE),
+      PP_GET_BOOLEAN(self, PROP_INTENSITY_FEATURE, 0),
       PP_GET_FLOAT(self, PROP_LAG, DEFAULT_PROP_LAG),
       PP_GET_FLOAT(self, PROP_CONFIRMATION_LAG, DEFAULT_PROP_CONFIRMATION_LAG)
   );
