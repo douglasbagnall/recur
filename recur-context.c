@@ -135,7 +135,7 @@ extract_audio_features(RecurContext *context){
   float scale = 1.0f / (dct_bins[0] ? dct_bins[0] : 1.0f);
   context->current_audio[0] = (dct_bins[0] - previous_volume) * scale;
   for (int i = 1; i < RECUR_N_MFCCS; i++){
-    context->current_audio[i] = dct_bins[i]  * scale;
+    context->current_audio[i] = dct_bins[i] * scale;
   }
 }
 
