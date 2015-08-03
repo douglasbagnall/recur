@@ -96,15 +96,14 @@ def main():
 
     c = Trainer(channels=n_channels)
     c.no_save_net = args.no_save_net
-    c.setp('random-alignment', args.random_alignment)
+    c.maybe_setp('random-alignment', args.random_alignment)
     if args.bptt_depth:
-        c.setp('bptt-depth', args.bptt_depth)
+        c.maybe_setp('bptt-depth', args.bptt_depth)
     if args.test_interval > 0:
         c.test_interval = args.test_interval
-    c.setp('weight-noise', args.weight_noise)
-    c.setp('weight-init-scale', args.weight_init_scale)
+    c.maybe_setp('weight-noise', args.weight_noise)
+    c.maybe_setp('weight-init-scale', args.weight_init_scale)
     timed_files = process_common_args(c, args, prop_names)
-
     validate_streams = [timed_files[:n_channels]]
     training_streams = [timed_files[n_channels:]]
     random.shuffle(training_streams[0])

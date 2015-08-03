@@ -116,6 +116,10 @@ class BaseClassifier(object):
         self.setp = self.classifier.set_property
         self.getp = self.classifier.get_property
 
+    def maybe_setp(self, k, v):
+        if v is not None:
+            self.setp(k, v)
+
     def setup_from_file(self, filename, properties):
         #XXX many arguments are quietly ignored.
         self.setp('net-filename', filename)
@@ -608,7 +612,7 @@ class Trainer(BaseClassifier):
             log_file = ''
         self.setp('log-file', log_file)
         for k, v in properties:
-            self.setp(k, v)
+            self.maybe_setp(k, v)
         if len(self.classes) == 2 and stat_target is None:
             stat_target = self.classes[1]
         self.stat_target = stat_target
@@ -616,7 +620,8 @@ class Trainer(BaseClassifier):
         #Now that the net should exist, try again to set properties,
         #in case any of them require it to work (e.g. momentum).
         for k, v in properties:
-            self.setp(k, v)
+            self.maybe_setp(k, v)
+
         self.next_training_set()
         #print >> sys.stderr, "setting PLAYING()"
         self.pipeline.set_state(Gst.State.PLAYING)
@@ -1120,7 +1125,7 @@ def add_args_from_classifier(group, arg_names):
         prop_type = type_lut[prop.value_type.name]
         kwargs = {
             'type': prop_type,
-            'default': prop.default_value,
+            'default': None,
             'help': prop.blurb
         }
         if prop_type is bool and not prop.default_value:
@@ -1164,8 +1169,11 @@ def add_common_args(parser):
 def process_common_args(c, args, prop_names, random_seed=1, timed=True,
                         load_net=True, load_files=True):
     vargs = vars(args)
-    properties = {k.replace('_', '-'): v for k, v in vargs.items()
-                  if k in prop_names}
+    properties = {}
+    for k, v in vargs.items():
+        k2 = k.replace('_', '-')
+        if k2 in prop_names and v is not None:
+            properties[k2] = v
 
     c.verbosity = args.verbosity
     if load_net:
