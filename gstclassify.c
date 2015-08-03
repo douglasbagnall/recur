@@ -32,8 +32,9 @@ enum
   PROP_KNEE_FREQUENCY,
   PROP_FOCUS_FREQUENCY,
   PROP_MOMENTUM,
-  PROP_LEARNING_STYLE,
+  PROP_MOMENTUM_WEIGHT,
   PROP_MOMENTUM_SOFT_START,
+  PROP_LEARNING_STYLE,
   PROP_MFCCS,
   PROP_SAVE_NET,
   PROP_PGM_DUMP,
@@ -81,6 +82,7 @@ enum
 #define DEFAULT_PROP_MFCCS 0
 #define DEFAULT_PROP_DELTA_FEATURES 0
 #define DEFAULT_PROP_MOMENTUM 0.95f
+#define DEFAULT_PROP_MOMENTUM_WEIGHT 0.5f
 #define DEFAULT_PROP_MOMENTUM_SOFT_START 0.0f
 #define DEFAULT_PROP_LEARNING_STYLE 1
 #define DEFAULT_MIN_FREQUENCY 100
@@ -502,6 +504,13 @@ gst_classify_class_init (GstClassifyClass * klass)
           "(eventual) momentum",
           MOMENTUM_MIN, MOMENTUM_MAX,
           DEFAULT_PROP_MOMENTUM,
+          G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+
+  g_object_class_install_property (gobject_class, PROP_MOMENTUM_WEIGHT,
+      g_param_spec_float("momentum-weight", "momentum-weight",
+          "Momentum weight (1.0 for full momentum, 0 for none)",
+          0.0f, 1.0f,
+          DEFAULT_PROP_MOMENTUM_WEIGHT,
           G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class, PROP_LEARNING_STYLE,
@@ -1578,6 +1587,9 @@ maybe_set_net_scalar(GstClassify *self, guint prop_id, const GValue *value)
     case PROP_MOMENTUM:
       SET_FLOAT(net->bptt->momentum);
       break;
+    case PROP_MOMENTUM_WEIGHT:
+      SET_FLOAT(net->bptt->momentum_weight);
+      break;
     case PROP_PRESYNAPTIC_NOISE:
       SET_FLOAT(net->presynaptic_noise);
       break;
@@ -1681,6 +1693,7 @@ gst_classify_set_property (GObject * object, guint prop_id, const GValue * value
     case PROP_LEARN_RATE:
     case PROP_PRESYNAPTIC_NOISE:
     case PROP_MOMENTUM:
+    case PROP_MOMENTUM_WEIGHT:
       maybe_set_net_scalar(self, prop_id, value);
       break;
     /*These properties only need to be stored until net creation, and can't

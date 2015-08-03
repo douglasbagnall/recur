@@ -31,6 +31,7 @@ def main():
                                      ['--learning-style'],
                                      ['-m', '--momentum'],
                                      ['--momentum-soft-start'],
+                                     ['--momentum-weight'],
                                      ['--top-learn-rate-scale'],
                                      ['--bottom-learn-rate-scale'],
                                      ['-r', '--random-alignment'],
