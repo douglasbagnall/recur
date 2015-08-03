@@ -1938,7 +1938,7 @@ prepare_channel_features(GstClassify *self, s16 *buffer_i, int j){
   GST_LOG("buffer offset %d, channel %d",
       self->read_offset, j);
 
-  for(i = 0, k = j; i < half_window; i++, k += self->n_channels){
+  for (i = 0, k = j; i < half_window; i++, k += self->n_channels){
     c->pcm_next[i] = buffer_i[k];
     c->pcm_now[half_window + i] = buffer_i[k];
   }
