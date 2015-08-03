@@ -39,6 +39,7 @@ def main():
     data = load(args.csv_file)
     if args.feature_offsets:
         for name, raw_seq, f in (
+                ('median', np.median(data, axis=0), bounded_identity(args.bound)),
                 ('mean', np.mean(data, axis=0), bounded_identity(args.bound)),
                 ('std', np.std(data, axis=0), bounded_recip(args.bound))
                 ):
@@ -52,6 +53,8 @@ def main():
 
             print ':'.join('%.3g' % x for x in seq[:i + 1])
     else:
+        print "median"
+        print np.median(data, axis=0)
         print "mean"
         print np.mean(data, axis=0)
         print "standard deviation"
