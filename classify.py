@@ -9,6 +9,18 @@ import numpy as np
 from math import sqrt
 from classify_stats import draw_roc_curve, calc_stats, draw_presence_roc
 from classify_stats import actually_show_roc
+from colour import CYAN, C_NORMAL, BLUE
+
+def DEBUG(*args):
+    for a in args:
+        print >> sys.stderr, a
+
+def DEBUG_LINENO(msg=''):
+    import traceback
+    filename, lineno, function, text = traceback.extract_stack(None, 2)[0]
+    DEBUG("%s%s:%s%s %s%s()%s '%s'" % (CYAN, filename, BLUE, lineno,
+                                       CYAN, function, C_NORMAL, msg))
+
 
 _dirname = os.path.dirname(os.path.abspath(__file__))
 os.environ['GST_PLUGIN_PATH'] = os.path.join(_dirname, 'plugins')
