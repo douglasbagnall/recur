@@ -66,6 +66,8 @@ enum
   PROP_ADAGRAD_BALLAST,
   PROP_ACTIVATION,
   PROP_FEATURES_FILE,
+  PROP_FEATURES_OFFSET,
+  PROP_FEATURES_SCALE,
 
   PROP_LAST
 };
@@ -604,6 +606,18 @@ gst_classify_class_init (GstClassifyClass * klass)
           NULL,
           G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
+  g_object_class_install_property (gobject_class, PROP_FEATURES_OFFSET,
+      g_param_spec_string("features-offset", "features-offset",
+          "offsets for the means of the features (colon separated)",
+          NULL,
+          G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
+
+  g_object_class_install_property (gobject_class, PROP_FEATURES_SCALE,
+      g_param_spec_string("features-scale", "features-scale",
+          "scale multipliers for the features (colon separated)",
+          NULL,
+          G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
+
   trans_class->transform_ip = GST_DEBUG_FUNCPTR (gst_classify_transform_ip);
   af_class->setup = GST_DEBUG_FUNCPTR (gst_classify_setup);
   GST_INFO("gst audio class init\n");
@@ -706,6 +720,79 @@ static int parse_classes_string(GstClassify *self, const char *orig)
   return s - str - 1;
 }
 
+static size_t
+alloc_floats_from_colon_sep_string(GstClassify *self, const char *s,
+    float **numbers, size_t n_limit)
+{
+  float f;
+  char *e;
+  int i;
+  size_t n_max;
+  size_t n = 0;
+
+#define CSS_DEBUG(args...) STDERR_DEBUG("colon separated string: " args)
+
+  CSS_DEBUG("looking at %s", s);
+  if (s == NULL){
+    CSS_DEBUG("not processing NULL string");
+    goto early_error;
+  }
+  /* The input format is a series of colon separated floating point numbers,
+     like this: "3.14:-2:1.7e-2:0.00002". The return value is the number of
+     numbers found with *numbers pointing to newly allocated memory containing
+     them. On error, the return value is zero and *numbers in NULL. Finding no
+     numbers counts as an error.
+
+     First count the colons to get the number of numbers.
+   */
+  for (n_max = 1, i = 0; s[i]; i++){
+    n_max += (s[i] == ':');
+  }
+  if (n_max > n_limit){
+    CSS_DEBUG("found %zu numbers, expected max %zu", n_max, n_limit);
+    goto early_error;
+  }
+  float *array = calloc(n_max, sizeof(float));
+
+  while (*s){
+    //char **restrict ee = &e;
+    f = strtof(s, &e);
+    if (f == 0 && e == s){ /* conversion error */
+      CSS_DEBUG("could not parse %s", s);
+      goto error;
+    }
+    if (e[0] != ':'){
+      if (e[0] != 0){
+        CSS_DEBUG("found non-colon %c e %s", e[1], e);
+        goto error;
+      }
+      break;
+    }
+    array[n] = f;
+    n++;
+    if (n > n_max){
+      CSS_DEBUG("too many numbers %c", e[1]);
+      goto error;
+    }
+    s = e + 1;
+  }
+  if (n == 0){
+    CSS_DEBUG("found no numbers");
+    goto error;
+  }
+  *numbers = array;
+  return n;
+ error:
+  free(array);
+ early_error:
+  *numbers = NULL;
+  return 0;
+
+#undef CSS_DEBUG
+
+}
+
+
 #define CLASSIFY_METADATA_DEFAULTS(self) {                              \
     PP_GET_STRING(self, PROP_CLASSES, DEFAULT_PROP_CLASSES),            \
     PP_GET_FLOAT(self, PROP_MIN_FREQUENCY, DEFAULT_MIN_FREQUENCY),    \
@@ -719,6 +806,8 @@ static int parse_classes_string(GstClassify *self, const char *orig)
     PP_GET_FLOAT(self, PROP_LAG, DEFAULT_PROP_LAG),                     \
     PP_GET_BOOLEAN(self, PROP_INTENSITY_FEATURE, 0),                    \
     PP_GET_FLOAT(self, PROP_CONFIRMATION_LAG, DEFAULT_PROP_CONFIRMATION_LAG), \
+    PP_GET_STRING(self, PROP_FEATURES_OFFSET, NULL),                   \
+    PP_GET_STRING(self, PROP_FEATURES_SCALE, NULL)                   \
     }
 
 static char*
@@ -741,6 +830,8 @@ construct_metadata(GstClassify *self, struct ClassifyMetadata *m){
       "lag %f\n"
       "intensity-feature %d\n"
       "confirmation-lag %f\n"
+      "features-offset %s\n"
+      "features-scale %s\n"
       ,
       m->classes,
       m->min_freq,
@@ -753,7 +844,9 @@ construct_metadata(GstClassify *self, struct ClassifyMetadata *m){
       m->focus_freq,
       m->lag,
       m->intensity_feature,
-      m->confirmation_lag
+      m->confirmation_lag,
+      m->features_offset,
+      m->features_scale
   );
   STDERR_DEBUG("%s", metadata);
   if (ret == -1){
@@ -810,24 +903,33 @@ free_metadata_items(struct ClassifyMetadata *m){
 }
 
 static void
-setup_audio(GstClassify *self, int window_size, int mfccs, float min_freq,
-    float max_freq, float knee_freq, float focus_freq, int delta_features,
+setup_audio(GstClassify *self, int window_size, int mfccs,
+    float min_freq, float max_freq,
+    const char *features_offset_string,
+    float knee_freq, float focus_freq, int delta_features,
+    const char *features_scale_string,
     int intensity_feature, float lag, float confirmation_lag){
-  /*List arguments to help make sure they have been passed in in the right
-    order!*/
+  /* The feature offset and scale strings are interspersed seemingly randomly
+     in the argument list to increase the changes of a compilation warning if
+     something gets missed out or wrongly ordered. The numeric arguments don't
+     complain. Let's print them out to be sure. */
   GST_DEBUG("setting up audio thus:\n"
       "window_size %d\n"
       "mfccs %d\n"
       "min_freq %f\n"
       "max_freq %f\n"
+      "feature_offset_string %s\n"
       "knee_freq %f\n"
       "focus_freq %f\n"
       "delta_features %d\n"
+      "feature_scale_string %s\n"
       "intensity_feature %d\n"
       "lag %f\n"
       "confirmation_lag %f\n",
       window_size, mfccs, min_freq,
-      max_freq, knee_freq, focus_freq, delta_features,
+      max_freq, features_offset_string,
+      knee_freq, focus_freq, delta_features,
+      features_scale_string,
       intensity_feature, lag, confirmation_lag);
 
   self->mfcc_factory = recur_audio_binner_new(window_size,
@@ -847,15 +949,15 @@ setup_audio(GstClassify *self, int window_size, int mfccs, float min_freq,
   self->mfccs = mfccs;
   int n_features = get_n_features(self);
 
-  self->features_offset_string = features_offset_string;
   self->n_feature_offsets = alloc_floats_from_colon_sep_string(self,
       features_offset_string,
       &self->feature_offsets, n_features);
 
-  self->features_scale_string = features_scale_string;
   self->n_feature_scales = alloc_floats_from_colon_sep_string(self,
       features_scale_string,
       &self->feature_scales, n_features);
+  STDERR_DEBUG("n_feature_offsets %d, n_feature_scales %d",
+      self->n_feature_offsets, self->n_feature_scales);
 }
 
 static RecurNN *
@@ -895,8 +997,9 @@ load_specified_net(GstClassify *self, const char *filename){
   self->net_filename = strdup(filename);
   self->basename = strdup(m.basename);
   setup_audio(self, m.window_size, m.mfccs, m.min_freq,
-      m.max_freq, m.knee_freq, m.focus_freq, m.delta_features,
-      m.intensity_feature, m.lag, m.confirmation_lag);
+      m.max_freq, m.features_offset, m.knee_freq, m.focus_freq,
+      m.delta_features, m.features_scale, m.intensity_feature,
+      m.lag, m.confirmation_lag);
   self->net = net;
   if (! unloaded_items){
     /* in the unloaded_items case, it might be that some of the strings that
@@ -1082,9 +1185,11 @@ load_or_create_net_and_audio(GstClassify *self)
       PP_GET_INT(self, PROP_MFCCS, DEFAULT_PROP_MFCCS),
       PP_GET_FLOAT(self, PROP_MIN_FREQUENCY, DEFAULT_MIN_FREQUENCY),
       PP_GET_FLOAT(self, PROP_MAX_FREQUENCY, DEFAULT_MAX_FREQUENCY),
+      PP_GET_STRING(self, PROP_FEATURES_OFFSET, NULL),
       PP_GET_FLOAT(self, PROP_KNEE_FREQUENCY, DEFAULT_KNEE_FREQUENCY),
       PP_GET_FLOAT(self, PROP_FOCUS_FREQUENCY, DEFAULT_FOCUS_FREQUENCY),
       PP_GET_INT(self, PROP_DELTA_FEATURES, DEFAULT_PROP_DELTA_FEATURES),
+      PP_GET_STRING(self, PROP_FEATURES_SCALE, NULL),
       PP_GET_BOOLEAN(self, PROP_INTENSITY_FEATURE, 0),
       PP_GET_FLOAT(self, PROP_LAG, DEFAULT_PROP_LAG),
       PP_GET_FLOAT(self, PROP_CONFIRMATION_LAG, DEFAULT_PROP_CONFIRMATION_LAG)
@@ -1605,6 +1710,8 @@ gst_classify_set_property (GObject * object, guint prop_id, const GValue * value
     case PROP_WEIGHT_INIT_SCALE:
     case PROP_ADAGRAD_BALLAST:
     case PROP_ACTIVATION:
+    case PROP_FEATURES_OFFSET:
+    case PROP_FEATURES_SCALE:
       if (self->net == NULL){
         copy_gvalue(PENDING_PROP(self, prop_id), value);
       }
@@ -1838,6 +1945,19 @@ prepare_channel_features(GstClassify *self, s16 *buffer_i, int j){
   /*get the features -- after which pcm_now is finished with. */
   pcm_to_features(self->mfcc_factory, c, self->mfccs, self->delta_features,
       self->intensity_feature);
+  if (self->n_feature_offsets){
+    ASSUME_ALIGNED(self->feature_offsets);
+    for (i = 0; i < self->n_feature_offsets; i++){
+      c->features[i] -= self->feature_offsets[i];
+    }
+  }
+  if (self->n_feature_scales){
+    ASSUME_ALIGNED(self->feature_scales);
+    for (i = 0; i < self->n_feature_scales; i++){
+      c->features[i] *= self->feature_scales[i];
+    }
+  }
+
   if (c->mfcc_image){
     temporal_ppm_row_from_source(c->mfcc_image);
   }

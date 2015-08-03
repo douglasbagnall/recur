@@ -67,6 +67,8 @@ struct ClassifyMetadata {
   float lag;
   int intensity_feature;
   float confirmation_lag;
+  const char *features_offset;
+  const char *features_scale;
 };
 
 typedef struct _ClassifyClassEvent {
@@ -131,6 +133,10 @@ struct _GstClassify
   float lag;
   float confirmation_lag;
   float weight_noise;
+  float *feature_offsets;
+  int n_feature_offsets;
+  float *feature_scales;
+  int n_feature_scales;
   FILE *features_file;
 };
 

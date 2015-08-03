@@ -1144,6 +1144,8 @@ def add_common_args(parser):
                                              ['-F', '--force-load'],
                                              ['--ignore-start'],
                                              ['--features-file'],
+                                             ['--features-offset'],
+                                             ['--features-scale'],
                                          ))
 
 
