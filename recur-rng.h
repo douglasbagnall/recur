@@ -77,6 +77,13 @@ rand_double(rand_ctx *rng)
   return x.d - 1.0;
 }
 
+#define RNG_U64_TO_FLOAT01 (1.0f / ((float) 0xfffffffffffffffeULL))
+static inline double
+rand_float(rand_ctx *rng)
+{
+  return (float)rand64(rng) * RNG_U64_TO_FLOAT01;
+}
+
 static inline double
 rand_expovariate(rand_ctx *rng, double lambda)
 {

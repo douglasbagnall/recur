@@ -4,6 +4,7 @@
 #include "audio-common.h"
 #include <string.h>
 #include <math.h>
+#include <stdbool.h>
 
 GST_DEBUG_CATEGORY_STATIC (classify_debug);
 #define GST_CAT_DEFAULT classify_debug
@@ -69,6 +70,7 @@ enum
   PROP_FEATURES_FILE,
   PROP_FEATURES_OFFSET,
   PROP_FEATURES_SCALE,
+  PROP_BALANCED_TRAINING,
 
   PROP_LAST
 };
@@ -146,6 +148,7 @@ enum
 #define MAX_PROP_MFCCS (CLASSIFY_N_FFT_BINS - 1)
 #define MOMENTUM_SOFT_START_MAX 1e9
 #define MOMENTUM_SOFT_START_MIN 0
+#define DEFAULT_PROP_BALANCED_TRAINING 0
 
 #define DEFAULT_RNG_SEED 11
 
@@ -629,6 +632,14 @@ gst_classify_class_init (GstClassifyClass * klass)
           NULL,
           G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
+  g_object_class_install_property (gobject_class, PROP_BALANCED_TRAINING,
+      g_param_spec_float("balanced-training", "balanced-training",
+          ("Skip some training examples for balance "
+              "(<1 favour common, >1 favour rare, 1 equal numbers, 0 off)"),
+          0, G_MAXFLOAT,
+          DEFAULT_PROP_ADAGRAD_BALLAST,
+          G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
+
   trans_class->transform_ip = GST_DEBUG_FUNCPTR (gst_classify_transform_ip);
   af_class->setup = GST_DEBUG_FUNCPTR (gst_classify_setup);
   GST_INFO("gst audio class init\n");
@@ -651,6 +662,9 @@ gst_classify_init (GstClassify * self)
   self->weight_noise = DEFAULT_PROP_WEIGHT_NOISE;
   self->error_weight = NULL;
   self->ignored_windows = 0;
+  self->used_training_counts = NULL;
+  self->seen_training_counts = NULL;
+  self->balanced_training_bias = 0;
   GST_INFO("gst classify init\n");
 }
 
@@ -1239,6 +1253,21 @@ load_or_create_net_and_audio(GstClassify *self)
   }
 }
 
+static void
+maybe_setup_balanced_training(GstClassify *self)
+{
+  self->balanced_training_bias = PP_GET_FLOAT(self, PROP_BALANCED_TRAINING,
+      DEFAULT_PROP_BALANCED_TRAINING);
+  if (self->balanced_training_bias){
+    if (self->used_training_counts == NULL){
+      self->seen_training_counts = calloc(self->net->output_size,
+          sizeof(*self->seen_training_counts));
+      self->used_training_counts = calloc(self->net->output_size,
+          sizeof(*self->used_training_counts));
+    }
+  }
+}
+
 /*start() is called once by gstreamer just before the first call to setup()
   below */
 static gboolean
@@ -1247,8 +1276,10 @@ start(GstBaseTransform *trans){
   if (self->net == NULL){
     load_or_create_net_and_audio(self);
   }
+  maybe_setup_balanced_training(self);
   return TRUE;
 }
+
 
 /*gst_classify_setup is called every time the pipeline starts up -- that is,
   for every new set of input files.
@@ -1758,6 +1789,7 @@ gst_classify_set_property (GObject * object, guint prop_id, const GValue * value
     case PROP_ACTIVATION:
     case PROP_FEATURES_OFFSET:
     case PROP_FEATURES_SCALE:
+    case PROP_BALANCED_TRAINING:
       if (self->net == NULL){
         copy_gvalue(PENDING_PROP(self, prop_id), value);
       }
@@ -2024,37 +2056,55 @@ prepare_channel_features(GstClassify *self, s16 *buffer_i, int j){
 }
 
 static inline float
-train_channel(GstClassify *self, ClassifyChannel *c, int *win_count){
+train_channel(GstClassify *self, ClassifyChannel *c, int *win_count,
+    float *train_probabilities, u32 *seen_counts, u32 *used_counts){
   RecurNN *net = c->net;
   float *answer = rnn_opinion(net, c->features, net->presynaptic_noise);
   float *error = net->bptt->o_error;
   float wrongness = 0;
+  bool need_to_bptt = false;
   for (int i = 0; i < self->n_groups; i++){
     ClassifyClassGroup *g = &self->class_groups[i];
     int o = g->offset;
     float *group_error = error + o;
     float *group_answer = answer + o;
     int target = c->group_target[i];
+    MAYBE_DEBUG("seen_counts %u %u, used_counts %u %u "
+        "p %f %f r %f", seen_counts[0], seen_counts[1], used_counts[0], used_counts[1],
+        train_probabilities[0], train_probabilities[1], rand_float(&self->net->rng));
     if (target >= 0 && target < g->n_classes &&
-        self->window_no >= self->ignored_windows){
+        self->window_no >= self->ignored_windows &&
+        (train_probabilities == NULL ||
+            train_probabilities[o + target] > rand_float(&self->net->rng)
+        )){
+      if (seen_counts != NULL){
+        used_counts[o + target]++;
+        seen_counts[o + target]++;
+      }
       int winner = softmax_best_guess(group_error, group_answer, g->n_classes);
       c->group_winner[i] = winner;
       *win_count += winner == target;
       group_error[target] += 1.0f;
       wrongness += group_error[target];
+      need_to_bptt = true;
     }
     else {
       for (int j = 0; j < g->n_classes; j++){
         group_error[j] = 0;
       }
+      if (seen_counts != NULL){
+        seen_counts[o + target]++;
+      }
     }
   }
-  if (self->error_weight){
-    for (int i = 0; i < net->output_size; i++){
-      error[i] *= self->error_weight[i];
+  if (need_to_bptt){
+    if (self->error_weight){
+      for (int i = 0; i < net->output_size; i++){
+        error[i] *= self->error_weight[i];
+      }
     }
+    rnn_bptt_calc_deltas(net, 1, NULL);
   }
-  rnn_bptt_calc_deltas(net, 1, NULL);
   rnn_bptt_advance(net);
   return wrongness;
 }
@@ -2115,15 +2165,37 @@ maybe_learn(GstClassify *self){
   GST_LOG("maybe learn; offset %d",
       self->read_offset);
 
+  const int n_classes = net->output_size;
+  float training_probabilities[n_classes];
+  u32 *seen_counts = self->seen_training_counts;
+  u32 *used_counts = self->used_training_counts;
+  float *train_p = seen_counts ? training_probabilities : NULL;
+
   while ((buffer = prepare_next_chunk(self))){
     float err_sum = 0.0f;
     int winners = 0;
+    u32 seen_sum = 0;
+    u32 used_sum = 0;
     rnn_bptt_clear_deltas(net);
     GST_LOG("buffer offset %ld, %d", buffer - self->audio_queue,
         self->read_offset);
+
+    if (seen_counts != NULL){
+      for (j = 0; j < n_classes; j++){
+        seen_sum += seen_counts[j];
+        used_sum += used_counts[j];
+      }
+      float scale = 1.0f / (seen_sum + 1.0f);
+      for (j = 0; j < n_classes; j++){
+        float p = 1.0f - seen_counts[j] * scale;
+        train_p[j] = powf(p, self->balanced_training_bias);
+      }
+    }
+
     for (j = 0; j < self->n_channels; j++){
       ClassifyChannel *c = prepare_channel_features(self, buffer, j);
-      err_sum += train_channel(self, c, &winners);
+      err_sum += train_channel(self, c, &winners, train_p, seen_counts,
+          used_counts);
     }
 
     /*XXX periodic_pgm_dump and image string should be gst properties */
@@ -2132,17 +2204,31 @@ maybe_learn(GstClassify *self){
     }
     float momentum = rnn_calculate_momentum_soft_start(net->generation,
         net->bptt->momentum, self->momentum_soft_start);
-
-    rnn_apply_learning(net, self->learning_style, momentum);
+    if (err_sum){
+      rnn_apply_learning(net, self->learning_style, momentum);
+    }
     rnn_condition_net(net);
     possibly_save_net(net, self->net_filename);
     rnn_log_net(net);
     if (self->error_image){
       temporal_ppm_row_from_source(self->error_image);
     }
+    float err_scale;
+    if (used_counts == NULL){
+      err_scale = 1.0f / self->n_channels;
+    }
+    else {
+      u32 used_sum2 = 0;
+      for (j = 0; j < n_classes; j++){
+        used_sum2 += used_counts[j];
+      }
+      u32 d = used_sum2 - used_sum;
+      err_scale = 1.0f / (d ? d : 1);
+      rnn_log_int(net, "trained", d);
+    }
     rnn_log_float(net, "momentum", momentum);
-    rnn_log_float(net, "error", err_sum / self->n_channels);
-    rnn_log_float(net, "correct", winners * 1.0f / self->n_channels);
+    rnn_log_float(net, "error", err_sum * err_scale);
+    rnn_log_float(net, "correct", winners * err_scale);
   }
 }
 

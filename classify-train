@@ -50,6 +50,7 @@ def main():
                                      ['--max-frequency'],
                                      ['--knee-frequency'],
                                      ['--lag'],
+                                     ['--balanced-training'],
                                  ))
 
     group.add_argument('--learn-rate-decay', type=float, default=DEFAULT_LEARN_RATE_DECAY,

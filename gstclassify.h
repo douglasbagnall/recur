@@ -138,6 +138,9 @@ struct _GstClassify
   float *feature_scales;
   int n_feature_scales;
   FILE *features_file;
+  u32 *seen_training_counts;
+  u32 *used_training_counts;
+  float balanced_training_bias;
 };
 
 struct _GstClassifyClass
