@@ -739,7 +739,6 @@ class Trainer(BaseClassifier):
                     auc += tp
                 area = float(tp * fp)
                 auc /= area
-                #print auc, auc2, auc - auc2
                 auc_string = " %sAUC %s%d" %  (white,
                                               colours[max(int((auc - 0.5) * 20.0), 0)],
                                               int(auc * 1e2 + 0.5))
@@ -1101,6 +1100,7 @@ def load_untimed_files(audio_directories, accept):
 
     return untimed_files
 
+
 def add_args_from_classifier(group, arg_names):
     classifier = Gst.ElementFactory.make('classify')
     prop_lut = {x.name : x for x in classifier.list_properties()}
@@ -1122,6 +1122,7 @@ def add_args_from_classifier(group, arg_names):
             'default': None,
             'help': prop.blurb
         }
+        #print args, kwargs
         if prop_type is bool and not prop.default_value:
             kwargs['action'] = 'store_true'
             del kwargs['type']
