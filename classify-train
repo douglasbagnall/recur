@@ -39,6 +39,7 @@ def main():
                                      ['--bptt-depth'],
                                      ['--mfccs'],
                                      ['--weight-noise'],
+                                     ['--weight-init-scale'],
                                      ['--presynaptic-noise'],
                                      ['--activation'],
                                      ['--delta-features'],
@@ -69,8 +70,6 @@ def main():
                        help="Do not renice downwards")
     group.add_argument('--test-interval', type=int, default=0,
                        help="Test after this many training cycles")
-    group.add_argument('--weight-init-scale', type=float, default=0.0,
-                       help="scale weights to approximately this gain")
     group.add_argument('--log-file', default="auto",
                        help="log to this file (default: based on net basename)")
     args = parser.parse_args()
