@@ -35,6 +35,8 @@
 
 #define VERBOSE_DEBUG 0
 
+#define ARRAY_LEN(x) sizeof(x) / sizeof((x)[0])
+
 #define ROTATE(x, k) (((x) << (k)) | ((x) >> (sizeof(x) * 8 - (k))))
 
 #define streq(a,b) (strcmp((a),(b)) == 0)

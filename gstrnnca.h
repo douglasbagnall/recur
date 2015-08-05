@@ -48,8 +48,6 @@ G_BEGIN_DECLS
 
 #define RNNCA_DEFAULT_PATTERN "Y00120111C0111"
 
-#define ARRAY_LEN(x) sizeof(x) / sizeof((x)[0])
-
 static const int RNNCA_POSITIONAL_LEN = 2;
 
 typedef struct _RnncaFrame {
