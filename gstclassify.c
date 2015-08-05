@@ -1639,6 +1639,8 @@ gst_classify_set_property (GObject * object, guint prop_id, const GValue * value
   GST_DEBUG("gst_classify_set_property with prop_id %d\n", prop_id);
   if (value){
     switch (prop_id) {
+
+      /* "pgm-dump" and "save-net" act immediately and don't change the state */
     case PROP_PGM_DUMP:
       if (self->net){
         const char *s = g_value_get_string(value);
@@ -1658,6 +1660,7 @@ gst_classify_set_property (GObject * object, guint prop_id, const GValue * value
       }
       break;
 
+      /* "forget" clears recurrent state, leaves classifier state untouched. */
     case PROP_FORGET:
       if (self->net && self->channels){
         gboolean bptt_too = g_value_get_boolean(value);
@@ -1668,6 +1671,8 @@ gst_classify_set_property (GObject * object, guint prop_id, const GValue * value
       }
       break;
 
+      /* "random-alignment" can be changed any time, having effect from next
+         setup() (i.e. file load) */
     case PROP_RANDOM_ALIGNMENT:
       self->random_alignment = g_value_get_boolean(value);
 
@@ -1675,6 +1680,7 @@ gst_classify_set_property (GObject * object, guint prop_id, const GValue * value
       self->training = g_value_get_boolean(value);
       break;
 
+      /* "momentum-soft-start" can be changed any time */
     case PROP_MOMENTUM_SOFT_START:
       self->momentum_soft_start = g_value_get_float(value);
       break;
@@ -1947,6 +1953,8 @@ pcm_to_features(RecurAudioBinner *mf, ClassifyChannel *c, int mfccs,
       answer[CLASSIFY_N_FFT_BINS] = sum / CLASSIFY_N_FFT_BINS;
     }
   }
+
+  /* do delta features if necessary */
   if (c->prev_features){
     float *tmp = c->features;
     c->features = c->prev_features;
