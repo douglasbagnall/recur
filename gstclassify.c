@@ -1058,6 +1058,8 @@ create_net(GstClassify *self, int bottom_layer_size,
   int bptt_depth = PP_GET_INT(self, PROP_BPTT_DEPTH, DEFAULT_PROP_BPTT_DEPTH);
   int activation = PP_GET_INT(self, PROP_ACTIVATION, RNN_RELU);
   float momentum = PP_GET_FLOAT(self, PROP_MOMENTUM, DEFAULT_PROP_MOMENTUM);
+  float momentum_weight = PP_GET_FLOAT(self, PROP_MOMENTUM_WEIGHT,
+      DEFAULT_PROP_MOMENTUM_WEIGHT);
   float learn_rate = PP_GET_FLOAT(self, PROP_LEARN_RATE, DEFAULT_LEARN_RATE);
   float bottom_learn_rate_scale = PP_GET_FLOAT(self, PROP_BOTTOM_LEARN_RATE_SCALE,
       DEFAULT_BOTTOM_LEARN_RATE_SCALE);
@@ -1088,6 +1090,8 @@ create_net(GstClassify *self, int bottom_layer_size,
         DEFAULT_PROP_ADAGRAD_BALLAST);
     rnn_set_momentum_values(net, ada_ballast);
   }
+
+  net->bptt->momentum_weight = momentum_weight;
 
   if (weight_init_scale){
     rnn_scale_initial_weights(net, weight_init_scale);
