@@ -72,6 +72,17 @@ def main():
                        help="Test after this many training cycles")
     group.add_argument('--log-file', default="auto",
                        help="log to this file (default: based on net basename)")
+
+    advanced_group = parser.add_argument_group('advanced classify-train specific '
+                                               'arguments')
+
+    add_args_from_classifier(advanced_group, (['--weight-init-method'],
+                                              ['--weight-fan-in-sum'],
+                                              ['--weight-fan-in-kurtosis'],
+                                              ['--lawn-mower'],
+                                              ['--confirmation-lag'],
+                                              ['--adagrad-ballast']))
+
     args = parser.parse_args()
 
     if args.learn_rate_schedule == "flat":
