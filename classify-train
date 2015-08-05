@@ -126,19 +126,9 @@ def main():
             break
         random.shuffle(s)
         training_streams.append(s[i:])
-
     c.train(training_streams, validate_streams,
             iterations=args.iterations,
             learn_rate_fn=lr,
-            log_file=args.log_file,
-            properties=(('momentum-soft-start', args.momentum_soft_start),
-                        ('momentum', args.momentum),
-                        ('learning-style', args.learning_style),
-                        #('weight-fan-in-sum', 4),
-                        #('weight-fan-in-kurtosis', 0.15),
-                        ('weight-init-method', 3),
-                        ('presynaptic-noise', args.presynaptic_noise),
-                        ('activation', args.activation)
-                    ))
+            log_file=args.log_file)
 
 main()

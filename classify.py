@@ -597,7 +597,7 @@ class Trainer(BaseClassifier):
     no_save_net = False
     test_interval = 2
     def train(self, trainers, testers, learn_rate_fn,
-              iterations=100, log_file='auto', properties=(), stat_target=None):
+              iterations=100, log_file='auto', stat_target=None):
         self.learn_rate_fn = learn_rate_fn
         self.counter = 0
         self.save_threshold_adjust = 1.0
@@ -611,16 +611,10 @@ class Trainer(BaseClassifier):
         elif not log_file:
             log_file = ''
         self.setp('log-file', log_file)
-        for k, v in properties:
-            self.maybe_setp(k, v)
         if len(self.classes) == 2 and stat_target is None:
             stat_target = self.classes[1]
         self.stat_target = stat_target
         self.setp('load-net-now', 1)
-        #Now that the net should exist, try again to set properties,
-        #in case any of them require it to work (e.g. momentum).
-        for k, v in properties:
-            self.maybe_setp(k, v)
 
         self.next_training_set()
         #print >> sys.stderr, "setting PLAYING()"

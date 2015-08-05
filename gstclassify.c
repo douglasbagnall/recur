@@ -1072,6 +1072,9 @@ create_net(GstClassify *self, int bottom_layer_size,
   float presynaptic_noise = PP_GET_FLOAT(self, PROP_PRESYNAPTIC_NOISE,
     DEFAULT_PROP_PRESYNAPTIC_NOISE);
 
+  self->learning_style = PP_GET_INT(self, PROP_LEARNING_STYLE,
+      DEFAULT_PROP_LEARNING_STYLE);
+
   int lawnmower = PP_GET_BOOLEAN(self, PROP_LAWN_MOWER, 0);
   if (lawnmower){
     flags |= RNN_COND_USE_LAWN_MOWER;
@@ -1693,10 +1696,6 @@ gst_classify_set_property (GObject * object, guint prop_id, const GValue * value
       self->weight_noise = g_value_get_float(value);
       break;
 
-    case PROP_LEARNING_STYLE:
-      self->learning_style = g_value_get_int(value);
-      break;
-
       /*this causes the net to be loaded or created based on the properties so
         far.*/
     case PROP_LOAD_NET_NOW:
@@ -1732,6 +1731,7 @@ gst_classify_set_property (GObject * object, guint prop_id, const GValue * value
     /*These properties only need to be stored until net creation, and can't
       be changed afterwards.
     */
+    case PROP_LEARNING_STYLE:
     case PROP_FORCE_LOAD:
     case PROP_BASENAME:
     case PROP_LAG:
