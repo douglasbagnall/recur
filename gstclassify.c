@@ -161,6 +161,8 @@ static void maybe_parse_target_string(GstClassify *self);
 static void maybe_start_logging(GstClassify *self);
 static void maybe_parse_error_weight_string(GstClassify *self);
 
+static void maybe_set_net_scalar(GstClassify *self, guint prop_id, const GValue *value);
+
 
 #define gst_classify_parent_class parent_class
 G_DEFINE_TYPE (GstClassify, gst_classify, GST_TYPE_AUDIO_FILTER)
@@ -1139,13 +1141,30 @@ load_or_create_net(GstClassify *self){
           bottom_layer_size, net->bottom_layer ? net->bottom_layer->output_size : 0,
           metadata, net->metadata);
     }
-    /*XXX need to get the likes of PROP_LEARN_RATE, PROP_TOP_LEARN_RATE_SCALE,
-      PROP_MOMENTUM, PROP_BOTTOM_LEARN_RATE_SCALE from gvalue store.
-    */
   }
   else {
     net = create_net(self, bottom_layer_size, hidden_size, top_layer_size, metadata);
   }
+  if (net == NULL){
+    goto out;
+  }
+  self->net = net;
+
+  /* We need to set some values from the pending gvalue store. The logic for
+   selecting the right types and locations is in maybe_set_net_scalar() */
+  guint props[] = {PROP_LEARN_RATE,
+                   PROP_TOP_LEARN_RATE_SCALE,
+                   PROP_MOMENTUM,
+                   PROP_MOMENTUM_WEIGHT,
+                   PROP_MOMENTUM_SOFT_START,
+                   PROP_PRESYNAPTIC_NOISE,
+                   PROP_BOTTOM_LEARN_RATE_SCALE};
+
+  for (size_t i = 0; i < ARRAY_LEN(props); i++){
+    guint prop_id = props[i];
+    maybe_set_net_scalar(self, props[i], PENDING_PROP(self, prop_id));
+  }
+
   struct ClassifyMetadata m = {0};
   int unloaded_items = load_metadata(net->metadata, &m);
   int n_outputs = parse_classes_string(self, m.classes);
@@ -1158,6 +1177,7 @@ load_or_create_net(GstClassify *self){
     free_metadata_items(&m);
   }
   free(metadata);
+ out:
   return net;
 }
 
@@ -1203,7 +1223,7 @@ load_or_create_net_and_audio(GstClassify *self)
       PP_GET_FLOAT(self, PROP_LAG, DEFAULT_PROP_LAG),
       PP_GET_FLOAT(self, PROP_CONFIRMATION_LAG, DEFAULT_PROP_CONFIRMATION_LAG)
   );
-  self->net = load_or_create_net(self);
+  load_or_create_net(self);
 
   RecurNN *net = self->net;
   if (net->bottom_layer && 0){
@@ -1601,7 +1621,10 @@ maybe_set_net_scalar(GstClassify *self, guint prop_id, const GValue *value)
     }
   }
   else {
-    copy_gvalue(PENDING_PROP(self, prop_id), value);
+    GValue *pp = PENDING_PROP(self, prop_id);
+    if (pp != (GValue *)value){
+      copy_gvalue(PENDING_PROP(self, prop_id), value);
+    }
   }
 
 #undef SET_FLOAT
