@@ -1577,7 +1577,7 @@ maybe_parse_error_weight_string(GstClassify *self){
     In the two class case, this may have little effect other than scaling the
     overall error.
   */
-
+  /*XXXX use colon sep thingy */
   char *orig, *e, *s;
   int i;
   if (self->channels == NULL){
@@ -1714,6 +1714,7 @@ gst_classify_set_property (GObject * object, guint prop_id, const GValue * value
     case PROP_RANDOM_ALIGNMENT:
       self->random_alignment = g_value_get_boolean(value);
 
+      /* XXX "training" should probably be changed at setup only. */
     case PROP_TRAINING:
       self->training = g_value_get_boolean(value);
       break;
@@ -1723,6 +1724,7 @@ gst_classify_set_property (GObject * object, guint prop_id, const GValue * value
       self->momentum_soft_start = g_value_get_float(value);
       break;
 
+      /*weight noise only has effect in set-up XXX which is wrong */
     case PROP_WEIGHT_NOISE:
       self->weight_noise = g_value_get_float(value);
       break;
