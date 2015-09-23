@@ -4,6 +4,7 @@
 import sys
 import struct, array
 import cdb
+import argparse
 
 def read_int(n, key, unsigned=False):
     v = n[key]
@@ -110,6 +111,13 @@ def read(fn, *keys):
             print "unknown key '%s'" % k
 
 def main():
-    read(*sys.argv[1:])
+    parser = argparse.ArgumentParser()
+    parser.add_argument('file',
+                        help='net file to look at')
+    parser.add_argument('keys', nargs='*',
+                        help='keys to describe (default: all)')
+
+    args = parser.parse_args()
+    read(args.file, *args.keys)
 
 main()
