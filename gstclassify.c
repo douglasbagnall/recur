@@ -755,7 +755,7 @@ alloc_floats_from_colon_sep_string(GstClassify *self, const char *s,
   size_t n_max;
   size_t n = 0;
 
-#define CSS_DEBUG(args...) STDERR_DEBUG("colon separated string: " args)
+#define CSS_DEBUG(args...) /*STDERR_DEBUG("colon separated string: " args)*/
 
   CSS_DEBUG("looking at %s", s);
   if (s == NULL){
