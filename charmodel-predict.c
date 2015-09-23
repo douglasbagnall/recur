@@ -354,7 +354,8 @@ rnn_char_epoch(RnnCharModel *model, RecurNN *confab_net, RnnCharVentropy *v,
                 &confab_char, confab_size, model->alphabet, confab_bias);
           }
           else{
-            fprintf(stderr, C_GREY "%5dk e.%02d t%.2f v%.2f a.%02d %.0f/s |" C_NORMAL,
+            fprintf(stderr, C_GREY "%5dk e.%02d t%.2f v" C_CYAN "%.2f"
+                C_GREY " a.%02d %.0f/s |" C_NORMAL,
                 k, (int)(error * 100 + 0.5),
                 entropy, ventropy,
                 (int)(accuracy * 100 + 0.5), per_sec + 0.5);
@@ -362,7 +363,7 @@ rnn_char_epoch(RnnCharModel *model, RecurNN *confab_net, RnnCharVentropy *v,
             char confab[alloc_size + 1];
             rnn_char_confabulate(confab_net, confab, confab_size, alloc_size,
                 model->alphabet, confab_bias, &confab_char, -1, -1);
-            STDERR_DEBUG("%s|", confab);
+            STDERR_DEBUG("%s" C_GREY "|", confab);
           }
         }
         rnn_log_float(net, "t_error", error);
