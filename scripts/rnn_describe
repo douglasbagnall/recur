@@ -43,6 +43,10 @@ def read_float_array(n, key):
 def read_string(n, key):
     return '\n' + n[key]
 
+def read_string_urlencoded(n, key):
+    from urllib import unquote
+    return '\n' + unquote(n[key])
+
 def read_rng(*args):
     pass
 
@@ -112,12 +116,17 @@ def read(fn, *keys):
 
 def main():
     parser = argparse.ArgumentParser()
+    parser.add_argument('-u', '--url-decode', action='store_true',
+                        help='treat metadata as url-encoded text')
     parser.add_argument('file',
                         help='net file to look at')
     parser.add_argument('keys', nargs='*',
                         help='keys to describe (default: all)')
 
     args = parser.parse_args()
+    if args.url_decode:
+        KEYS['net.metadata'] = (read_string_urlencoded, True)
+
     read(args.file, *args.keys)
 
 main()
