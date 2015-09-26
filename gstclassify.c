@@ -1523,7 +1523,7 @@ parse_complex_target_string(GstClassify *self, const char *str){
     ev = &self->class_events[i];
     fprintf(stderr, "c%dt%.2f:%c ",
         ev->channel, WINDOW_NO_TO_TIME(ev->window_no),
-        self->class_groups[0].classes[ev->target]);
+        (ev->target >= 0) ? self->class_groups[0].classes[ev->target] : '-');
   }
   fprintf(stderr, "\n");
 #endif
