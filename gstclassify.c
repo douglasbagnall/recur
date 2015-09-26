@@ -1434,7 +1434,8 @@ parse_complex_target_string(GstClassify *self, const char *str){
     self->class_events = realloc_or_die(self->class_events,
         (n_events + 1) * sizeof(ClassifyClassEvent));
   }
-  GST_DEBUG("events %p, n %d", self->class_events, n_events);
+  GST_DEBUG("events %p, n %d. lag is %f", self->class_events, n_events,
+      self->lag);
 
   s = str;
 
@@ -1475,6 +1476,9 @@ parse_complex_target_string(GstClassify *self, const char *str){
         ev->class_group = j;
         ev->window_no = window_no;
         ev->target = -1;
+        GST_LOG("event: channel %d target %d window %d starting %.2f (request %.2f)",
+            ev->channel, ev->target, ev->window_no,
+            (double)WINDOW_NO_TO_TIME(ev->window_no), time);
         ev++;
       }
       else if (*s != '='){
@@ -1484,10 +1488,14 @@ parse_complex_target_string(GstClassify *self, const char *str){
 
         for (k = 0; k < g->n_classes; k++){
           if (g->classes[k] == *s){
+            GST_DEBUG("letter '%c' is good", *s);
             ev->channel = channel;
             ev->class_group = j;
             ev->window_no = window_no;
             ev->target = k;
+            GST_LOG("event: channel %d target %d window %d starting %.2f (request %.2f)",
+                ev->channel, ev->target, ev->window_no,
+                (double)WINDOW_NO_TO_TIME(ev->window_no), time);
             ev++;
             break;
           }
@@ -1505,9 +1513,6 @@ parse_complex_target_string(GstClassify *self, const char *str){
       break;
     }
     s++;
-    GST_LOG("event: channel %d target %d window %d starting %.2f (request %.2f)",
-        ev->channel, ev->target, ev->window_no,
-        (double)WINDOW_NO_TO_TIME(ev->window_no), time);
 #undef ERROR_IF
   }
   qsort(self->class_events, n_events, sizeof(ClassifyClassEvent), cmp_class_event);
