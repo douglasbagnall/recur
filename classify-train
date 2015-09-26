@@ -5,7 +5,7 @@ import random
 import argparse
 
 DEFAULT_LEARN_RATE = 3e-5
-DEFAULT_LEARN_RATE_DECAY = 1e-6
+DEFAULT_LEARN_RATE_DECAY = 0
 DEFAULT_LEARN_RATE_MIN = 1e-8
 DEFAULT_MOMENTUM = 0.93
 DEFAULT_LEARNING_STYLE = 0
@@ -94,6 +94,8 @@ def main():
                              min(args.learn_rate_min, args.learn_rate),
                              offset=(args.learn_rate_time_offset or
                                      DEFAULT_LEARN_RATE_TIME_OFFSET))
+    elif args.learn_rate_decay == 0.0:
+        lr = lr_inverse_time(args.learn_rate, args.learn_rate)
     else:
         if args.learn_rate_schedule != "sqrt-exponential":
             print >> sys.stderr, "assuming sqrt-exponential schedule"
