@@ -660,7 +660,7 @@ class Trainer(BaseClassifier):
             targets.extend(x % channel for x in f.targets)
             fs.set_property('location', f.fullname)
             if self.verbosity > 1:
-                print f.basename, targets
+                print f.basename, f.targets
 
         target_string = ' '.join(targets)
         self.setp('target', target_string)
