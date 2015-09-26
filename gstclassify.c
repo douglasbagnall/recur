@@ -2074,22 +2074,29 @@ train_channel(GstClassify *self, ClassifyChannel *c, int *win_count,
   for (int i = 0; i < self->n_groups; i++){
     ClassifyClassGroup *g = &self->class_groups[i];
     int o = g->offset;
+    int n_classes = g->n_classes;
     float *group_error = error + o;
     float *group_answer = answer + o;
     int target = c->group_target[i];
-    MAYBE_DEBUG("seen_counts %u %u, used_counts %u %u "
-        "p %f %f r %f", seen_counts[0], seen_counts[1], used_counts[0], used_counts[1],
-        train_probabilities[0], train_probabilities[1], rand_float(&self->net->rng));
-    if (target >= 0 && target < g->n_classes &&
-        self->window_no >= self->ignored_windows &&
+    if (target < 0 || target >= n_classes){
+      for (int j = 0; j < n_classes; j++){
+        group_error[j] = 0;
+      }
+      continue;
+    }
+
+    if (seen_counts != NULL){
+      seen_counts[o + target]++;
+    }
+
+    if (self->window_no >= self->ignored_windows &&
         (train_probabilities == NULL ||
             train_probabilities[o + target] > rand_float(&self->net->rng)
         )){
-      if (seen_counts != NULL){
+      if (used_counts != NULL){
         used_counts[o + target]++;
-        seen_counts[o + target]++;
       }
-      int winner = softmax_best_guess(group_error, group_answer, g->n_classes);
+      int winner = softmax_best_guess(group_error, group_answer, n_classes);
       c->group_winner[i] = winner;
       *win_count += winner == target;
       group_error[target] += 1.0f;
@@ -2097,11 +2104,8 @@ train_channel(GstClassify *self, ClassifyChannel *c, int *win_count,
       need_to_bptt = true;
     }
     else {
-      for (int j = 0; j < g->n_classes; j++){
+      for (int j = 0; j < n_classes; j++){
         group_error[j] = 0;
-      }
-      if (seen_counts != NULL){
-        seen_counts[o + target]++;
       }
     }
   }
