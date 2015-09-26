@@ -1028,6 +1028,33 @@ def load_binary_timings(fn, all_classes, default_state=0, classes=None,
     return timings
 
 
+def load_multiclass_timings(fn):
+    """Timings are expected to be in this form:
+
+    <filename>','<targets>
+
+    where <targets> is like the gstclassify.c target specification
+    (try `git grep -A15 'target specification'`) but with '%d' in
+    place of the channel number. That is, something like this:
+
+    some/file.wav,c%dt0.00:A c%dt50.23:B c%d t57:-
+
+    Too bad if your filenames contain commmas.
+    """
+    #XXX only works for single group
+    timings = {}
+    f = open(fn)
+    for line in f:
+        line = line.strip()
+        fn, targets = line.split(',')
+        events = timings.setdefault(fn, [])
+        for target in targets.split():
+            secs, c = target[4:].split(':')
+            events.append((0, c, float(secs), target))
+    f.close()
+    return timings
+
+
 def targeted_wav_finder(d, files):
     for fn in files:
         ffn = os.path.join(d, fn)
@@ -1047,17 +1074,21 @@ def always(x):
     return True
 
 def load_timings(all_classes, timing_files, audio_directories, min_call_intensity=0,
-                 max_call_duration=0, accept=always):
+                 max_call_duration=0, accept=always, multiclass=False):
     timings = {}
-    for fn in timing_files:
-        classes = None
-        if ',' in fn:
-            fn, classes = fn.rsplit(',', 1)
-            if classes not in all_classes:
-                classes = None
-        timings.update(load_binary_timings(fn, all_classes, classes=classes,
-                                           threshold=min_call_intensity,
-                                           max_duration=max_call_duration))
+    if multiclass:
+        for fn in timing_files:
+            timings.update(load_multiclass_timings(fn))
+    else:
+        for fn in timing_files:
+            classes = None
+            if ',' in fn:
+                fn, classes = fn.rsplit(',', 1)
+                if classes not in all_classes:
+                    classes = None
+            timings.update(load_binary_timings(fn, all_classes, classes=classes,
+                                               threshold=min_call_intensity,
+                                               max_duration=max_call_duration))
 
     timed_files = []
     for d in audio_directories:
@@ -1149,6 +1180,8 @@ def add_common_args(parser):
                        help="ignore calls longer than this")
     group.add_argument('--accept-file-regex', type=str, default='.+\.(wav|WAV)$',
                        help="accept files matching this regex ['.+\.(wav|WAV)$']")
+    group.add_argument('--multiclass-timings', action='store_true',
+                       help='the timings contain are in multiclass format')
 
     return  add_args_from_classifier(group, (['-f', '--net-filename'],
                                              ['-c', '--classes'],
@@ -1203,7 +1236,8 @@ def process_common_args(c, args, prop_names, random_seed=1, timed=True,
                              args.audio_directory,
                              args.min_call_intensity,
                              args.max_call_duration,
-                             accept_file)
+                             accept_file,
+                             args.multiclass_timings)
     random.shuffle(files)
 
     return files
