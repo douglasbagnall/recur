@@ -73,6 +73,8 @@ def main():
                        help="Test after this many training cycles")
     group.add_argument('--log-file', default="auto",
                        help="log to this file (default: based on net basename)")
+    group.add_argument('--random-seed', default=1,
+                       help="use this random seed")
 
     advanced_group = parser.add_argument_group('advanced classify-train specific '
                                                'arguments')
@@ -117,7 +119,7 @@ def main():
         c.test_interval = args.test_interval
     c.maybe_setp('weight-noise', args.weight_noise)
     c.maybe_setp('weight-init-scale', args.weight_init_scale)
-    timed_files = process_common_args(c, args, prop_names)
+    timed_files = process_common_args(c, args, prop_names, random_seed=args.random_seed)
     validate_streams = [timed_files[:n_channels]]
     training_streams = [timed_files[n_channels:]]
     random.shuffle(training_streams[0])
