@@ -14,6 +14,7 @@ from colour import CYAN, C_NORMAL, BLUE
 def DEBUG(*args):
     for a in args:
         print >> sys.stderr, a
+    sys.stderr.flush()
 
 def DEBUG_LINENO(msg=''):
     import traceback
