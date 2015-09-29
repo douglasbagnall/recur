@@ -1134,7 +1134,7 @@ def load_untimed_files(audio_directories, accept):
 
 
 def add_args_from_classifier(group, arg_names):
-    classifier = Gst.ElementFactory.make('classify')
+    classifier = Gst.ElementFactory.make('classify', 'classify-tmp')
     prop_lut = {x.name : x for x in GObject.list_properties(classifier)}
     type_lut = {
         'gchararray': str,
