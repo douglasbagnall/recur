@@ -30,7 +30,8 @@ def main():
         process_common_args(c, args, prop_names, timed=False, load_files=False)
         run(c, [], args.reverse)
     else:
-        c = GTKClassifier(sinkname='autoaudiosink', srcname='filesrc')
+        c = GTKClassifier(sinkname='autoaudiosink', srcname='filesrc',
+                          filetype=args.filetype)
         if args.min_changes:
             files = process_common_args(c, args, prop_names, timed=True)
             files = [x for x in files

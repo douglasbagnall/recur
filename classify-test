@@ -70,7 +70,7 @@ def main():
         print >> sys.stderr, "writing classification/calls requires --target-class"
         sys.exit(1)
 
-    c = Classifier(channels=1)
+    c = Classifier(channels=1, filetype=args.filetype)
     timed_files = process_common_args(c, args, prop_names, timed=timed)
     if args.sort_files:
         timed_files.sort(key=lambda x: x.fullname)

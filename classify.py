@@ -75,7 +75,8 @@ class BaseClassifier(object):
             x.link(link)
         return x
 
-    def build_pipeline(self, channels, sinkname, samplerate, srcname):
+    def build_pipeline(self, channels, sinkname, samplerate, srcname,
+                       parse_element='wavparse'):
         self.channels = channels
         self.srcname = srcname
         self.sink = self.make_add_link(sinkname, None)
@@ -87,7 +88,7 @@ class BaseClassifier(object):
             ac = self.make_add_link('audioconvert', self.interleave)
             ar = self.make_add_link('audioresample', ac)
             if srcname == 'filesrc':
-                wp = self.make_add_link('wavparse', ar)
+                wp = self.make_add_link(parse_element, ar)
                 fs = self.make_add_link(srcname, wp)
             else:
                 cf = self.make_add_link('capsfilter', ar)
@@ -110,11 +111,19 @@ class BaseClassifier(object):
                                       "pipeline.dot")
 
     def __init__(self, channels=1, mainloop=None, sinkname='fakesink',
-                 samplerate=8000, srcname='filesrc'):
+                 samplerate=8000, srcname='filesrc', filetype='wav'):
+        parse_element = {
+            'aiff': 'aiffparse',
+            'au': 'auparse',
+            'flac': 'flacparse',
+            'auto': 'decodebin',
+        }.get(filetype, 'wavparse')
+
         if mainloop is None:
             mainloop = GObject.MainLoop()
         self.mainloop = mainloop
-        self.build_pipeline(channels, sinkname, samplerate, srcname)
+        self.build_pipeline(channels, sinkname, samplerate, srcname,
+                            parse_element)
         self.setp = self.classifier.set_property
         self.getp = self.classifier.get_property
 
@@ -1178,6 +1187,8 @@ def add_common_args(parser):
                        help="accept files matching this regex ['.+\.(wav|WAV)$']")
     group.add_argument('--multiclass-timings', action='store_true',
                        help='the timings contain are in multiclass format')
+    group.add_argument('--filetype', default='wav',
+                       help='audio file type (wav, aiff, flac, auto)')
 
     return  add_args_from_classifier(group, (['-f', '--net-filename'],
                                              ['-c', '--classes'],

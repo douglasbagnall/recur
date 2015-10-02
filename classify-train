@@ -109,8 +109,7 @@ def main():
         os.nice(10)
 
     n_channels = args.channels
-
-    c = Trainer(channels=n_channels)
+    c = Trainer(channels=n_channels, filetype=args.filetype)
     c.no_save_net = args.no_save_net
     c.maybe_setp('random-alignment', args.random_alignment)
     if args.bptt_depth:
