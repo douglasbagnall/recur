@@ -1,4 +1,5 @@
 # Copyright 2013 Douglas Bagnall <douglas@halo.gen.nz> LGPL
+# -*- coding: utf-8 -*-
 import os, sys
 import random
 import itertools
@@ -8,8 +9,8 @@ import re
 import numpy as np
 from math import sqrt
 from classify_stats import draw_roc_curve, calc_stats, draw_presence_roc
-from classify_stats import actually_show_roc
-from colour import CYAN, C_NORMAL, BLUE
+from classify_stats import actually_show_roc, calc_auc
+from colour import CYAN, C_NORMAL, BLUE, GREY
 
 def DEBUG(*args):
     for a in args:
@@ -598,7 +599,7 @@ class Trainer(BaseClassifier):
     no_save_net = False
     test_interval = 2
     def train(self, trainers, testers, learn_rate_fn,
-              iterations=100, log_file='auto', stat_target=None):
+              iterations=100, log_file='auto', auc_targets=None):
         self.learn_rate_fn = learn_rate_fn
         self.counter = 0
         self.save_threshold_adjust = 1.0
@@ -612,9 +613,13 @@ class Trainer(BaseClassifier):
         elif not log_file:
             log_file = ''
         self.setp('log-file', log_file)
-        if len(self.classes) == 2 and stat_target is None:
-            stat_target = self.classes[1]
-        self.stat_target = stat_target
+        if auc_targets is None:
+            if len(self.classes) == 2:
+                self.auc_targets = self.classes[1]
+            else:
+                self.auc_targets = self.classes
+        else:
+            self.auc_targets = auc_targets
         self.setp('load-net-now', 1)
 
         self.next_training_set()
@@ -628,7 +633,7 @@ class Trainer(BaseClassifier):
                             for y in self.class_groups]
         self.test_runs = [{x: 0 for x in y}
                           for y in self.class_groups]
-        self.stat_target_list = []
+        self.auc_lists = {c: [] for c in self.auc_targets}
         self.setp('forget', 0)
         self.setp('training', False)
         self.next_set(iter(self.testset))
@@ -670,15 +675,19 @@ class Trainer(BaseClassifier):
 
 
     def evaluate_test(self):
-        #print self.test_scores, self.classes, self.test_runs
+        """Print something indicating how the training is going."""
         colours = [COLOURS[x] for x in 'PPrRYYGGgCCZ']
         white = COLOURS['Z']
+        mean_auc = 0.0
         for (classes, score, runs, pstats) in zip(self.class_groups,
                                                   self.test_scores,
                                                   self.test_runs,
                                                   self.probability_stats):
-            #classes is a string
-            #score and runs are dicts indexed by chars in classes
+            # classes is a string
+            # score and runs are dicts indexed by chars in classes
+            # pstats is a dictionary of tuples indexed by class char.
+            # Each tuple has three lists of two numbers.
+
             output = [self.getp('basename'), ': ']
             rightness = 0
             p_strings = [" means:"]
@@ -690,7 +699,6 @@ class Trainer(BaseClassifier):
                 pmeans, pvars, pcounts = pstats[c]
                 wrong_p, right_p = pmeans
                 wrong_c, right_c = pcounts
-                p_strings.append(" %s %.2f/%.2f " % (c, right_p, wrong_p))
                 wrong_var = pvars[0] / (wrong_c or 1e99)
                 right_var = pvars[1] / (right_c or 1e99)
                 gap_p += right_p - wrong_p
@@ -701,61 +709,49 @@ class Trainer(BaseClassifier):
                 gap = right_p - wrong_p
                 dp = gap / sqrt(0.5 * (right_var + wrong_var) or 1e99)
                 dprime += dp
+                p_strings.append(" %s %d%s±%s%d%s|%s%d%s±%s%d" %
+                                 (c,
+                                  int(right_p * 99.9 + 0.5),
+                                  GREY, white, int(sqrt(right_var) * 99.9 + 0.5),
+                                  GREY, white,
+                                  int(wrong_p * 99.9 + 0.5),
+                                  GREY, white, int(sqrt(wrong_var) * 99.9 + 0.5)))
+
+                auc_results = self.auc_lists.get(c)
+                if auc_results:
+                    auc = calc_auc(auc_results)
+                    i = int(auc * 9.99)
+                    output.append("%s%s%s %s" % (white, c, colours[i],
+                                                 int(auc * 99.99 + 0.5)))
+                    mean_auc += auc
+                else:
+                    output.append("%s." % c)
 
                 s = score[c]
                 r = runs[c]
                 if r:
                     x = float(s) / r
                     i = int(x * 9.99)
-                    output.append(colours[i])
-                    output.append(c)
-                    output.append(' %.2f%s %d/%d ' % (x, white, s, r))
+                    output.append(' %s%d/%d ' % (colours[i], s, r))
                     rightness += x
                 else:
                     output.append('%s --- %d/0 ' % (c, s,))
+
             if count_p:
                 ratio_p /= count_p
 
-            stat_list = self.stat_target_list
-            stat_target = self.stat_target
-            if stat_target and stat_target in classes and stat_list:
-                #auc2 = _calc_stats(stat_list[:])['auc']
-                # AUC avoiding in-loop maths:
-                # start off with threshold 1.0, i.e. 0% positive
-                stat_list.sort(reverse=True)
-                auc = 0
-                tp = 0
-                fp = 0
-                #as the threshold drops, either a true or false positive is revealed.
-                # if it is true, increment the true positive column (y++)
-                # if it is false, advance along the x axis
-                for p, t in stat_list:
-                    if t:
-                        tp += 1
-                    else:
-                        fp += 1
-                        auc += tp
-                #if the last one is true, add the last TP column
-                if stat_list[-1][1]:
-                    auc += tp
-                area = float(tp * fp)
-                auc /= area
-                auc_string = " %sAUC %s%d" %  (white,
-                                              colours[max(int((auc - 0.5) * 20.0), 0)],
-                                              int(auc * 1e2 + 0.5))
-            else:
-                auc = 0
-                auc_string = ''
-
+            mean_auc /= len(self.auc_lists)
             dprime /= len(classes)
             gap_p /= len(classes)
             rightness /= len(classes)
-            output.append(" %s%d%% %s.%02d %s\xC3\x97%.1f %sd'%s%.2f%s%s" %
+            output.append(" %s%d%% %s.%02d %s\xC3\x97%.1f %sd'%s%.2f %sa%s%d%s" %
                           (colours[int(rightness * 9.99)], int(rightness * 1e2 + 0.5),
                            colours[min(int(gap_p * 18.), 9)], int(gap_p * 1e2 + 0.5),
                            colours[min(int(ratio_p * 2.), 9)], ratio_p, white,
                            colours[min(int(dprime * 4.), 9)], dprime,
-                           auc_string, white))
+                           white, colours[min(int(mean_auc * 9.99), 9)],
+                           int(mean_auc * 99.9 + 0.5),
+                           white))
 
             output.extend(p_strings)
 
@@ -766,8 +762,8 @@ class Trainer(BaseClassifier):
                 gap_p > 0.5 * adj or
                 ratio_p * gap_p * adj > 2.0 or
                 dprime > 1.5  * adj or
-                auc > 0.94 * adj):
-                self.save_threshold_adjust = 1.03
+                mean_auc > 0.94 * adj):
+                self.save_threshold_adjust *= 1.02
                 self.save_named_net(tag='win-%d-gap-%d-ratio-%d-dprime-%d-auc-%d' %
                                     (int(rightness * 100 + 0.5),
                                      int(gap_p * 100 + 0.5),
@@ -826,8 +822,7 @@ class Trainer(BaseClassifier):
         #print s.to_string()
         name = s.get_name()
         if name == 'classify' and not self.getp('training'):
-            stat_target = self.stat_target
-            stat_list = self.stat_target_list
+            auc_lists = self.auc_lists
             self.test_n += self.channels
             v = s.get_value
             for i in range(self.channels):
@@ -851,8 +846,8 @@ class Trainer(BaseClassifier):
                         mean += delta / n
                         pvars[correct] += delta * (p - mean)
                         pmeans[correct] = mean
-                        if x == stat_target:
-                            stat_list.append((p, correct))
+                        if x in auc_lists:
+                            auc_lists[x].append((p, correct))
 
 def negate_exponent(x, name=None):
     """Sometimes, on the command-line, I write 1e6 when I mean 1e-6, and

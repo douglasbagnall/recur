@@ -313,3 +313,35 @@ def draw_presence_roc(scores, label='presence', label_every=0.0):
         for score, x, y in labels:
             plt.annotate("%.2f" % score, xy=(x, y), xytext=(-3, 2), ha='right',
                          textcoords='offset points', color=colour)
+
+
+def calc_auc(scores_and_truth):
+    """Calculate AUC from a list of tuples containing score and ground
+    truth. Like this:
+
+        [(0.434, True), (0.1, False), (0.9, True),...]
+    """
+    results = sorted((s, int(bool(t))) for s, t in scores_and_truth)
+    n_true = sum(x[1] for x in results)
+    n_false = len(results) - n_true
+
+    true_positives, false_positives = n_true, n_false
+    tp_scale = 1.0 / (n_true or 1)
+    fp_scale = 1.0 / (n_false or 1)
+    px, py = 1.0, 1.0  # previous position for area calculation
+    auc = 1.0
+
+    prev_score = -1.0
+    for score, truth in results:
+        false_positives -= 1 - truth
+        true_positives -= truth
+        if prev_score != score:
+            x = false_positives * fp_scale
+            y = true_positives * tp_scale
+            auc += (px + x) * 0.5 * (y - py)
+            px = x
+            py = y
+            prev_score = score
+
+    auc += px * 0.5 * -py
+    return auc
