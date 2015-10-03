@@ -782,7 +782,7 @@ class Trainer(BaseClassifier):
                 ratio_p * gap_p * adj > 2.0 or
                 dprime > 1.5  * adj or
                 mean_auc > 0.94 * adj):
-                self.save_threshold_adjust = 1.03
+                self.save_threshold_adjust *= 1.02
                 self.save_named_net(tag='win-%d-gap-%d-ratio-%d-dprime-%d-auc-%d' %
                                     (int(rightness * 100 + 0.5),
                                      int(gap_p * 100 + 0.5),
