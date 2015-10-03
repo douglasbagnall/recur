@@ -868,31 +868,12 @@ class Trainer(BaseClassifier):
                         if x in auc_lists:
                             auc_lists[x].append((p, correct))
 
-def negate_exponent(x, name=None):
-    """Sometimes, on the command-line, I write 1e6 when I mean 1e-6, and
-    where the former value would be ridiculous, meaningless, or
-    destructive. This function corrects those errors -- silently
-    unless a name is provided.
-    """
-    m, e = ("%.9e" % x).split('e')
-    s = e[0]
-    e = e[1:]
-    if s == '-':
-        y = float(m + 'e+' + e)
-    elif s == '+':
-        y = float(m + 'e-' + e)
-    else:
-        y = x #should not happen
-
-    if name is not None:
-        print >> sys.stderr, "assuming %s %e means %e" % (name, x, y)
-    return y
 
 def lr_sqrt_exp(start, scale, min_value, post_min_value=None):
-    if start > 1:
-        start = negate_exponent(start, 'learn-rate')
-    if scale > 1:
-        scale = negate_exponent(scale, 'learn-rate-scale')
+    if start > 1 or scale > 1:
+        raise ValueError("learn rate start %f or scale %f is bad",
+                         start, scale)
+
     if post_min_value is None:
         post_min_value = min_value
     if scale == 0:
