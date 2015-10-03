@@ -4,6 +4,7 @@ import os, sys
 import argparse
 import numpy as np
 
+from colour import COLOURS
 from classify import gst_init, Gst, GObject, COLOURS
 from classify import draw_roc_curve, draw_presence_roc, actually_show_roc
 from classify import BaseClassifier, add_common_args, process_common_args

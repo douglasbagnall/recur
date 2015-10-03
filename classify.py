@@ -10,7 +10,8 @@ import numpy as np
 from math import sqrt
 from classify_stats import draw_roc_curve, calc_stats, draw_presence_roc
 from classify_stats import actually_show_roc, calc_auc
-from colour import CYAN, C_NORMAL, BLUE, GREY
+import colour
+
 
 def DEBUG(*args):
     for a in args:
@@ -20,8 +21,9 @@ def DEBUG(*args):
 def DEBUG_LINENO(msg=''):
     import traceback
     filename, lineno, function, text = traceback.extract_stack(None, 2)[0]
-    DEBUG("%s%s:%s%s %s%s()%s '%s'" % (CYAN, filename, BLUE, lineno,
-                                       CYAN, function, C_NORMAL, msg))
+    DEBUG("%s%s:%s%s %s%s()%s '%s'" % (colour.CYAN, filename, colour.BLUE,
+                                       lineno, colour.CYAN, function,
+                                       colour.C_NORMAL, msg))
 
 
 _dirname = os.path.dirname(os.path.abspath(__file__))
@@ -37,18 +39,6 @@ MAX_FREQUENCY = 3900
 KNEE_FREQUENCY = 700
 WINDOW_SIZE = 1024
 BASENAME = 'classify'
-COLOURS = {
-    "Z": "\033[00m",
-    "g": '\033[00;32m',
-    "G": '\033[01;32m',
-    "r": '\033[00;31m',
-    "R": '\033[01;31m',
-    "M": "\033[01;35m",
-    "P": "\033[00;35m",
-    "C": "\033[01;36m",
-    "Y": "\033[01;33m",
-    "W": "\033[01;37m",
-}
 
 SAVE_LOCATION = 'nets/autosave'
 
@@ -296,8 +286,10 @@ class Classifier(BaseClassifier):
     def report(self):
         self.pipeline.set_state(Gst.State.READY)
         out = []
-        colours = [COLOURS[x] for x in 'PPrrRRYYGgCC']
-        white = COLOURS['Z']
+        colours = colour.SCALE_12
+        c_scale = len(colours) * 0.9999
+        white, grey = colour.C_NORMAL, colour.GREY
+
         for groupno, file_results in enumerate(self.file_results):
             classes = self.class_groups[groupno]
             step = len(file_results) / 100.0
@@ -685,8 +677,9 @@ class Trainer(BaseClassifier):
 
     def evaluate_test(self):
         """Print something indicating how the training is going."""
-        colours = [COLOURS[x] for x in 'PPrRYYGGgCCZ']
-        white = COLOURS['Z']
+        colourise = colour.colouriser(colour.SCALE_30)
+
+        white, grey = colour.C_NORMAL, colour.GREY
         mean_auc = 0.0
         for (classes, score, runs, pstats) in zip(self.class_groups,
                                                   self.test_scores,
@@ -699,12 +692,15 @@ class Trainer(BaseClassifier):
 
             output = [self.getp('basename'), ': ']
             rightness = 0
-            p_strings = [" means:"]
             gap_p = 0
             ratio_p = 0
             count_p = 0
             dprime = 0
+            title_colour = colour.combo(15, 235)
+            t_colour = colour.combo(155, 0)
+            f_colour = colour.combo(205, 0)
             for c in classes:
+                output.append("%s|%s|%s" % (title_colour, c, white))
                 pmeans, pvars, pcounts = pstats[c]
                 wrong_p, right_p = pmeans
                 wrong_c, right_c = pcounts
@@ -718,33 +714,39 @@ class Trainer(BaseClassifier):
                 gap = right_p - wrong_p
                 dp = gap / sqrt(0.5 * (right_var + wrong_var) or 1e99)
                 dprime += dp
-                p_strings.append(" %s %d%s±%s%d%s|%s%d%s±%s%d" %
-                                 (c,
-                                  int(right_p * 99.9 + 0.5),
-                                  GREY, white, int(sqrt(right_var) * 99.9 + 0.5),
-                                  GREY, white,
-                                  int(wrong_p * 99.9 + 0.5),
-                                  GREY, white, int(sqrt(wrong_var) * 99.9 + 0.5)))
+
 
                 auc_results = self.auc_lists.get(c)
                 if auc_results:
                     auc = calc_auc(auc_results)
-                    i = int(auc * 9.99)
-                    output.append("%s%s%s %s" % (white, c, colours[i],
-                                                 int(auc * 99.99 + 0.5)))
+                    output.append(" %s%2d" % (colourise((auc - 0.5) * 2.0),
+                                              int(auc * 99.99 + 0.5)))
                     mean_auc += auc
                 else:
-                    output.append("%s." % c)
+                    output.append(".")
 
                 s = score[c]
                 r = runs[c]
                 if r:
                     x = float(s) / r
-                    i = int(x * 9.99)
-                    output.append(' %s%d/%d ' % (colours[i], s, r))
+                    percent = int(x * 100.0 + 0.5)
+                    if r >= 10000:
+                        rs = "%dk" % (int(r * 1e-3 + 0.5))
+                    else:
+                        rs = str(r)
+                    output.append(' %s%2d%%%s/%s' % (colourise(x), percent,
+                                                     grey, rs))
                     rightness += x
                 else:
-                    output.append('%s --- %d/0 ' % (c, s,))
+                    output.append(' untested ')
+
+
+                output.append(" %st%s%2d%s±%02d %sf%s%2d%s±%02d " %
+                              (t_colour, white, int(right_p * 99.99 + 0.5),
+                               grey, int(sqrt(right_var) * 99.99 + 0.5),
+                               f_colour, white,
+                               int(wrong_p * 99.99 + 0.5),
+                               grey, int(sqrt(wrong_var) * 99.99 + 0.5)))
 
             if count_p:
                 ratio_p /= count_p
@@ -753,16 +755,24 @@ class Trainer(BaseClassifier):
             dprime /= len(classes)
             gap_p /= len(classes)
             rightness /= len(classes)
-            output.append(" %s%d%% %s.%02d %s\xC3\x97%.1f %sd'%s%.2f %sa%s%d%s" %
-                          (colours[int(rightness * 9.99)], int(rightness * 1e2 + 0.5),
-                           colours[min(int(gap_p * 18.), 9)], int(gap_p * 1e2 + 0.5),
-                           colours[min(int(ratio_p * 2.), 9)], ratio_p, white,
-                           colours[min(int(dprime * 4.), 9)], dprime,
-                           white, colours[min(int(mean_auc * 9.99), 9)],
-                           int(mean_auc * 99.9 + 0.5),
-                           white))
+            output.append("%s Σ %s " % (title_colour, white))
 
-            output.extend(p_strings)
+            output.append("🜚 %s%2d" %
+                          (colourise((mean_auc - 0.5) * 2.0),
+                           int(mean_auc * 99.9 + 0.5)))
+
+            output.append(" %s%2d%% %s≏%s.%02d %s×%.1f" %
+                          (colourise(rightness),
+                           int(rightness * 1e2 + 0.5),
+                           white,
+                           colourise(gap_p * 1.5),
+                           int(gap_p * 1e2 + 0.5),
+                           colourise(ratio_p * 0.06),
+                           ratio_p))
+
+            output.append(" %sd'%s%.2f%s" %
+                          (white, colourise(dprime * 0.4), dprime, white))
+
 
             print ''.join(output)
             adj = min(1.0, self.save_threshold_adjust)
@@ -772,13 +782,13 @@ class Trainer(BaseClassifier):
                 ratio_p * gap_p * adj > 2.0 or
                 dprime > 1.5  * adj or
                 mean_auc > 0.94 * adj):
-                self.save_threshold_adjust *= 1.02
+                self.save_threshold_adjust = 1.03
                 self.save_named_net(tag='win-%d-gap-%d-ratio-%d-dprime-%d-auc-%d' %
                                     (int(rightness * 100 + 0.5),
                                      int(gap_p * 100 + 0.5),
                                      int(ratio_p + 0.5),
                                      int(dprime * 100 + 0.5),
-                                     int(auc * 100 + 0.5)))
+                                     int(mean_auc * 100 + 0.5)))
             else:
                 self.save_threshold_adjust *= 0.99
 

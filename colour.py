@@ -1,3 +1,5 @@
+_FOREGROUND = "\033[38;5;%sm"
+_BACKGROUND = "\033[48;5;%sm"
 
 C_NORMAL    = "\033[00m"
 DARK_RED    = "\033[00;31m"
@@ -17,8 +19,21 @@ WHITE       = "\033[01;37m"
 
 REV_RED     = "\033[01;41m"
 
-_FOREGROUND = "\033[38;5;%sm"
-_BACKGROUND = "\033[48;5;%sm"
+def combo(foreground, background):
+    return _BACKGROUND % background + _FOREGROUND % foreground
+
+COLOURS = {
+    "Z": C_NORMAL,
+    "g": GREEN,
+    "G": DARK_GREEN,
+    "r": RED,
+    "R": DARK_RED,
+    "M": MAGENTA,
+    "P": PURPLE,
+    "C": CYAN,
+    "Y": YELLOW,
+    "W": WHITE,
+}
 
 _spectrum = (range(160, 196, 6) +
              range(226, 190, -6) +
@@ -35,22 +50,22 @@ _spectrum = (range(160, 196, 6) +
 SPECTRUM = [_FOREGROUND % x for x in _spectrum]
 BACKGROUND_SPECTRUM = [_BACKGROUND % x for x in _spectrum]
 
+SCALE_30 = [_BACKGROUND % '16' + _FOREGROUND % x
+            for x in
+            (17, 17, 18, 18, 19, 19,
+             57, 56, 55, 54, 53, 52,
+             90, 89, 88, 160, 196, 202,
+             208, 214, 220, 226, 190, 154,
+             118, 82, 46, 48, 49, 51)]
 
-def get_namespace(use_colour='auto'):
-    import sys
-    class EmptyThing(object):
-        pass
-    ns = EmptyThing()
+SCALE_12 = [COLOURS[x] for x in 'PPrRYYGGgCCW']
+SCALE_11 = SCALE_12[:-1]
 
-    if use_colour.lower() in ('yes', 'true', 'y', 'always'):
-        c = True
-    elif use_colour.lower() in ('no', 'false', 'n', 'never'):
-        c = False
-    else:
-        c = sys.stdout.isatty()
 
-    for k, v in globals().items():
-        if k.isupper():
-            setattr(ns, k, (v if c else ''))
-
-    return ns
+def colouriser(colour_scale):
+    c_scale = len(colour_scale) * 0.9999
+    c_max = int(c_scale)
+    def colourise(val):
+        i = min(int(val * c_scale), c_max)
+        return colour_scale[max(i, 0)]
+    return colourise
