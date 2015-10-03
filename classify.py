@@ -884,11 +884,11 @@ def lr_sqrt_exp(start, scale, min_value, post_min_value=None):
         def fn(generation):
             x = (generation * scale + 1) ** 0.5
             v = start ** x
-            #print >> sys.stderr, "start %f, x %f, v %f" % (start, x, v)
             if v < min_value:
                 return post_min_value
             return v
     return fn
+
 
 def lr_inverse_time(start, min_value, offset=1.0, post_min_value=None):
     if post_min_value is None:
