@@ -67,7 +67,7 @@ def main():
                        help="don't save the net, periodically or otherwise")
     group.add_argument('-C', '--channels', default=12, type=int,
                        help="how many channels to use")
-    group.add_argument('--activity-bias', type=int, default=1,
+    group.add_argument('--activity-bias', type=int, default=0,
                        help="Train more on examples with changing classes")
     group.add_argument('-P', '--prioritise', action='store_true',
                        help="Do not renice downwards")
