@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 import os, sys
 import random
+import argparse
 import itertools
 import time
 import json
@@ -1127,6 +1128,14 @@ def load_untimed_files(audio_directories, accept):
 
     return untimed_files
 
+def range_arg(bottom, top, _type=float):
+    def check(x):
+        x = _type(x)
+        if x < bottom or x > top:
+            raise argparse.ArgumentTypeError("%s is not between %s and %s" %
+                                             (x, bottom, top))
+        return x
+    return check
 
 def add_args_from_classifier(group, arg_names):
     classifier = Gst.ElementFactory.make('classify', 'classify-tmp')
@@ -1144,6 +1153,8 @@ def add_args_from_classifier(group, arg_names):
         prop_name = args[-1][2:]
         prop = prop_lut[prop_name]
         prop_type = type_lut[prop.value_type.name]
+        if prop_type in (float, int, long):
+            prop_type = range_arg(prop.minimum, prop.maximum, prop_type)
         kwargs = {
             'type': prop_type,
             'default': None,

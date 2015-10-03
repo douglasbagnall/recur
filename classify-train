@@ -14,7 +14,7 @@ DEFAULT_LEARN_RATE_TIME_OFFSET = 2000.0
 
 from classify import gst_init
 from classify import Trainer, lr_sqrt_exp, lr_inverse_time
-from classify import add_args_from_classifier
+from classify import add_args_from_classifier, range_arg
 from classify import add_common_args, process_common_args
 
 def main():
@@ -53,13 +53,15 @@ def main():
                                      ['--balanced-training'],
                                  ))
 
-    group.add_argument('--learn-rate-decay', type=float, default=DEFAULT_LEARN_RATE_DECAY,
+    group.add_argument('--learn-rate-decay', type=range_arg(0, 1),
+                       default=DEFAULT_LEARN_RATE_DECAY,
                        help="learning rate decay")
     group.add_argument('--learn-rate-time-offset', type=float,
                        help="learning rate time offset (implies inverse-time schedule)")
     group.add_argument('--learn-rate-schedule', default='sqrt-exponential',
                        help='"sqrt-exponential", "inverse-time", or "flat"')
-    group.add_argument('--learn-rate-min', type=float, default=DEFAULT_LEARN_RATE_MIN,
+    group.add_argument('--learn-rate-min', type=range_arg(0, 10),
+                       default=DEFAULT_LEARN_RATE_MIN,
                        help="learning rate decay stops here")
     group.add_argument('-N', '--no-save-net', action='store_true',
                        help="don't save the net, periodically or otherwise")
