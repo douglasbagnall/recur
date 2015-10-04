@@ -622,6 +622,7 @@ class Trainer(BaseClassifier):
                 self.auc_targets = self.classes
         else:
             self.auc_targets = auc_targets
+        self.decaying_records = [0] * (6 + len(self.auc_targets)) # for auto-save
         self.setp('load-net-now', 1)
 
         self.next_training_set()
@@ -681,7 +682,7 @@ class Trainer(BaseClassifier):
         colourise = colour.colouriser(colour.SCALE_30)
 
         white, grey = colour.C_NORMAL, colour.GREY
-        mean_auc = 0.0
+        aucs = []
         for (classes, score, runs, pstats) in zip(self.class_groups,
                                                   self.test_scores,
                                                   self.test_runs,
@@ -722,7 +723,7 @@ class Trainer(BaseClassifier):
                     auc = calc_auc(auc_results)
                     output.append(" %s%2d" % (colourise((auc - 0.5) * 2.0),
                                               int(auc * 99.99 + 0.5)))
-                    mean_auc += auc
+                    aucs.append(auc)
                 else:
                     output.append(".")
 
@@ -752,7 +753,7 @@ class Trainer(BaseClassifier):
             if count_p:
                 ratio_p /= count_p
 
-            mean_auc /= len(self.auc_lists)
+            mean_auc = sum(aucs) / len(aucs)
             dprime /= len(classes)
             gap_p /= len(classes)
             rightness /= len(classes)
@@ -774,24 +775,30 @@ class Trainer(BaseClassifier):
             output.append(" %sd'%s%.2f%s" %
                           (white, colourise(dprime * 0.4), dprime, white))
 
-
             print ''.join(output)
-            adj = min(1.0, self.save_threshold_adjust)
-            if (rightness > 0.8 * adj or
-                ratio_p > 8.0 * adj or
-                gap_p > 0.5 * adj or
-                ratio_p * gap_p * adj > 2.0 or
-                dprime > 1.5  * adj or
-                mean_auc > 0.94 * adj):
-                self.save_threshold_adjust *= 1.02
+
+            save = False
+            for i, v in enumerate(aucs +
+                                  [rightness,
+                                   ratio_p,
+                                   gap_p,
+                                   ratio_p * gap_p,
+                                   dprime,
+                                   mean_auc]):
+                r = self.decaying_records[i]
+                if v > r:
+                    save = True
+                    r = v
+                    if self.verbosity > 0:
+                        print "%srecord %d: %.3g%s," % (grey, i, v, white),
+                self.decaying_records[i] = r * 0.999
+            if save:
                 self.save_named_net(tag='win-%d-gap-%d-ratio-%d-dprime-%d-auc-%d' %
                                     (int(rightness * 100 + 0.5),
                                      int(gap_p * 100 + 0.5),
                                      int(ratio_p + 0.5),
                                      int(dprime * 100 + 0.5),
                                      int(mean_auc * 100 + 0.5)))
-            else:
-                self.save_threshold_adjust *= 0.99
 
 
     def save_named_net(self, tag='', dir=SAVE_LOCATION):
