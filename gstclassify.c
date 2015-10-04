@@ -2063,14 +2063,14 @@ prepare_channel_features(GstClassify *self, s16 *buffer_i, int j){
   return c;
 }
 
-static inline float
+static inline int
 train_channel(GstClassify *self, ClassifyChannel *c, int *win_count,
-    float *train_probabilities, u32 *seen_counts, u32 *used_counts){
+    float *train_probabilities, u32 *seen_counts, u32 *used_counts,
+    float *wrongness){
   RecurNN *net = c->net;
   float *answer = rnn_opinion(net, c->features, net->presynaptic_noise);
   float *error = net->bptt->o_error;
-  float wrongness = 0;
-  bool need_to_bptt = false;
+  int groups_trained = 0;
   for (int i = 0; i < self->n_groups; i++){
     ClassifyClassGroup *g = &self->class_groups[i];
     int o = g->offset;
@@ -2078,10 +2078,12 @@ train_channel(GstClassify *self, ClassifyChannel *c, int *win_count,
     float *group_error = error + o;
     float *group_answer = answer + o;
     int target = c->group_target[i];
-    if (target < 0 || target >= n_classes){
+    if (target < 0 || target >= n_classes ||
+        self->window_no < self->ignored_windows){
       for (int j = 0; j < n_classes; j++){
         group_error[j] = 0;
       }
+      /* No training for this channel. */
       continue;
     }
 
@@ -2089,10 +2091,9 @@ train_channel(GstClassify *self, ClassifyChannel *c, int *win_count,
       seen_counts[o + target]++;
     }
 
-    if (self->window_no >= self->ignored_windows &&
-        (train_probabilities == NULL ||
-            train_probabilities[o + target] > rand_float(&self->net->rng)
-        )){
+    if (train_probabilities == NULL ||
+        train_probabilities[o + target] > rand_float(&self->net->rng)
+        ){
       if (used_counts != NULL){
         used_counts[o + target]++;
       }
@@ -2100,16 +2101,19 @@ train_channel(GstClassify *self, ClassifyChannel *c, int *win_count,
       c->group_winner[i] = winner;
       *win_count += winner == target;
       group_error[target] += 1.0f;
-      wrongness += group_error[target];
-      need_to_bptt = true;
+      *wrongness += group_error[target];
+      groups_trained++;
     }
     else {
+      /* No training for this channel. This is the same as the earlier case,
+         but we needed target to be in rage to work this out, and to increment
+         seen_counts. */
       for (int j = 0; j < n_classes; j++){
         group_error[j] = 0;
       }
     }
   }
-  if (need_to_bptt){
+  if (groups_trained){
     if (self->error_weight){
       for (int i = 0; i < net->output_size; i++){
         error[i] *= self->error_weight[i];
@@ -2118,7 +2122,7 @@ train_channel(GstClassify *self, ClassifyChannel *c, int *win_count,
     rnn_bptt_calc_deltas(net, 1, NULL);
   }
   rnn_bptt_advance(net);
-  return wrongness;
+  return groups_trained;
 }
 
 static inline s16 *
@@ -2188,6 +2192,8 @@ maybe_learn(GstClassify *self){
     int winners = 0;
     u32 seen_sum = 0;
     u32 used_sum = 0;
+    int please_log = 0;
+    int all_groups_trained = 0;
     rnn_bptt_clear_deltas(net);
     GST_LOG("buffer offset %ld, %d", buffer - self->audio_queue,
         self->read_offset);
@@ -2206,8 +2212,15 @@ maybe_learn(GstClassify *self){
 
     for (j = 0; j < self->n_channels; j++){
       ClassifyChannel *c = prepare_channel_features(self, buffer, j);
-      err_sum += train_channel(self, c, &winners, train_p, seen_counts,
-          used_counts);
+      int groups_trained = train_channel(self, c, &winners, train_p,
+          seen_counts, used_counts, &err_sum);
+      if (j == 0){
+        /* some of the logging only applies to channel zero. If we don't use
+           it, the log will get out of sync, which breaks the [broken] plot
+           system */
+        please_log = groups_trained;
+      }
+      all_groups_trained += groups_trained;
     }
 
     /*XXX periodic_pgm_dump and image string should be gst properties */
@@ -2221,26 +2234,21 @@ maybe_learn(GstClassify *self){
     }
     rnn_condition_net(net);
     possibly_save_net(net, self->net_filename);
-    rnn_log_net(net);
     if (self->error_image){
       temporal_ppm_row_from_source(self->error_image);
     }
-    float err_scale;
-    if (used_counts == NULL){
-      err_scale = 1.0f / self->n_channels;
+    if (please_log){
+      /* if we are in the ignored windows we are not training, so we don't
+         log.*/
+      rnn_log_int(net, "window", self->window_no);
+      rnn_log_net(net);
+      float err_scale;
+      err_scale = 1.0f / (all_groups_trained ? all_groups_trained : 1);
+      rnn_log_int(net, "trained", all_groups_trained);
+      rnn_log_float(net, "momentum", momentum);
+      rnn_log_float(net, "error", err_sum * err_scale);
+      rnn_log_float(net, "correct", winners * err_scale);
     }
-    else {
-      u32 used_sum2 = 0;
-      for (j = 0; j < n_classes; j++){
-        used_sum2 += used_counts[j];
-      }
-      u32 d = used_sum2 - used_sum;
-      err_scale = 1.0f / (d ? d : 1);
-      rnn_log_int(net, "trained", d);
-    }
-    rnn_log_float(net, "momentum", momentum);
-    rnn_log_float(net, "error", err_sum * err_scale);
-    rnn_log_float(net, "correct", winners * err_scale);
   }
 }
 
