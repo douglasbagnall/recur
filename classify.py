@@ -721,8 +721,8 @@ class Trainer(BaseClassifier):
                 auc_results = self.auc_lists.get(c)
                 if auc_results:
                     auc = calc_auc(auc_results)
-                    output.append(" %s%2d" % (colourise((auc - 0.5) * 2.0),
-                                              int(auc * 99.99 + 0.5)))
+                    output.append("%s.%03d" % (colourise(abs((auc - 0.5)) * 2.0),
+                                               int(auc * 1000.0 + 0.5)))
                     aucs.append(auc)
                 else:
                     output.append(".")
@@ -759,9 +759,9 @@ class Trainer(BaseClassifier):
             rightness /= len(classes)
             output.append("%s Σ %s " % (title_colour, white))
 
-            output.append("🜚 %s%2d" %
+            output.append("🜚%s.%03d" %
                           (colourise((mean_auc - 0.5) * 2.0),
-                           int(mean_auc * 99.9 + 0.5)))
+                           int(mean_auc * 1000.0 + 0.5)))
 
             output.append(" %s%2d%% %s≏%s.%02d %s×%.1f" %
                           (colourise(rightness),
@@ -798,7 +798,7 @@ class Trainer(BaseClassifier):
                                      int(gap_p * 100 + 0.5),
                                      int(ratio_p + 0.5),
                                      int(dprime * 100 + 0.5),
-                                     int(mean_auc * 100 + 0.5)))
+                                     int(mean_auc * 1000 + 0.5)))
 
 
     def save_named_net(self, tag='', dir=SAVE_LOCATION):
