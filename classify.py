@@ -305,8 +305,8 @@ class Classifier(BaseClassifier):
                             c = classes[current_targets.index(m)]
                         else:
                             c = '~'
-                        colour = colours[int(current_correct * 10.01 / s)]
-                        out.append('%s%s' % (colour, c))
+                        hue = colours[int(current_correct * 10.01 / s)]
+                        out.append('%s%s' % (hue, c))
                     next_stop += step
                     current_correct = 0
                     current_targets = [0] * len(classes)
