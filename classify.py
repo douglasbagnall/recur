@@ -257,7 +257,6 @@ class Classifier(BaseClassifier):
         self.current_file = f
         self.sources[0].set_property('location', f.fullname)
         self.setp('target', targets)
-        self.file_results = [[] for x in self.class_groups]
         self.file_scores = {x[0]:[] for x in self.collected_classes}
         self.pipeline.set_state(Gst.State.PLAYING)
 
@@ -272,98 +271,69 @@ class Classifier(BaseClassifier):
         no_targets = not self.current_file.targets
         for k, i in self.collected_classes:
             key = 'channel 0, group %d ' % i
-            correct = v(key + 'correct')
-            target = v(key + 'target')
             if no_targets:
                 self.file_scores[k].append((v(key + k), None, timestamp))
-            elif target is None:
-                continue
             else:
+                target = v(key + 'target')
+                if target is None:
+                    continue
                 self.file_scores[k].append((v(key + k), k == target, timestamp))
-                if self.verbosity:
-                    self.file_results[i].append((target, correct))
 
 
     def report(self):
         self.pipeline.set_state(Gst.State.READY)
-        out = []
-        colours = colour.SCALE_12
-        c_scale = len(colours) * 0.9999
+        colours = list(reversed(colour.SCALE_30))
+        c_scale = len(colours) * 0.999
         white, grey = colour.C_NORMAL, colour.GREY
+        sparkline = u' ▁▂▃▄▅▆▇█'
+        sparkline_scale = len(sparkline) * 0.9999
 
-        for groupno, file_results in enumerate(self.file_results):
-            classes = self.class_groups[groupno]
-            step = len(file_results) / 100.0
-            next_stop = 0
-            #print file_results
-            for i, result in enumerate(file_results):
+        print "%s%s\n" % (white, self.current_file.basename)
+        target_line = ['', ' '] * 100
+        sparklines = []
+        for k, results in self.file_scores.items():
+            step = len(results) / 100.0
+            next_stop = step
+            row = []
+            p_sum = 0.0
+            target_sum = 0
+            n = 0
+            j = 0
+            scores_and_truth = []
+            some_true = False
+            for i, result in enumerate(results):
                 if i >= next_stop:
-                    if i:
-                        s = sum(current_targets)
-                        m = max(current_targets)
-                        if m > s * 0.9:
-                            c = classes[current_targets.index(m)]
-                        else:
-                            c = '~'
-                        hue = colours[int(current_correct * 10.01 / s)]
-                        out.append('%s%s' % (hue, c))
+                    n = float(n)
+                    score = p_sum / n
+                    e = abs(p_sum - target_sum + 0.1) / (n + 0.1)
+                    c = colours[int(e * c_scale)]
+                    char = sparkline[int(score * sparkline_scale)]
+                    row.append('%s%s' % (c, char))
+                    if target_sum / n > 0.9:
+                        target_line[j] = c
+                        target_line[j + 1] = k
+
                     next_stop += step
-                    current_correct = 0
-                    current_targets = [0] * len(classes)
-
-                target, correct = result
-                t_index = classes.index(target)
-                current_correct += correct
-                current_targets[t_index] += 1
-
-            out.extend((white, str(len(file_results)), '\n'))
-
-        if self.target_index:
-            k = self.target_index
-        else:
-            k = self.classes[-1]
-
-        scores = self.file_scores[k]
-        r_sum = 0
-        w_sum = 0
-        r_sum2, w_sum2 = 0, 0
-        r_count = 0
-        w_count = 0
-        for s, t, _time in scores:
-            if t:
-                r_sum += s
-                r_sum2 += s * s
-                r_count += 1
+                    p_sum = 0.0
+                    target_sum = 0
+                    n = 0
+                    j += 2
+                p, target, timestamp = result
+                p_sum += p
+                target_sum += target
+                n += 1
+                if target:
+                    scores_and_truth.append((p, target))
+                    some_true = True
+            if scores_and_truth:
+                auc = int(calc_auc(scores_and_truth) * 1000)
             else:
-                w_sum += s
-                w_sum2 += s * s
-                w_count += 1
-        if r_count:
-            r_mean = r_sum / r_count
-            r_stddev = (r_sum2 / r_count - r_mean * r_mean) ** 0.5
-        else:
-            r_mean = r_stddev = float('nan')
-        if w_count:
-            w_mean = w_sum / w_count
-            w_stddev = (w_sum2 / w_count  - w_mean * w_mean) ** 0.5
-        else:
-            w_mean = w_stddev = float('nan')
+                auc = ' - '
+            sparklines.append('%s%s: auc %3s %s\n' % (white, k, auc,
+                                                      u''.join(row).encode('utf-8')))
 
-        if r_count:
-            diff = r_mean - w_mean
-            sd = r_stddev + w_stddev
-            c = colours[(diff > 0) + (diff > r_stddev) + (diff > w_stddev) +
-                        (diff > sd) + (diff > sd * 2) + (diff > sd * 3) +
-                        (diff > w_mean) + (diff > w_mean * 2) +
-                        (diff > 0.1) + (diff > 0.5)]
-        else:
-            c = white
-        sigma = unichr(0x03c3).encode('utf-8')
-        out.append("%s scores. %s%s %.2f (%s %.2f)   not-%s %.2f (%s %.2f)%s %s\n" %
-                   (k, c, k, r_mean, sigma, r_stddev, k, w_mean, sigma,
-                    w_stddev, white, self.current_file.basename))
-
-        print ''.join(out)
+        print '  ' + ''.join(target_line)
+        print ''.join(sparklines)
 
 
     def calc_presence(self, scores):
