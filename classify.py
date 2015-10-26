@@ -168,7 +168,8 @@ class BaseClassifier(object):
         return {x: [0] * members for x in self.classes}
 
 
-class Classifier(BaseClassifier):
+
+class CallFinder(BaseClassifier):
     data = []
     verbosity = 1
     ground_truth_file = None

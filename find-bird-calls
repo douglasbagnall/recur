@@ -4,7 +4,7 @@ import os, sys
 import argparse
 
 from classify import gst_init
-from classify import Classifier, add_common_args, process_common_args
+from classify import CallFinder, add_common_args, process_common_args
 
 def main():
     gst_init()
@@ -70,7 +70,7 @@ def main():
         print >> sys.stderr, "writing classification/calls requires --target-class"
         sys.exit(1)
 
-    c = Classifier(channels=1, filetype=args.filetype)
+    c = CallFinder(channels=1, filetype=args.filetype)
     timed_files = process_common_args(c, args, prop_names, timed=timed)
     if args.sort_files:
         timed_files.sort(key=lambda x: x.fullname)
