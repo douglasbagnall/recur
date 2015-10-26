@@ -1,6 +1,6 @@
 #!/usr/bin/python
 # Copyright 2014 Douglas Bagnall <douglas@halo.gen.nz> LGPL
-import os, sys
+import sys
 import argparse
 import json
 import numpy as np
@@ -23,6 +23,7 @@ class CallFinder(BaseClassifier):
     presence_file = None
     presence_csv = None
     minute_results = None
+
     def classify(self, data,
                  ground_truth_file=None,
                  classification_file=None,
@@ -104,12 +105,10 @@ class CallFinder(BaseClassifier):
         self.file_scores = {x[0]:[] for x in self.collected_classes}
         self.pipeline.set_state(Gst.State.PLAYING)
 
-
     def on_element(self, bus, msg):
         s = msg.get_structure()
         if s.get_name() != "classify":
             return
-        #print s.to_string()
         v = s.get_value
         timestamp = v('time')
         no_targets = not self.current_file.targets
@@ -122,7 +121,6 @@ class CallFinder(BaseClassifier):
                 if target is None:
                     continue
                 self.file_scores[k].append((v(key + k), k == target, timestamp))
-
 
     def report(self):
         self.pipeline.set_state(Gst.State.READY)
@@ -168,29 +166,26 @@ class CallFinder(BaseClassifier):
                 n += 1
                 if target:
                     scores_and_truth.append((p, target))
-                    some_true = True
             if scores_and_truth:
                 auc = int(calc_auc(scores_and_truth) * 1000)
             else:
                 auc = ' - '
-            sparklines.append('%s%s: auc %3s %s\n' % (white, k, auc,
-                                                      u''.join(row).encode('utf-8')))
+            sparklines.append('%s%s: auc %3s %s\n' %
+                              (white, k, auc, u''.join(row).encode('utf-8')))
 
         print '  ' + ''.join(target_line)
         print ''.join(sparklines)
 
-
     def calc_presence(self, scores):
         wps = self.getp('windows-per-second')
         w_size = int(wps / (self.presence_subsample or wps) + 0.5)
-        #print >> sys.stderr, "windows per second: %s. w_size %d" % (wps, w_size)
 
         if self.presence_run_length:
             run_length = int(wps * self.presence_run_length / w_size)
             rl_window = np.zeros(run_length) + 1.0 / run_length
 
         if self.presence_ignore_start is None:
-            ignore_start  = 10
+            ignore_start = 10
         else:
             ignore_start = int(self.presence_ignore_start * wps + 0.5)
 
@@ -229,7 +224,6 @@ class CallFinder(BaseClassifier):
                 fn = self.current_file.basename
                 if self.presence_file:
                     j = json.dumps([fn] + [round(x, 7) for x in r])
-                    #print >> sys.stderr, "presence", j
                     print >> self.presence_file, j
                 if self.presence_csv:
                     row = "%s,%s,%s" % (fn, r[0], gt)
@@ -274,8 +268,10 @@ class CallFinder(BaseClassifier):
                         start = timestamp
                         score = s
                 elif s < edge_threshold:
-                    if score > peak_threshold and timestamp - start > duration_threshold:
-                        call = [round(start, 2), round(timestamp, 2), round(score, 4)]
+                    if (score > peak_threshold and
+                        timestamp - start > duration_threshold):
+                        call = [round(start, 2), round(timestamp, 2),
+                                round(score, 4)]
                         row.append(call)
                     score = 0.0
                 else:
@@ -305,7 +301,6 @@ class CallFinder(BaseClassifier):
                 periods = peak_periodic_scores(scores[self.target_index],
                                                self.score_file_period, n,
                                                smooth=self.smooth_presence)
-                #print periods[0]
                 line = [fn] + [x[2] for x in periods]
                 print >>self.score_file, json.dumps(line)
 
@@ -331,7 +326,8 @@ class CallFinder(BaseClassifier):
                     classes = self.classes
                 for k in classes:
                     label = "%s instantaneous" % k
-                    draw_roc_curve(self.scores[k], label, arrows=self.roc_arrows)
+                    draw_roc_curve(self.scores[k], label,
+                                   arrows=self.roc_arrows)
                     if self.show_presence_roc:
                         results = zip(*self.minute_results[k])
                         label_i = indices[len(indices) // 2]
@@ -345,7 +341,6 @@ class CallFinder(BaseClassifier):
             self.stop()
         else:
             self.load_next_file()
-
 
     def on_error(self, bus, msg):
         pass
@@ -362,6 +357,7 @@ def peak_smoothed_scores(scores, top_n=200, smooth=0, ignore_first=10, kaiser=7)
         s = sorted([x[0] for x in scores[ignore_first:]], reverse=True)
         top_scores = s[:top_n]
     return top_scores
+
 
 def peak_periodic_scores(scores, period, nth, smooth=0, kaiser=7):
     if smooth:
@@ -383,7 +379,7 @@ def peak_periodic_scores(scores, period, nth, smooth=0, kaiser=7):
             starttime = endtime
             endtime += period
 
-    #last one could be a sample or two short, so add it if its long enough.
+    # last one could be a sample or two short, so add it if its long enough.
     if i > start + nth:
         c = [x[0] for x in scores[start:i]]
         chunks.append([starttime, endtime, c])
@@ -489,6 +485,6 @@ def main():
                presence_ignore_start=args.presence_ignore_start,
                presence_file=args.presence_file,
                presence_csv=args.presence_csv
-           )
+               )
 
 main()
