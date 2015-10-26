@@ -1,0 +1,190 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+# Copyright 2015 Douglas Bagnall <douglas@halo.gen.nz> LGPL
+from urllib import quote
+import os, sys
+import argparse
+
+import colour
+
+from classify_stats import draw_roc_curve, calc_stats
+from classify_stats import actually_show_roc, calc_auc
+
+from classify import gst_init, Gst
+from classify import BaseClassifier, add_common_args, process_common_args
+
+
+class TestClassifier(BaseClassifier):
+    """This is a simple classifier that says how well a net does when
+    compared to ground truth."""
+    filelist = []
+    verbosity = 0
+    ground_truth_file = None
+    classification_file = None
+    def classify(self, filelist,
+                 show_roc=False,
+                 summarise=False,
+                 roc_arrows=1):
+        self.filelist = list(reversed(filelist))
+        self.collected_classes = self.class_group_indices.items()
+        self.show_roc = show_roc
+        self.roc_arrows = roc_arrows
+        self.summarise = summarise
+        self.setp('training', False)
+        if self.show_roc or self.summarise:
+            self.scores = {x[0]:[] for x in self.collected_classes}
+        self.load_next_file()
+        self.mainloop.run()
+
+    def load_next_file(self):
+        self.pipeline.set_state(Gst.State.READY)
+        f = self.filelist.pop()
+        targets = ' '.join(x % 0 for x in f.targets)
+        self.current_file = f
+        self.sources[0].set_property('location', f.fullname)
+        self.setp('target', targets)
+        self.file_scores = {x[0]:[] for x in self.collected_classes}
+        self.pipeline.set_state(Gst.State.PLAYING)
+
+    def on_element(self, bus, msg):
+        s = msg.get_structure()
+        if s.get_name() != "classify":
+            return
+        v = s.get_value
+        for k, i in self.collected_classes:
+            key = 'channel 0, group %d ' % i
+            target = v(key + 'target')
+            if target is None:
+                continue
+            self.file_scores[k].append((v(key + k), k == target))
+
+    def report(self):
+        self.pipeline.set_state(Gst.State.READY)
+        colours = list(reversed(colour.SCALE_30))
+        c_scale = len(colours) * 0.999
+        white, grey = colour.C_NORMAL, colour.GREY
+        sparkline = u' ▁▂▃▄▅▆▇█'
+        sparkline_scale = len(sparkline) * 0.9999
+
+        filename = os.path.abspath(self.current_file.fullname)
+        print "%sfile://%s" % (white, quote(filename))
+                               
+        target_line = [' '] * 100
+        rows = []
+        interesting = False
+        for k, results in self.file_scores.items():
+            step = len(results) / 100.0
+            next_stop = step
+            row = []
+            p_sum = 0.0
+            target_sum = 0
+            n = 0
+            j = 0
+            target_total = 0
+            hit, missed = 0, 0
+            for i, result in enumerate(results):
+                if i >= next_stop:
+                    n = float(n)
+                    score = p_sum / n
+                    e = abs(p_sum - target_sum + 0.1) / (n + 0.1)
+                    if e > 0.1:
+                        interesting = True
+                    c = colours[int(e * c_scale)]
+                    char = sparkline[int(score * sparkline_scale)]
+                    row.append('%s%s' % (c, char))
+                    if target_sum / n > 0.9:
+                        target_line[j] = '%s%s' % (c, k)
+
+                    next_stop += step
+                    p_sum = 0.0
+                    target_sum = 0
+                    n = 0
+                    j += 1
+                p, target = result
+                p_sum += p
+                target_sum += target
+                missed += not target
+                hit += target
+                n += 1
+
+            if hit > 0 and hit < len(results):
+                auc = int(calc_auc(results) * 999.99)
+                interesting = True
+            else:
+                auc = ' - '
+            rows.append('%s%s: %3s %s%s\n' % (white, k, auc,
+                                              u''.join(row).encode('utf-8'),
+                                              colour.C_NORMAL))
+
+        print '       ' + ''.join(target_line)
+        if interesting:
+            print ''.join(rows)
+        else:
+            print 'skipped boring charts'
+
+    def on_eos(self, bus, msg):
+        if self.verbosity > 0:
+            self.report()
+
+        if self.show_roc or self.summarise:
+            for k in self.scores:
+                self.scores[k].extend(self.file_scores[k])
+
+        if not self.filelist:
+            self.finish()
+        else:
+            self.load_next_file()
+
+    def finish(self):
+        if self.summarise:
+            for k, results in self.scores.items():
+                auc = calc_auc(results)                
+                print "%s AUC %.5f" % (k, auc)
+
+        if self.show_roc:
+            for k in self.classes:
+                label = "%s instantaneous" % k
+                draw_roc_curve(self.scores[k], label, arrows=self.roc_arrows)
+            actually_show_roc(title=self.getp('basename'))
+        self.stop()
+
+    def on_error(self, bus, msg):
+        pass
+
+def main():
+    gst_init()
+    parser = argparse.ArgumentParser()
+    prop_names = add_common_args(parser)
+    group = parser.add_argument_group('classify-test specific arguments')
+    group.add_argument('-C', '--first-n', type=int, default=0,
+                       help="classify this many files")
+    group.add_argument('--roc', action='store_true',
+                       help="show ROC curves")
+    group.add_argument('--roc-arrows', type=int, default=1,
+                       help="degree of arrow infestation on ROC curves")
+    group.add_argument('--min-changes', type=int, default=0,
+                       help="only test files with at least this many class switches")
+    group.add_argument('--summary', action='store_true',
+                       help="print short message indicating goodness")
+    group.add_argument('--sort-files', action='store_true',
+                       help="process files in alphabetical order")
+
+    args = parser.parse_args()
+    c = TestClassifier(channels=1, filetype=args.filetype)
+    c.verbosity = args.verbosity
+    timed_files = process_common_args(c, args, prop_names, timed=True)
+    if args.sort_files:
+        timed_files.sort(key=lambda x: x.fullname)
+
+    if args.min_changes:
+        timed_files = [x for x in timed_files
+                       if len(x.timings) >= args.min_changes]
+
+    if args.first_n:
+        timed_files = timed_files[:args.first_n]
+
+    c.classify(timed_files, show_roc=args.roc,
+               summarise=args.summary,
+               roc_arrows=args.roc_arrows)
+
+main()
