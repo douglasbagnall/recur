@@ -2,9 +2,397 @@
 # Copyright 2014 Douglas Bagnall <douglas@halo.gen.nz> LGPL
 import os, sys
 import argparse
+import json
+import numpy as np
 
-from classify import gst_init
-from classify import CallFinder, add_common_args, process_common_args
+from classify import gst_init, Gst
+from classify import BaseClassifier, add_common_args, process_common_args
+from classify_stats import draw_roc_curve, calc_stats, draw_presence_roc
+from classify_stats import actually_show_roc, calc_auc
+import colour
+
+
+class CallFinder(BaseClassifier):
+    data = []
+    verbosity = 1
+    ground_truth_file = None
+    classification_file = None
+    call_json_file = None
+    score_file = None
+    smooth_presence = None
+    presence_file = None
+    presence_csv = None
+    minute_results = None
+    def classify(self, data,
+                 ground_truth_file=None,
+                 classification_file=None,
+                 show_roc=False,
+                 call_json_file=None,
+                 call_edge_threshold=0,
+                 call_peak_threshold=0,
+                 call_duration_threshold=0,
+                 show_presence_roc=False,
+                 target_index=None,
+                 summarise=False,
+                 presence_index=None,
+                 score_file=None,
+                 score_file_period=None,
+                 score_file_n=None,
+                 smooth_presence=None,
+                 presence_subsample=None,
+                 presence_run_length=None,
+                 presence_ignore_start=None,
+                 presence_file=None,
+                 presence_csv=None,
+                 roc_arrows=1):
+        if len(self.classes) == 2 and target_index is None:
+            self.target_index = self.classes[1]
+        else:
+            self.target_index = target_index
+
+        if self.target_index is None:
+            self.collected_classes = self.class_group_indices.items()
+        else:
+            self.collected_classes = [(self.target_index,
+                                      self.class_group_indices[self.target_index])]
+
+        if ground_truth_file:
+            self.ground_truth_file = open(ground_truth_file, 'w')
+        if classification_file:
+            self.classification_file = open(classification_file, 'w')
+        if call_json_file:
+            self.call_json_file = open(call_json_file, 'w')
+        if score_file:
+            self.score_file = open(score_file, 'w')
+        self.score_file_period = score_file_period
+        self.score_file_n = score_file_n
+        self.call_edge_threshold = call_edge_threshold
+        self.call_peak_threshold = call_peak_threshold
+        self.call_duration_threshold = call_duration_threshold
+        self.show_roc = show_roc
+        self.roc_arrows = roc_arrows
+        self.show_presence_roc = show_presence_roc
+        self.summarise = summarise
+        self.presence_index = presence_index
+        self.presence_subsample = presence_subsample
+        self.presence_run_length = presence_run_length
+        self.presence_ignore_start = presence_ignore_start
+        self.smooth_presence = smooth_presence
+        if presence_file:
+            self.presence_file = open(presence_file, 'w')
+        if presence_csv:
+            self.presence_csv = open(presence_csv, 'w')
+            print >> self.presence_csv, 'filename,score,truth'
+
+        self.data = list(reversed(data))
+        self.setp('training', False)
+        if self.show_roc or self.summarise:
+            self.scores = {x[0]:[] for x in self.collected_classes}
+        if self.show_presence_roc or self.summarise:
+            self.minute_results = {x[0]:[] for x in self.collected_classes}
+            self.minute_gt = {x[0]:[] for x in self.collected_classes}
+        self.load_next_file()
+        self.mainloop.run()
+
+    def load_next_file(self):
+        self.pipeline.set_state(Gst.State.READY)
+        f = self.data.pop()
+        targets = ' '.join(x % 0 for x in f.targets)
+        self.current_file = f
+        self.sources[0].set_property('location', f.fullname)
+        self.setp('target', targets)
+        self.file_scores = {x[0]:[] for x in self.collected_classes}
+        self.pipeline.set_state(Gst.State.PLAYING)
+
+
+    def on_element(self, bus, msg):
+        s = msg.get_structure()
+        if s.get_name() != "classify":
+            return
+        #print s.to_string()
+        v = s.get_value
+        timestamp = v('time')
+        no_targets = not self.current_file.targets
+        for k, i in self.collected_classes:
+            key = 'channel 0, group %d ' % i
+            if no_targets:
+                self.file_scores[k].append((v(key + k), None, timestamp))
+            else:
+                target = v(key + 'target')
+                if target is None:
+                    continue
+                self.file_scores[k].append((v(key + k), k == target, timestamp))
+
+
+    def report(self):
+        self.pipeline.set_state(Gst.State.READY)
+        colours = list(reversed(colour.SCALE_30))
+        c_scale = len(colours) * 0.999
+        white, grey = colour.C_NORMAL, colour.GREY
+        sparkline = u' ▁▂▃▄▅▆▇█'
+        sparkline_scale = len(sparkline) * 0.9999
+
+        print "%s%s\n" % (white, self.current_file.basename)
+        target_line = ['', ' '] * 100
+        sparklines = []
+        for k, results in self.file_scores.items():
+            step = len(results) / 100.0
+            next_stop = step
+            row = []
+            p_sum = 0.0
+            target_sum = 0
+            n = 0
+            j = 0
+            scores_and_truth = []
+            some_true = False
+            for i, result in enumerate(results):
+                if i >= next_stop:
+                    n = float(n)
+                    score = p_sum / n
+                    e = abs(p_sum - target_sum + 0.1) / (n + 0.1)
+                    c = colours[int(e * c_scale)]
+                    char = sparkline[int(score * sparkline_scale)]
+                    row.append('%s%s' % (c, char))
+                    if target_sum / n > 0.9:
+                        target_line[j] = c
+                        target_line[j + 1] = k
+
+                    next_stop += step
+                    p_sum = 0.0
+                    target_sum = 0
+                    n = 0
+                    j += 2
+                p, target, timestamp = result
+                p_sum += p
+                target_sum += target
+                n += 1
+                if target:
+                    scores_and_truth.append((p, target))
+                    some_true = True
+            if scores_and_truth:
+                auc = int(calc_auc(scores_and_truth) * 1000)
+            else:
+                auc = ' - '
+            sparklines.append('%s%s: auc %3s %s\n' % (white, k, auc,
+                                                      u''.join(row).encode('utf-8')))
+
+        print '  ' + ''.join(target_line)
+        print ''.join(sparklines)
+
+
+    def calc_presence(self, scores):
+        wps = self.getp('windows-per-second')
+        w_size = int(wps / (self.presence_subsample or wps) + 0.5)
+        #print >> sys.stderr, "windows per second: %s. w_size %d" % (wps, w_size)
+
+        if self.presence_run_length:
+            run_length = int(wps * self.presence_run_length / w_size)
+            rl_window = np.zeros(run_length) + 1.0 / run_length
+
+        if self.presence_ignore_start is None:
+            ignore_start  = 10
+        else:
+            ignore_start = int(self.presence_ignore_start * wps + 0.5)
+
+        if self.presence_index is None:
+            if self.presence_run_length:
+                indices = [-1]
+            elif self.summarise: # a historical default
+                indices = [-6]
+            else:
+                indices = [-x * (x + 1) for x in range(1, 9)]
+        else:
+            indices = [-self.presence_index - 1]
+
+        if self.target_index:
+            items = [(self.target_index, scores[self.target_index])]
+        else:
+            items = scores.items()
+
+        for k, v in items:
+            rounding = (len(v) - ignore_start) % w_size
+            v2 = v[ignore_start + rounding:]
+            gt = any([x[1] for x in v2])
+            s = np.array([x[0] for x in v2])
+            if w_size != 1:
+                s = np.mean(s.reshape(-1, w_size), 1)
+
+            if self.presence_run_length:
+                s = np.convolve(s, rl_window)
+
+            s = np.sort(s)
+            if len(s) > indices[-1]:
+                r = [s[x] for x in indices]
+                if self.minute_results:
+                    self.minute_results[k].append(r)
+                    self.minute_gt[k].append(gt)
+                fn = self.current_file.basename
+                if self.presence_file:
+                    j = json.dumps([fn] + [round(x, 7) for x in r])
+                    #print >> sys.stderr, "presence", j
+                    print >> self.presence_file, j
+                if self.presence_csv:
+                    row = "%s,%s,%s" % (fn, r[0], gt)
+                    print >> self.presence_csv, row
+            else:
+                print >> sys.stderr, ("ignoring presence results of length %d" %
+                                      len(s))
+        return indices
+
+    def on_eos(self, bus, msg):
+        if self.verbosity > 0:
+            self.report()
+        fn = self.current_file.basename
+        scores = self.file_scores
+
+        if self.target_index and (self.classification_file
+                                  or self.ground_truth_file):
+            ground_truth = [fn]
+            classifications = [fn]
+            for s, t, timestamp in scores[self.target_index]:
+                if t is not None:
+                    ground_truth.append('%d' % t)
+                classifications.append('%.5g' % s)
+
+            if self.ground_truth_file:
+                print >>self.ground_truth_file, ','.join(ground_truth)
+
+            if self.classification_file:
+                print >>self.classification_file, ','.join(classifications)
+
+        if self.target_index and self.call_json_file:
+            edge_threshold = self.call_edge_threshold
+            peak_threshold = self.call_peak_threshold
+            duration_threshold = self.call_duration_threshold
+            row = [fn]
+            #XXX convolve?
+            start = 0
+            score = 0
+            for s, t, timestamp in scores[self.target_index]:
+                if score == 0.0:
+                    if s > edge_threshold:
+                        start = timestamp
+                        score = s
+                elif s < edge_threshold:
+                    if score > peak_threshold and timestamp - start > duration_threshold:
+                        call = [round(start, 2), round(timestamp, 2), round(score, 4)]
+                        row.append(call)
+                    score = 0.0
+                else:
+                    score = max(score, s)
+
+            print >>self.call_json_file, json.dumps(row)
+
+        if self.target_index and self.score_file:
+            # self.score_file does completely different things,
+            # depending on whether self.score_file_period is non-zero.
+            # If it is zero (or None), the top self.score_file_n
+            # scores are printed. If it is non-zero, the
+            # `self.score_file_n`th top score for each period of
+            # self.score_file_period seconds is printed. If
+            # self.score_file_n is zero or None, a default value is
+            # used.
+            if not self.score_file_period:
+                n = self.score_file_n or 200
+                top_scores = peak_smoothed_scores(scores[self.target_index],
+                                                  top_n=n,
+                                                  smooth=self.smooth_presence)
+                line = [fn]
+                line.extend(top_scores)
+                print >>self.score_file, json.dumps(line)
+            else:
+                n = self.score_file_n or 60
+                periods = peak_periodic_scores(scores[self.target_index],
+                                               self.score_file_period, n,
+                                               smooth=self.smooth_presence)
+                #print periods[0]
+                line = [fn] + [x[2] for x in periods]
+                print >>self.score_file, json.dumps(line)
+
+        if self.show_presence_roc or self.summarise or self.presence_file:
+            indices = self.calc_presence(scores)
+
+        if self.show_roc or self.summarise:
+            for k in self.scores:
+                self.scores[k].extend(scores[k])
+
+        if not self.data:
+            if self.summarise and self.target_index:
+                stats = calc_stats(self.scores[self.target_index],
+                                   self.minute_results[self.target_index],
+                                   self.minute_gt[self.target_index])
+                stats['filename'] = self.getp('net-filename')
+                print json.dumps(stats)
+
+            if self.show_roc:
+                if self.target_index:
+                    classes = [self.target_index]
+                else:
+                    classes = self.classes
+                for k in classes:
+                    label = "%s instantaneous" % k
+                    draw_roc_curve(self.scores[k], label, arrows=self.roc_arrows)
+                    if self.show_presence_roc:
+                        results = zip(*self.minute_results[k])
+                        label_i = indices[len(indices) // 2]
+                        for i, row in zip(indices, results):
+                            le = (0.1 if i == label_i else 0)
+                            draw_presence_roc(zip(row, self.minute_gt[k]),
+                                              '%s presence %s' % (k, -i - 1),
+                                              label_every=le)
+
+                actually_show_roc(title=self.getp('basename'))
+            self.stop()
+        else:
+            self.load_next_file()
+
+
+    def on_error(self, bus, msg):
+        pass
+
+
+def peak_smoothed_scores(scores, top_n=200, smooth=0, ignore_first=10, kaiser=7):
+    if smooth:
+        window = np.kaiser(smooth, kaiser)
+        s = np.array([x[0] for x in scores])
+        s = np.convolve(s, window)[ignore_first:]
+        top_scores = np.sort(s)[-top_n:]
+        top_scores = top_scores[::-1]
+    else:
+        s = sorted([x[0] for x in scores[ignore_first:]], reverse=True)
+        top_scores = s[:top_n]
+    return top_scores
+
+def peak_periodic_scores(scores, period, nth, smooth=0, kaiser=7):
+    if smooth:
+        window = np.kaiser(smooth, kaiser)
+        s = np.array([x[0] for x in scores])
+        s = np.convolve(s, window, mode='same')
+        scores = [(x, None, y[2]) for x, y in zip(s, scores)]
+
+    endtime = 0
+    starttime = 0
+    chunks = []
+    start = 0
+    for i, x in enumerate(scores):
+        if x[2] >= endtime:
+            c = [x[0] for x in scores[start:i]]
+            if endtime > 0 and len(c) > nth:
+                chunks.append([starttime, endtime, c])
+            start = i
+            starttime = endtime
+            endtime += period
+
+    #last one could be a sample or two short, so add it if its long enough.
+    if i > start + nth:
+        c = [x[0] for x in scores[start:i]]
+        chunks.append([starttime, endtime, c])
+
+    for c in chunks:
+        c[2] = sorted(c[2])[-nth]
+
+    return chunks
+
 
 def main():
     gst_init()
