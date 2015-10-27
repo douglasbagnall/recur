@@ -379,7 +379,7 @@ class Trainer(BaseClassifier):
                     r = v
                     if self.verbosity > 0:
                         print "%srecord %d: %.3g%s," % (grey, i, v, white),
-                self.decaying_records[i] = r * 0.999
+                self.decaying_records[i] = r * 0.9995
             if save:
                 self.save_named_net(tag='win-%d-gap-%d-ratio-%d-dprime-%d-auc-%d' %
                                     (int(rightness * 100 + 0.5),
