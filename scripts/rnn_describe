@@ -3,7 +3,7 @@
 
 import sys
 import struct, array
-import cdb
+import pycdb
 import argparse
 
 def read_int(n, key, unsigned=False):
@@ -103,7 +103,10 @@ KEYS = {'net.i_size': (read_int, True),
 
 
 def read(fn, *keys):
-    n = cdb.init(fn)
+    f = open(fn)
+    n = pycdb.Reader(f.read())
+    f.close()
+
     if not keys:
         keys = sorted(n.keys())
     for k in keys:

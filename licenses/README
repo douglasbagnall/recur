@@ -8,5 +8,8 @@ Which licence applies where:
 * mdct.c is from libvorbis and comes with a BSD license (see
   COPYING.mdct).
 
+* The MIT license applies to scripts/pycdb.py, which is derived from
+  David Wilson's python-pure-cdb module.
+
 * Everything else can be used under the terms of any version of the
   Gnu LGPL.
