@@ -521,7 +521,8 @@ gst_classify_class_init (GstClassifyClass * klass)
 
   g_object_class_install_property (gobject_class, PROP_LEARNING_STYLE,
       g_param_spec_int("learning-style", "learning-style",
-          "0: hypersimplified Nesterov, 1: Nesterov, 2: classical momentum",
+          ("0: hypersimplified Nesterov, 2: simplified Nesterov, "
+              "3: classical, 4: adagrad"),
           LEARNING_STYLE_MIN, LEARNING_STYLE_MAX,
           DEFAULT_PROP_LEARNING_STYLE,
           G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
@@ -581,7 +582,7 @@ gst_classify_class_init (GstClassifyClass * klass)
 
   g_object_class_install_property (gobject_class, PROP_PRESYNAPTIC_NOISE,
       g_param_spec_float("presynaptic-noise", "presynaptic-noise",
-          "Add this much noise before nonlinear tranform",
+          "Add this much noise before nonlinear transform",
           0, G_MAXFLOAT,
           DEFAULT_PROP_PRESYNAPTIC_NOISE,
           G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
