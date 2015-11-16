@@ -35,12 +35,6 @@ import gi
 gi.require_version('Gst', '1.0')
 from gi.repository import Gst, GObject
 
-MIN_FREQUENCY = 40
-MAX_FREQUENCY = 3900
-KNEE_FREQUENCY = 700
-WINDOW_SIZE = 1024
-BASENAME = 'classify'
-
 SAVE_LOCATION = 'nets/autosave'
 
 def gst_init():
