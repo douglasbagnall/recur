@@ -125,7 +125,7 @@ Alphabet_encode_text(Alphabet *self, PyObject *orig_obj)
         return PyErr_Format(PyExc_ValueError, "encode_text requires a string");
     }
 
-    u8 *encoded_text = rnn_char_alloc_encoded_text(alphabet,
+    u8 *encoded_text = rnn_char_alloc_encoded_text(self->alphabet,
         orig_str, orig_len, &encoded_len, NULL, false);
 
     PyObject *final_obj = PyString_FromStringAndSize((char *)encoded_text,
