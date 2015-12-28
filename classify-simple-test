@@ -148,9 +148,10 @@ class TestClassifier(BaseClassifier):
                 print "score %s ACC %.5f" % (k, c_score)
 
         if self.show_roc:
-            for k in self.classes:
+            for i, k in enumerate(self.classes):
                 label = "%s instantaneous" % k
-                draw_roc_curve(self.scores[k], label, arrows=self.roc_arrows)
+                draw_roc_curve(self.scores[k], label, arrows=self.roc_arrows,
+                               label_offset=i)
             actually_show_roc(title=self.getp('basename'))
         self.stop()
 

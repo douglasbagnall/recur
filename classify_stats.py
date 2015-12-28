@@ -81,27 +81,33 @@ def draw_roc_curve(results, label='ROC', arrows=1, label_offset=0):
     plt.plot(fp, tp, label=label)
     if arrows:
         x, y, s = n95_p
-        plt.annotate("95%% negative %.2g" % x, (x, y), (0.7, 0.7),
+        offset = label_offset * -0.03
+        plt.annotate("95%% negative %s %.2g" % (label, s), (x, y),
+                     (0.7, 0.7 + offset),
                      arrowprops={'width':1, 'color': '#0088aa'},
-                     )
+                 )
         if p95_p is not None:
             x, y, s = p95_p
-            plt.annotate("95%% positive %.2g" % s, (x, y), (0.2, 0.2),
+            plt.annotate("95%% positive %s %.2g" % (label, s), (x, y),
+                         (0.2, 0.2 + offset),
                          arrowprops={'width':1, 'color': '#8800aa'},
                      )
-        plt.annotate("0.5", (hx, hy), (0.4, 0.4),
+        plt.annotate("0.5 %s" % label, (hx, hy), (0.4, 0.4 + offset),
                      arrowprops={'width':1, 'color': '#00cc00'})
         x, y, s = dfd_p
-        plt.annotate("furthest from diagonal %.2g" % s, (x, y), (0.5, 0.5),
+        plt.annotate("furthest from diagonal %s %.2g" % (label, s), (x, y),
+                     (0.5, 0.5 + offset),
                      arrowprops={'width':1, 'color': '#aa6600'},
                      )
     if arrows > 1:
         x, y, s = dfw_p
-        plt.annotate("furthest from all bad %.2g" % s, (x, y), (0.3, 0.3),
+        plt.annotate("furthest from all bad %s %.2g" % (label, s), (x, y),
+                     (0.3, 0.3 + offset),
                      arrowprops={'width':1, 'color': '#00cccc'},
                      )
         x, y, s = dfb_p
-        plt.annotate("closest to all good %.2g" % s, (x, y), (0.6, 0.6),
+        plt.annotate("closest to all good %s %.2g" % (label, s), (x, y),
+                     (0.6, 0.6 + offset),
                      arrowprops={'width':1, 'color': '#cc0000'},
                      )
 
