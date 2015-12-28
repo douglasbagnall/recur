@@ -9,8 +9,8 @@ import json
 import re
 import numpy as np
 from math import sqrt
-from classify_stats import draw_roc_curve, calc_stats, draw_presence_roc
-from classify_stats import actually_show_roc, calc_auc
+from classify_stats import draw_roc_curve, draw_presence_roc
+from classify_stats import actually_show_roc, calc_core_stats
 import colour
 
 
@@ -204,7 +204,7 @@ class Trainer(BaseClassifier):
                 self.auc_targets = self.classes
         else:
             self.auc_targets = auc_targets
-        self.decaying_records = [0] * (6 + len(self.auc_targets)) # for auto-save
+        self.decaying_records = [0] * (9 + len(self.auc_targets)) # for auto-save
         self.setp('load-net-now', 1)
 
         self.next_training_set()
@@ -265,6 +265,8 @@ class Trainer(BaseClassifier):
 
         white, grey = colour.C_NORMAL, colour.GREY
         aucs = []
+        dfds = []
+        accuracies = []
         for (classes, score, runs, pstats) in zip(self.class_groups,
                                                   self.test_scores,
                                                   self.test_runs,
@@ -299,13 +301,18 @@ class Trainer(BaseClassifier):
                 dp = gap / sqrt(0.5 * (right_var + wrong_var) or 1e99)
                 dprime += dp
 
-
                 auc_results = self.auc_lists.get(c)
                 if auc_results:
-                    auc = calc_auc(auc_results)
-                    output.append("%s.%03d" % (colourise(abs((auc - 0.5)) * 2.0),
-                                               int(auc * 1000.0 + 0.5)))
+                    (auc, dfd, dfd_score,
+                     acc, acc_score) = calc_core_stats(auc_results)
+                    output.append("%s.%03d %s.%03d" % (
+                        colourise(abs((auc - 0.5)) * 2.0),
+                        int(auc * 1000.0 + 0.5),
+                        colourise(acc),
+                        int(acc * 1000.0)))
                     aucs.append(auc)
+                    dfds.append(dfd)
+                    accuracies.append(acc)
                 else:
                     output.append(".")
 
@@ -336,14 +343,18 @@ class Trainer(BaseClassifier):
                 ratio_p /= count_p
 
             mean_auc = sum(aucs) / len(aucs)
+            mean_dfd = sum(dfds) / len(dfds)
+            mean_accuracy = sum(accuracies) / len(accuracies)
             dprime /= len(classes)
             gap_p /= len(classes)
             rightness /= len(classes)
             output.append("%s Σ %s " % (title_colour, white))
 
-            output.append("🜚%s.%03d" %
+            output.append("🚀%s.%03d ✓%s.%.03d" %
                           (colourise((mean_auc - 0.5) * 2.0),
-                           int(mean_auc * 1000.0 + 0.5)))
+                           int(mean_auc * 1000.0 + 0.5),
+                           colourise(mean_accuracy),
+                           int(mean_accuracy * 1000.0)))
 
             output.append(" %s%2d%% %s≏%s.%02d %s×%.1f" %
                           (colourise(rightness),
@@ -366,21 +377,25 @@ class Trainer(BaseClassifier):
                                    gap_p,
                                    ratio_p * gap_p,
                                    dprime,
-                                   mean_auc]):
+                                   mean_auc,
+                                   mean_dfd,
+                                   mean_accuracy
+                               ]):
                 r = self.decaying_records[i]
                 if v > r:
                     save = True
                     r = v
                     if self.verbosity > 0:
                         print "%srecord %d: %.3g%s," % (grey, i, v, white),
-                self.decaying_records[i] = r * 0.9995
+                self.decaying_records[i] = r * 0.9997
             if save:
-                self.save_named_net(tag='win-%d-gap-%d-ratio-%d-dprime-%d-auc-%d' %
+                self.save_named_net(tag='win-%d-dprime-%d-auc-%d-acc-%d-dfd-%d' %
                                     (int(rightness * 100 + 0.5),
-                                     int(gap_p * 100 + 0.5),
-                                     int(ratio_p + 0.5),
                                      int(dprime * 100 + 0.5),
-                                     int(mean_auc * 1000 + 0.5)))
+                                     int(mean_auc * 1000 + 0.5),
+                                     int(mean_accuracy * 1000 + 0.5),
+                                     int(mean_dfd * 1000 + 0.5),
+                                     ))
 
 
     def save_named_net(self, tag='', dir=SAVE_LOCATION):

@@ -10,7 +10,7 @@ def prepare_roc_data(results):
     return results, sum_true, sum_false, tp_scale, fp_scale
 
 
-def draw_roc_curve(results, label='ROC', arrows=1):
+def draw_roc_curve(results, label='ROC', arrows=1, label_offset=0):
     import matplotlib.pyplot as plt
 
     results, true_positives, false_positives, \
@@ -315,7 +315,7 @@ def draw_presence_roc(scores, label='presence', label_every=0.0):
                          textcoords='offset points', color=colour)
 
 
-def calc_auc(scores_and_truth):
+def calc_core_stats(scores_and_truth):
     """Calculate AUC from a list of tuples containing score and ground
     truth. Like this:
 
@@ -326,15 +326,21 @@ def calc_auc(scores_and_truth):
     n_false = len(results) - n_true
 
     true_positives, false_positives = n_true, n_false
+    true_negatives = 0
     tp_scale = 1.0 / (n_true or 1)
     fp_scale = 1.0 / (n_false or 1)
     px, py = 1.0, 1.0  # previous position for area calculation
     auc = 1.0
-
+    dfd = 0.0
+    dfd_y = 0
+    dfd_x = 0
+    dfd_score = 0.0
     prev_score = -1.0
+    max_n_correct = 0
     for score, truth in results:
         false_positives -= 1 - truth
         true_positives -= truth
+        true_negatives += 1 - truth
         if prev_score != score:
             x = false_positives * fp_scale
             y = true_positives * tp_scale
@@ -342,6 +348,18 @@ def calc_auc(scores_and_truth):
             px = x
             py = y
             prev_score = score
+        d = y - x
+        n_correct = true_positives + true_negatives
 
-    auc += px * 0.5 * -py
-    return auc
+        if d > dfd:
+            dfd = d
+            dfd_score = score
+
+        if n_correct > max_n_correct:
+            max_n_correct = n_correct
+            correct_score = score
+
+    auc += px * 0.5 * - py
+    dfd *= 0.5 ** 0.5
+    max_correct = max_n_correct / float(len(results))
+    return auc, dfd, dfd_score, max_correct, correct_score

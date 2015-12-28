@@ -8,7 +8,7 @@ import numpy as np
 from classify import gst_init, Gst
 from classify import BaseClassifier, add_common_args, process_common_args
 from classify_stats import draw_roc_curve, calc_stats, draw_presence_roc
-from classify_stats import actually_show_roc, calc_auc
+from classify_stats import actually_show_roc, calc_core_stats
 import colour
 
 
@@ -167,11 +167,14 @@ class CallFinder(BaseClassifier):
                 if target:
                     scores_and_truth.append((p, target))
             if scores_and_truth:
-                auc = int(calc_auc(scores_and_truth) * 1000)
+                (auc, dfd, dfd_score,
+                 acc, acc_score) = calc_core_stats(scores_and_truth)
+                auc_str = int(auc * 1000)
             else:
-                auc = ' - '
+                auc_str = ' - '
             sparklines.append('%s%s: auc %3s %s\n' %
-                              (white, k, auc, u''.join(row).encode('utf-8')))
+                              (white, k, auc_str,
+                               u''.join(row).encode('utf-8')))
 
         print '  ' + ''.join(target_line)
         print ''.join(sparklines)

@@ -7,8 +7,8 @@ import argparse
 
 import colour
 
-from classify_stats import draw_roc_curve, calc_stats
-from classify_stats import actually_show_roc, calc_auc
+from classify_stats import draw_roc_curve
+from classify_stats import actually_show_roc, calc_core_stats
 
 from classify import gst_init, Gst
 from classify import BaseClassifier, add_common_args, process_common_args
@@ -108,13 +108,15 @@ class TestClassifier(BaseClassifier):
                 n += 1
 
             if hit > 0 and hit < len(results):
-                auc = int(calc_auc(results) * 999.99)
+                auc, dfd, dfd_score, correct, c_score = calc_core_stats(results)
+                auc = int(auc * 999.99)
+                correct = int(correct * 999.99)
                 interesting = True
             else:
                 auc = ' - '
-            rows.append('%s%s: %3s %s%s\n' % (white, k, auc,
-                                              u''.join(row).encode('utf-8'),
-                                              colour.C_NORMAL))
+            rows.append('%s%s: %3s %3s %s%s\n' % (white, k, auc, correct,
+                                                  u''.join(row).encode('utf-8'),
+                                                  colour.C_NORMAL))
 
         print '       ' + ''.join(target_line)
         if interesting:
@@ -138,8 +140,12 @@ class TestClassifier(BaseClassifier):
     def finish(self):
         if self.summarise:
             for k, results in self.scores.items():
-                auc = calc_auc(results)                
+                auc, dfd, dfd_score, correct, c_score = calc_core_stats(results)
                 print "%s AUC %.5f" % (k, auc)
+                print "%s DFD %.5f" % (k, dfd)
+                print "score %s DFD %.5f" % (k, dfd_score)
+                print "%s ACC %.5f" % (k, correct)
+                print "score %s ACC %.5f" % (k, c_score)
 
         if self.show_roc:
             for k in self.classes:
