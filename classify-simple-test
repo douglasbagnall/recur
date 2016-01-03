@@ -68,7 +68,7 @@ class TestClassifier(BaseClassifier):
 
         filename = os.path.abspath(self.current_file.fullname)
         print "%sfile://%s" % (white, quote(filename))
-                               
+
         target_line = [' '] * 100
         rows = []
         interesting = False
