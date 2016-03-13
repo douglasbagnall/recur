@@ -48,8 +48,8 @@ init_rand64_maybe_randomly(rand_ctx *ctx, u64 seed)
   if (seed == RECUR_RNG_RANDOM_SEED){
     struct timespec t;
     clock_gettime(CLOCK_REALTIME, &t);
-    seed = (u64)(((u64)t.tv_nsec << 20) + t.tv_sec) ^ (u64)ctx;
-    DEBUG("seeding with %zx\n", seed);
+    seed = (u64)(((u64)t.tv_nsec << 20) + t.tv_sec) ^ (u64)((uintptr_t)ctx);
+    DEBUG("seeding with %"PRIx64"\n", seed);
   }
   init_rand64(ctx, seed);
 }
@@ -127,7 +127,7 @@ doublecheap_gaussian_noise_f(rand_ctx *ctx,
     x = i.s[0];
     y = i.s[1];
     r = x * x + y * y;
-    if (r && r < (1UL << 62UL))
+    if (r && r < (1ULL << 62ULL))
       break;
   }
   float s = (float)r * RECIP62f;
