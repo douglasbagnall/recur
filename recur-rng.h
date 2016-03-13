@@ -212,7 +212,7 @@ randomise_mem(rand_ctx *rng, void *mem, const size_t size)
   }
   if (size > size64 * sizeof(u64)){
     u64 r = rand64(rng);
-    u8 *bytes = (u8 *)r;
+    u8 *bytes = (u8 *)&r;
     for (i = size; i < size64 * sizeof(u64); i++){
       m64[i] = bytes[i];
     }
