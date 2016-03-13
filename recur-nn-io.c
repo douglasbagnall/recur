@@ -177,7 +177,7 @@ rnn_load_net(const char *filename){
     if (ret < 1){ DEBUG("error %d loading '%s'", ret, key);             \
       goto pre_alloc_error;}                                            \
     if (vlen != sizeof(obj->attr)) {                                    \
-      DEBUG("size mismatch on '%s->%s' want %u, found %lu",             \
+      DEBUG("size mismatch on '%s->%s' want %u, found %zu",             \
           QUOTE(obj), QUOTE(attr), vlen, sizeof(obj->attr));            \
       goto pre_alloc_error;                                             \
     }                                                                   \
@@ -306,8 +306,8 @@ rnn_load_net(const char *filename){
     if (ret < 1){ DEBUG("error %d loading '%s'", ret, key);             \
       goto error;}                                                      \
     if (vlen != size) {                                                 \
-      DEBUG("array size mismatch on '%s->%s' saved %u, calculated %lu", \
-          QUOTE(obj), QUOTE(attr), vlen, size);                         \
+      DEBUG("array size mismatch on '%s->%s' saved %u, calculated %zu", \
+	    QUOTE(obj), QUOTE(attr), vlen, (size_t)size);		\
       goto error;                                                       \
     }                                                                   \
     cdb_bread(fd, obj->attr, size);                                     \
