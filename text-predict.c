@@ -21,6 +21,7 @@ Because of ccan/opt, --help will tell you something.
 #include "charmodel.h"
 #include "utf8.h"
 #include "opt-helpers.h"
+#include <limits.h>
 
 #define DICKENS_SHUFFLED_TEXT TEST_DATA_DIR "/dickens-shuffled.txt"
 #define DICKENS_TEXT TEST_DATA_DIR "/dickens.txt"
@@ -186,8 +187,17 @@ static struct opt_table options[] = {
       &opt_hidden_size, "number of hidden nodes"),
   OPT_WITH_ARG("-d|--depth=<n>", opt_set_uintval, opt_show_uintval,
       &opt_bptt_depth, "max depth of BPTT recursion"),
+  /* Some machines quibble over long vs long long when both are 64 bit, so we
+     need to appease them without upsetting the others. This is not
+     necessarily right, but seems to work. */
+#if LONG_BIT == 64
   OPT_WITH_ARG("-r|--rng-seed=<seed>", opt_set_longval_bi, opt_show_longval_bi,
       &opt_rng_seed, "RNG seed (-1 for auto)"),
+#else
+  OPT_WITH_ARG("-r|--rng-seed=<seed>", opt_set_longlongval_bi,
+      opt_show_longlongval_bi,
+      &opt_rng_seed, "RNG seed (-1 for auto)"),
+#endif
   OPT_WITH_ARG("-s|--stop-after=<n>", opt_set_intval_bi, opt_show_intval_bi,
       &opt_stop, "Stop at generation n (0: no stop, negative means relative)"),
   OPT_WITH_ARG("--batch-size=<n>", opt_set_uintval_bi, opt_show_uintval_bi,
