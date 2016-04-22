@@ -603,7 +603,7 @@ gst_classify_class_init (GstClassifyClass * klass)
 
   g_object_class_install_property (gobject_class, PROP_ACTIVATION,
       g_param_spec_int("activation", "activation",
-          "Activation function (1: ReLU, 2: ReSQRT, 3: ReLOG, 4:ReTANH, "
+          "Activation function (1: ReLU, 2: ReSQRT "
           "5: Clipped ReLU)",
           RNN_RELU, RNN_ACTIVATION_LAST - 1,
           RNN_RELU,

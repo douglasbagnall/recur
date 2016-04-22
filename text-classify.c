@@ -270,7 +270,7 @@ static struct opt_table options[] = {
   OPT_WITH_ARG("--ada-ballast", opt_set_floatval, opt_show_floatval,
       &opt_ada_ballast, "adagrad/adadelta accumulators start at this value"),
   OPT_WITH_ARG("--activation", opt_set_intval, opt_show_intval,
-      &opt_activation, "1: ReLU, 2: ReSQRT, 3: ReLOG, 4: ReTANH, 5: clipped ReLU"),
+      &opt_activation, "1: ReLU, 2: ReSQRT, 5: clipped ReLU"),
   OPT_WITHOUT_ARG("--no-save-net", opt_set_invbool,
       &opt_save_net, "Don't save learnt changes"),
   OPT_WITH_ARG("--epochs=<n>", opt_set_intval, opt_show_intval,

@@ -131,18 +131,6 @@ rnn_opinion(RecurNN *net, const float *restrict inputs, float presynaptic_noise)
       }
     }
   }
-  else if (net->activation == RNN_RELOG){
-    for (int i = 1; i < net->h_size; i++){
-      volatile float h = hiddens[i] + 1.0f;
-      hiddens[i] = (h > 1.0f) ? logf(h) : 0.0f;
-    }
-  }
-  else if (net->activation == RNN_RETANH){
-    for (int i = 1; i < net->h_size; i++){
-      volatile float h = hiddens[i] + 1.0f;
-      hiddens[i] = (h > 1.0f) ? fast_tanhf(h) : 0.0f;
-    }
-  }
   else if (net->activation == RNN_RECLIP20){
     for (int i = 1; i < net->h_size; i++){
       float h = hiddens[i] - RNN_HIDDEN_PENALTY;
@@ -378,12 +366,6 @@ bptt_and_accumulate_error(RecurNN *net, float *restrict ih_delta,
 #endif
         if (net->activation == RNN_RESQRT){
           e /= 2 * (input + 1.0f);
-        }
-        else if (net->activation == RNN_RELOG){
-          e /= fast_expf(input);
-        }
-        else if (net->activation == RNN_RETANH){
-          e *= 1.0f - input * input;
         }
         i_error[y] = e;
         error_sum += e * e;

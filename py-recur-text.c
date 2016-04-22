@@ -1139,8 +1139,6 @@ initcharmodel(void)
 
     r = r || ADD_INT_CONSTANT(RELU);
     r = r || ADD_INT_CONSTANT(RESQRT);
-    r = r || ADD_INT_CONSTANT(RELOG);
-    r = r || ADD_INT_CONSTANT(RETANH);
     r = r || ADD_INT_CONSTANT(RECLIP20);
 
     r = r || ADD_INT_CONSTANT(INIT_ZERO);

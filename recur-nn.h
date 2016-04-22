@@ -130,9 +130,11 @@ typedef enum {
 typedef enum {
   RNN_RELU = 1,
   RNN_RESQRT,
-  RNN_RELOG,
-  RNN_RETANH,
-  RNN_RECLIP20,
+  /* there were two here, but they're gone on account of being a bit
+     useless. */
+  RNN_RESERVED_ACTIVATION_1,
+  RNN_RESERVED_ACTIVATION_2,
+  RNN_RECLIP20 = 5,
 
   RNN_ACTIVATION_LAST
 } rnn_activation;
