@@ -226,7 +226,12 @@ startup/%.desktop: startup/%.desktop.template
 	sed "s|{recur-root}|$(CURDIR)|g" < $< > $@
 	chmod a+x $@
 
-.PHONY: all test-pipeline clean pgm-clean
+.PHONY: all test-pipeline clean pgm-clean tags
+
+TAGS: tags
+
+tags:
+	etags $(find -name '*.[ch]' |grep -v -F '/junk')
 
 #base urls for fetching test video.
 IA_URL = https://archive.org/download
