@@ -137,7 +137,7 @@ recur_train_nets(RecurContext *context, RecurFrame *src_frame,
         RECUR_INPUT_WIDTH + 2, RECUR_INPUT_HEIGHT + 2, t->x - t->scale, t->y - t->scale,
         t->scale * RECUR_RESOLUTION_GAIN);
 
-    float *answer = rnn_opinion(net, NULL, net->presynaptic_noise);
+    float *answer = rnn_opinion(net, NULL, net->presynaptic_noise, NULL);
     ASSUME_ALIGNED(answer);
     fast_sigmoid_array(answer, answer, net->o_size);
 
@@ -233,7 +233,7 @@ rnn_recursive_opinion(RecurContext *context, int index)
   int i;
   RecurNN **constructors = context->constructors;
   RecurNN *net = constructors[index];
-  float *image = rnn_opinion(net, NULL, 0);
+  float *image = rnn_opinion(net, NULL, 0, NULL);
   const int mul = RECUR_RESOLUTION_GAIN * RECUR_RESOLUTION_GAIN;
   int first_child = index * mul + 1;
   if (first_child < RECUR_N_CONSTRUCTORS){

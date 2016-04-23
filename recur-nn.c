@@ -16,6 +16,38 @@ rnn_forget_history(RecurNN *net, int bptt_too){
 }
 
 static inline void
+calculate_interlayer_sparse(const float *restrict inputs,
+    int input_size,
+    float *restrict outputs,
+    int output_size,
+    const float *restrict weights,
+    const RecurErrorRange *ranges)
+{
+  ASSUME_ALIGNED(inputs);
+  ASSUME_ALIGNED(outputs);
+  ASSUME_ALIGNED(weights);
+  ASSUME_ALIGNED_LENGTH(output_size);
+  int x, y, i;
+  for (y = 0; y < input_size; y++){
+    float input = inputs[y];
+    if (input){
+      const float *row = weights + output_size * y;
+      ASSUME_ALIGNED(row);
+      for (i = 0; ranges[i].start >= 0; i++){
+        int range_start = ALIGNED_ROUND_DOWN(ranges[i].start);
+        int range_len = ALIGNED_ROUND_UP(ranges[i].len);
+        float const *restrict subrow = row + range_start;
+        float *restrict suboutputs = outputs + range_start;
+        for (x = 0; x < range_len; x++){
+          suboutputs[x] += input * subrow[x];
+        }
+      }
+    }
+  }
+}
+
+
+static inline void
 calculate_interlayer(const float *restrict inputs,
     int input_size,
     float *restrict outputs,
@@ -81,7 +113,8 @@ maybe_scale_inputs(RecurNN *net){
 }
 
 float *
-rnn_opinion(RecurNN *net, const float *restrict inputs, float presynaptic_noise){
+  rnn_opinion(RecurNN *net, const float *restrict inputs, float presynaptic_noise,
+      RecurErrorRange *output_ranges){
   /*If inputs is NULL, assume the inputs have already been set.*/
   float *restrict hiddens = net->hidden_layer;
   ASSUME_ALIGNED(hiddens);
@@ -146,10 +179,15 @@ rnn_opinion(RecurNN *net, const float *restrict inputs, float presynaptic_noise)
   }
 
   hiddens[0] = 1.0f;
-
-  calculate_interlayer(hiddens, net->h_size,
-      net->output_layer, net->o_size, net->ho_weights);
-
+  if (output_ranges) {
+    calculate_interlayer_sparse(hiddens, net->h_size,
+        net->output_layer, net->o_size, net->ho_weights,
+        output_ranges);
+  }
+  else {
+    calculate_interlayer(hiddens, net->h_size,
+        net->output_layer, net->o_size, net->ho_weights);
+  }
   return net->output_layer;
 }
 

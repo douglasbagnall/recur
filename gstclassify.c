@@ -2069,7 +2069,7 @@ train_channel(GstClassify *self, ClassifyChannel *c, int *win_count,
     float *train_probabilities, u32 *seen_counts, u32 *used_counts,
     float *wrongness){
   RecurNN *net = c->net;
-  float *answer = rnn_opinion(net, c->features, net->presynaptic_noise);
+  float *answer = rnn_opinion(net, c->features, net->presynaptic_noise, NULL);
   float *error = net->bptt->o_error;
   int groups_trained = 0;
   for (int i = 0; i < self->n_groups; i++){
@@ -2267,7 +2267,7 @@ emit_opinions(GstClassify *self, GstClockTime pts){
       ClassifyChannel *c = prepare_channel_features(self, buffer, j);
       RecurNN *net = c->net;
       float *error = net->bptt->o_error;
-      float *answer = rnn_opinion(net, c->features, 0);
+      float *answer = rnn_opinion(net, c->features, 0, NULL);
       for (i = 0; i < self->n_groups; i++){
         ClassifyClassGroup *g = &self->class_groups[i];
         int o = g->offset;

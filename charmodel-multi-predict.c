@@ -91,8 +91,8 @@ multi_softmax_error(RecurNN *net, float *restrict error, int c, int next,
     RecurErrorRange *error_ranges, int *cold_point)
 {
   int i;
-  float *restrict answer = one_hot_opinion_with_cold(net, c, *cold_point,
-      net->presynaptic_noise);
+  float *restrict answer = one_hot_opinion_sparse(net, c,
+      net->presynaptic_noise, error_ranges);
   *cold_point = c;
   int n_classes = net->output_size / alphabet_len;
   float err = 0;
@@ -181,7 +181,7 @@ text_train(RecurNN *net, u8 *text, int len, int learning_style,
       /* top_error_range learning only implemented for adagrad (so far) */
       if (learning_style == RNN_ADAGRAD){
         rnn_apply_learning(net, learning_style, bptt->momentum,
-            top_delta_ranges);
+            NULL);
       }
       else {
         rnn_apply_learning(net, learning_style, bptt->momentum, NULL);

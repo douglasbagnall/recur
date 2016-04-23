@@ -25,7 +25,26 @@ one_hot_opinion(RecurNN *net, int hot, float presynaptic_noise){
 
   memset(inputs, 0, len * sizeof(float));
   inputs[hot] = 1.0f;
-  return rnn_opinion(net, NULL, presynaptic_noise);
+  return rnn_opinion(net, NULL, presynaptic_noise, NULL);
+}
+
+static inline float*
+one_hot_opinion_sparse(RecurNN *net, int hot,
+    float presynaptic_noise, RecurErrorRange *ranges){
+  float *inputs;
+  int len;
+  if (net->bottom_layer){
+    inputs = net->bottom_layer->inputs;
+    len = net->bottom_layer->input_size;
+  }
+  else{
+    inputs = net->real_inputs;
+    len = net->input_size;
+  }
+
+  memset(inputs, 0, len * sizeof(float));
+  inputs[hot] = 1.0f;
+  return rnn_opinion(net, NULL, presynaptic_noise, ranges);
 }
 
 static inline float*
@@ -43,7 +62,7 @@ one_hot_opinion_with_cold(RecurNN *net, int hot, int cold,
   /*XXX not checking ranges!*/
   inputs[cold] = 0.0f;
   inputs[hot] = 1.0f;
-  return rnn_opinion(net, NULL, presynaptic_noise);
+  return rnn_opinion(net, NULL, presynaptic_noise, NULL);
 }
 
 
