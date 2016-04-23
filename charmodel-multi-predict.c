@@ -25,29 +25,38 @@ multi_softmax_error(RecurNN *net, float *restrict error, int c, int next,
   int n_classes = net->output_size / alphabet_len;
   float err = 0;
   int j = 0;
+  int k;
   u64 threshold = leakage * UINT64_MAX;
-  /* XXX memset is *almost* redundant with error_ranges, but the zeros are
-     necessary for alignment, and are useful for debug images. */
-
-  memset(error, 0, net->output_size * sizeof(float));
 
   for (i = 0; i < n_classes; i++){
     int offset = i * alphabet_len;
     if (i == target_class || rand64(&net->rng) < threshold){
+      int range_start = ALIGNED_ROUND_DOWN(offset);
+      int range_end = ALIGNED_ROUND_UP(offset + alphabet_len);
+
+      for (k = range_start; k < offset; k++){
+        error[k] = 0.0f;
+      }
+
       softmax_best_guess(error + offset, answer + offset, alphabet_len);
       error[offset + next] += 1.0f;
+
+      for (k = offset + alphabet_len; k < range_end; k++){
+        error[k] = 0.0f;
+      }
+
       if (i == target_class){
         err = error[offset + next];
       }
-      int range_start = ALIGNED_ROUND_DOWN(offset);
-      int range_end = ALIGNED_ROUND_UP(offset + alphabet_len);
-      if (j){
+
+      if (j){ /* merge adjacent ranges */
         RecurErrorRange prev = error_ranges[j - 1];
         if (prev.start + prev.len >= range_start){
           error_ranges[j - 1].len = range_end - prev.start;
           continue;
         }
       }
+
       error_ranges[j].start = range_start;
       error_ranges[j].len = range_end - range_start;
       j++;
