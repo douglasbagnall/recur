@@ -15,6 +15,76 @@ This uses the RNN to predict the next character in a text sequence.
 #include "utf8.h"
 #include "colour.h"
 
+
+static void
+accumulate_ranges(RecurErrorRange *dest, const RecurErrorRange *src, int max_n)
+{
+  int end;
+  int i;
+  RecurErrorRange src2[max_n];
+  const RecurErrorRange *tmp, *a, *b;
+  if (src->start < 0) { /* merging empty list */
+    return;
+  }
+
+  if (dest->start < 0) {  /* merging into empty list */
+    for (i = 0; i < max_n; i++) {
+      dest[i] = src[i];
+      if (dest[i].start < 0) {
+        return;
+      }
+    }
+  }
+
+  for (i = 0; i < max_n; i++) {
+    src2[i] = dest[i];
+    if (src2[i].start < 0) {
+      break;
+    }
+  }
+
+  end = -1;
+  a = src;
+  b = src2;
+  dest --;
+  /* sort of like mergesort. a is always the leader */
+  for (i = 0; i < max_n; i++){
+    if (a->start < 0) {
+      if (b->start < 0) {
+        break;
+      }
+      /* a is finished but b isn't. swap them. */
+      tmp = b;
+      b = a;
+      a = tmp;
+    }
+    else if (b->start >= 0 && b->start < a->start) {
+      tmp = b;
+      b = a;
+      a = tmp;
+    }
+
+    if (a->start > end) {
+      /* we start a new dest node */
+      dest++;
+      dest->start = a->start;
+      dest->len = a->len;
+      end = a->start + a->len;
+    }
+    else {
+      /* we merge it into dest */
+      end = a->start + a->len;
+      dest->len = end - dest->start;
+    }
+    a++;
+  }
+  dest++;
+  dest->len = 0;
+  dest->start = -1;
+}
+
+
+
 static inline float
 multi_softmax_error(RecurNN *net, float *restrict error, int c, int next,
     int target_class, int alphabet_len, float leakage,
@@ -96,7 +166,9 @@ text_train(RecurNN *net, u8 *text, int len, int learning_style,
   float error = 0.0f;
   float entropy = 0.0f;
   RecurNNBPTT *bptt = net->bptt;
-  RecurErrorRange top_error_ranges[net->output_size / alphabet_len];
+  int n_classes = net->output_size / alphabet_len;
+  RecurErrorRange top_error_ranges[n_classes + 1];
+  RecurErrorRange top_delta_ranges[n_classes + 1];
   int countdown = batch_size - net->generation % batch_size;
   int cold_point = 0;
   zero_real_inputs(net);
@@ -109,7 +181,7 @@ text_train(RecurNN *net, u8 *text, int len, int learning_style,
       /* top_error_range learning only implemented for adagrad (so far) */
       if (learning_style == RNN_ADAGRAD){
         rnn_apply_learning(net, learning_style, bptt->momentum,
-            top_error_ranges);
+            top_delta_ranges);
       }
       else {
         rnn_apply_learning(net, learning_style, bptt->momentum, NULL);
@@ -119,6 +191,7 @@ text_train(RecurNN *net, u8 *text, int len, int learning_style,
     }
     else {
       rnn_bptt_calc_deltas(net, 1, top_error_ranges);
+      accumulate_ranges(top_delta_ranges, top_error_ranges, n_classes + 1);
     }
     if (report){
       error += e;
