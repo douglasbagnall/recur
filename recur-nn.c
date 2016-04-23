@@ -518,9 +518,8 @@ apply_adagrad_learning(float *restrict weights,
   for (int i = 0; i < size; i++){
     float d = delta[i];
     float a = accumulators[i];
-    a += d * d;
     weights[i] += d * rate / sqrtf(a);
-    accumulators[i] = a;
+    accumulators[i] = a + d * d;
   }
 }
 
