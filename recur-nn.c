@@ -524,6 +524,32 @@ apply_adagrad_learning(float *restrict weights,
 }
 
 static void
+apply_adagrad_learning_sparse(float *restrict weights,
+    const float *restrict delta, float *restrict accumulators,
+    int size, float rate, RecurErrorRange *ranges){
+  ASSUME_ALIGNED(accumulators);
+  ASSUME_ALIGNED(delta);
+  ASSUME_ALIGNED(weights);
+  int i, j;
+  for (i = 0; ranges[i].start >= 0; i++){
+    int range_start = ALIGNED_ROUND_DOWN(ranges[i].start);
+    int range_len = ALIGNED_ROUND_UP(ranges[i].len);
+    float const *restrict subdelta = delta + range_start;
+    float *restrict subaccumulators = accumulators + range_start;
+    float *restrict subweights = weights + range_start;
+    ASSUME_ALIGNED(subdelta);
+    ASSUME_ALIGNED(subaccumulators);
+    ASSUME_ALIGNED(subweights);
+    for (j = 0; j < range_len; j++){
+      float d = subdelta[j];
+      float a = subaccumulators[j];
+      subweights[j] += d * rate / sqrtf(a);
+      subaccumulators[j] = a + d * d;
+    }
+  }
+}
+
+static void
 apply_adadelta_learning(float *restrict weights,
     const float *restrict delta, float *restrict gradient_accumulators,
     float *restrict step_accumulators,
@@ -599,7 +625,7 @@ rnn_calculate_momentum_soft_start(float generation, float max_momentum, float x)
 
 void
 rnn_apply_learning(RecurNN *net, int learning_method,
-    float momentum){
+    float momentum, RecurErrorRange *top_error_ranges){
   RecurNNBPTT *bptt = net->bptt;
   RecurExtraLayer *bl = net->bottom_layer;
   if (learning_method == RNN_MOMENTUM_NESTEROV){
@@ -614,8 +640,15 @@ rnn_apply_learning(RecurNN *net, int learning_method,
     }
   }
   else if (learning_method == RNN_ADAGRAD){
-    apply_adagrad_learning(net->ho_weights, bptt->ho_delta,
-        bptt->ho_momentum, net->ho_size, bptt->learn_rate * bptt->ho_scale);
+    if (top_error_ranges){
+      apply_adagrad_learning_sparse(net->ho_weights, bptt->ho_delta,
+          bptt->ho_momentum, net->ho_size, bptt->learn_rate * bptt->ho_scale,
+          top_error_ranges);
+    }
+    else {
+      apply_adagrad_learning(net->ho_weights, bptt->ho_delta,
+          bptt->ho_momentum, net->ho_size, bptt->learn_rate * bptt->ho_scale);
+    }
     apply_adagrad_learning(net->ih_weights, bptt->ih_delta,
         bptt->ih_momentum, net->ih_size, bptt->learn_rate);
     if (bl){

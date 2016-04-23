@@ -2231,7 +2231,7 @@ maybe_learn(GstClassify *self){
     float momentum = rnn_calculate_momentum_soft_start(net->generation,
         net->bptt->momentum, self->momentum_soft_start);
     if (err_sum){
-      rnn_apply_learning(net, self->learning_style, momentum);
+      rnn_apply_learning(net, self->learning_style, momentum, NULL);
     }
     rnn_condition_net(net);
     possibly_save_net(net, self->net_filename);

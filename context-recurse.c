@@ -154,7 +154,7 @@ recur_train_nets(RecurContext *context, RecurFrame *src_frame,
     rnn_bptt_calc_deltas(net, j ? 1 : 0, NULL);
   }
   rnn_apply_learning(context->net, RNN_MOMENTUM_WEIGHTED,
-      context->net->bptt->momentum);
+      context->net->bptt->momentum, NULL);
   rnn_condition_net(context->net);
   rnn_log_net(context->net);
 }

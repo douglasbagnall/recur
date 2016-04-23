@@ -92,7 +92,14 @@ text_train(RecurNN *net, u8 *text, int len, int learning_style,
     float e = multi_softmax_error(net, bptt->o_error, text[i], text[i + 1],
         target_class, alphabet_len, leakage, top_error_ranges);
     if (countdown == 0){
-      rnn_apply_learning(net, learning_style, bptt->momentum);
+      /* top_error_range learning only implemented for adagrad (so far) */
+      if (learning_style == RNN_ADAGRAD){
+        rnn_apply_learning(net, learning_style, bptt->momentum,
+            top_error_ranges);
+      }
+      else {
+        rnn_apply_learning(net, learning_style, bptt->momentum, NULL);
+      }
       countdown = batch_size;
       rnn_bptt_calc_deltas(net, 0, top_error_ranges);
     }

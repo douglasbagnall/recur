@@ -541,7 +541,8 @@ maybe_learn(GstParrot *self){
     if (PERIODIC_PGM_DUMP && net->generation % PERIODIC_PGM_DUMP == 0){
       rnn_multi_pgm_dump(net, "how ihw", "parrot");
     }
-    rnn_apply_learning(self->net, RNN_MOMENTUM_WEIGHTED, self->net->bptt->momentum);
+    rnn_apply_learning(self->net, RNN_MOMENTUM_WEIGHTED,
+        self->net->bptt->momentum, NULL);
     rnn_condition_net(self->net);
     self->net->generation = net->generation;
     possibly_save_net(self->net, self->net_filename);

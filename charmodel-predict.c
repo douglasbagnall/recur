@@ -302,7 +302,7 @@ rnn_char_epoch(RnnCharModel *model, RecurNN *confab_net, RnnCharVentropy *v,
          */
         rnn_bptt_calc_deltas(n, j ? 1 : 0, NULL);
       }
-      rnn_apply_learning(net, model->learning_style, momentum);
+      rnn_apply_learning(net, model->learning_style, momentum, NULL);
     }
     else {
       RecurNNBPTT *bptt = net->bptt;
