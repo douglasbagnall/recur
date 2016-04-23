@@ -518,8 +518,9 @@ apply_adagrad_learning(float *restrict weights,
   for (int i = 0; i < size; i++){
     float d = delta[i];
     float a = accumulators[i];
+    a += d * d;
     weights[i] += d * rate / sqrtf(a);
-    accumulators[i] = a + d * d;
+    accumulators[i] = a;
   }
 }
 
@@ -543,8 +544,9 @@ apply_adagrad_learning_sparse(float *restrict weights,
     for (j = 0; j < range_len; j++){
       float d = subdelta[j];
       float a = subaccumulators[j];
+      a += d * d;
       subweights[j] += d * rate / sqrtf(a);
-      subaccumulators[j] = a + d * d;
+      subaccumulators[j] = a;
     }
   }
 }
