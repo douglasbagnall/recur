@@ -23,9 +23,45 @@ one_hot_opinion(RecurNN *net, int hot, float presynaptic_noise){
     len = net->input_size;
   }
 
-  //XXX could just set the previous one to zero (i.e. remember it)
   memset(inputs, 0, len * sizeof(float));
   inputs[hot] = 1.0f;
   return rnn_opinion(net, NULL, presynaptic_noise);
+}
+
+static inline float*
+one_hot_opinion_with_cold(RecurNN *net, int hot, int cold,
+    float presynaptic_noise){
+  /* This version assumes that the input array is already
+     zero except for the point named in <cold> */
+  float *inputs;
+  if (net->bottom_layer){
+    inputs = net->bottom_layer->inputs;
+  }
+  else{
+    inputs = net->real_inputs;
+  }
+  /*XXX not checking ranges!*/
+  inputs[cold] = 0.0f;
+  inputs[hot] = 1.0f;
+  return rnn_opinion(net, NULL, presynaptic_noise);
+}
+
+
+/* This helps one_hot_opinion_with_cold() by zeroing the array at the
+   beginning of each cycle */
+
+static inline void
+zero_real_inputs(RecurNN *net){
+  float *inputs;
+  int len;
+  if (net->bottom_layer){
+    inputs = net->bottom_layer->inputs;
+    len = net->bottom_layer->input_size;
+  }
+  else{
+    inputs = net->real_inputs;
+    len = net->input_size;
+  }
+  memset(inputs, 0, len * sizeof(float));
 }
 

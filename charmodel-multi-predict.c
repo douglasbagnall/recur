@@ -18,10 +18,12 @@ This uses the RNN to predict the next character in a text sequence.
 static inline float
 multi_softmax_error(RecurNN *net, float *restrict error, int c, int next,
     int target_class, int alphabet_len, float leakage,
-    RecurErrorRange *error_ranges)
+    RecurErrorRange *error_ranges, int *cold_point)
 {
   int i;
-  float *restrict answer = one_hot_opinion(net, c, net->presynaptic_noise);
+  float *restrict answer = one_hot_opinion_with_cold(net, c, *cold_point,
+      net->presynaptic_noise);
+  *cold_point = c;
   int n_classes = net->output_size / alphabet_len;
   float err = 0;
   int j = 0;
@@ -96,10 +98,13 @@ text_train(RecurNN *net, u8 *text, int len, int learning_style,
   RecurNNBPTT *bptt = net->bptt;
   RecurErrorRange top_error_ranges[net->output_size / alphabet_len];
   int countdown = batch_size - net->generation % batch_size;
+  int cold_point = 0;
+  zero_real_inputs(net);
+
   for(i = 0; i < len - 1; i++, countdown--){
     rnn_bptt_advance(net);
     float e = multi_softmax_error(net, bptt->o_error, text[i], text[i + 1],
-        target_class, alphabet_len, leakage, top_error_ranges);
+        target_class, alphabet_len, leakage, top_error_ranges, &cold_point);
     if (countdown == 0){
       /* top_error_range learning only implemented for adagrad (so far) */
       if (learning_style == RNN_ADAGRAD){
@@ -134,6 +139,9 @@ rnn_char_multitext_spin(RecurNN *net, u8 *text, int len,
     const char *periodic_pgm_string, int periodic_pgm_period)
 {
   int periodic_pgm_countdown;
+  int cold = 0;
+  zero_real_inputs(net);
+
   if (periodic_pgm_period){
     periodic_pgm_countdown = (periodic_pgm_period -
         net->generation % periodic_pgm_period);
@@ -146,7 +154,9 @@ rnn_char_multitext_spin(RecurNN *net, u8 *text, int len,
   }
   for(int i = 0; i < len; i++){
     rnn_bptt_advance(net);
-    one_hot_opinion(net, text[i], net->presynaptic_noise);
+    int hot = text[i];
+    one_hot_opinion_with_cold(net, hot, cold, net->presynaptic_noise);
+    cold = hot;
     INNER_CYCLE_PGM_DUMP();
   }
 }
@@ -200,12 +210,18 @@ rnn_char_multi_cross_entropy(RecurNN *net, const u8 *text, int len,
   float error[alphabet_len];
   int i, j;
   int n_classes = net->output_size / alphabet_len;
+  int cold = 0;
+  zero_real_inputs(net);
   /*skip the first few because state depends too much on previous experience */
   for (i = 0; i < ignore_start; i++){
-    one_hot_opinion(net, text[i], 0);
+    int hot = text[i];
+    one_hot_opinion_with_cold(net, hot, cold, 0);
+    cold = hot;
   }
   for (; i < len - 1; i++){
-    float *restrict answer = one_hot_opinion(net, text[i], 0);
+    int hot = text[i];
+    float *restrict answer = one_hot_opinion_with_cold(net, hot, cold, 0);
+    cold = hot;
     for (j = 0; j < n_classes; j++){
       float *group = answer + alphabet_len * j;
       softmax(error, group, alphabet_len);
