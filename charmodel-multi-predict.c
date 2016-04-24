@@ -91,8 +91,8 @@ multi_softmax_error(RecurNN *net, float *restrict error, int c, int next,
     RecurErrorRange *error_ranges, int *cold_point)
 {
   int i;
-  float *restrict answer = one_hot_opinion_with_cold(net, c,
-      *cold_point, net->presynaptic_noise, error_ranges);
+  float *restrict answer = one_hot_opinion_sparse(net, c,
+      net->presynaptic_noise, error_ranges);
   *cold_point = c;
   int n_classes = net->output_size / alphabet_len;
   float err = 0;
@@ -228,7 +228,7 @@ rnn_char_multitext_spin(RecurNN *net, u8 *text, int len,
   for(int i = 0; i < len; i++){
     rnn_bptt_advance(net);
     int hot = text[i];
-    one_hot_opinion_with_cold(net, hot, cold, net->presynaptic_noise, NULL);
+    one_hot_opinion_with_cold(net, hot, cold, net->presynaptic_noise);
     cold = hot;
     INNER_CYCLE_PGM_DUMP();
   }
@@ -288,12 +288,12 @@ rnn_char_multi_cross_entropy(RecurNN *net, const u8 *text, int len,
   /*skip the first few because state depends too much on previous experience */
   for (i = 0; i < ignore_start; i++){
     int hot = text[i];
-    one_hot_opinion_with_cold(net, hot, cold, 0, NULL);
+    one_hot_opinion_with_cold(net, hot, cold, 0);
     cold = hot;
   }
   for (; i < len - 1; i++){
     int hot = text[i];
-    float *restrict answer = one_hot_opinion_with_cold(net, hot, cold, 0, NULL);
+    float *restrict answer = one_hot_opinion_with_cold(net, hot, cold, 0);
     cold = hot;
     for (j = 0; j < n_classes; j++){
       float *group = answer + alphabet_len * j;

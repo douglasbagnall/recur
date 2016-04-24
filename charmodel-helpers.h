@@ -49,7 +49,7 @@ one_hot_opinion_sparse(RecurNN *net, int hot,
 
 static inline float*
 one_hot_opinion_with_cold(RecurNN *net, int hot, int cold,
-    float presynaptic_noise, RecurErrorRange *ranges){
+    float presynaptic_noise){
   /* This version assumes that the input array is already
      zero except for the point named in <cold> */
   float *inputs;
@@ -61,19 +61,8 @@ one_hot_opinion_with_cold(RecurNN *net, int hot, int cold,
   }
   /*XXX not checking ranges!*/
   inputs[cold] = 0.0f;
-#if 1
-  int zero = 1;
-  for (int i = 0; i < net->input_size; i++) {
-    if (inputs[i]){
-      zero = 0;
-    }
-  }
-  if (zero == 0) {
-    DEBUG("one_hot_opinion_with_cold() is FAILING to zero!");
-  }
-#endif
   inputs[hot] = 1.0f;
-  return rnn_opinion(net, NULL, presynaptic_noise, ranges);
+  return rnn_opinion(net, NULL, presynaptic_noise, NULL);
 }
 
 
