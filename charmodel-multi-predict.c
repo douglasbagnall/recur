@@ -88,12 +88,11 @@ accumulate_ranges(RecurErrorRange *dest, const RecurErrorRange *src, int max_n)
 static inline float
 multi_softmax_error(RecurNN *net, float *restrict error, int c, int next,
     int target_class, int alphabet_len, float leakage,
-    RecurErrorRange *error_ranges, int *cold_point)
+    RecurErrorRange *error_ranges)
 {
   int i;
   float *restrict answer = one_hot_opinion_sparse(net, c,
       net->presynaptic_noise, error_ranges);
-  *cold_point = c;
   int n_classes = net->output_size / alphabet_len;
   float err = 0;
   int j = 0;
@@ -170,13 +169,11 @@ text_train(RecurNN *net, u8 *text, int len, int learning_style,
   RecurErrorRange top_error_ranges[n_classes + 1];
   RecurErrorRange top_delta_ranges[n_classes + 1];
   int countdown = batch_size - net->generation % batch_size;
-  int cold_point = 0;
-  zero_real_inputs(net);
 
   for(i = 0; i < len - 1; i++, countdown--){
     rnn_bptt_advance(net);
     float e = multi_softmax_error(net, bptt->o_error, text[i], text[i + 1],
-        target_class, alphabet_len, leakage, top_error_ranges, &cold_point);
+        target_class, alphabet_len, leakage, top_error_ranges);
     if (countdown == 0){
       /* top_error_range learning only implemented for adagrad (so far) */
       if (learning_style == RNN_ADAGRAD){
@@ -212,8 +209,6 @@ rnn_char_multitext_spin(RecurNN *net, u8 *text, int len,
     const char *periodic_pgm_string, int periodic_pgm_period)
 {
   int periodic_pgm_countdown;
-  int cold = 0;
-  zero_real_inputs(net);
 
   if (periodic_pgm_period){
     periodic_pgm_countdown = (periodic_pgm_period -
@@ -228,8 +223,7 @@ rnn_char_multitext_spin(RecurNN *net, u8 *text, int len,
   for(int i = 0; i < len; i++){
     rnn_bptt_advance(net);
     int hot = text[i];
-    one_hot_opinion_with_cold(net, hot, cold, net->presynaptic_noise);
-    cold = hot;
+    one_hot_opinion_sparse(net, hot, net->presynaptic_noise, NULL);
     INNER_CYCLE_PGM_DUMP();
   }
 }
@@ -283,18 +277,14 @@ rnn_char_multi_cross_entropy(RecurNN *net, const u8 *text, int len,
   float error[alphabet_len];
   int i, j;
   int n_classes = net->output_size / alphabet_len;
-  int cold = 0;
-  zero_real_inputs(net);
   /*skip the first few because state depends too much on previous experience */
   for (i = 0; i < ignore_start; i++){
     int hot = text[i];
-    one_hot_opinion_with_cold(net, hot, cold, 0);
-    cold = hot;
+    one_hot_opinion_sparse(net, hot, 0, NULL);
   }
   for (; i < len - 1; i++){
     int hot = text[i];
-    float *restrict answer = one_hot_opinion_with_cold(net, hot, cold, 0);
-    cold = hot;
+    float *restrict answer = one_hot_opinion_sparse(net, hot, 0, NULL);
     for (j = 0; j < n_classes; j++){
       float *group = answer + alphabet_len * j;
       softmax(error, group, alphabet_len);
