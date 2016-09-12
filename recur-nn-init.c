@@ -162,8 +162,6 @@ rnn_new_extra_layer(int input_size, int output_size, int overlap,
   RecurExtraLayer *layer = zalloc_aligned_or_die(sizeof(RecurExtraLayer));
   layer->input_size = input_size;
   layer->output_size = output_size;
-  layer->input_size = input_size;
-  layer->output_size = output_size;
   layer->overlap = overlap;
   layer->learn_rate_scale = 1.0;
   layer->i_size = ALIGNED_VECTOR_LEN(input_size + 1, float);
