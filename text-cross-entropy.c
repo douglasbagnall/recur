@@ -83,7 +83,7 @@ colourise_text(RecurNN *net, RnnCharAlphabet *alphabet, u8 *text, int len,
   }
   for (i = 0; i < skip; i++){
     one_hot_opinion(net, text[i], 0);
-    write_possibly_utf8_char(alphabet->points[text[i]], buffer, utf8);
+    int j = write_possibly_utf8_char(alphabet->points[text[i]], buffer, utf8);
     fwrite(buffer, 1, j, stdout);
   }
   int j = write_possibly_utf8_char(alphabet->points[text[i]], buffer, utf8);
