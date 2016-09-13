@@ -1,3 +1,5 @@
+default::
+
 all::
 
 local.mak:
@@ -74,8 +76,16 @@ subdirs = images nets test-video plugins
 $(subdirs):
 	mkdir -p $@
 
-all:: plugins/libgstclassify.so $(subdirs)
+default:: plugins/libgstclassify.so $(subdirs)
 
+all:: plugins/libgstclassify.so $(subdirs) plugins/libgstclassify.so $(subdirs) \
+	plugins/libgstrecur.so plugins/libgstrnnca.so \
+	libcharmodel.so charmodel.so \
+	test/test_mfcc_table test/test_mfcc_bins test/test_charmodel_alphabet \
+	test/test_utf8 \
+	text-predict text-cross-entropy text-confabulate text-classify \
+	text-classify-results xml-lang-classify convert-saved-net \
+	test/test_mdct test/test_window gtk-recur
 
 ELF_EXECUTABLES = text-predict convert-saved-net rnnca-player gtk-recur xml-lang-classify\
 	 text-confabulate text-cross-entropy text-classify  text-classify-results
