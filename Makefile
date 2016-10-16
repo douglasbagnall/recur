@@ -238,10 +238,10 @@ startup/%.desktop: startup/%.desktop.template
 
 .PHONY: all test-pipeline clean pgm-clean tags
 
-TAGS: tags
+tags: TAGS
 
-tags:
-	etags $(find -name '*.[ch]' |grep -v -F '/junk')
+TAGS:
+	etags $$(find -name '*.[ch]' |grep -v -F '/junk')
 
 #base urls for fetching test video.
 IA_URL = https://archive.org/download
