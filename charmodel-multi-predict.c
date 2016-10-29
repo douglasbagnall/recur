@@ -171,9 +171,15 @@ multi_confab(RnnCharMultiConfab *mc)
         pending_caps = true;
       }
       else {
-        if (pending_caps) { /* capitalisation is limited to ascii */
+        if (pending_caps) { /* capitalisation is limited to ascii and greek */
           if (c >= 'a' && c <= 'z') {
             c -= ('a' - 'A');
+          }
+          else if (c >= 945 && c <= 969) { /* greek */
+            c -= 32;
+            if (c == 930) {
+              c++; /* 962 is word-final sigma; capitalises to plain sigma 931 */
+            }
           }
         }
         int w = write_possibly_utf8_char(c, d, utf8);
