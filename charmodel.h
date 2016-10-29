@@ -137,6 +137,19 @@ typedef struct _RnnCharProgressReport
   float per_second;
 } RnnCharProgressReport;
 
+typedef struct RnnCharMultiConfab
+{
+  RecurNN **nets;
+  int *last_char;
+  char **strings;
+  uint n_classes;
+  uint char_len;
+  uint byte_len;
+  float bias;
+  uint period;
+  RnnCharAlphabet *alphabet;
+} RnnCharMultiConfab;
+
 
 #define NO_CLASS 0xFF
 
@@ -226,9 +239,11 @@ double rnn_char_cross_entropy(RecurNN *net, RnnCharAlphabet *alphabet,
 void
 rnn_char_multitext_train(RecurNN *net, u8 *text, int len, int alphabet_len,
     int target_class, float leakage, RnnCharProgressReport *report,
+    RnnCharMultiConfab *confab,
     int learning_style, float momentum, int batch_size,
     TemporalPPM *input_ppm, TemporalPPM *error_ppm,
     const char *periodic_pgm_string, int periodic_pgm_period);
+
 
 void rnn_char_multitext_spin(RecurNN *net, u8 *text, int len,
     TemporalPPM *input_ppm, TemporalPPM *error_ppm,
@@ -237,6 +252,14 @@ void rnn_char_multitext_spin(RecurNN *net, u8 *text, int len,
 void
 rnn_char_multi_cross_entropy(RecurNN *net, const u8 *text, int len,
     int alphabet_len, double *entropy, int ignore_start);
+
+RnnCharMultiConfab *
+rnn_char_new_multi_confab(RecurNN *net, RnnCharAlphabet *alhapbet, int n_classes,
+    int target_len, uint confab_period);
+
+
+void
+rnn_char_free_multi_confab(RnnCharMultiConfab *mc);
 
 
 #endif

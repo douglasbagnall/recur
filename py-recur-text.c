@@ -329,6 +329,7 @@ typedef struct {
     RnnCharImageSettings images;
     int periodic_pgm_period;
     const char *filename;
+    RnnCharMultiConfab *mc;
 } Net;
 
 static void
@@ -346,6 +347,11 @@ Net_dealloc(Net* self)
     if (self->images.error_ppm){
         free(self->images.error_ppm);
         self->images.error_ppm = NULL;
+    }
+    if (self->report) {
+        free(self->report);
+        self->report = NULL;
+
     }
     Py_CLEAR(self->alphabet);
     Py_CLEAR(self->class_names);
@@ -444,7 +450,6 @@ set_net_pgm_dump(Net *self, const char *basename, int temporal_pgm_dump,
     }
     return 0;
 }
-
 
 
 static int
@@ -569,7 +574,12 @@ Net_init(Net *self, PyObject *args, PyObject *kwds)
 
     self->net = net;
     self->momentum = momentum;
-    self->report = verbose ? calloc(sizeof(*self->report), 1) : NULL;
+    if (verbose) {
+        self->report = calloc(sizeof(*self->report), 1);
+    }
+    else {
+        self->report = NULL;
+    }
     self->batch_size = batch_size;
 
     if (init_method < RNN_INIT_ZERO || init_method >= RNN_INIT_LAST){
@@ -591,7 +601,7 @@ Net_init(Net *self, PyObject *args, PyObject *kwds)
 
     Py_INCREF(alphabet);
     self->alphabet = alphabet;
-
+    self->mc = NULL;
 
     switch(learning_method){
     case RNN_ADAGRAD:
@@ -730,18 +740,68 @@ Net_dump_parameters(Net *self, PyObject *args)
     printf("flags %x\n", net->flags);
     printf("generation %d\n", net->generation);
     printf("presynaptic noise %f\n", net->presynaptic_noise);
-    printf("activation %x\n", net->activation);
-    printf("bptt depth %d\n", bptt->depth);
-    printf("bptt index %d\n", bptt->index);
-    printf("learn_rate %f\n", bptt->learn_rate);
-    printf("ih_scale %f\n", bptt->ih_scale);
-    printf("ho_scale %f\n", bptt->ho_scale);
-    printf("bptt momentum %g\n", bptt->momentum);
-    printf("bptt momentum_weight %g\n", bptt->momentum_weight);
-    printf("bptt min_error_factor %g\n", bptt->min_error_factor);
+    printf("activation %x\n", net->activation);\
+    if (bptt) {
+        printf("bptt depth %d\n", bptt->depth);
+        printf("bptt index %d\n", bptt->index);
+        printf("learn_rate %f\n", bptt->learn_rate);
+        printf("ih_scale %f\n", bptt->ih_scale);
+        printf("ho_scale %f\n", bptt->ho_scale);
+        printf("bptt momentum %g\n", bptt->momentum);
+        printf("bptt momentum_weight %g\n", bptt->momentum_weight);
+        printf("bptt min_error_factor %g\n", bptt->min_error_factor);
+    }
+    if (self->mc) {
+        printf("confab interval %u\n", self->mc->period);
+        printf("confab n %u\n", self->mc->n_classes);
+        printf("confab len %u\n", self->mc->char_len);
+    }
     return Py_BuildValue("");
 }
 
+
+static PyObject *
+Net_start_confab(Net *self, PyObject *args, PyObject *kwds)
+{
+    uint confab_interval = 0;
+    uint confab_n = 3;
+    uint confab_len = 79;
+    static char *kwlist[] = {"interval",             /* I  */
+                             "n",                    /* I  */
+                             "len",                  /* I  */
+                             NULL};
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "I|II", kwlist,
+            &confab_interval,
+            &confab_n,
+            &confab_len
+        )){
+        return NULL;
+    }
+
+    if (self->mc){
+        rnn_char_free_multi_confab(self->mc);
+        self->mc = NULL;
+    }
+
+    if (confab_interval) {
+        self->mc = rnn_char_new_multi_confab(self->net,
+            self->alphabet->alphabet,
+            confab_n, confab_len - 5, confab_interval);
+    }
+    return Py_BuildValue("");
+}
+
+
+static PyObject *
+Net_stop_confab(Net *self, PyObject *args, PyObject *kwds)
+{
+    if (self->mc){
+        rnn_char_free_multi_confab(self->mc);
+        self->mc = NULL;
+    }
+    return Py_BuildValue("");
+}
 
 
 static PyObject *
@@ -795,9 +855,10 @@ Net_train(Net *self, PyObject *args, PyObject *kwds)
 
     rnn_char_multitext_train(self->net, (u8*)text, text_len,
         self->alphabet->alphabet->len, target_index, leakage,
-        self->report, self->learning_method, self->momentum,
+        self->report, self->mc, self->learning_method, self->momentum,
         self->batch_size, self->images.input_ppm, self->images.error_ppm,
         self->images.periodic_pgm_dump_string, self->periodic_pgm_period);
+
     if (self->report){
         RnnCharProgressReport *r = self->report;
         char *s = PyString_AsString(target_class);
@@ -806,7 +867,6 @@ Net_train(Net *self, PyObject *args, PyObject *kwds)
     }
     return Py_BuildValue("");
 }
-
 
 static PyObject *
 Net_test(Net *self, PyObject *args, PyObject *kwds)
@@ -970,12 +1030,19 @@ Net_load(PyTypeObject *class, PyObject *args, PyObject *kwds)
     self->alphabet = (Alphabet *)alphabet;
 
     Py_INCREF(classnames);
-    self->n_classes = set_net_classnames(self, classnames);
+    set_net_classnames(self, classnames);
     self->momentum = PyFloat_AsDouble(momentum);
     self->learning_method = PyInt_AsLong(learning_method);
     self->batch_size = PyInt_AsLong(batch_size);
     int verbose_flag = PyInt_AsLong(verbose);
-    self->report = verbose_flag ? calloc(sizeof(*self->report), 1) : NULL;
+
+    if (verbose_flag) {
+        self->report = calloc(1, sizeof(&self->report));
+    }
+    else {
+        self->report = NULL;
+    }
+
     self->filename = strdup(filename);
 
     const char *basename_char;
@@ -1001,6 +1068,11 @@ Net_load(PyTypeObject *class, PyObject *args, PyObject *kwds)
 static PyMethodDef Net_methods[] = {
     {"train", (PyCFunction)Net_train, METH_VARARGS | METH_KEYWORDS,
      "train the net with a block of text"},
+    {"start_confab", (PyCFunction)Net_start_confab,
+     METH_VARARGS | METH_KEYWORDS,
+     "confabulate during training (at this interval)"},
+    {"stop_confab", (PyCFunction)Net_stop_confab, METH_NOARGS,
+     "stop confabulation"},
     {"test", (PyCFunction)Net_test, METH_VARARGS | METH_KEYWORDS,
      "calculate cross entropies for a block of text"},
     {"save", (PyCFunction)Net_save, METH_VARARGS | METH_KEYWORDS,
