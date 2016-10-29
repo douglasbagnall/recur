@@ -766,17 +766,36 @@ Net_start_confab(Net *self, PyObject *args, PyObject *kwds)
     uint confab_interval = 0;
     uint confab_n = 3;
     uint confab_len = 79;
+    const char *caps_marker = NULL;
+    int caps_marker_code = -1;
     static char *kwlist[] = {"interval",             /* I  */
                              "n",                    /* I  */
                              "len",                  /* I  */
+                             "caps_marker",          /* z  */
                              NULL};
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "I|II", kwlist,
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "I|IIz", kwlist,
             &confab_interval,
             &confab_n,
-            &confab_len
+            &confab_len,
+            &caps_marker
         )){
         return NULL;
+    }
+
+    if (caps_marker) {
+        const char *s = caps_marker;
+        caps_marker_code = read_utf8_char(&s);
+        if (*s != '\0') {
+            PyErr_Format(PyExc_ValueError, "caps_marker should be a single "
+                "character, not '%s'", caps_marker);
+            return NULL;
+        }
+        if (caps_marker_code == -1) {
+            PyErr_Format(PyExc_ValueError, "caps_marker '%s' is bad utf-8!",
+                caps_marker);
+            return NULL;
+        }
     }
 
     if (self->mc){
@@ -787,7 +806,8 @@ Net_start_confab(Net *self, PyObject *args, PyObject *kwds)
     if (confab_interval) {
         self->mc = rnn_char_new_multi_confab(self->net,
             self->alphabet->alphabet,
-            confab_n, confab_len - 5, confab_interval);
+            confab_n, confab_len - 5, confab_interval,
+            caps_marker_code);
     }
     return Py_BuildValue("");
 }

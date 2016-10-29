@@ -75,7 +75,7 @@ multi_softmax_error(RecurNN *net, float *restrict error, int c, int next,
 
 RnnCharMultiConfab *
 rnn_char_new_multi_confab(RecurNN *net, RnnCharAlphabet *alphabet, int n_classes,
-    int target_len, uint confab_period)
+    int target_len, uint confab_period, int caps_marker)
 {
   int len = target_len / n_classes - 1;
   if (len < 1) {
@@ -90,6 +90,7 @@ rnn_char_new_multi_confab(RecurNN *net, RnnCharAlphabet *alphabet, int n_classes
   mc->alphabet = alphabet;
   mc->period = confab_period;
   mc->n_classes = n_classes;
+  mc->caps_marker = caps_marker;
 
   mc->last_char = calloc(n_classes, sizeof(int));
   mc->strings = calloc(n_classes, sizeof(char *));
@@ -159,14 +160,28 @@ multi_confab(RnnCharMultiConfab *mc)
     char *d = mc->strings[m];
     int n = mc->last_char[m];
     int bytes_left = mc->byte_len;
+    bool pending_caps = false;
     for (int i = 0;
          i < mc->char_len && bytes_left > char_width;
-         i++){
-        n = offset_guess_next_character(net, error, n, mc->bias,
-            m, mc->alphabet->len);
-      int w = write_possibly_utf8_char(alphabet[n], d, utf8);
-      d += w;
-      bytes_left -= w;
+         ){
+      n = offset_guess_next_character(net, error, n, mc->bias,
+          m, mc->alphabet->len);
+      int c = alphabet[n];
+      if (c == mc->caps_marker) {
+        pending_caps = true;
+      }
+      else {
+        if (pending_caps) { /* capitalisation is limited to ascii */
+          if (c >= 'a' && c <= 'z') {
+            c -= ('a' - 'A');
+          }
+        }
+        int w = write_possibly_utf8_char(c, d, utf8);
+        d += w;
+        bytes_left -= w;
+        pending_caps = false;
+        i++;
+      }
     }
     *d = '\0';
     total += mc->byte_len - bytes_left;

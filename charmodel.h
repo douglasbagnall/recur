@@ -141,6 +141,7 @@ typedef struct RnnCharMultiConfab
 {
   RecurNN **nets;
   int *last_char;
+  int caps_marker;
   char **strings;
   uint n_classes;
   uint char_len;
@@ -255,7 +256,7 @@ rnn_char_multi_cross_entropy(RecurNN *net, const u8 *text, int len,
 
 RnnCharMultiConfab *
 rnn_char_new_multi_confab(RecurNN *net, RnnCharAlphabet *alhapbet, int n_classes,
-    int target_len, uint confab_period);
+    int target_len, uint confab_period, int caps_marker);
 
 
 void
