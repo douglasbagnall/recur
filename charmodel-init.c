@@ -650,6 +650,7 @@ rnn_char_construct_net_filename(struct RnnCharMetadata *m, const char *basename,
   char s[260];
   char *metadata = rnn_char_construct_metadata(m);
   u32 sig = rnn_hash32(metadata);
+  free(metadata);
   if (bottom_size){
     snprintf(s, sizeof(s), "%s-s%0" PRIx32 "-i%d-b%d-h%d-o%d.net", basename,
         sig, input_size, bottom_size, hidden_size, output_size);

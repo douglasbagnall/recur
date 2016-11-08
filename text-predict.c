@@ -412,7 +412,8 @@ exit_unless_metadata_matches(RecurNN *net, struct RnnCharMetadata *m,
 
 
 static RecurNN *
-create_net(const char *filename, struct RnnCharMetadata *m, int alpha_len){
+create_net(const char *filename, int alpha_len)
+{
   RecurNN *net;
   u32 flags = RNN_NET_FLAG_STANDARD;
   if (opt_bptt_adaptive_min){/*on by default*/
@@ -427,7 +428,6 @@ create_net(const char *filename, struct RnnCharMetadata *m, int alpha_len){
       opt_momentum, opt_presynaptic_noise, opt_activation, 0);
   initialise_net(net);
   net->bptt->momentum_weight = opt_momentum_weight;
-  net->metadata = rnn_char_construct_metadata(m);
 
   net->bptt->ho_scale = opt_top_learn_rate_scale;
   if (net->bottom_layer){
@@ -470,7 +470,9 @@ static void prepare_diagonal_only_section(RecurNN *net,
 }
 
 static void
-load_and_train_model(struct RnnCharMetadata *m, RnnCharAlphabet *alphabet){
+load_and_train_model(struct RnnCharMetadata *m, RnnCharAlphabet *alphabet)
+{
+  char *metadata = NULL;
   RnnCharModel model = {
     .n_training_nets = MAX(opt_multi_tap, 1),
     .batch_size = opt_batch_size,
@@ -506,7 +508,9 @@ load_and_train_model(struct RnnCharMetadata *m, RnnCharAlphabet *alphabet){
   }
   else {
     DEBUG("Could not load '%s', let's make a new net", model.filename);
-    net = create_net(model.filename, m, alphabet->len);
+    net = create_net(model.filename, alphabet->len);
+    metadata = rnn_char_construct_metadata(m);
+    net->metadata = metadata;
   }
 
   rnn_set_log_file(net, opt_logfile, 1);
@@ -650,12 +654,20 @@ load_and_train_model(struct RnnCharMetadata *m, RnnCharAlphabet *alphabet){
   rnn_delete_training_set(model.training_nets, model.n_training_nets, 0);
   rnn_delete_net(confab_net);
   rnn_delete_net(validate_net);
+  rnn_char_delete_ventropy(&v);
 
   if (model.images.input_ppm){
     temporal_ppm_free(model.images.input_ppm);
   }
   if (model.images.error_ppm){
     temporal_ppm_free(model.images.error_ppm);
+  }
+  if (model.filename != opt_filename) {
+    free(model.filename);
+  }
+  rnn_char_free_alphabet(alphabet);
+  if (metadata != NULL) {
+    free(metadata);
   }
 }
 
@@ -720,6 +732,7 @@ void train_new_or_existing_model(void){
 
 int
 main(int argc, char *argv[]){
+  char *mem = NULL;
   opt_register_table(options, NULL);
   if (!opt_parse(&argc, argv, opt_log_stderr)){
     exit(1);
@@ -749,6 +762,7 @@ main(int argc, char *argv[]){
   if (! opt_logfile){
     if (opt_basename){
       int n = asprintf(&opt_logfile, "%s.log", opt_basename);
+      mem = opt_logfile;
       if (n < 5){
         FATAL_ERROR("error setting log filename from basename");
       }
@@ -758,4 +772,8 @@ main(int argc, char *argv[]){
     }
   }
   train_new_or_existing_model();
+  opt_free_table();
+  if (mem != NULL) {
+    free(mem);
+  }
 }

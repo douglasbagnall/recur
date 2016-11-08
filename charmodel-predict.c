@@ -208,6 +208,12 @@ rnn_char_fconfab_variable(FILE *f, RecurNN *net, const int end_code,
 }
 
 void
+rnn_char_delete_ventropy(RnnCharVentropy *v)
+{
+  free(v->history);
+}
+
+void
 rnn_char_init_ventropy(RnnCharVentropy *v, RecurNN *net, const u8 *text, const int len,
     const int lap){
   v->net = net;

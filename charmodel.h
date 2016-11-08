@@ -190,6 +190,8 @@ int rnn_char_confabulate(RecurNN *net, char *dest, int char_len,
     int byte_len, RnnCharAlphabet* a, float bias, int *prev_char,
     int start_point, int stop_point);
 
+void rnn_char_delete_ventropy(RnnCharVentropy *v);
+
 void rnn_char_init_ventropy(RnnCharVentropy *v, RecurNN *net, const u8 *text,
     const int len, const int lap);
 
