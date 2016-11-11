@@ -40,32 +40,21 @@ ALL_CFLAGS = -march=native -pthread $(WARNINGS) -pipe  -D_GNU_SOURCE \
 	$(CLANG_FLAGS) -std=gnu11 $(CFLAGS) $(BLAS_CFLAGS) $(LOCAL_FLAGS)
 ALL_LDFLAGS = $(LDFLAGS)
 
-GST_INCLUDES =  -isystem $(INC_DIR)/gstreamer-1.0\
-	 -isystem $(INC_DIR)/glib-2.0\
-	 -isystem $(LIB_ARCH_DIR)/glib-2.0/include\
-	 -isystem $(INC_DIR)/glib-2.0/include\
-	 -isystem /usr/include/libxml2
 
-GTK_INCLUDES = -isystem /usr/include/gtk-3.0 \
-	       -isystem /usr/include/pango-1.0/\
-	       -isystem /usr/include/cairo/ \
-	       -isystem /usr/lib/gdk \
-	       -isystem /usr/include/gdk-pixbuf-2.0/ \
-	       -isystem /usr/include/atk-1.0/
+GST_INCLUDES != pkg-config --cflags gstreamer-1.0
 
+GTK_INCLUDES !=  pkg-config --cflags gtk+-3.0
 
 INCLUDES = -I. $(GST_INCLUDES)
 
 COMMON_LINKS = -L/usr/local/lib  -lm -pthread -lrt \
 		 $(BLAS_LINK) -lcdb
 
-GST_LINKS = -lgstbase-1.0 -lgstreamer-1.0 \
-	 -lgobject-2.0 -lglib-2.0 -lgstvideo-1.0  \
-	-lgmodule-2.0 -lgthread-2.0  -lgstfft-1.0 -lgstaudio-1.0 \
+GST_LINKS != pkg-config --libs gstreamer-1.0
 
 LINKS = $(COMMON_LINKS) $(GST_LINKS)
 
-GTK_LINKS =  -lgtk-3 -lgdk-3
+GTK_LINKS != pkg-config --libs gtk+-3.0
 
 OPT_OBJECTS = ccan/opt/opt.o ccan/opt/parse.o ccan/opt/helpers.o ccan/opt/usage.o
 
