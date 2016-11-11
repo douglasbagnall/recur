@@ -677,6 +677,7 @@ void train_new_or_existing_model(void){
 
     This may involve reading the training text an extra time.
   */
+  bool locally_allocated_alphabet = false;
   RnnCharAlphabet *alphabet = rnn_char_new_alphabet();
   rnn_char_alphabet_set_flags(alphabet,
       opt_case_insensitive,
@@ -705,6 +706,7 @@ void train_new_or_existing_model(void){
     opt_alphabet = new_string_from_codepoints(alphabet->points, alphabet->len, opt_utf8);
     opt_collapse_chars = new_string_from_codepoints(alphabet->collapsed_points,
         alphabet->collapsed_len, opt_utf8);
+    locally_allocated_alphabet = true;
   }
   else { /*use given or default alphabet */
     if (! opt_alphabet){
@@ -727,6 +729,10 @@ void train_new_or_existing_model(void){
     .collapse_space = opt_collapse_space
   };
   load_and_train_model(&m, alphabet);
+  if (locally_allocated_alphabet) {
+    free(opt_alphabet);
+    free(opt_collapse_chars);
+  }
 }
 
 
