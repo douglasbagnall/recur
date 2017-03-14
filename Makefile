@@ -41,20 +41,20 @@ ALL_CFLAGS = -march=native -pthread $(WARNINGS) -pipe  -D_GNU_SOURCE \
 ALL_LDFLAGS = $(LDFLAGS)
 
 
-GST_INCLUDES != pkg-config --cflags gstreamer-1.0
+GST_INCLUDES := $(shell pkg-config --cflags gstreamer-1.0)
 
-GTK_INCLUDES !=  pkg-config --cflags gtk+-3.0
+GTK_INCLUDES :=  $(shell pkg-config --cflags gtk+-3.0)
 
 INCLUDES = -I. $(GST_INCLUDES)
 
 COMMON_LINKS = -L/usr/local/lib  -lm -pthread -lrt \
 		 $(BLAS_LINK) -lcdb
 
-GST_LINKS != pkg-config --libs gstreamer-1.0
+GST_LINKS := $(shell pkg-config --libs gstreamer-1.0)
 
 LINKS = $(COMMON_LINKS) $(GST_LINKS)
 
-GTK_LINKS != pkg-config --libs gtk+-3.0
+GTK_LINKS := $(pkg-config --libs gtk+-3.0)
 
 OPT_OBJECTS = ccan/opt/opt.o ccan/opt/parse.o ccan/opt/helpers.o ccan/opt/usage.o
 
