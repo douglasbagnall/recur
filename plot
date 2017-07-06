@@ -89,7 +89,7 @@ def read_log(fn, names, step=1,
 
 def graph(lists):
     times = lists.pop('generation')
-    i = 0
+    i = 1
     ax = None
     for k, v in lists.items():
         if ax is None:
