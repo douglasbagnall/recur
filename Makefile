@@ -143,10 +143,16 @@ libcharmodel.so: charmodel-classify.o charmodel-predict.o charmodel-init.o $(RNN
 
 CHARMODEL_SRCS = py-recur-text.c *.h charmodel-predict.c charmodel-init.c \
 	charmodel-multi-predict.c recur-nn.c recur-nn-io.c recur-nn-init.c \
-	setup-charmodel.py
+	setup-charmodel.py  path.h
 
-charmodel.so: $(CHARMODEL_SRCS) path.h
+charmodel.so: $(CHARMODEL_SRCS)
 	python setup-charmodel.py build_ext --inplace
+
+RNNUMPY_SRCS = py-recur-numpy.c *.h recur-nn.c recur-nn-io.c recur-nn-init.c \
+	setup-rnnumpy.py py-recur-helpers.h path.h
+
+rnnumpy.so: $(RNNUMPY_SRCS)
+	python setup-rnnumpy.py build_ext --inplace
 
 test/test_mfcc_table: %:  mfcc.o rescale.o %.o
 	$(CC) -Wl,-O1 $^ $(INCLUDES) $(DEFINES) $(LINKS)   -o $@
