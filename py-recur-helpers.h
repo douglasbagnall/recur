@@ -43,49 +43,53 @@ set_net_filename(BaseNet *self, const char *filename, const char *basename,
     return 0;
 }
 
+/* Net_{get,set}float_{rnn,bptt}. These access float attributes that are
+   pointed to via an integer offset into the struct.
+
+   Without this we'd need separate access functions for each attribute.
+ */
+
 static UNUSED PyObject *
-Net_getfloat_rnn(BaseNet *self, int *closure)
+Net_getfloat_rnn(BaseNet *self, int *offset)
 {
-    void *addr = ((void *)self->net) + *closure;
+    void *addr = ((void *)self->net) + *offset;
     float f = *(float *)addr;
     return PyFloat_FromDouble((double)f);
 }
 
 static UNUSED int
-Net_setfloat_rnn(BaseNet *self, PyObject *value, int *closure)
+Net_setfloat_rnn(BaseNet *self, PyObject *value, int *offset)
 {
     PyObject *pyfloat = PyNumber_Float(value);
     if (pyfloat == NULL){
         return -1;
     }
-    void *addr = ((void *)self->net) + *(int*)closure;
+    void *addr = ((void *)self->net) + *offset;
     float f = PyFloat_AS_DOUBLE(pyfloat);
     *(float *)addr = f;
     return 0;
 }
 
 static UNUSED PyObject *
-Net_getfloat_bptt(BaseNet *self, void *closure)
+Net_getfloat_bptt(BaseNet *self, int *offset)
 {
-    void *addr = ((void *)self->net->bptt) + *(int*)closure;
+    void *addr = ((void *)self->net->bptt) + *offset;
     float f = *(float *)addr;
     return PyFloat_FromDouble((double)f);
 }
 
 static UNUSED int
-Net_setfloat_bptt(BaseNet *self, PyObject *value, void *closure)
+Net_setfloat_bptt(BaseNet *self, PyObject *value, int *offset)
 {
     PyObject *pyfloat = PyNumber_Float(value);
     if (pyfloat == NULL){
         return -1;
     }
-    void *addr = ((void *)self->net->bptt) + *(int*)closure;
+    void *addr = ((void *)self->net->bptt) + *offset;
     float f = PyFloat_AS_DOUBLE(pyfloat);
     *(float *)addr = f;
     return 0;
 }
-
-
 
 
 static int add_module_constants(PyObject* m)
