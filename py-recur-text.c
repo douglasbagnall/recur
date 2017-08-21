@@ -2,6 +2,7 @@
 
 Python bindings for text RNNs.
 */
+#include "py-recur-helpers.h"
 #include <Python.h>
 #include "charmodel.h"
 #include "utf8.h"
@@ -316,20 +317,15 @@ static PyTypeObject AlphabetType = {
 /*net object */
 
 typedef struct {
-    PyObject_HEAD
-    RecurNN *net;
+    BaseNet_HEAD
     Alphabet *alphabet;
     PyObject *class_names;
     PyObject *class_name_lut;
-    rnn_learning_method learning_method;
     RnnCharProgressReport *report;
-    float momentum;
-    int n_classes;
-    int batch_size;
     RnnCharImageSettings images;
     int periodic_pgm_period;
-    const char *filename;
     RnnCharMultiConfab *mc;
+    int n_classes;
 } Net;
 
 static void
@@ -402,29 +398,6 @@ set_net_classnames(Net *self, PyObject *class_names)
     self->class_name_lut = class_name_lut;
 
     return n_classes;
-}
-
-static int
-set_net_filename(Net *self, const char *filename, const char *basename,
-		 char *metadata)
-{
-    char s[1000];
-    RecurNN *net = self->net;
-    if (filename){
-        self->filename = strdup(filename);
-    }
-    else {
-        u32 sig = rnn_hash32(metadata);
-        int wrote = snprintf(s, sizeof(s), "%s-%0" PRIx32 "i%d-h%d-o%d.net",
-            basename, sig, net->input_size, net->hidden_size, net->output_size);
-        if (wrote >= sizeof(s)){
-	    PyErr_Format(PyExc_ValueError,
-			 "filename is trying to be too long!");
-            return -1;
-        }
-        self->filename = strdup(s);
-    }
-    return 0;
 }
 
 
@@ -592,7 +565,7 @@ Net_init(Net *self, PyObject *args, PyObject *kwds)
         basename = "multi-text";
     }
 
-    set_net_filename(self, filename, basename, metadata);
+    set_net_filename(RNNPY_BASE_NET(self), filename, basename, metadata);
 
     set_net_pgm_dump(self, basename, temporal_pgm_dump,
 		     periodic_pgm_dump, periodic_pgm_period);
@@ -617,47 +590,6 @@ Net_init(Net *self, PyObject *args, PyObject *kwds)
     return 0;
 }
 
-static PyObject *
-Net_getfloat_rnn(Net *self, int *closure)
-{
-    void *addr = ((void *)self->net) + *closure;
-    float f = *(float *)addr;
-    return PyFloat_FromDouble((double)f);
-}
-
-static int
-Net_setfloat_rnn(Net *self, PyObject *value, int *closure)
-{
-    PyObject *pyfloat = PyNumber_Float(value);
-    if (pyfloat == NULL){
-        return -1;
-    }
-    void *addr = ((void *)self->net) + *(int*)closure;
-    float f = PyFloat_AS_DOUBLE(pyfloat);
-    *(float *)addr = f;
-    return 0;
-}
-
-static PyObject *
-Net_getfloat_bptt(Net *self, void *closure)
-{
-    void *addr = ((void *)self->net->bptt) + *(int*)closure;
-    float f = *(float *)addr;
-    return PyFloat_FromDouble((double)f);
-}
-
-static int
-Net_setfloat_bptt(Net *self, PyObject *value, void *closure)
-{
-    PyObject *pyfloat = PyNumber_Float(value);
-    if (pyfloat == NULL){
-        return -1;
-    }
-    void *addr = ((void *)self->net->bptt) + *(int*)closure;
-    float f = PyFloat_AS_DOUBLE(pyfloat);
-    *(float *)addr = f;
-    return 0;
-}
 
 static const int rnn_offset_presynaptic_noise = offsetof(RecurNN, presynaptic_noise);
 
@@ -1217,29 +1149,7 @@ initcharmodel(void)
         return;
     }
 
-    int r = 0;
-
-#define ADD_INT_CONSTANT(x) (PyModule_AddIntConstant(m, QUOTE(x), (RNN_ ##x)))
-
-    r = r || ADD_INT_CONSTANT(MOMENTUM_WEIGHTED);
-    r = r || ADD_INT_CONSTANT(MOMENTUM_NESTEROV);
-    r = r || ADD_INT_CONSTANT(MOMENTUM_SIMPLIFIED_NESTEROV);
-    r = r || ADD_INT_CONSTANT(MOMENTUM_CLASSICAL);
-    r = r || ADD_INT_CONSTANT(ADAGRAD);
-    r = r || ADD_INT_CONSTANT(ADADELTA);
-    r = r || ADD_INT_CONSTANT(RPROP);
-
-    r = r || ADD_INT_CONSTANT(RELU);
-    r = r || ADD_INT_CONSTANT(RESQRT);
-    r = r || ADD_INT_CONSTANT(RECLIP20);
-
-    r = r || ADD_INT_CONSTANT(INIT_ZERO);
-    r = r || ADD_INT_CONSTANT(INIT_FLAT);
-    r = r || ADD_INT_CONSTANT(INIT_FAN_IN);
-    r = r || ADD_INT_CONSTANT(INIT_RUNS);
-
-#undef ADD_INT_CONSTANT
-
+    int r = add_module_constants(m);
     if (r < 0){
         DEBUG("can't add constants to module charmodel");
         return;
