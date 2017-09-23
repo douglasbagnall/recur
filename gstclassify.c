@@ -2107,7 +2107,7 @@ train_channel(GstClassify *self, ClassifyChannel *c, int *win_count,
     }
     else {
       /* No training for this channel. This is the same as the earlier case,
-         but we needed target to be in rage to work this out, and to increment
+         but we needed target to be in range to work this out, and to increment
          seen_counts. */
       for (int j = 0; j < n_classes; j++){
         group_error[j] = 0;
