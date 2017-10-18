@@ -116,6 +116,7 @@ Net_init(Net *self, PyObject *args, PyObject *kwds)
     int periodic_pgm_period = 1000;
     const char *basename = NULL;
     char *metadata = NULL;
+    float ballast = -1;
 
     /* other vars */
     RecurNN *net;
@@ -141,9 +142,10 @@ Net_init(Net *self, PyObject *args, PyObject *kwds)
                              "periodic_pgm_period",  /* i  */
                              "batch_size",           /* i  */
                              "init_method",          /* i  */
+                             "ballast",     /* f  */
                              NULL};
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "iii|zifzffKziiziiziii",
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "iii|zifzffKziiziiziiif",
 				     kwlist,
 				     &input_size,          /* i  */
 				     &hidden_size,         /* i  */
@@ -164,7 +166,8 @@ Net_init(Net *self, PyObject *args, PyObject *kwds)
 				     &periodic_pgm_dump,   /* z  */
 				     &periodic_pgm_period, /* i  */
 				     &batch_size,          /* i  */
-				     &init_method          /* i  */
+				     &init_method,         /* i  */
+                                     &ballast              /* f  */
         )){
         return -1;
     }
@@ -225,10 +228,16 @@ Net_init(Net *self, PyObject *args, PyObject *kwds)
 
     switch(learning_method){
     case RNN_ADAGRAD:
-        rnn_set_momentum_values(self->net, DEFAULT_ADAGRAD_BALLAST);
+        if (ballast <= 0) {
+            ballast = DEFAULT_ADAGRAD_BALLAST;
+        }
+        rnn_set_momentum_values(self->net, ballast);
         break;
     case RNN_ADADELTA:
-        rnn_set_momentum_values(self->net, DEFAULT_ADADELTA_BALLAST);
+        if (ballast <= 0) {
+            ballast = DEFAULT_ADADELTA_BALLAST;
+        }
+        rnn_set_momentum_values(self->net, ballast);
         break;
     case RNN_RPROP:
         rnn_set_aux_values(self->net, 1);
