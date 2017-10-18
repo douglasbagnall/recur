@@ -388,7 +388,7 @@ Net_train(Net *self, PyObject *args, PyObject *kwds)
     }
 
     for (epoch = 1; epoch <= n_epochs; epoch++) {
-        uint countdown = 100;
+        uint countdown = self->batch_size;
 	for (i = 0; i < shape[0]; i++) {
 	    rnn_bptt_advance(net);
 	    float *restrict irow = idata + i * net->input_size;
@@ -426,7 +426,7 @@ Net_train(Net *self, PyObject *args, PyObject *kwds)
 	    if (countdown == 0) {
 		rnn_apply_learning(net, self->learning_method, self->momentum);
 		rnn_bptt_calc_deltas(net, 0, NULL);
-                countdown = 100;
+                countdown = self->batch_size;
 	    } else {
 		rnn_bptt_calc_deltas(net, 1, NULL);
             }
