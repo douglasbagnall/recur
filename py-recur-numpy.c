@@ -321,20 +321,21 @@ Net_train(Net *self, PyObject *args, PyObject *kwds)
 
     static char *kwlist[] = {"features",             /* O  */
                              "targets",              /* O  */
-                             "hidden_size",          /* I  */
-                             "mask",                 /* i  */
+                             "n_epochs",             /* I  */
+                             "mask",                 /* O  */
                              "learn_rate",           /* f  */
                              "balance",              /* f  */
                              NULL};
 
     if (!PyArg_ParseTupleAndKeywords(args, kwds, "OOI|Off",
 				     kwlist,
-                                     &input_arg,
-                                     &target_arg,
-                                     &n_epochs,
+                                     &input_arg,           /* O  */
+                                     &target_arg,          /* O  */
+                                     &n_epochs,            /* I  */
+                                     &mask_arg,            /* O  */
                                      &learn_rate,          /* f  */
                                      &balance,             /* f  */
-                                     &mask_arg)) {
+                                     NULL)) {
         return NULL;
     }
 
