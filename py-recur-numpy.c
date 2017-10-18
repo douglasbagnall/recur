@@ -395,13 +395,13 @@ Net_train(Net *self, PyObject *args, PyObject *kwds)
 	    float *restrict trow = tdata + i * net->output_size;
 	    float *restrict answer = rnn_opinion(net, irow,
 						 net->presynaptic_noise);
-            if (mdata[i] == false) {
+            if (mdata && mdata[i] == false) {
                 continue;
             }
             if (balance != 0) {
                 uint target = 0;
                 for (j = 0; j < net->output_size; j++) {
-                    if (tdata[j] > tdata[target]) {
+                    if (trow[j] > trow[target]) {
                         target = j;
                     }
                 }
