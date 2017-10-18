@@ -18,6 +18,8 @@
 #define DEFAULT_ADAGRAD_BALLAST 100
 #define DEFAULT_ADADELTA_BALLAST 100
 
+#define BATCH_SIZE 80
+
 /*net object. see py-recur-helpers.h */
 typedef struct {
     BaseNet_HEAD
@@ -107,7 +109,7 @@ Net_init(Net *self, PyObject *args, PyObject *kwds)
     rnn_activation activation = RNN_RELU;
     int learning_method = RNN_ADAGRAD;
     int verbose = 0;
-    int batch_size = 100;
+    int batch_size = BATCH_SIZE;
     int init_method = RNN_INIT_FLAT;
     int temporal_pgm_dump = 0;
     char *periodic_pgm_dump = NULL;
