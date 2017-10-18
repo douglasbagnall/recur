@@ -14,8 +14,8 @@ from math import log
 
 
 DEFAULT_LOGFILE = "classify.log"
-DEFAULT_KEYS = ('error_sum', 'error', 'hidden_sum', 'depth',
-                'error_gain', 'correct',
+DEFAULT_KEYS = ('error_sum', 'error', 'depth',
+                'error_gain', 'correct', 'top_error_raw',
                 'weight_sum', 'hidden_zeros', 'hidden_magnitude'
                )
 
