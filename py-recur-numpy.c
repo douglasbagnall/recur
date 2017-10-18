@@ -387,6 +387,7 @@ Net_train(Net *self, PyObject *args, PyObject *kwds)
         bptt->learn_rate = learn_rate;
     }
 
+    DEBUG("balance is %f; learn-rate %f", balance, bptt->learn_rate);
     float rolling_accuracy = 0.5;
     for (epoch = 1; epoch <= n_epochs; epoch++) {
         uint countdown = self->batch_size;
@@ -416,17 +417,26 @@ Net_train(Net *self, PyObject *args, PyObject *kwds)
                     /* no training for this one. */
                     continue;
                 }
+                self->used_sum++;
+                rnn_log_float(net, "use_ratio",
+                              (float)self->used_sum / self->seen_sum);
             }
 
 	    softmax_best_guess(error, answer, net->output_size);
+            float error_t = 0;
             rolling_accuracy *= 255.0;
 	    for (j = 0; j < net->output_size; j++) {
 		error[j] += trow[j];
+                if (trow[j]) {
+                    error_t += error[j];
                     rolling_accuracy += fabsf(error[j]) < 0.5;
+                }
 	    }
             rolling_accuracy /= 256.0;
-            //rnn_bptt_calculate(net, 100);
+            rnn_log_float(net, "error_1", error[1]);
             rnn_log_float(net, "rolling_accuracy", rolling_accuracy);
+            rnn_log_float(net, "t1", trow[1]);
+            rnn_log_float(net, "error_t", error_t);
             countdown--;
 	    if (countdown == 0) {
 		rnn_apply_learning(net, self->learning_method, self->momentum);
