@@ -11,7 +11,7 @@ setup(
             libraries=['cdb'],
             sources=["py-recur-numpy.c", "recur-nn.c",
                      "recur-nn-io.c", "recur-nn-init.c"],
-            depends=["pgm_dump.h", "badmaths.h",
+            depends=["pgm_dump.h", "badmaths.h", "colour.h",
                      "path.h", #"py-recur-numpy.h",
                      "recur-common.h", "recur-nn.h"],
             include_dirs = [".", np.get_include()],

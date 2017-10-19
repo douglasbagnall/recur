@@ -14,6 +14,7 @@
 #include "badmaths.h"
 #include <fenv.h>
 #include <stdbool.h>
+#include "colour.h"
 
 #define DEFAULT_ADAGRAD_BALLAST 100
 #define DEFAULT_ADADELTA_BALLAST 100
@@ -455,12 +456,17 @@ Net_train(Net *self, PyObject *args, PyObject *kwds)
             }
         }
         if (epoch_count != 0) {
-	    DEBUG("epoch %3u trained on %5u; "
-		  "alleged accuracy %.2f alleged error %.2f",
+	    epoch_accuracy /= epoch_count;
+	    epoch_error /= epoch_count;
+	    DEBUG("epoch %3u trained on %5u; alleged"
+		  " accuracy %s%.2f" C_NORMAL
+		  " error %s%.2f" C_NORMAL,
 		  epoch,
 		  epoch_count,
-		  epoch_accuracy / epoch_count,
-		  epoch_error / epoch_count);
+		  colourise_float01(epoch_accuracy, true),
+		  epoch_accuracy,
+		  colourise_float01(1.0f - (epoch_error * epoch_error), false),
+		  epoch_error);
 	} else {
 		DEBUG("epoch %u trained on zero examples!", epoch);
 	}
