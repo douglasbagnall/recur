@@ -391,6 +391,9 @@ Net_train(Net *self, PyObject *args, PyObject *kwds)
     float rolling_accuracy = 0.5;
     for (epoch = 1; epoch <= n_epochs; epoch++) {
         uint countdown = self->batch_size;
+        float epoch_accuracy = 0;
+        float epoch_error = 0;
+        uint epoch_count = 0;
 	for (i = 0; i < shape[0]; i++) {
 	    rnn_bptt_advance(net);
 	    float *restrict irow = idata + i * net->input_size;
@@ -425,13 +428,18 @@ Net_train(Net *self, PyObject *args, PyObject *kwds)
 	    softmax_best_guess(error, answer, net->output_size);
             float error_t = 0;
             rolling_accuracy *= 255.0;
+            float accuracy = 0;
 	    for (j = 0; j < net->output_size; j++) {
 		error[j] += trow[j];
                 if (trow[j]) {
                     error_t += error[j];
-                    rolling_accuracy += fabsf(error[j]) < 0.5;
+                    accuracy += fabsf(error[j]) < 0.5;
                 }
 	    }
+            epoch_count++;
+            rolling_accuracy += accuracy;
+            epoch_accuracy += accuracy;
+            epoch_error += error_t;
             rolling_accuracy /= 256.0;
             rnn_log_float(net, "error_1", error[1]);
             rnn_log_float(net, "rolling_accuracy", rolling_accuracy);
@@ -445,6 +453,16 @@ Net_train(Net *self, PyObject *args, PyObject *kwds)
 	    } else {
 		rnn_bptt_calc_deltas(net, 1, NULL);
             }
+        }
+        if (epoch_count != 0) {
+	    DEBUG("epoch %3u trained on %5u; "
+		  "alleged accuracy %.2f alleged error %.2f",
+		  epoch,
+		  epoch_count,
+		  epoch_accuracy / epoch_count,
+		  epoch_error / epoch_count);
+	} else {
+		DEBUG("epoch %u trained on zero examples!", epoch);
 	}
         if (PyErr_CheckSignals() == -1) {
             /* this will allow a control-C to interrupt. */
