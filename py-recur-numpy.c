@@ -436,6 +436,11 @@ Net_train(Net *self, PyObject *args, PyObject *kwds)
 		rnn_bptt_calc_deltas(net, 1, NULL);
             }
 	}
+        if (PyErr_CheckSignals() == -1) {
+            /* this will allow a control-C to interrupt. */
+                DEBUG("interrupted");
+            break;
+        }
     }
 
     Py_DECREF(inputs);
