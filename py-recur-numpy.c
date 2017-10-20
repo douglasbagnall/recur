@@ -215,7 +215,7 @@ Net_init(Net *self, PyObject *args, PyObject *kwds)
     rnn_randomise_weights_simple(net, init_method);
 
     net->metadata = metadata;
-    if (basename != NULL){
+    if (basename != NULL || filename != NULL){
 	set_net_filename(RNNPY_BASE_NET(self), filename, basename, metadata);
     }
 
@@ -545,6 +545,35 @@ Net_classify(Net *self, PyObject *args)
 }
 
 
+static PyObject *
+Net_save(Net *self, PyObject *args, PyObject *kwds)
+{
+    RecurNN *net = self->net;
+    const char *filename = NULL;
+    int backup = 1;
+
+    static char *kwlist[] = {"filename",             /* z */
+                             "backup",               /* i */
+                             NULL};
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "|zi", kwlist,
+            &filename,
+            &backup
+        )){
+        return NULL;
+    }
+    if (filename == NULL){
+        filename = self->filename;
+    }
+    int r = rnn_save_net(net, filename, backup);
+    if (r){
+        return PyErr_Format(PyExc_IOError, "could not save to %s",
+            filename);
+    }
+    return Py_BuildValue("");
+}
+
+
 static const char Net_doc[] =                                           \
     "Numpy interface to Recur recurrent neural network\n\n"             \
     "Besides the ``Net()`` constructor, you can load a saved "          \
@@ -558,6 +587,8 @@ static PyMethodDef Net_methods[] = {
     {"classify", (PyCFunction)Net_classify,
      METH_VARARGS | METH_KEYWORDS,
      "generate answers for an input array"},
+    {"save", (PyCFunction)Net_save, METH_VARARGS | METH_KEYWORDS,
+     "Save the net"},
     {NULL}
 };
 
