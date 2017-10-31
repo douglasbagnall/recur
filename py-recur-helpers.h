@@ -20,6 +20,34 @@ typedef struct {
 
 #define RNNPY_BASE_NET(x) ((BaseNet *)(x))
 
+static PyObject *
+BaseNet_save(BaseNet *self, PyObject *args, PyObject *kwds)
+{
+    RecurNN *net = self->net;
+    const char *filename = NULL;
+    int backup = 1;
+
+    static char *kwlist[] = {"filename",             /* z */
+                             "backup",               /* i */
+                             NULL};
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "|zi", kwlist,
+            &filename,
+            &backup
+        )){
+        return NULL;
+    }
+    if (filename == NULL){
+        filename = self->filename;
+    }
+    int r = rnn_save_net(net, filename, backup);
+    if (r){
+        return PyErr_Format(PyExc_IOError, "could not save to %s",
+            filename);
+    }
+    return Py_BuildValue("");
+}
+
 static int
 set_net_filename(BaseNet *self, const char *filename, const char *basename,
 		 char *metadata)

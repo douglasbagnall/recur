@@ -548,29 +548,7 @@ Net_classify(Net *self, PyObject *args)
 static PyObject *
 Net_save(Net *self, PyObject *args, PyObject *kwds)
 {
-    RecurNN *net = self->net;
-    const char *filename = NULL;
-    int backup = 1;
-
-    static char *kwlist[] = {"filename",             /* z */
-                             "backup",               /* i */
-                             NULL};
-
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "|zi", kwlist,
-            &filename,
-            &backup
-        )){
-        return NULL;
-    }
-    if (filename == NULL){
-        filename = self->filename;
-    }
-    int r = rnn_save_net(net, filename, backup);
-    if (r){
-        return PyErr_Format(PyExc_IOError, "could not save to %s",
-            filename);
-    }
-    return Py_BuildValue("");
+	return BaseNet_save(RNNPY_BASE_NET(self), args, kwds);
 }
 
 
