@@ -1746,6 +1746,8 @@ gst_classify_set_property (GObject * object, guint prop_id, const GValue * value
       else {
         GST_WARNING("There is a net already. Let's not make a new one");
       }
+      break;
+
       /*this causes the net to be loaded immediately, if possible, so that
         various properties can be queried */
     case PROP_NET_FILENAME:
