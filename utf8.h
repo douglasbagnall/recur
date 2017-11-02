@@ -6,6 +6,9 @@ versa.
 Obviously it should have been easy to use a library, but I was interested in
 how it would work.
 */
+#ifndef HAVE_UTF8_H
+#define HAVE_UTF8_H
+
 #include "recur-common.h"
 #include <stdbool.h>
 
@@ -265,3 +268,5 @@ fill_codepoints_from_string(int *points, int len, const char *string, bool utf8)
   }
   return fill_codepoints_from_bytes(points, len, string);
 }
+
+#endif
