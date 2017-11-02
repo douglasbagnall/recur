@@ -1,3 +1,6 @@
+#ifndef HAVE_RESCALE_H
+#define HAVE_RESCALE_H
+
 #include "recur-common.h"
 
 struct _Image {
@@ -59,3 +62,5 @@ recur_integer_downscale_to_float(const u8 *im, float *dest, int stride,
     dest[i] /= (scale * scale * 256.0);
   }
 }
+
+#endif
