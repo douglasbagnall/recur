@@ -13,7 +13,7 @@ setup(
                      "recur-nn-io.c", "recur-nn-init.c"],
             depends=["charmodel.h", "pgm_dump.h", "badmaths.h",
                      "charmodel-helpers.h", "path.h", "py-recur-text.h",
-                     "recur-common.h", "recur-nn.h"],  # ..., etc.
+                     "recur-common.h", "recur-nn.h", "colour.h"],  # ..., etc.
             include_dirs = ["."],
             define_macros = [('_GNU_SOURCE', None),
                              ('VECTOR', None)],
