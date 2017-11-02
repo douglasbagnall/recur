@@ -9,7 +9,7 @@ setup(
             name="rnnumpy",
             library_dirs=['.'],
             libraries=['cdb'],
-            sources=["py-recur-numpy.c", "recur-nn.c",
+            sources=["py-recur-numpy.c", "recur-nn.c", "colour.c",
                      "recur-nn-io.c", "recur-nn-init.c"],
             depends=["pgm_dump.h", "badmaths.h", "colour.h",
                      "path.h", #"py-recur-numpy.h",
