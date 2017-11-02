@@ -5,6 +5,8 @@ This thinly wraps and extends ccan/opt/opt.h.
 All files that include this are licensed under the GNU General Public License,
 version 2 or greater, due to the ccan/opt link.
 */
+#ifndef HAVE_OPT_HELPERS_H
+#define HAVE_OPT_HELPERS_H
 
 #include "recur-nn.h"
 #include "recur-nn-helpers.h"
@@ -25,3 +27,5 @@ opt_set_floatval01(const char *arg, float *f){
   }
   return msg;
 }
+
+#endif
