@@ -1720,6 +1720,7 @@ gst_classify_set_property (GObject * object, guint prop_id, const GValue * value
          setup() (i.e. file load) */
     case PROP_RANDOM_ALIGNMENT:
       self->random_alignment = g_value_get_boolean(value);
+      break;
 
       /* XXX "training" should probably be changed at setup only. */
     case PROP_TRAINING:
