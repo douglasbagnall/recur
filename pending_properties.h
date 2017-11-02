@@ -1,4 +1,7 @@
 /* Copyright 2014 Douglas Bagnall <douglas@halo.gen.nz> LGPL */
+#ifndef HAVE_PENDING_PROPERTIES_H
+#define HAVE_PENDING_PROPERTIES_H
+
 #include "gstclassify.h"
 #include "recur-common.h"
 #include <string.h>
@@ -104,3 +107,5 @@ set_gvalue_float(GValue *v, const float f){
   RESET_OR_INIT_GV(v, G_TYPE_FLOAT);
   g_value_set_float(v, f);
 }
+
+#endif
