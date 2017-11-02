@@ -1,3 +1,6 @@
+#ifndef HAVE_AUDIO_COMMON_H
+#define HAVE_AUDIO_COMMON_H
+
 #include "recur-common.h"
 
 /* queue_audio_segment collects up the audio data in a circular buffer, but
@@ -39,3 +42,5 @@ queue_audio_segment(GstBuffer *buffer, s16 *const queue, const int queue_size,
       GST_BUFFER_PTS(buffer), GST_BUFFER_PTS(buffer) + GST_BUFFER_DURATION(buffer));
   gst_buffer_unmap(buffer, &map);
 }
+
+#endif
