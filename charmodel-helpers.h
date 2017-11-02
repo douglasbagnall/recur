@@ -1,3 +1,6 @@
+#ifndef HAVE_CHARMODEL_HELPERS_H
+#define HAVE_CHARMODEL_HELPERS_H
+
 #include "recur-nn.h"
 #include "recur-nn-helpers.h"
 #include <math.h>
@@ -29,3 +32,4 @@ one_hot_opinion(RecurNN *net, int hot, float presynaptic_noise){
   return rnn_opinion(net, NULL, presynaptic_noise);
 }
 
+#endif
