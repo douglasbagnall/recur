@@ -248,6 +248,7 @@ white-pelican_URL = $(IA_URL)/0812_White_Pelican_00_43_03_00/0812_White_Pelican_
 LA-colour_URL = $(IA_URL)/PET0981_R-2_LA_color/PET0981_R-2_LA_color.ogv
 filmcollectief-09-208_URL = $(IA_URL)/filmcollectief-09-208/filmcollectief-09-208.ogv
 filmcollectief-09-542_URL = $(IA_URL)/filmcollectief-09-542/filmcollectief-09-542.ogv
+RTV_Drenthe_20161016_1224_URL = $(IA_URL)/archiveteam_videobot_RTV_Drenthe_20161016_1224/RTV_Drenthe_20161016_1224.mp4
 
 camille_URL = $(NOAA_16_URL)/QC9452C3L331969.mov
 shrimp-tanks_URL = $(NOAA_16_URL)/QL444M33R631972pt1.mov
@@ -259,7 +260,7 @@ QC819O51958_URL = $(NOAA_16_URL)/QC819O51958.mov
 
 .PRECIOUS: test-video/%.ogv test-video/%.mov
 
-test-video/%.ogv test-video/%.mov: |test-video
+test-video/%.ogv test-video/%.mp4 test-video/%.mov: |test-video
 	wget "$($*_URL)" -O $@
 
 VID_W=288
@@ -271,6 +272,9 @@ test-video/%-$(VID_W)x$(VID_H)-$(VID_FPS)fps.avi: test-video/%.ogv
 
 test-video/%-$(VID_W)x$(VID_H)-$(VID_FPS)fps.avi: test-video/%.mov
 	scripts/reduce-video.sh $< $@ $(VID_FPS) $(VID_W) $(VID_H) 1
+
+test-video/%-$(VID_W)x$(VID_H)-$(VID_FPS)fps.avi: test-video/%.mp4
+	scripts/reduce-video.sh $< $@ $(VID_FPS) $(VID_W) $(VID_H)
 
 VID_SPECS = video/x-raw, format=I420, width=$(VID_W), height=$(VID_H), framerate=20/1
 
@@ -288,7 +292,8 @@ AUD_LINE=audioconvert ! audioresample
 VALGRIND = valgrind --tool=memcheck --log-file=valgrind.log --trace-children=yes\
 	--suppressions=valgrind-python.supp  --leak-check=full --show-reachable=yes
 
-DEFAULT_VIDEO = test-video/filmcollectief-09-542-288x192-20fps.avi
+DEFAULT_VIDEO = test-video/RTV_Drenthe_20161016_1224-288x192-20fps.avi
+#DEFAULT_VIDEO = test-video/filmcollectief-09-542-288x192-20fps.avi
 #DEFAULT_VIDEO = test-video/camille-288x192-20fps.avi
 VID_FILE_SRC_DEFAULT = uridecodebin name=src uri=file://$(CURDIR)/$(DEFAULT_VIDEO) \
 	! $(VID_LINE)
