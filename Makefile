@@ -54,7 +54,7 @@ GST_LINKS := $(shell pkg-config --libs gstreamer-1.0 gstreamer-fft-1.0 gstreamer
 
 LINKS = $(COMMON_LINKS) $(GST_LINKS)
 
-GTK_LINKS := $(pkg-config --libs gtk+-3.0)
+GTK_LINKS := $(shell pkg-config --libs gtk+-3.0)
 
 OPT_OBJECTS = ccan/opt/opt.o ccan/opt/parse.o ccan/opt/helpers.o ccan/opt/usage.o
 
