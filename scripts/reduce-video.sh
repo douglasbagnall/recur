@@ -8,9 +8,7 @@ HEIGHT=$5
 DEINT=$6
 
 if [[ -n "$DEINT" ]]; then
-    mencoder "$ORIG" -o "$DEST" -nosound -ovc lavc -lavcopts vcodec=mpeg4 \
-        -vf pp=fd,scale=$WIDTH:$HEIGHT -fps $FPS
-else
-    mencoder "$ORIG" -o "$DEST" -nosound -ovc lavc -lavcopts vcodec=mpeg4 \
-        -vf scale=$WIDTH:$HEIGHT -fps $FPS
+    VF="-vf mcdeint"
 fi
+# -an for silent
+ffmpeg -r 20  -i "$ORIG" $VF -vcodec mpeg4 -s "${WIDTH}x${HEIGHT}" $DEST
